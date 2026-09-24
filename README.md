@@ -1,4 +1,4 @@
-# Factory Control
+# ControlBot
 
 Centro de control web de la fábrica de software de pl0n3r. Una herramienta **separada** de los productos (Condor, GrindFlow, BRVTAL) y del kit (`pl0n3r/factory`).
 
@@ -13,7 +13,7 @@ Centro de control web de la fábrica de software de pl0n3r. Una herramienta **se
 - **Cuentas y perfiles:** agregar y administrar cada vez más cuentas de ChatGPT, cada una en su perfil de navegador.
 - **Bitácora:** todo auditado.
 
-Especificación completa: [#1](https://github.com/pl0n3r/factory-control/issues/1). Lado de la extensión: [pl0n3r/AutoFactory#1](https://github.com/pl0n3r/AutoFactory/issues/1).
+Especificación completa: [#1](https://github.com/pl0n3r/ControlBot/issues/1). Lado de la extensión: [pl0n3r/AutoFactory#1](https://github.com/pl0n3r/AutoFactory/issues/1).
 
 ## Despliegue
 

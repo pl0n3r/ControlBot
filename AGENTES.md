@@ -1,4 +1,4 @@
-# AGENTES.md: factory-control
+# AGENTES.md: ControlBot
 
 > **Antes de trabajar, lee y aplica [PLAN-AGENTES.md](https://github.com/pl0n3r/factory/blob/main/PLAN-AGENTES.md)** (protocolo común de la fábrica: prioridades, límites, formatos, roles y decisiones del dueño). Si contradice este archivo, gana el plan.
 

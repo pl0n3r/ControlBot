@@ -12,12 +12,50 @@ use ControlBot\Approvals\OwnerContext;
 final class FakeGitHub implements GitHubGateway
 {
     public array $calls = [];
+    public ?string $failAction = null;
+
     public function __construct(public string $sha) {}
-    public function mainSha(string $repository): string { $this->calls[] = ['mainSha', $repository]; return $this->sha; }
-    public function commentIssue(string $repository, int $issue, string $body): string { $this->calls[] = ['commentIssue', $repository, $issue, $body]; return "https://github.test/issue/$issue#comment"; }
-    public function closeIssue(string $repository, int $issue): string { $this->calls[] = ['closeIssue', $repository, $issue]; return "https://github.test/issue/$issue"; }
-    public function moveTag(string $repository, string $tag, string $sha): string { $this->calls[] = ['moveTag', $repository, $tag, $sha]; return "https://github.test/tag/$tag"; }
-    public function dispatchWorkflow(string $repository, string $workflow, array $inputs): string { $this->calls[] = ['dispatchWorkflow', $repository, $workflow, $inputs]; return "https://github.test/run/1"; }
+
+    private function maybeFail(string $action): void
+    {
+        if ($this->failAction === $action) {
+            throw new RuntimeException("fallo simulado: {$action}");
+        }
+    }
+
+    public function mainSha(string $repository): string
+    {
+        $this->calls[] = ['mainSha', $repository];
+        return $this->sha;
+    }
+
+    public function commentIssue(string $repository, int $issue, string $body): string
+    {
+        $this->calls[] = ['commentIssue', $repository, $issue, $body];
+        $this->maybeFail('commentIssue');
+        return "https://github.test/issue/$issue#comment";
+    }
+
+    public function closeIssue(string $repository, int $issue): string
+    {
+        $this->calls[] = ['closeIssue', $repository, $issue];
+        $this->maybeFail('closeIssue');
+        return "https://github.test/issue/$issue";
+    }
+
+    public function moveTag(string $repository, string $tag, string $sha): string
+    {
+        $this->calls[] = ['moveTag', $repository, $tag, $sha];
+        $this->maybeFail('moveTag');
+        return "https://github.test/tag/$tag";
+    }
+
+    public function dispatchWorkflow(string $repository, string $workflow, array $inputs): string
+    {
+        $this->calls[] = ['dispatchWorkflow', $repository, $workflow, $inputs];
+        $this->maybeFail('dispatchWorkflow');
+        return "https://github.test/run/1";
+    }
 }
 
 function gate(string $category): HumanGate {
@@ -43,7 +81,10 @@ $out = [];
 try {
     if ($scenario === 'release') {
         $result = $service->approve(gate('factory-release'), 'A', 'pl0n3r/factory', 114, $shaA, new OwnerContext('pl0n3r', true, $now - 10), $now);
-        $out = ['result' => $result, 'calls' => array_column($github->calls, 0)];
+        $out = ['result' => $result, 'calls' => $github->calls];
+    } elseif ($scenario === 'initial-release') {
+        $result = $service->approve(gate('release-1.0.0'), 'A', 'pl0n3r/factory', 95, $shaA, new OwnerContext('pl0n3r', true, $now - 10), $now);
+        $out = ['result' => $result, 'calls' => $github->calls];
     } elseif ($scenario === 'stale') {
         $github->sha = $shaB;
         try { $service->approve(gate('factory-release'), 'A', 'pl0n3r/factory', 114, $shaA, new OwnerContext('pl0n3r', true, $now - 10), $now); }
@@ -60,6 +101,24 @@ try {
     } elseif ($scenario === 'invalid') {
         try { HumanGate::fromIssueBody('<!-- factory-human-gate {"category":"unknown"} -->'); }
         catch (Throwable $e) { $out = ['error' => $e->getMessage()]; }
+    } elseif ($scenario === 'invalid-types') {
+        $payload = [
+            'category' => 'legal',
+            'context' => 'Contexto',
+            'options' => [['id' => 'A', 'label' => ['no']], ['id' => 'B', 'label' => 'No']],
+            'recommendation' => true,
+            'safe_default' => 'B',
+        ];
+        try { HumanGate::fromIssueBody('<!-- factory-human-gate ' . json_encode($payload, JSON_THROW_ON_ERROR) . ' -->'); }
+        catch (Throwable $e) { $out = ['error' => $e->getMessage()]; }
+    } elseif ($scenario === 'failed-step') {
+        $github->failAction = 'moveTag';
+        try {
+            $service->approve(gate('factory-release'), 'A', 'pl0n3r/factory', 114, $shaA, new OwnerContext('pl0n3r', true, $now - 5), $now);
+        } catch (Throwable $e) {
+            $audit = array_values(array_filter(file($path, FILE_IGNORE_NEW_LINES) ?: []));
+            $out = ['error' => $e->getMessage(), 'audit' => array_map(static fn (string $line): array => json_decode($line, true, 512, JSON_THROW_ON_ERROR), $audit)];
+        }
     } else {
         throw new RuntimeException('scenario inválido');
     }

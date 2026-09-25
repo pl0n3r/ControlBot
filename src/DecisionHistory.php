@@ -135,7 +135,10 @@ final class DecisionHistory
                 is_array($parts)
                 && ($parts['scheme'] ?? null) === 'https'
                 && ($parts['host'] ?? null) === 'github.com'
-                && !isset($parts['user'], $parts['pass'], $parts['query'], $parts['fragment'])
+                && !isset($parts['user'])
+                && !isset($parts['pass'])
+                && !isset($parts['query'])
+                && !isset($parts['fragment'])
                 && is_string($parts['path'] ?? null)
                 && str_starts_with($parts['path'], '/')
             ) {

@@ -89,15 +89,15 @@ class LabelsWorkflowTests(unittest.TestCase):
 
     def test_sync_depends_on_cleanup_and_keeps_factory_reusable(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        cleanup_at = workflow.index("  limpiar-etiqueta-legacy:")
+        cleanup_at = workflow.index("  limpiar_etiqueta_legacy:")
         sync_at = workflow.index("  sync:")
         validate_at = workflow.index("  validar-issue:")
         cleanup = workflow[cleanup_at:sync_at]
         sync = workflow[sync_at:validate_at]
 
         self.assertIn("run: bash scripts/cleanup-legacy-label.sh", cleanup)
-        self.assertIn("needs: limpiar-etiqueta-legacy", sync)
-        self.assertIn("needs.limpiar-etiqueta-legacy.result == 'success'", sync)
+        self.assertIn("needs: limpiar_etiqueta_legacy", sync)
+        self.assertIn("needs.limpiar_etiqueta_legacy.result == 'success'", sync)
         self.assertIn("uses: pl0n3r/factory/.github/workflows/etiquetas.yml@v1", sync)
 
     def test_cleanup_job_has_minimum_permissions(self):

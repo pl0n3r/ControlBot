@@ -1,13 +1,23 @@
 import os
+import re
 import subprocess
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "etiquetas.yml"
 SCRIPT = ROOT / "scripts" / "cleanup-legacy-label.sh"
+
+ALIASES = {
+    "prioridad: normal": "prioridad: media",
+    "calidad": "tipo: calidad",
+    "seguridad": "tipo: seguridad",
+    "deuda técnica": "tipo: deuda técnica",
+    "accesibilidad": "tipo: accesibilidad",
+}
 
 
 class LabelsWorkflowTests(unittest.TestCase):
@@ -18,35 +28,52 @@ class LabelsWorkflowTests(unittest.TestCase):
             stub = tmp_path / "gh"
             stub.write_text(
                 textwrap.dedent(
-                    """                    #!/usr/bin/env bash
-                    set -euo pipefail
-                    printf '%s\n' "$*" >> "$GH_STUB_LOG"
-                    args="$*"
+                    """                    #!/usr/bin/env python3
+                    import json
+                    import os
+                    import sys
+                    from urllib.parse import quote
 
-                    if [[ "$args" == *"/issues?state=all&labels="* ]]; then
-                      if [[ "$GH_STUB_SCENARIO" == "used" ]]; then
-                        printf '%s\n' '[[{"number":1}]]'
-                      else
-                        printf '%s\n' '[[]]'
-                      fi
-                      exit 0
-                    fi
+                    aliases = {
+                        "prioridad: normal": "prioridad: media",
+                        "calidad": "tipo: calidad",
+                        "seguridad": "tipo: seguridad",
+                        "deuda técnica": "tipo: deuda técnica",
+                        "accesibilidad": "tipo: accesibilidad",
+                    }
+                    args = sys.argv[1:]
+                    rendered = " ".join(args)
+                    with open(os.environ["GH_STUB_LOG"], "a", encoding="utf-8") as handle:
+                        handle.write(rendered + "\n")
 
-                    if [[ "$args" == *"--method DELETE"* ]]; then
-                      exit 0
-                    fi
+                    scenario = os.environ["GH_STUB_SCENARIO"]
+                    url = args[-1] if args else ""
 
-                    if [[ "$args" == *"/labels/"* ]]; then
-                      if [[ "$GH_STUB_SCENARIO" == "absent" ]]; then
-                        echo "gh: Not Found (HTTP 404)" >&2
-                        exit 1
-                      fi
-                      printf '%s\n' '{}'
-                      exit 0
-                    fi
+                    if "/issues?state=all&labels=" in url:
+                        if scenario == "used":
+                            print(json.dumps([[{"number": 1}]]))
+                        else:
+                            print(json.dumps([[]]))
+                        raise SystemExit(0)
 
-                    echo "unexpected gh invocation: $args" >&2
-                    exit 9
+                    if "--method" in args and "DELETE" in args:
+                        raise SystemExit(0)
+
+                    if "/labels/" in url:
+                        label = url.rsplit("/labels/", 1)[1]
+                        legacy = {quote(name, safe="") for name in aliases}
+                        canonical = {quote(name, safe="") for name in aliases.values()}
+                        if scenario == "aliases-absent" and label in legacy:
+                            print("gh: Not Found (HTTP 404)", file=sys.stderr)
+                            raise SystemExit(1)
+                        if scenario == "targets-missing" and label in canonical:
+                            print("gh: Not Found (HTTP 404)", file=sys.stderr)
+                            raise SystemExit(1)
+                        print("{}")
+                        raise SystemExit(0)
+
+                    print("unexpected gh invocation: " + rendered, file=sys.stderr)
+                    raise SystemExit(9)
                     """
                 ),
                 encoding="utf-8",
@@ -71,21 +98,53 @@ class LabelsWorkflowTests(unittest.TestCase):
             calls = log.read_text(encoding="utf-8") if log.exists() else ""
             return result, calls
 
-    def test_legacy_cleanup_fails_closed_when_label_is_used(self):
+    def test_cleanup_covers_exact_factory_legacy_aliases(self):
+        script = SCRIPT.read_text(encoding="utf-8")
+        match = re.search(r"^ALIASES=\$'(.*?)'$", script, re.MULTILINE)
+        self.assertIsNotNone(match)
+        decoded = bytes(match.group(1), "utf-8").decode("unicode_escape")
+        pairs = dict(line.split("\t", 1) for line in decoded.splitlines())
+        self.assertEqual(pairs, ALIASES)
+
+    def test_cleanup_fails_closed_when_legacy_alias_is_used(self):
         result, calls = self.run_cleanup("used")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("todavía tiene 1 uso(s)", result.stderr)
         self.assertNotIn("--method DELETE", calls)
 
-    def test_legacy_cleanup_is_idempotent_and_bounded(self):
-        absent, absent_calls = self.run_cleanup("absent")
-        self.assertEqual(absent.returncode, 0, absent.stderr)
-        self.assertNotIn("--method DELETE", absent_calls)
+    def test_cleanup_deletes_only_unused_alias_when_target_exists(self):
+        result, calls = self.run_cleanup("unused")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls.count("--method DELETE"), len(ALIASES))
+        for legacy in ALIASES:
+            encoded = quote(legacy, safe="")
+            self.assertIn(
+                f"issues?state=all&labels={encoded}&per_page=100",
+                calls,
+            )
+            self.assertIn(
+                f"--method DELETE repos/pl0n3r/ControlBot/labels/{encoded}",
+                calls,
+            )
+        for canonical in ALIASES.values():
+            encoded = quote(canonical, safe="")
+            self.assertNotIn(
+                f"--method DELETE repos/pl0n3r/ControlBot/labels/{encoded}",
+                calls,
+            )
 
-        unused, unused_calls = self.run_cleanup("unused")
-        self.assertEqual(unused.returncode, 0, unused.stderr)
-        self.assertIn("issues?state=all&labels=prioridad%3A%20normal&per_page=100", unused_calls)
-        self.assertEqual(unused_calls.count("--method DELETE"), 1)
+    def test_cleanup_preserves_alias_when_target_is_missing(self):
+        result, calls = self.run_cleanup("targets-missing")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("--method DELETE", calls)
+        self.assertNotIn("/issues?state=all&labels=", calls)
+        self.assertIn("se conserva", result.stdout)
+
+    def test_cleanup_is_idempotent_when_aliases_are_absent(self):
+        result, calls = self.run_cleanup("aliases-absent")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("--method DELETE", calls)
+        self.assertNotIn("/issues?state=all&labels=", calls)
 
     def test_sync_depends_on_cleanup_and_keeps_factory_reusable(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -111,7 +170,10 @@ class LabelsWorkflowTests(unittest.TestCase):
         self.assertIn("permissions:\n      contents: read\n      issues: write\n", cleanup)
         self.assertNotIn("pull-requests: write", cleanup)
         self.assertIn("persist-credentials: false", cleanup)
-        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", cleanup)
+        self.assertIn(
+            "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            cleanup,
+        )
 
 
 if __name__ == "__main__":

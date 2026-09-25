@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace ControlBot\Decisions;
 
+use ControlBot\Ui\UiTheme;
 use InvalidArgumentException;
 
 final class DecisionUi
@@ -257,21 +258,7 @@ final class DecisionUi
 
     private static function styles(): string
     {
-        return <<<'CSS'
-:root {
-  color-scheme: dark;
-  --bg: #0a0e13;
-  --panel: #10161d;
-  --panel-raised: #141b23;
-  --line: #283440;
-  --line-strong: #3b4b58;
-  --cyan: #7cc9dd;
-  --green: #6fcf9e;
-  --amber: #e3a857;
-  --red: #e0666f;
-  --muted: #95a2ad;
-  --text: #edf2f5;
-}
+        return UiTheme::tokensCss() . <<<'CSS'
 * { box-sizing: border-box; }
 html { background: var(--bg); }
 body {

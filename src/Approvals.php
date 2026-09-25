@@ -31,6 +31,10 @@ final class HumanGate
         }
 
         $raw = json_decode($match[1], true, 32, JSON_THROW_ON_ERROR);
+        if (!is_array($raw)) {
+            throw new InvalidArgumentException('Puerta humana inválida.');
+        }
+
         $required = ['category', 'context', 'options', 'recommendation', 'safe_default'];
         $keys = array_keys($raw);
         sort($keys);
@@ -53,23 +57,27 @@ final class HumanGate
             }
             $optionKeys = array_keys($option);
             sort($optionKeys);
-            if ($optionKeys !== ['id', 'label']) {
+            if ($optionKeys !== ['id', 'label'] || !is_string($option['id']) || !is_string($option['label'])) {
                 throw new InvalidArgumentException('Opción inválida.');
             }
-            $id = (string) $option['id'];
-            $label = trim((string) $option['label']);
+            $id = $option['id'];
+            $label = trim($option['label']);
             if (preg_match('/^[A-D]$/', $id) !== 1 || isset($options[$id]) || $label === '' || strlen($label) > 240 || str_contains($label, "\n")) {
                 throw new InvalidArgumentException('Opción inválida.');
             }
             $options[$id] = $label;
         }
-        $recommendation = (string) $raw['recommendation'];
-        $safeDefault = (string) $raw['safe_default'];
+
+        if (!is_string($raw['recommendation']) || !is_string($raw['safe_default'])) {
+            throw new InvalidArgumentException('Recomendación/default inválidos.');
+        }
+        $recommendation = $raw['recommendation'];
+        $safeDefault = $raw['safe_default'];
         if (!isset($options[$recommendation], $options[$safeDefault])) {
             throw new InvalidArgumentException('Recomendación/default no apuntan a una opción.');
         }
 
-        return new self((string) $raw['category'], trim($raw['context']), $options, $recommendation, $safeDefault);
+        return new self($raw['category'], trim($raw['context']), $options, $recommendation, $safeDefault);
     }
 
     public function option(string $id): string
@@ -143,7 +151,7 @@ final class OwnerApprovalService
         $owner->assertFresh($now);
         $label = $gate->option($optionId);
         $sha = null;
-        $release = in_array($gate->category, ['factory-release', 'release-1.0.0'], true) && $optionId === 'A';
+        $release = $gate->category === 'factory-release' && $optionId === 'A';
 
         if ($gate->category === 'go-live') {
             throw new RuntimeException('Go-live requiere verificación explícita de prerequisitos legales y de datos.');
@@ -166,25 +174,78 @@ final class OwnerApprovalService
             $comment .= "\n\n<!-- factory-release-approval {\"sha\":\"{$sha}\"} -->";
         }
 
-        $commentUrl = $this->github->commentIssue($repository, $issue, $comment);
-        $this->log($owner, 'comment', $repository, $issue, $optionId, $sha, 'success', $commentUrl, $now);
+        $commentUrl = $this->step(
+            $owner,
+            'comment',
+            $repository,
+            $issue,
+            $optionId,
+            $sha,
+            $now,
+            fn (): string => $this->github->commentIssue($repository, $issue, $comment),
+        );
 
-        $closeUrl = $this->github->closeIssue($repository, $issue);
-        $this->log($owner, 'close-issue', $repository, $issue, $optionId, $sha, 'success', $closeUrl, $now);
+        $closeUrl = $this->step(
+            $owner,
+            'close-issue',
+            $repository,
+            $issue,
+            $optionId,
+            $sha,
+            $now,
+            fn (): string => $this->github->closeIssue($repository, $issue),
+        );
 
         $evidence = ['comment' => $commentUrl, 'issue' => $closeUrl];
         if ($release) {
-            $tagUrl = $this->github->moveTag($repository, 'v1', $sha);
-            $this->log($owner, 'move-v1', $repository, $issue, $optionId, $sha, 'success', $tagUrl, $now);
-            $runUrl = $this->github->dispatchWorkflow($repository, 'release-bootstrap.yml', [
-                'expected_sha' => $sha,
-                'gate_issue' => (string) $issue,
-            ]);
-            $this->log($owner, 'dispatch-release', $repository, $issue, $optionId, $sha, 'success', $runUrl, $now);
+            $tagUrl = $this->step(
+                $owner,
+                'move-v1',
+                $repository,
+                $issue,
+                $optionId,
+                $sha,
+                $now,
+                fn (): string => $this->github->moveTag($repository, 'v1', $sha),
+            );
+            $runUrl = $this->step(
+                $owner,
+                'dispatch-release',
+                $repository,
+                $issue,
+                $optionId,
+                $sha,
+                $now,
+                fn (): string => $this->github->dispatchWorkflow($repository, 'release-bootstrap.yml', [
+                    'expected_sha' => $sha,
+                    'gate_issue' => (string) $issue,
+                ]),
+            );
             $evidence += ['tag' => $tagUrl, 'run' => $runUrl];
         }
 
         return ['category' => $gate->category, 'option' => $optionId, 'sha' => $sha, 'evidence' => $evidence];
+    }
+
+    private function step(
+        OwnerContext $owner,
+        string $action,
+        string $repository,
+        int $issue,
+        string $option,
+        ?string $sha,
+        int $at,
+        callable $call,
+    ): string {
+        try {
+            $evidence = $call();
+        } catch (\Throwable $error) {
+            $this->log($owner, $action, $repository, $issue, $option, $sha, 'failed', null, $at);
+            throw $error;
+        }
+
+        $this->log($owner, $action, $repository, $issue, $option, $sha, 'success', $evidence, $at);
+        return $evidence;
     }
 
     private function log(

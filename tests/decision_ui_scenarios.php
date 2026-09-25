@@ -28,6 +28,18 @@ if ($scenario === 'empty') {
     echo DecisionUi::render($decision, true, $csrf);
 } elseif ($scenario === 'no-csrf') {
     echo DecisionUi::render($decision, true);
+} elseif ($scenario === 'batch') {
+    $decision[0]['category'] = 'brand';
+    $decision[0]['title_simple'] = '¿Aplicar cambio seguro?';
+    $decision[0]['options'][0]['risk'] = 'low';
+    echo DecisionUi::render($decision, true, $csrf, [[
+        'repository' => 'pl0n3r/factory',
+        'issue' => 114,
+        'category' => 'brand',
+        'option' => 'A',
+        'displayed_sha' => '',
+        'title' => '¿Aplicar cambio seguro?',
+    ]]);
 } elseif ($scenario === 'enriched' || $scenario === 'enriched-escape' || $scenario === 'invalid-risk' || $scenario === 'default-id' || $scenario === 'zero-copy') {
     $decision[0]['title_simple'] = '¿Publicar la versión 1.0.4?';
     $decision[0]['summary_simple'] = 'El kit espera tu decisión. La versión actual sigue disponible.';

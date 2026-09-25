@@ -102,6 +102,7 @@ final class GateInbox
             'issue' => $issue['number'],
             'title' => $issue['title'],
             'context' => $gate->context,
+            'category' => $gate->category,
             'options' => self::options($payload['options']),
             'recommendation' => $gate->recommendation,
             'safe_default' => $gate->safeDefault,

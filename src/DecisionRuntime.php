@@ -84,6 +84,9 @@ final class DecisionRuntime
         if ($method === 'POST' && $path === '/approvals/execute') {
             return self::jsonResponse(200, $this->approve($session, $request, $now));
         }
+        if ($method === 'POST' && $path === '/approvals/batch') {
+            return self::jsonResponse(200, $this->approveBatch($session, $request, $now));
+        }
         if ($method === 'GET' && $path === '/release/status') {
             return self::jsonResponse(200, $this->safeReleaseStatus($session));
         }
@@ -92,8 +95,7 @@ final class DecisionRuntime
 
     private function render(array $session, int $now): string
     {
-        $components = $this->components($this->sessions->githubToken($session));
-        $inbox = new GateInbox($components['api'], $components['gateway']);
+        $decisions = $this->loadDecisions($session);
         $csrf = $this->sessions->csrfToken($session);
         $reauthenticated = false;
         try {
@@ -102,7 +104,44 @@ final class DecisionRuntime
         } catch (RuntimeException) {
             $reauthenticated = false;
         }
-        return DecisionUi::render($inbox->load($this->repositories), $reauthenticated, $csrf);
+        return DecisionUi::render(
+            $decisions,
+            $reauthenticated,
+            $csrf,
+            DecisionBatch::eligible($decisions),
+        );
+    }
+
+    private function loadDecisions(array $session): array
+    {
+        $components = $this->components($this->sessions->githubToken($session));
+        return (new GateInbox($components['api'], $components['gateway']))->load($this->repositories);
+    }
+
+    private function approveBatch(array &$session, array $request, int $now): array
+    {
+        if (
+            array_diff(array_keys($request), ['_csrf']) !== []
+            || !is_string($request['_csrf'] ?? null)
+        ) {
+            throw new InvalidArgumentException('Solicitud de lote inválida.');
+        }
+
+        $this->sessions->contextFromRequest($session, ['_csrf' => $request['_csrf']], $now);
+        $decisions = $this->loadDecisions($session);
+
+        return DecisionBatch::execute(
+            $decisions,
+            function (array $entry) use (&$session, $request, $now): array {
+                return $this->approve($session, [
+                    '_csrf' => $request['_csrf'],
+                    'repository' => $entry['repository'],
+                    'issue' => (string) $entry['issue'],
+                    'option' => $entry['option'],
+                    'displayed_sha' => $entry['displayed_sha'],
+                ], $now);
+            },
+        );
     }
 
     private function approve(array &$session, array $request, int $now): array

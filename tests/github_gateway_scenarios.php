@@ -50,6 +50,9 @@ if ($scenario === 'destination') {
         'http://api.github.com/repos/pl0n3r/factory',
         'https://evil.example/repos/pl0n3r/factory',
         'https://api.github.com/organizations/pl0n3r',
+        'https://user@api.github.com/repos/pl0n3r/factory',
+        'https://api.github.com/repos/pl0n3r/factory#fragment',
+        'https://api.github.com/repos/pl0n3r/factory?per_page=1',
     ] as $url) {
         try {
             $transport->request('GET', $url, [], null);

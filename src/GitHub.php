@@ -26,7 +26,10 @@ final class ApiTransport
             !is_array($parts)
             || ($parts['scheme'] ?? '') !== 'https'
             || ($parts['host'] ?? '') !== 'api.github.com'
-            || isset($parts['user'], $parts['pass'], $parts['fragment'])
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['fragment'])
+            || isset($parts['query'])
             || !is_string($parts['path'] ?? null)
             || !str_starts_with($parts['path'], '/repos/')
         ) {

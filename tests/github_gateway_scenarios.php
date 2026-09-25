@@ -16,6 +16,9 @@ $sender = static function (string $method, string $url, array $headers, ?string 
     if (str_ends_with($path, '/branches/main')) {
         return ['status' => 200, 'body' => json_encode(['commit' => ['sha' => str_repeat('a', 40)]])];
     }
+    if (str_ends_with($path, '/issues')) {
+        return ['status' => 200, 'body' => '[]'];
+    }
     if (str_ends_with($path, '/comments')) {
         return ['status' => 201, 'body' => json_encode(['html_url' => 'https://github.com/pl0n3r/factory/issues/137#comment'])];
     }
@@ -40,6 +43,18 @@ if ($scenario === 'exact') {
     $gateway->closeIssue('pl0n3r/factory', 137);
     $gateway->moveTag('pl0n3r/factory', 'v1', str_repeat('a', 40));
     $gateway->dispatchWorkflow('pl0n3r/factory', 'release-bootstrap.yml', ['expected_sha' => str_repeat('a', 40), 'gate_issue' => '137']);
+    echo json_encode(['calls' => $calls], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
+    exit;
+}
+
+if ($scenario === 'query') {
+    $api->json(
+        'GET',
+        '/repos/pl0n3r/factory/issues',
+        null,
+        [200],
+        ['state' => 'open', 'per_page' => 100, 'page' => 2],
+    );
     echo json_encode(['calls' => $calls], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
     exit;
 }

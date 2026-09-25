@@ -19,7 +19,7 @@ final class ApiTransport
 
     public function __construct(private readonly ?\Closure $sender = null) {}
 
-    public function request(string $method, string $url, array $headers, ?string $body): array
+    public function request(string $method, string $url, array $headers, ?string $body, array $query = []): array
     {
         $parts = parse_url($url);
         if (
@@ -35,6 +35,8 @@ final class ApiTransport
         ) {
             throw new RuntimeException('Destino GitHub no permitido.');
         }
+
+        $url = self::withQuery($url, $query);
 
         if ($this->sender !== null) {
             $result = ($this->sender)($method, $url, $headers, $body);
@@ -80,6 +82,34 @@ final class ApiTransport
         }
         return self::ORIGIN . $path;
     }
+
+    private static function withQuery(string $url, array $query): string
+    {
+        if (count($query) > 20) {
+            throw new InvalidArgumentException('Query GitHub demasiado grande.');
+        }
+
+        $normalized = [];
+        foreach ($query as $key => $value) {
+            if (
+                !is_string($key)
+                || preg_match('/^[a-z][a-z0-9_]{0,39}$/', $key) !== 1
+                || (!is_string($value) && !is_int($value))
+            ) {
+                throw new InvalidArgumentException('Parámetro GitHub inválido.');
+            }
+            $text = (string) $value;
+            if (strlen($text) > 200 || preg_match('/[\\r\\n]/', $text) === 1) {
+                throw new InvalidArgumentException('Valor GitHub inválido.');
+            }
+            $normalized[$key] = $text;
+        }
+
+        if ($normalized === []) {
+            return $url;
+        }
+        return $url . '?' . http_build_query($normalized, '', '&', PHP_QUERY_RFC3986);
+    }
 }
 
 final class ApiClient
@@ -93,7 +123,7 @@ final class ApiClient
         }
     }
 
-    public function json(string $method, string $path, ?array $payload, array $expected): array
+    public function json(string $method, string $path, ?array $payload, array $expected, array $query = []): array
     {
         $url = ApiTransport::url($path);
         $body = $payload === null ? null : json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
@@ -106,7 +136,7 @@ final class ApiClient
         if ($body !== null) {
             $headers[] = 'Content-Type: application/json';
         }
-        $response = $this->transport->request($method, $url, $headers, $body);
+        $response = $this->transport->request($method, $url, $headers, $body, $query);
         $status = (int) $response['status'];
         if (!in_array($status, $expected, true)) {
             throw new RuntimeException("GitHub API rechazó la operación (HTTP {$status}).");

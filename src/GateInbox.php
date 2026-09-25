@@ -7,10 +7,13 @@ use ControlBot\Approvals\HumanGate;
 use ControlBot\GitHub\ApiClient;
 use ControlBot\GitHub\Gateway;
 use InvalidArgumentException;
+use RuntimeException;
 
 final class GateInbox
 {
     private const TRUSTED = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+    private const PAGE_SIZE = 100;
+    private const MAX_PAGES = 10;
 
     public function __construct(
         private readonly ApiClient $api,
@@ -25,7 +28,7 @@ final class GateInbox
                 throw new InvalidArgumentException('Repositorio de inbox inválido.');
             }
             $repoPath = Gateway::repoPath($repository);
-            $issues = $this->api->json('GET', $repoPath . '/issues', null, [200]);
+            $issues = $this->issues($repoPath);
 
             foreach ($issues as $issue) {
                 $decision = $this->fromIssue($repository, $issue);
@@ -46,6 +49,30 @@ final class GateInbox
             unset($decision['_created_at']);
             return $decision;
         }, $decisions);
+    }
+
+    private function issues(string $repoPath): array
+    {
+        $issues = [];
+        for ($page = 1; $page <= self::MAX_PAGES; $page++) {
+            $chunk = $this->api->json(
+                'GET',
+                $repoPath . '/issues',
+                null,
+                [200],
+                ['state' => 'open', 'per_page' => self::PAGE_SIZE, 'page' => $page],
+            );
+            if (!array_is_list($chunk) || count($chunk) > self::PAGE_SIZE) {
+                throw new RuntimeException('Página de Issues GitHub inválida.');
+            }
+
+            $issues = array_merge($issues, $chunk);
+            if (count($chunk) < self::PAGE_SIZE) {
+                return $issues;
+            }
+        }
+
+        throw new RuntimeException('Inbox excede el límite defensivo de paginación.');
     }
 
     private function fromIssue(string $repository, mixed $issue): ?array

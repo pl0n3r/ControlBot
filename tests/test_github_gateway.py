@@ -32,6 +32,14 @@ class GitHubGatewayTests(unittest.TestCase):
         headers = "\n".join(calls[0][2])
         self.assertIn("Authorization: Bearer ghp_test_only_token", headers)
 
+    def test_query_parameters_are_encoded_without_relaxing_destination_guard(self):
+        calls = scenario("query")["calls"]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(
+            calls[0][1],
+            "https://api.github.com/repos/pl0n3r/factory/issues?state=open&per_page=100&page=2",
+        )
+
     def test_transport_rejects_untrusted_destination(self):
         errors = scenario("destination")["errors"]
         self.assertEqual(len(errors), 7)

@@ -76,7 +76,7 @@ final class DecisionRuntime
             return self::jsonResponse(200, $this->approve($session, $request, $now));
         }
         if ($method === 'GET' && $path === '/release/status') {
-            return self::jsonResponse(200, $this->releaseStatus($session));
+            return self::jsonResponse(200, $this->safeReleaseStatus($session));
         }
         return self::jsonResponse(404, ['error' => 'not-found']);
     }

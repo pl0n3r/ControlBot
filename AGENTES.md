@@ -10,4 +10,6 @@
 - **Nunca** se guardan ni escriben contraseñas de ChatGPT, ni se resuelven captchas o verificaciones; el login de cada cuenta lo hace el dueño.
 - Los tokens (GitHub, Sentry) viven solo en el `.env` del servidor.
 - Bitácora de toda acción del dueño y de los agentes.
-- Mientras no exista el kit v1 de factory, seguir las convenciones de Condor para CI, etiquetas, releases y coordinación.
+- **Decisiones del dueño:** `decisiones.yml` es normativo (copia de las vigentes en factory, D-054 a D-059); no se revierte.
+- **Kit de factory:** CI, coordinación `/tomar`, etiquetas, releases, política, privacidad y observación se consumen desde `pl0n3r/factory/.github/workflows/...@v1` (épico de adopción en este repo). Hasta completarlo, seguir las convenciones de Condor.
+- **Privacidad:** ControlBot trata alias de cuentas, estados de agentes y, opcionalmente, respuestas de chats: todo debe declararse en `datos.yml` (privacidad como código, factory#54).

@@ -16,7 +16,7 @@ Centro de control web **privado** de la fábrica de software de pl0n3r. Es una h
 1. #2 — adopción del kit Factory v1.
 2. #3 — aprobaciones con un clic.
 3. #4 — centro de decisiones.
-4. Dashboard básico con la dirección visual de #18.
+4. #74 — dashboard básico con la dirección visual de #18, sin datos inventados.
 5. Resto de Issues por prioridad y dependencias.
 
 ## Módulos previstos

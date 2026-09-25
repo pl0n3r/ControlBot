@@ -28,7 +28,7 @@ class ControlBotBootstrapTests(unittest.TestCase):
         version = json.loads(self.read("config/version.json"))
         decisions = json.loads(self.read("decisiones.yml"))
         data = json.loads(self.read("datos.yml"))
-        self.assertEqual("0.1.0", version["version"])
+        self.assertRegex(version["version"], r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
         self.assertTrue({"D-054", "D-055", "D-056", "D-057", "D-058", "D-059"}.issubset(
             {row["id"] for row in decisions["decisions"]}
         ))

@@ -47,10 +47,11 @@ class LabelsWorkflowTests(unittest.TestCase):
                 "url = next((item for item in args if item.startswith('repos/')), '')",
                 "",
                 "if '/issues?state=all&labels=' in url:",
-                "    if scenario == 'used':",
-                "        print(json.dumps([[{'number': 1}]]))",
-                "    else:",
-                "        print(json.dumps([[]]))",
+                "    used = scenario == 'used'",
+                "    if scenario.startswith('used:'):",
+                "        selected = scenario.split(':', 1)[1]",
+                "        used = f'labels={selected}&' in url",
+                "    print(json.dumps([[{'number': 1}]] if used else [[]]))",
                 "    raise SystemExit(0)",
                 "",
                 "if '--method' in args and 'DELETE' in args:",
@@ -146,7 +147,16 @@ class LabelsWorkflowTests(unittest.TestCase):
         self.test_cleanup_covers_exact_factory_legacy_aliases()
 
     def test_legacy_cleanup_fails_closed_when_any_label_is_used(self):
-        self.test_cleanup_fails_closed_when_legacy_alias_is_used()
+        for legacy in ALIASES:
+            with self.subTest(legacy=legacy):
+                encoded = quote(legacy, safe="")
+                result, calls = self.run_cleanup(f"used:{encoded}")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("todavía tiene 1 uso(s)", result.stderr)
+                self.assertNotIn(
+                    f"--method DELETE repos/pl0n3r/ControlBot/labels/{encoded}",
+                    calls,
+                )
 
     def test_legacy_cleanup_is_idempotent_for_absent_or_orphaned_labels(self):
         absent, absent_calls = self.run_cleanup("aliases-absent")

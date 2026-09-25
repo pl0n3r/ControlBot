@@ -117,7 +117,11 @@ try {
             $service->approve(gate('factory-release'), 'A', 'pl0n3r/factory', 114, $shaA, new OwnerContext('pl0n3r', true, $now - 5), $now);
         } catch (Throwable $e) {
             $audit = array_values(array_filter(file($path, FILE_IGNORE_NEW_LINES) ?: []));
-            $out = ['error' => $e->getMessage(), 'audit' => array_map(static fn (string $line): array => json_decode($line, true, 512, JSON_THROW_ON_ERROR), $audit)];
+            $out = [
+                'error' => $e->getMessage(),
+                'calls' => array_column($github->calls, 0),
+                'audit' => array_map(static fn (string $line): array => json_decode($line, true, 512, JSON_THROW_ON_ERROR), $audit),
+            ];
         }
     } else {
         throw new RuntimeException('scenario inválido');

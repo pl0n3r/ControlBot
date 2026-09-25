@@ -77,6 +77,12 @@ class DecisionSnoozeTests(unittest.TestCase):
             for method, url in data["seen"]
         ))
 
+    def test_large_audit_without_snoozes_does_not_break_visibility(self):
+        data = scenario("render-large-audit")
+
+        self.assertEqual(data["response"]["status"], 200)
+        self.assertIn("¿Publicamos Factory?", data["response"]["body"])
+
 
 if __name__ == "__main__":
     unittest.main()

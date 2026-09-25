@@ -2,7 +2,6 @@ import os
 import re
 import subprocess
 import tempfile
-import textwrap
 import unittest
 from pathlib import Path
 from urllib.parse import quote
@@ -26,58 +25,54 @@ class LabelsWorkflowTests(unittest.TestCase):
             tmp_path = Path(tmp)
             log = tmp_path / "gh.log"
             stub = tmp_path / "gh"
-            stub.write_text(
-                textwrap.dedent(
-                    """                    #!/usr/bin/env python3
-                    import json
-                    import os
-                    import sys
-                    from urllib.parse import quote
-
-                    aliases = {
-                        "prioridad: normal": "prioridad: media",
-                        "calidad": "tipo: calidad",
-                        "seguridad": "tipo: seguridad",
-                        "deuda técnica": "tipo: deuda técnica",
-                        "accesibilidad": "tipo: accesibilidad",
-                    }
-                    args = sys.argv[1:]
-                    rendered = " ".join(args)
-                    with open(os.environ["GH_STUB_LOG"], "a", encoding="utf-8") as handle:
-                        handle.write(rendered + "\n")
-
-                    scenario = os.environ["GH_STUB_SCENARIO"]
-                    url = args[-1] if args else ""
-
-                    if "/issues?state=all&labels=" in url:
-                        if scenario == "used":
-                            print(json.dumps([[{"number": 1}]]))
-                        else:
-                            print(json.dumps([[]]))
-                        raise SystemExit(0)
-
-                    if "--method" in args and "DELETE" in args:
-                        raise SystemExit(0)
-
-                    if "/labels/" in url:
-                        label = url.rsplit("/labels/", 1)[1]
-                        legacy = {quote(name, safe="") for name in aliases}
-                        canonical = {quote(name, safe="") for name in aliases.values()}
-                        if scenario == "aliases-absent" and label in legacy:
-                            print("gh: Not Found (HTTP 404)", file=sys.stderr)
-                            raise SystemExit(1)
-                        if scenario == "targets-missing" and label in canonical:
-                            print("gh: Not Found (HTTP 404)", file=sys.stderr)
-                            raise SystemExit(1)
-                        print("{}")
-                        raise SystemExit(0)
-
-                    print("unexpected gh invocation: " + rendered, file=sys.stderr)
-                    raise SystemExit(9)
-                    """
-                ).lstrip(),
-                encoding="utf-8",
-            )
+            stub_lines = [
+                "#!/usr/bin/env python3",
+                "import json",
+                "import os",
+                "import sys",
+                "from urllib.parse import quote",
+                "",
+                "aliases = {",
+                "    'prioridad: normal': 'prioridad: media',",
+                "    'calidad': 'tipo: calidad',",
+                "    'seguridad': 'tipo: seguridad',",
+                "    'deuda técnica': 'tipo: deuda técnica',",
+                "    'accesibilidad': 'tipo: accesibilidad',",
+                "}",
+                "args = sys.argv[1:]",
+                "rendered = ' '.join(args)",
+                "with open(os.environ['GH_STUB_LOG'], 'a', encoding='utf-8') as handle:",
+                "    handle.write(rendered + '\\n')",
+                "scenario = os.environ['GH_STUB_SCENARIO']",
+                "url = args[-1] if args else ''",
+                "",
+                "if '/issues?state=all&labels=' in url:",
+                "    if scenario == 'used':",
+                "        print(json.dumps([[{'number': 1}]]))",
+                "    else:",
+                "        print(json.dumps([[]]))",
+                "    raise SystemExit(0)",
+                "",
+                "if '--method' in args and 'DELETE' in args:",
+                "    raise SystemExit(0)",
+                "",
+                "if '/labels/' in url:",
+                "    label = url.rsplit('/labels/', 1)[1]",
+                "    legacy = {quote(name, safe='') for name in aliases}",
+                "    canonical = {quote(name, safe='') for name in aliases.values()}",
+                "    if scenario == 'aliases-absent' and label in legacy:",
+                "        print('gh: Not Found (HTTP 404)', file=sys.stderr)",
+                "        raise SystemExit(1)",
+                "    if scenario == 'targets-missing' and label in canonical:",
+                "        print('gh: Not Found (HTTP 404)', file=sys.stderr)",
+                "        raise SystemExit(1)",
+                "    print('{}')",
+                "    raise SystemExit(0)",
+                "",
+                "print('unexpected gh invocation: ' + rendered, file=sys.stderr)",
+                "raise SystemExit(9)",
+            ]
+            stub.write_text("\n".join(stub_lines) + "\n", encoding="utf-8")
             stub.chmod(0o755)
             env = os.environ.copy()
             env.update(

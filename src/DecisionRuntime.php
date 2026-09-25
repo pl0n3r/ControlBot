@@ -25,6 +25,7 @@ final class DecisionRuntime
         private readonly AppendOnlyAuditLog $audit,
         private readonly \Closure $githubFactory,
         array $repositories,
+        private readonly ?DecisionConversationProvider $conversationProvider = null,
     ) {
         if ($repositories === [] || count($repositories) > 20) {
             throw new InvalidArgumentException('Allowlist de repositorios inválida.');
@@ -87,6 +88,9 @@ final class DecisionRuntime
         if ($method === 'POST' && $path === '/approvals/batch') {
             return self::jsonResponse(200, $this->approveBatch($session, $request, $now));
         }
+        if ($method === 'POST' && $path === '/decisions/question') {
+            return self::jsonResponse(200, $this->askQuestion($session, $request, $now));
+        }
         if ($method === 'GET' && $path === '/release/status') {
             return self::jsonResponse(200, $this->safeReleaseStatus($session));
         }
@@ -109,6 +113,8 @@ final class DecisionRuntime
             $reauthenticated,
             $csrf,
             DecisionBatch::eligible($decisions),
+            DecisionQuestions::forUi($session),
+            $this->conversationProvider !== null,
         );
     }
 
@@ -116,6 +122,38 @@ final class DecisionRuntime
     {
         $components = $this->components($this->sessions->githubToken($session));
         return (new GateInbox($components['api'], $components['gateway']))->load($this->repositories);
+    }
+
+    private function askQuestion(array &$session, array $request, int $now): array
+    {
+        if (
+            array_diff(array_keys($request), ['_csrf', 'repository', 'issue', 'question']) !== []
+            || !is_string($request['_csrf'] ?? null)
+            || !is_string($request['repository'] ?? null)
+            || (!is_int($request['issue'] ?? null)
+                && !(is_string($request['issue'] ?? null) && ctype_digit($request['issue'])))
+            || !is_string($request['question'] ?? null)
+        ) {
+            throw new InvalidArgumentException('Solicitud de pregunta inválida.');
+        }
+
+        $repository = $request['repository'];
+        $issue = (int) $request['issue'];
+        if (!in_array($repository, $this->repositories, true) || $issue < 1) {
+            throw new InvalidArgumentException('Decisión fuera de allowlist runtime.');
+        }
+
+        $this->sessions->contextFromRequest($session, ['_csrf' => $request['_csrf']], $now);
+        $decisions = $this->loadDecisions($session);
+
+        return (new DecisionQuestions($this->conversationProvider))->ask(
+            $session,
+            $decisions,
+            $repository,
+            $issue,
+            $request['question'],
+            $now,
+        );
     }
 
     private function approveBatch(array &$session, array $request, int $now): array

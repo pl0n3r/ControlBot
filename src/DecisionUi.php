@@ -12,6 +12,8 @@ final class DecisionUi
         bool $reauthenticated,
         ?string $csrfToken = null,
         array $batchEligible = [],
+        array $questions = [],
+        bool $conversationAvailable = false,
     ): string
     {
         $csrf = '';
@@ -30,7 +32,13 @@ final class DecisionUi
         $cards = $decisions === []
             ? self::emptyState()
             : implode('', array_map(
-                static fn (array $decision): string => self::decisionCard($decision, $actionEnabled, $csrf),
+                static fn (array $decision): string => self::decisionCard(
+                    $decision,
+                    $actionEnabled,
+                    $csrf,
+                    $questions,
+                    $conversationAvailable,
+                ),
                 $decisions
             ));
 
@@ -83,7 +91,13 @@ final class DecisionUi
             . '</form></section>';
     }
 
-    private static function decisionCard(array $decision, bool $actionEnabled, string $csrf): string
+    private static function decisionCard(
+        array $decision,
+        bool $actionEnabled,
+        string $csrf,
+        array $questions,
+        bool $conversationAvailable,
+    ): string
     {
         $required = ['repository', 'issue', 'title', 'context', 'options', 'recommendation'];
         foreach ($required as $key) {
@@ -154,6 +168,23 @@ final class DecisionUi
         }
 
         $csrfField = $csrf !== '' ? '<input type="hidden" name="_csrf" value="' . $csrf . '">' : '';
+        $question = self::questionState($questions, $decision['repository'], $issue);
+        $questionDisabled = $actionEnabled && $conversationAvailable ? '' : ' disabled aria-disabled="true"';
+        $questionForm = '<section class="question-panel" aria-label="Dudas sobre esta decisión">'
+            . '<h3>Tengo una duda</h3>'
+            . ($conversationAvailable
+                ? '<p>Pregunta sobre esta decisión. ControlBot reconstruye el contexto en el servidor.</p>'
+                : '<p class="question-unavailable">Asistente de dudas no disponible ahora. Puedes decidir igual.</p>')
+            . ($question !== null ? self::questionResult($question) : '')
+            . '<form method="post" action="/decisions/question" class="question-form">'
+            . $csrfField
+            . '<input type="hidden" name="repository" value="' . $repository . '">'
+            . '<input type="hidden" name="issue" value="' . $issue . '">'
+            . '<label for="question-' . $issue . '">Tu pregunta</label>'
+            . '<textarea id="question-' . $issue . '" name="question" maxlength="500" rows="3"'
+            . $questionDisabled . '></textarea>'
+            . '<button class="question-action" type="submit"' . $questionDisabled . '>Preguntar</button>'
+            . '</form></section>';
 
         return '<article class="panel decision-card" data-state="' . ($actionEnabled ? 'ready' : 'reauth-required') . '">'
             . '<div class="panel-line" aria-hidden="true"></div>'
@@ -171,7 +202,53 @@ final class DecisionUi
             . '<input type="hidden" name="displayed_sha" value="' . $shaEscaped . '">'
             . $options
             . '</form>'
+            . $questionForm
             . '</article>';
+    }
+
+    private static function questionState(array $questions, string $repository, int $issue): ?array
+    {
+        $key = $repository . '#' . $issue;
+        if (!array_key_exists($key, $questions)) {
+            return null;
+        }
+        $entry = $questions[$key];
+        if (
+            !is_array($entry)
+            || ($entry['repository'] ?? null) !== $repository
+            || ($entry['issue'] ?? null) !== $issue
+            || !is_string($entry['question'] ?? null)
+            || strlen($entry['question']) > 500
+            || !in_array($entry['status'] ?? null, ['answered', 'unavailable'], true)
+            || !is_int($entry['at'] ?? null)
+            || ($entry['at'] ?? 0) < 1
+        ) {
+            throw new InvalidArgumentException('Estado de pregunta inválido.');
+        }
+        $answer = $entry['answer'] ?? null;
+        if (
+            (($entry['status'] ?? null) === 'answered'
+                && (!is_string($answer) || $answer === '' || strlen($answer) > 2000))
+            || (($entry['status'] ?? null) === 'unavailable' && $answer !== null)
+        ) {
+            throw new InvalidArgumentException('Estado de pregunta inválido.');
+        }
+        return $entry;
+    }
+
+    private static function questionResult(array $entry): string
+    {
+        $question = self::e($entry['question']);
+        if ($entry['status'] === 'answered') {
+            return '<div class="question-result" role="status">'
+                . '<p><strong>Tu duda:</strong> ' . $question . '</p>'
+                . '<p><strong>Respuesta:</strong> ' . self::e($entry['answer']) . '</p>'
+                . '</div>';
+        }
+        return '<div class="question-result unavailable" role="status">'
+            . '<p><strong>Tu duda:</strong> ' . $question . '</p>'
+            . '<p>No fue posible responder ahora. Puedes decidir igual o volver a intentar.</p>'
+            . '</div>';
     }
 
     private static function optionalText(array $source, string $key, int $limit): string
@@ -335,6 +412,27 @@ h1 { font-size: clamp(1.9rem, 10vw, 3.4rem); letter-spacing: .03em; }
 .technical summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 .technical summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 .actions { display: grid; gap: 12px; margin-top: 18px; }
+.question-panel { margin-top: 20px; padding-top: 18px; border-top: 1px solid #294d56; }
+.question-panel h3 { margin: 0 0 6px; font-size: 1rem; color: var(--cyan); }
+.question-panel > p { margin: 0 0 12px; color: var(--muted); line-height: 1.4; }
+.question-unavailable { color: var(--amber) !important; }
+.question-form { display: grid; gap: 8px; }
+.question-form label { font-weight: 700; }
+.question-form textarea {
+  width: 100%; min-height: 84px; resize: vertical; border: 1px solid #357d8d; border-radius: 10px;
+  background: rgba(3,12,17,.9); color: var(--text); padding: 10px 12px; font: inherit;
+}
+.question-form textarea:focus-visible, .question-action:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+.question-form textarea:disabled, .question-action:disabled { opacity: .5; cursor: not-allowed; }
+.question-action {
+  min-height: 52px; width: 100%; border: 1px solid var(--cyan); border-radius: 10px;
+  background: rgba(8,28,35,.92); color: var(--text); padding: 12px 14px;
+  font: 800 1rem/1.2 Rajdhani, system-ui, sans-serif; cursor: pointer;
+}
+.question-result { margin: 12px 0; padding: 12px; border: 1px solid #294d56; border-radius: 10px; }
+.question-result p { margin: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.question-result p + p { margin-top: 8px; }
+.question-result.unavailable { border-color: #9e7524; }
 .decision-option { display: grid; gap: 8px; }
 .option-copy { display: grid; gap: 7px; min-width: 0; overflow-wrap: anywhere; padding: 0 14px 4px; }
 .option-label { font-weight: 800; }

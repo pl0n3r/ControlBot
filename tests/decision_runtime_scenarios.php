@@ -9,6 +9,7 @@ require __DIR__ . '/../src/GateInbox.php';
 require __DIR__ . '/../src/DecisionBatch.php';
 require __DIR__ . '/../src/DecisionUi.php';
 require __DIR__ . '/../src/DecisionHistory.php';
+require __DIR__ . '/../src/DecisionQuestions.php';
 require __DIR__ . '/../src/DecisionRuntime.php';
 
 use ControlBot\Approvals\AppendOnlyAuditLog;

@@ -47,8 +47,10 @@ final class DecisionUi
 
         $repository = self::e($decision['repository']);
         $issue = $decision['issue'];
-        $title = self::optionalText($decision, 'title_simple', 120) ?: self::e($decision['title']);
-        $context = self::optionalText($decision, 'summary_simple', 400) ?: self::e($decision['context']);
+        $simpleTitle = self::optionalText($decision, 'title_simple', 120);
+        $simpleSummary = self::optionalText($decision, 'summary_simple', 400);
+        $title = $simpleTitle !== '' ? $simpleTitle : self::e($decision['title']);
+        $context = $simpleSummary !== '' ? $simpleSummary : self::e($decision['context']);
         $why = self::optionalText($decision, 'why_recommended', 180);
         $blocks = self::optionalText($decision, 'blocks', 180);
         $safeDefault = self::optionalText($decision, 'safe_default', 40);
@@ -90,10 +92,13 @@ final class DecisionUi
             if ($pros !== '' || $cons !== '') {
                 $details .= '<span class="tradeoffs">' . $pros . $cons . '</span>';
             }
-            $options .= '<button class="decision-action' . ($recommended ? ' recommended' : '') . '"'
+            $options .= '<div class="decision-option">'
+                . '<button class="decision-action' . ($recommended ? ' recommended' : '') . '"'
                 . ' type="submit" name="option" value="' . $id . '"' . $disabled . '>'
-                . '<span class="option-copy"><span class="option-label">' . $label . '</span>' . $details . '</span>'
-                . $badge . '</button>';
+                . '<span class="option-label">' . $label . '</span>'
+                . $badge . '</button>'
+                . ($details !== '' ? '<div class="option-copy">' . $details . '</div>' : '')
+                . '</div>';
         }
 
         return '<article class="panel decision-card" data-state="' . ($reauthenticated ? 'ready' : 'reauth-required') . '">'
@@ -262,7 +267,8 @@ h1 { font-size: clamp(1.9rem, 10vw, 3.4rem); letter-spacing: .03em; }
 .technical summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 .technical summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 .actions { display: grid; gap: 12px; margin-top: 18px; }
-.option-copy { display: grid; gap: 7px; min-width: 0; }
+.decision-option { display: grid; gap: 8px; }
+.option-copy { display: grid; gap: 7px; min-width: 0; overflow-wrap: anywhere; padding: 0 14px 4px; }
 .option-label { font-weight: 800; }
 .effect { color: var(--cyan-soft); font-size: .93rem; line-height: 1.4; }
 .impact { font-size: .83rem; color: var(--amber); line-height: 1.4; }

@@ -68,6 +68,18 @@ class DecisionUiTests(unittest.TestCase):
         self.assertIn("Si no decides:</strong> Mantener sin publicar", html)
         self.assertNotIn("Si no decides:</strong> B", html)
 
+    def test_zero_optional_copy_is_preserved(self):
+        html = render("zero-copy")
+        self.assertIn("<h2>0</h2>", html)
+        self.assertIn('<p class="context">0</p>', html)
+
+    def test_option_details_are_outside_submit_button(self):
+        html = render("enriched")
+        button_end = html.index("</button>")
+        effect_at = html.index("Publica una versión nueva")
+        self.assertLess(button_end, effect_at)
+        self.assertIn("overflow-wrap: anywhere", html)
+
     def test_enriched_fields_escape_untrusted_html(self):
         html = render("enriched-escape")
         self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)

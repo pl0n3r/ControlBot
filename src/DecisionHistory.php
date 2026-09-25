@@ -92,10 +92,13 @@ final class DecisionHistory
         }
         unset($item);
 
-        usort($history, static fn (array $left, array $right): int =>
-            [$right['at'], $left['repository'], $left['issue']]
-            <=> [$left['at'], $right['repository'], $right['issue']]
-        );
+        usort($history, static function (array $left, array $right): int {
+            if ($left['at'] !== $right['at']) {
+                return $right['at'] <=> $left['at'];
+            }
+            return [$left['repository'], $left['issue'], $left['option']]
+                <=> [$right['repository'], $right['issue'], $right['option']];
+        });
         return $history;
     }
 

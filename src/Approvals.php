@@ -257,18 +257,7 @@ final class OwnerApprovalService
             fn (): string => $this->github->commentIssue($repository, $issue, $comment),
         );
 
-        $closeUrl = $this->step(
-            $owner,
-            'close-issue',
-            $repository,
-            $issue,
-            $optionId,
-            $sha,
-            $now,
-            fn (): string => $this->github->closeIssue($repository, $issue),
-        );
-
-        $evidence = ['comment' => $commentUrl, 'issue' => $closeUrl];
+        $evidence = ['comment' => $commentUrl];
         if ($release) {
             $tagUrl = $this->step(
                 $owner,
@@ -295,6 +284,18 @@ final class OwnerApprovalService
             );
             $evidence += ['tag' => $tagUrl, 'run' => $runUrl];
         }
+
+        $closeUrl = $this->step(
+            $owner,
+            'close-issue',
+            $repository,
+            $issue,
+            $optionId,
+            $sha,
+            $now,
+            fn (): string => $this->github->closeIssue($repository, $issue),
+        );
+        $evidence['issue'] = $closeUrl;
 
         return ['category' => $gate->category, 'option' => $optionId, 'sha' => $sha, 'evidence' => $evidence];
     }

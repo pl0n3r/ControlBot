@@ -21,12 +21,26 @@ class OwnerApprovalTests(unittest.TestCase):
     def test_factory_release_executes_verified_steps(self):
         data = scenario("release")
         self.assertEqual(
-            data["calls"],
+            [call[0] for call in data["calls"]],
             ["mainSha", "commentIssue", "closeIssue", "moveTag", "dispatchWorkflow"],
+        )
+        self.assertEqual(
+            data["calls"][3],
+            ["moveTag", "pl0n3r/factory", "v1", "a" * 40],
         )
         self.assertEqual(data["result"]["sha"], "a" * 40)
         self.assertIn("tag", data["result"]["evidence"])
         self.assertIn("run", data["result"]["evidence"])
+
+    def test_initial_release_does_not_move_major_tag(self):
+        data = scenario("initial-release")
+        self.assertEqual(
+            [call[0] for call in data["calls"]],
+            ["commentIssue", "closeIssue"],
+        )
+        self.assertIsNone(data["result"]["sha"])
+        self.assertNotIn("tag", data["result"]["evidence"])
+        self.assertNotIn("run", data["result"]["evidence"])
 
     def test_stale_sha_fails_before_mutation(self):
         data = scenario("stale")
@@ -51,6 +65,17 @@ class OwnerApprovalTests(unittest.TestCase):
     def test_factory_gate_contract_is_fail_closed(self):
         data = scenario("invalid")
         self.assertIn("inválid", data["error"].lower())
+
+    def test_gate_rejects_non_string_option_and_selector_fields(self):
+        data = scenario("invalid-types")
+        self.assertIn("inválid", data["error"].lower())
+
+    def test_failed_github_step_is_audited_before_rethrow(self):
+        data = scenario("failed-step")
+        self.assertIn("fallo simulado", data["error"])
+        self.assertEqual(data["audit"][-1]["action"], "move-v1")
+        self.assertEqual(data["audit"][-1]["result"], "failed")
+        self.assertIsNone(data["audit"][-1]["evidence"])
 
 
 if __name__ == "__main__":

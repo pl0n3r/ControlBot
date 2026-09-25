@@ -9,14 +9,33 @@ on:
   issues:
     types: [opened, edited, reopened, labeled, unlabeled]
   pull_request:
-    types: [opened, edited, reopened, ready_for_review, labeled, unlabeled]
+    types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
 
 jobs:
+  candidate:
+    name: Etiquetas
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Validar contrato local de etiquetas
+        run: >-
+          python3 -m unittest
+          tests.test_labels_workflow.LabelsWorkflowTests.test_cleanup_covers_exact_factory_legacy_aliases
+          tests.test_labels_workflow.LabelsWorkflowTests.test_sync_depends_on_cleanup_and_keeps_factory_reusable
+
   limpiar_etiqueta_legacy:
-    name: Limpiar etiqueta legacy huérfana
+    name: Limpiar aliases legacy huérfanos
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -29,7 +48,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Eliminar prioridad legacy solo si está huérfana
+      - name: Eliminar aliases legacy solo si están huérfanos
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORIO: ${{ github.repository }}

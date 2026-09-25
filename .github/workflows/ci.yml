@@ -38,7 +38,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Ejecutar regresión de bootstrap
-        run: python3 -m unittest tests.test_controlbot_bootstrap
+        run: python3 -m unittest tests.test_controlbot_bootstrap tests.test_owner_approval_core
 
   validar:
     name: Validar

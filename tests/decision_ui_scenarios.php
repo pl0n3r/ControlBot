@@ -25,7 +25,7 @@ if ($scenario === 'empty') {
     echo DecisionUi::render($decision, false);
 } elseif ($scenario === 'ready') {
     echo DecisionUi::render($decision, true);
-} elseif ($scenario === 'enriched' || $scenario === 'enriched-escape' || $scenario === 'invalid-risk') {
+} elseif ($scenario === 'enriched' || $scenario === 'enriched-escape' || $scenario === 'invalid-risk' || $scenario === 'default-id') {
     $decision[0]['title_simple'] = '¿Publicar la versión 1.0.4?';
     $decision[0]['summary_simple'] = 'El kit espera tu decisión. La versión actual sigue disponible.';
     $decision[0]['why_recommended'] = 'Los controles de calidad pasaron.';
@@ -45,6 +45,9 @@ if ($scenario === 'empty') {
     }
     if ($scenario === 'invalid-risk') {
         $decision[0]['options'][0]['risk'] = ['high'];
+    }
+    if ($scenario === 'default-id') {
+        $decision[0]['safe_default'] = 'B';
     }
     echo DecisionUi::render($decision, true);
 } elseif ($scenario === 'escape') {

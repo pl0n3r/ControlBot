@@ -63,6 +63,11 @@ class DecisionUiTests(unittest.TestCase):
         self.assertIn("<summary>Ver detalles técnicos</summary>", html)
         self.assertIn('action="/approvals/execute"', html)
 
+    def test_safe_default_id_uses_friendly_option_label(self):
+        html = render("default-id")
+        self.assertIn("Si no decides:</strong> Mantener sin publicar", html)
+        self.assertNotIn("Si no decides:</strong> B", html)
+
     def test_enriched_fields_escape_untrusted_html(self):
         html = render("enriched-escape")
         self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)

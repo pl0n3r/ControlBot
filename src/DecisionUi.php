@@ -52,6 +52,16 @@ final class DecisionUi
         $why = self::optionalText($decision, 'why_recommended', 180);
         $blocks = self::optionalText($decision, 'blocks', 180);
         $safeDefault = self::optionalText($decision, 'safe_default', 40);
+        // Factory gates store safe_default as an option ID, not a user-facing sentence.
+        if ($safeDefault !== '' && isset($decision['safe_default'])) {
+            foreach ($decision['options'] as $choice) {
+                if (is_array($choice) && ($choice['id'] ?? null) === $decision['safe_default']
+                    && is_string($choice['label'] ?? null)) {
+                    $safeDefault = self::e($choice['label']);
+                    break;
+                }
+            }
+        }
         $sha = isset($decision['sha']) && is_string($decision['sha']) ? $decision['sha'] : '';
         $shaEscaped = self::e($sha);
         $options = '';

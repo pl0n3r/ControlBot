@@ -7,7 +7,7 @@ use Throwable;
 
 final class DecisionBatch
 {
-    private const EXCLUDED_CATEGORIES = ['money', 'legal', 'go-live', 'factory-release'];
+    private const EXCLUDED_CATEGORIES = ['money', 'legal', 'real-customer-data', 'release-1.0.0', 'go-live', 'factory-release'];
 
     public static function eligible(array $decisions): array
     {

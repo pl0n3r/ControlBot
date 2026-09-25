@@ -27,6 +27,25 @@ class DecisionUiTests(unittest.TestCase):
         self.assertIn("@media (min-width: 760px)", html)
         self.assertIn("CONTROLBOT / DECISIONES", html)
 
+    def test_canonical_hud_palette_is_sober_and_non_neon(self):
+        html = render("ready")
+        self.assertIn("--bg: #0a0e13", html)
+        self.assertIn("--panel: #10161d", html)
+        self.assertIn("--cyan: #7cc9dd", html)
+        self.assertIn("--green: #6fcf9e", html)
+        self.assertIn("--amber: #e3a857", html)
+        self.assertIn("--red: #e0666f", html)
+        self.assertNotIn("text-shadow", html)
+        self.assertNotIn("box-shadow", html)
+        self.assertNotIn("scanline", html)
+
+    def test_inter_is_primary_and_orbitron_is_brand_only(self):
+        html = render("ready")
+        self.assertIn('font-family: Inter, system-ui', html)
+        self.assertIn('class="brand-mark">CONTROLBOT</span>', html)
+        self.assertIn('font-family: Orbitron, Inter, system-ui', html)
+        self.assertNotIn('h1, h2 { font-family: Orbitron', html)
+
     def test_reauth_guard_disables_actions(self):
         html = render("reauth")
         self.assertIn("Reautenticación requerida", html)

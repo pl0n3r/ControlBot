@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  limpiar-etiqueta-legacy:
+  limpiar_etiqueta_legacy:
     name: Limpiar etiqueta legacy huérfana
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -36,10 +36,10 @@ jobs:
         run: bash scripts/cleanup-legacy-label.sh
 
   sync:
-    needs: limpiar-etiqueta-legacy
+    needs: limpiar_etiqueta_legacy
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
-      needs.limpiar-etiqueta-legacy.result == 'success'
+      needs.limpiar_etiqueta_legacy.result == 'success'
     permissions:
       contents: read
       issues: write

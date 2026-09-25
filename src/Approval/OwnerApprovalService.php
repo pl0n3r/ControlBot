@@ -150,10 +150,14 @@ final class OwnerApprovalService
 
     private function record(string $actor, int $issue, string $action, string $result): void
     {
-        ($this->audit)([
-            'actor' => $actor, 'action' => $action, 'target_type' => 'issue',
-            'target_id' => (string) $issue, 'result' => $result,
-            'created_at' => gmdate('c', ($this->clock)()),
-        ]);
+        try {
+            ($this->audit)([
+                'actor' => $actor, 'action' => $action, 'target_type' => 'issue',
+                'target_id' => (string) $issue, 'result' => $result,
+                'created_at' => gmdate('c', ($this->clock)()),
+            ]);
+        } catch (\Throwable $error) {
+            throw new ApprovalDenied('Bitácora no disponible', 0, $error);
+        }
     }
 }

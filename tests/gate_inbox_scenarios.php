@@ -34,7 +34,7 @@ function gateBody(string $category, string $context = 'Necesita decisión.', ?st
 
 function issue(int $number, string $association, string $body, string $title, string $createdAt, array $extra = []): array
 {
-    return [
+    return array_replace([
         'number' => $number,
         'state' => 'open',
         'author_association' => $association,
@@ -42,7 +42,7 @@ function issue(int $number, string $association, string $body, string $title, st
         'title' => $title,
         'created_at' => $createdAt,
         'html_url' => "https://github.com/pl0n3r/demo/issues/{$number}",
-    ] + $extra;
+    ], $extra);
 }
 
 $scenario = $argv[1] ?? '';

@@ -25,6 +25,8 @@ if ($scenario==='eligible') {
         decision(5,'money','low'),
         decision(6,'go-live','low'),
         decision(7,'factory-release','low'),
+        decision(8,'real-customer-data','low'),
+        decision(9,'release-1.0.0','low'),
     ];
     echo json_encode(['eligible'=>DecisionBatch::eligible($decisions)],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
     exit;

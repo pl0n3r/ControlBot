@@ -5,7 +5,7 @@ Centro de control web **privado** de la fábrica de software de pl0n3r. Es una h
 ## Estado actual
 
 - Fase: **construcción**.
-- Versión actual: **0.1.7** (candidato #38: inbox paginado y fail-closed).
+- Versión actual: **0.1.8** (candidato #39: runtime privado de decisiones y seguimiento de release).
 - Stack objetivo: PHP 8.5 + MariaDB.
 - Hosting objetivo: Hostinger, junto a Condor pero con app, base y deploy independientes.
 - Deploy y observer: instalados en modo **fail-closed**; no actúan sin variables/configuración explícita.
@@ -38,3 +38,8 @@ Todo agente debe leer primero `pl0n3r/factory/PLAN-AGENTES.md` y luego `AGENTES.
 ## Inbox de decisiones
 
 El inbox descubre puertas humanas abiertas y confiables en los repos configurados, recorre Issues abiertos con paginación acotada y falla cerrado si no puede completar la lectura. En `factory-release` conserva el SHA exacto de `main`, estado de checks y evidencia disponible. El seguimiento de release correlaciona la corrida por workflow, SHA y momento del dispatch; estados ausentes permanecen pendientes en vez de inventarse.
+
+
+## Runtime privado de decisiones
+
+El runtime de #39 vive en `src/DecisionRuntime.php`: carga el inbox real desde GitHub con allowlist configurada en servidor, inyecta CSRF en las acciones, delega aprobaciones al endpoint seguro existente y conserva en la sesión server-side la correlación del release. No crea `public/`, no habilita deploy y no expone una cabina pública. El seguimiento devuelve evidencia terminal cuando existe una única corrida compatible y bloquea correlaciones ambiguas sin atribuir una ejecución arbitraria.

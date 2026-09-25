@@ -120,9 +120,18 @@ if ($scenario === 'trusted') {
         issuesUrl('pl0n3r/ControlBot') => ['status' => 200, 'body' => '[]'],
         issuesUrl('pl0n3r/factory') => ['status' => 200, 'body' => '[]'],
     ];
-} elseif ($scenario === 'tracker-success' || $scenario === 'tracker-failure') {
+} elseif ($scenario === 'tracker-success' || $scenario === 'tracker-failure' || $scenario === 'tracker-ambiguous') {
     $sha = str_repeat('b', 40);
     $conclusion = $scenario === 'tracker-success' ? 'success' : 'failure';
+    $extraMatch = $scenario === 'tracker-ambiguous' ? [[
+        'id' => 5,
+        'event' => 'workflow_dispatch',
+        'head_sha' => $sha,
+        'created_at' => '2026-09-25T10:04:00Z',
+        'status' => 'completed',
+        'conclusion' => 'success',
+        'html_url' => 'https://github.com/run/5',
+    ]] : [];
     $responses = [
         'https://api.github.com/repos/pl0n3r/factory/actions/workflows/release-bootstrap.yml/runs' => [
             'status' => 200,
@@ -131,6 +140,7 @@ if ($scenario === 'trusted') {
                 ['id' => 2, 'event' => 'workflow_dispatch', 'head_sha' => str_repeat('c', 40), 'created_at' => '2026-09-25T10:02:00Z', 'status' => 'completed', 'conclusion' => 'success', 'html_url' => 'https://github.com/run/2'],
                 ['id' => 3, 'event' => 'workflow_dispatch', 'head_sha' => $sha, 'created_at' => '2026-09-25T09:59:00Z', 'status' => 'completed', 'conclusion' => 'success', 'html_url' => 'https://github.com/run/3'],
                 ['id' => 4, 'event' => 'workflow_dispatch', 'head_sha' => $sha, 'created_at' => '2026-09-25T10:03:00Z', 'status' => 'completed', 'conclusion' => $conclusion, 'html_url' => 'https://github.com/run/4'],
+                ...$extraMatch,
             ]], JSON_THROW_ON_ERROR),
         ],
     ];

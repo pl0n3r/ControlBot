@@ -32,7 +32,7 @@
     {
       "id": "audit_log",
       "category": "usage",
-      "fields": ["actor", "action", "repository", "issue", "category", "option", "sha", "result", "evidence", "at"],
+      "fields": ["actor", "action", "repository", "issue", "category", "option", "sha", "result", "evidence", "at", "snoozed_until"],
       "purpose": "security_audit",
       "basis": "review_required",
       "retention": "review_required",

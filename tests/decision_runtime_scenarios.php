@@ -9,6 +9,7 @@ require __DIR__ . '/../src/GateInbox.php';
 require __DIR__ . '/../src/DecisionBatch.php';
 require __DIR__ . '/../src/DecisionUi.php';
 require __DIR__ . '/../src/DecisionHistory.php';
+require __DIR__ . '/../src/DecisionSnooze.php';
 require __DIR__ . '/../src/DecisionRuntime.php';
 
 use ControlBot\Approvals\AppendOnlyAuditLog;
@@ -131,7 +132,35 @@ try {
         ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
         exit;
     }
-    if ($scenario==='batch' || $scenario==='batch-untrusted-selection' || $scenario==='batch-reauth' || $scenario==='batch-no-csrf') {
+    if ($scenario==='snooze-direct-approval') {
+        $runtime->handle('POST','/decisions/snooze',$session,[
+            '_csrf'=>$sessions->csrfToken($session),
+            'repository'=>'pl0n3r/factory',
+            'issue'=>'137',
+            'duration'=>'tomorrow',
+        ],$now);
+        try {
+            $runtime->handle('POST','/approvals/execute',$session,[
+                '_csrf'=>$sessions->csrfToken($session),
+                'repository'=>'pl0n3r/factory',
+                'issue'=>'137',
+                'option'=>'A',
+                'displayed_sha'=>$sha,
+            ],$now+1);
+            echo json_encode(['blocked'=>false,'audit'=>$audit->entries(),'seen'=>$seen],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        } catch (Throwable) {
+            echo json_encode(['blocked'=>true,'audit'=>$audit->entries(),'seen'=>$seen],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        }
+        exit;
+    }
+    if ($scenario==='batch' || $scenario==='batch-untrusted-selection' || $scenario==='batch-reauth' || $scenario==='batch-no-csrf' || $scenario==='batch-snoozed') {
+        if ($scenario==='batch-snoozed') {
+            $audit->record([
+                'actor'=>'pl0n3r','action'=>'snooze','repository'=>'pl0n3r/factory','issue'=>138,
+                'category'=>'brand','option'=>'S','sha'=>null,'result'=>'success',
+                'evidence'=>null,'at'=>$now,'snoozed_until'=>$now+86400,
+            ]);
+        }
         $request=['_csrf'=>$sessions->csrfToken($session)];
         $at=$now;
         if ($scenario==='batch-untrusted-selection') {
@@ -152,6 +181,46 @@ try {
             ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
         } catch (Throwable) {
             echo json_encode(['blocked'=>true,'seen'=>$seen],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        }
+        exit;
+    }
+    if (str_starts_with($scenario, 'snooze')) {
+        $request=[
+            '_csrf'=>$sessions->csrfToken($session),
+            'repository'=>'pl0n3r/factory',
+            'issue'=>'137',
+            'duration'=>$scenario==='snooze-week' ? 'week' : 'tomorrow',
+        ];
+        $at=$now;
+        if ($scenario==='snooze-invalid-duration') {
+            $request['duration']='custom-date';
+        }
+        if ($scenario==='snooze-manipulated') {
+            $request['issue']='999';
+        }
+        if ($scenario==='snooze-no-csrf') {
+            unset($request['_csrf']);
+        }
+        if ($scenario==='snooze-stale-reauth') {
+            $at=$now+301;
+        }
+        try {
+            $response=$runtime->handle('POST','/decisions/snooze',$session,$request,$at);
+            $before=$runtime->handle('GET','/decisions',$session,[],$at+1);
+            $after=$runtime->handle('GET','/decisions',$session,[],$at+604801);
+            echo json_encode([
+                'response'=>json_decode($response['body'],true,32,JSON_THROW_ON_ERROR),
+                'before'=>$before['body'],
+                'after'=>$after['body'],
+                'audit'=>$audit->entries(),
+                'seen'=>$seen,
+            ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        } catch (Throwable) {
+            echo json_encode([
+                'blocked'=>true,
+                'audit'=>$audit->entries(),
+                'seen'=>$seen,
+            ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
         }
         exit;
     }

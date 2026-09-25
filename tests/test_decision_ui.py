@@ -120,5 +120,26 @@ class DecisionUiTests(unittest.TestCase):
         self.assertNotIn("<script>alert(1)</script>", html)
 
 
+    def test_snooze_actions_are_mobile_and_non_approving(self):
+        html = render("snooze")
+        self.assertIn('action="/decisions/snooze"', html)
+        self.assertIn('name="duration" value="tomorrow"', html)
+        self.assertIn(">Mañana</button>", html)
+        self.assertIn('name="duration" value="week"', html)
+        self.assertIn(">En una semana</button>", html)
+        self.assertIn(".snooze-action:focus-visible", html)
+        self.assertIn("min-height: 52px", html)
+
+        start = html.index('action="/decisions/snooze"')
+        end = html.index("</form>", start)
+        snooze_form = html[start:end]
+        self.assertIn('name="_csrf"', snooze_form)
+        self.assertIn('name="repository"', snooze_form)
+        self.assertIn('name="issue"', snooze_form)
+        self.assertNotIn('name="option"', snooze_form)
+        self.assertNotIn('name="displayed_sha"', snooze_form)
+        self.assertNotIn("/approvals/execute", snooze_form)
+
+
 if __name__ == "__main__":
     unittest.main()

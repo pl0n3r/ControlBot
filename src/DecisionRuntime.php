@@ -78,7 +78,7 @@ final class DecisionRuntime
             $this->sessions->githubToken($session);
             $repository = self::optionalFilter($request, 'repository');
             $category = self::optionalFilter($request, 'category');
-            $history = (new DecisionHistory($this->audit, $this->repositories))->load($repository, $category);
+            $history = (new DecisionHistory($this->audit, $this->repositories))->load($repository, $category, $now);
             return self::jsonResponse(200, ['history' => $history]);
         }
         if ($method === 'POST' && $path === '/approvals/execute') {
@@ -86,6 +86,9 @@ final class DecisionRuntime
         }
         if ($method === 'POST' && $path === '/approvals/batch') {
             return self::jsonResponse(200, $this->approveBatch($session, $request, $now));
+        }
+        if ($method === 'POST' && $path === '/decisions/snooze') {
+            return self::jsonResponse(200, $this->snooze($session, $request, $now));
         }
         if ($method === 'GET' && $path === '/release/status') {
             return self::jsonResponse(200, $this->safeReleaseStatus($session));
@@ -95,7 +98,7 @@ final class DecisionRuntime
 
     private function render(array $session, int $now): string
     {
-        $decisions = $this->loadDecisions($session);
+        $decisions = (new DecisionSnooze($this->audit))->visible($this->loadDecisions($session), $now);
         $csrf = $this->sessions->csrfToken($session);
         $reauthenticated = false;
         try {
@@ -118,6 +121,38 @@ final class DecisionRuntime
         return (new GateInbox($components['api'], $components['gateway']))->load($this->repositories);
     }
 
+    private function snooze(array &$session, array $request, int $now): array
+    {
+        if (
+            array_diff(array_keys($request), ['_csrf', 'repository', 'issue', 'duration']) !== []
+            || !is_string($request['_csrf'] ?? null)
+            || !is_string($request['repository'] ?? null)
+            || (!is_int($request['issue'] ?? null)
+                && !(is_string($request['issue'] ?? null) && ctype_digit($request['issue'])))
+            || !is_string($request['duration'] ?? null)
+        ) {
+            throw new InvalidArgumentException('Solicitud de recordatorio inválida.');
+        }
+
+        $repository = $request['repository'];
+        $issue = (int) $request['issue'];
+        if (!in_array($repository, $this->repositories, true) || $issue < 1) {
+            throw new InvalidArgumentException('Decisión fuera de allowlist runtime.');
+        }
+
+        $owner = $this->sessions->contextFromRequest($session, ['_csrf' => $request['_csrf']], $now);
+        $decisions = (new DecisionSnooze($this->audit))->visible($this->loadDecisions($session), $now);
+
+        return (new DecisionSnooze($this->audit))->snooze(
+            $decisions,
+            $repository,
+            $issue,
+            $request['duration'],
+            $owner,
+            $now,
+        );
+    }
+
     private function approveBatch(array &$session, array $request, int $now): array
     {
         if (
@@ -128,7 +163,7 @@ final class DecisionRuntime
         }
 
         $this->sessions->contextFromRequest($session, ['_csrf' => $request['_csrf']], $now);
-        $decisions = $this->loadDecisions($session);
+        $decisions = (new DecisionSnooze($this->audit))->visible($this->loadDecisions($session), $now);
 
         return DecisionBatch::execute(
             $decisions,
@@ -147,8 +182,27 @@ final class DecisionRuntime
     private function approve(array &$session, array $request, int $now): array
     {
         $repository = $request['repository'] ?? null;
+        $issue = $request['issue'] ?? null;
         if (!is_string($repository) || !in_array($repository, $this->repositories, true)) {
             throw new InvalidArgumentException('Repositorio fuera de la allowlist runtime.');
+        }
+        if (
+            (!is_int($issue) && !(is_string($issue) && ctype_digit($issue)))
+            || (int) $issue < 1
+        ) {
+            throw new InvalidArgumentException('Solicitud de aprobación inválida.');
+        }
+
+        $issueNumber = (int) $issue;
+        $visible = (new DecisionSnooze($this->audit))->visible($this->loadDecisions($session), $now);
+        $matches = array_filter(
+            $visible,
+            static fn (mixed $decision): bool => is_array($decision)
+                && ($decision['repository'] ?? null) === $repository
+                && ($decision['issue'] ?? null) === $issueNumber,
+        );
+        if (count($matches) !== 1) {
+            throw new RuntimeException('La decisión no está disponible para aprobar.');
         }
 
         $result = $this->approvals->execute($session, $request, $now);

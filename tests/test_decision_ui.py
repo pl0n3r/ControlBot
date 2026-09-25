@@ -49,6 +49,51 @@ class DecisionUiTests(unittest.TestCase):
         self.assertNotIn("/approvals/execute", html)
         self.assertNotIn("pl0n3r/factory", html)
 
+    def test_enriched_card_shows_plain_language_and_impact(self):
+        html = render("enriched")
+        self.assertIn("¿Publicar la versión 1.0.4?", html)
+        self.assertIn("Por qué se recomienda:", html)
+        self.assertIn("Si no decides:", html)
+        self.assertIn("Trabajo en espera:", html)
+        self.assertIn("Riesgo medio", html)
+        self.assertIn("Costo: Sin costo adicional", html)
+        self.assertIn("Reversible", html)
+        self.assertIn("✓ Ventajas", html)
+        self.assertIn("✗ Desventajas", html)
+        self.assertIn("<summary>Ver detalles técnicos</summary>", html)
+        self.assertIn('action="/approvals/execute"', html)
+
+    def test_safe_default_id_uses_friendly_option_label(self):
+        html = render("default-id")
+        self.assertIn("Si no decides:</strong> Mantener sin publicar", html)
+        self.assertNotIn("Si no decides:</strong> B", html)
+
+    def test_zero_optional_copy_is_preserved(self):
+        html = render("zero-copy")
+        self.assertIn("<h2>0</h2>", html)
+        self.assertIn('<p class="context">0</p>', html)
+
+    def test_option_details_are_outside_submit_button(self):
+        html = render("enriched")
+        button_end = html.index("</button>")
+        effect_at = html.index("Publica una versión nueva")
+        self.assertLess(button_end, effect_at)
+        self.assertIn("overflow-wrap: anywhere", html)
+
+    def test_enriched_fields_escape_untrusted_html(self):
+        html = render("enriched-escape")
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
+        self.assertNotIn("<script>alert(1)</script>", html)
+
+    def test_invalid_risk_fails_closed(self):
+        result = subprocess.run(
+            ["php", str(ROOT / "tests/decision_ui_scenarios.php"), "invalid-risk"],
+            cwd=ROOT, text=True, capture_output=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("onerror=", result.stdout)
+
     def test_untrusted_copy_is_escaped(self):
         html = render("escape")
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)

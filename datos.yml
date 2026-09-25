@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "project": "pl0n3r/ControlBot",
+  "phase": "construccion",
+  "controller": {
+    "name": "[COMPLETAR POR EL DUEÑO]",
+    "identifier": "[COMPLETAR POR EL DUEÑO]",
+    "address": "[COMPLETAR POR EL DUEÑO]",
+    "rights_email": "[COMPLETAR POR EL DUEÑO]"
+  },
+  "treatments": [
+    {
+      "id": "account_profiles",
+      "category": "identification",
+      "fields": ["account_alias", "profile_alias", "browser", "plan"],
+      "purpose": "account_inventory",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "agent_status",
+      "category": "usage",
+      "fields": ["agent_id", "account_alias", "profile_alias", "tab_id", "status", "last_heartbeat_at", "mode", "repository", "issue_number"],
+      "purpose": "agent_orchestration",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "audit_log",
+      "category": "usage",
+      "fields": ["actor", "action", "target_type", "target_id", "result", "created_at"],
+      "purpose": "security_audit",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "chat_response_opt_in",
+      "category": "usage",
+      "fields": ["agent_id", "tab_id", "response_text", "received_at", "opt_in"],
+      "purpose": "agent_response_relay",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    }
+  ]
+}

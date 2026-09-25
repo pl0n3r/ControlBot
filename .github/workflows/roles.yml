@@ -1,0 +1,53 @@
+name: Roles profesionales
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  issues:
+    types: [opened, edited, reopened, labeled, unlabeled]
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    uses: pl0n3r/factory/.github/workflows/roles.yml@v1
+    with:
+      mode: sync
+      language: es
+
+  sugerir-issue:
+    if: github.event_name == 'issues'
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    uses: pl0n3r/factory/.github/workflows/roles.yml@v1
+    with:
+      mode: suggest
+      number: ${{ github.event.issue.number }}
+      language: es
+
+  validar-pr:
+    if: github.event_name == 'pull_request'
+    # El reusable contiene también el job mutador (skipped en mode=validate).
+    # GitHub valida el máximo permiso del workflow llamado antes de arrancar;
+    # por eso el caller debe permitir issues:write aunque validate permanezca
+    # read-only dentro de Factory.
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    uses: pl0n3r/factory/.github/workflows/roles.yml@v1
+    with:
+      mode: validate
+      number: ${{ github.event.pull_request.number }}
+      language: es

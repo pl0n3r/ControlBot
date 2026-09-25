@@ -1,0 +1,15 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: pl0n3r/factory/.github/workflows/release.yml@v1
+    with:
+      version_source: config/version.json
+      version_format: json

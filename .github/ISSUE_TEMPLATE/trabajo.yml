@@ -1,0 +1,55 @@
+name: Trabajo ejecutable
+description: Define trabajo con criterios de aceptación verificables por CI.
+title: ""
+labels:
+  - "estado: disponible"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Todo trabajo debe enlazar criterios humanos AC-* con evidencia ejecutable. No pegues secretos, PII ni comandos shell arbitrarios.
+
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto
+      description: Problema, evidencia y por qué importa.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alcance
+    attributes:
+      label: Alcance
+      description: Qué cambia este trabajo.
+    validations:
+      required: true
+
+  - type: textarea
+    id: fuera
+    attributes:
+      label: Fuera de alcance
+      description: Qué no debe cambiar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación
+      description: Usa una línea por criterio con ID estable AC-NN.
+      placeholder: |
+        - [ ] [AC-01] El comportamiento X queda probado.
+        - [ ] [AC-02] El check Y termina success.
+    validations:
+      required: true
+
+  - type: textarea
+    id: contrato
+    attributes:
+      label: Contrato ejecutable
+      description: Enlaza cada AC-NN a un test unittest exacto o un check exacto.
+      placeholder: |
+        <!-- factory-acceptance {"version":1,"criteria":[{"id":"AC-01","kind":"test","target":"tests/test_x.py::Clase::test_caso"}]} -->
+    validations:
+      required: true

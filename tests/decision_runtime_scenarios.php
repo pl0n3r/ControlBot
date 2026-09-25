@@ -6,6 +6,7 @@ require __DIR__ . '/../src/OwnerSession.php';
 require __DIR__ . '/../src/GitHub.php';
 require __DIR__ . '/../src/ApprovalEndpoint.php';
 require __DIR__ . '/../src/GateInbox.php';
+require __DIR__ . '/../src/DecisionBatch.php';
 require __DIR__ . '/../src/DecisionUi.php';
 require __DIR__ . '/../src/DecisionHistory.php';
 require __DIR__ . '/../src/DecisionRuntime.php';
@@ -35,11 +36,25 @@ function runtimeGateBody(): string {
     return '<!-- factory-human-gate '.json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES).' -->';
 }
 
+function runtimeBatchGateBody(): string {
+    $payload = [
+        'category'=>'brand','context'=>'Aplicar un cambio seguro.',
+        'options'=>[
+            ['id'=>'A','label'=>'Aplicar','effect'=>'Aplica el cambio.','pros'=>['Desbloquea'],'cons'=>['Cambia estado'],'risk'=>'low','cost'=>'','reversible'=>true],
+            ['id'=>'B','label'=>'No aplicar','effect'=>'Mantiene el estado.','pros'=>['Sin cambio'],'cons'=>['Sigue pendiente'],'risk'=>'low','cost'=>'','reversible'=>true],
+        ],
+        'recommendation'=>'A','safe_default'=>'B','title_simple'=>'¿Aplicar cambio seguro?',
+        'summary_simple'=>'Cambio de bajo riesgo listo.','why_recommended'=>'Los controles pasaron.',
+    ];
+    return '<!-- factory-human-gate '.json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES).' -->';
+}
+
 $scenario=$argv[1]??'';
 $now=strtotime('2026-09-25T10:00:00Z');
 $sha=str_repeat('a',40);
+$isBatch=str_starts_with($scenario,'batch');
 $gate=[
-    'number'=>137,'state'=>'open','author_association'=>'OWNER','body'=>runtimeGateBody(),
+    'number'=>$isBatch ? 138 : 137,'state'=>'open','author_association'=>'OWNER','body'=>$isBatch ? runtimeBatchGateBody() : runtimeGateBody(),
     'title'=>'Release Factory','created_at'=>'2026-09-25T09:00:00Z',
     'html_url'=>'https://github.com/pl0n3r/factory/issues/137',
 ];
@@ -50,14 +65,14 @@ $sender=static function(string $method,string $url,array $headers,?string $body)
     $seen[]=[$method,$url];
     $base='https://api.github.com/repos/pl0n3r/factory';
     if ($url===$base.'/issues?state=open&per_page=100&page=1') return ['status'=>200,'body'=>json_encode([$gate],JSON_THROW_ON_ERROR)];
-    if ($url===$base.'/issues/137') return ['status'=>200,'body'=>json_encode($gate,JSON_THROW_ON_ERROR)];
+    if ($url===$base.'/issues/'.$gate['number']) return ['status'=>200,'body'=>json_encode($gate,JSON_THROW_ON_ERROR)];
     if ($url===$base.'/branches/main') return ['status'=>200,'body'=>json_encode(['commit'=>['sha'=>$sha]],JSON_THROW_ON_ERROR)];
     if ($url===$base."/commits/{$sha}/check-runs") return ['status'=>200,'body'=>json_encode(['check_runs'=>[['status'=>'completed','conclusion'=>'success','html_url'=>'https://github.com/check/1']]],JSON_THROW_ON_ERROR)];
     if ($url===$base."/commits/{$sha}") return ['status'=>200,'body'=>json_encode(['html_url'=>"https://github.com/pl0n3r/factory/commit/{$sha}"],JSON_THROW_ON_ERROR)];
-    if ($method==='POST' && $url===$base.'/issues/137/comments') return ['status'=>201,'body'=>json_encode(['html_url'=>'https://github.com/comment/1'],JSON_THROW_ON_ERROR)];
+    if ($method==='POST' && $url===$base.'/issues/'.$gate['number'].'/comments') return ['status'=>201,'body'=>json_encode(['html_url'=>'https://github.com/comment/1'],JSON_THROW_ON_ERROR)];
     if ($method==='PATCH' && $url===$base.'/git/refs/tags/v1') return ['status'=>200,'body'=>json_encode(['ref'=>'https://api.github.com/ref/v1'],JSON_THROW_ON_ERROR)];
     if ($method==='POST' && $url===$base.'/actions/workflows/release-bootstrap.yml/dispatches') return ['status'=>204,'body'=>''];
-    if ($method==='PATCH' && $url===$base.'/issues/137') return ['status'=>200,'body'=>json_encode(['html_url'=>'https://github.com/pl0n3r/factory/issues/137'],JSON_THROW_ON_ERROR)];
+    if ($method==='PATCH' && $url===$base.'/issues/'.$gate['number']) return ['status'=>200,'body'=>json_encode(['html_url'=>'https://github.com/pl0n3r/factory/issues/'.$gate['number']],JSON_THROW_ON_ERROR)];
     if ($url===$base.'/actions/workflows/release-bootstrap.yml/runs') {
         $workflowCalls++;
         if ($scenario==='ambiguous') {
@@ -114,6 +129,30 @@ try {
             'status'=>json_decode($status['body'],true,32,JSON_THROW_ON_ERROR),
             'seen'=>$seen,'session_keys'=>array_keys($session),
         ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        exit;
+    }
+    if ($scenario==='batch' || $scenario==='batch-untrusted-selection' || $scenario==='batch-reauth' || $scenario==='batch-no-csrf') {
+        $request=['_csrf'=>$sessions->csrfToken($session)];
+        $at=$now;
+        if ($scenario==='batch-untrusted-selection') {
+            $request['repository']='evil/example';
+            $request['option']='A';
+        }
+        if ($scenario==='batch-no-csrf') {
+            $request=[];
+        }
+        if ($scenario==='batch-reauth') {
+            $at=$now+301;
+        }
+        try {
+            $response=$runtime->handle('POST','/approvals/batch',$session,$request,$at);
+            echo json_encode([
+                'response'=>json_decode($response['body'],true,32,JSON_THROW_ON_ERROR),
+                'seen'=>$seen,
+            ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        } catch (Throwable) {
+            echo json_encode(['blocked'=>true,'seen'=>$seen],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        }
         exit;
     }
     if ($scenario==='history') {

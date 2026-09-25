@@ -56,6 +56,19 @@ class DecisionUiTests(unittest.TestCase):
         self.assertNotIn("/approvals/execute", html)
         self.assertNotIn("pl0n3r/factory", html)
 
+    def test_low_risk_batch_action_is_mobile_and_explicit(self):
+        html = render("batch")
+        self.assertIn("Aprobar recomendadas de bajo riesgo", html)
+        self.assertIn("pl0n3r/factory #114", html)
+        self.assertIn("¿Aplicar cambio seguro?", html)
+        self.assertIn(".batch-action:focus-visible", html)
+        start = html.index('action="/approvals/batch"')
+        end = html.index("</form>", start)
+        batch_form = html[start:end]
+        self.assertIn('name="_csrf"', batch_form)
+        self.assertNotIn('name="repository"', batch_form)
+        self.assertNotIn('name="option"', batch_form)
+
     def test_enriched_card_shows_plain_language_and_impact(self):
         html = render("enriched")
         self.assertIn("¿Publicar la versión 1.0.4?", html)

@@ -7,7 +7,12 @@ use InvalidArgumentException;
 
 final class DecisionUi
 {
-    public static function render(array $decisions, bool $reauthenticated, ?string $csrfToken = null): string
+    public static function render(
+        array $decisions,
+        bool $reauthenticated,
+        ?string $csrfToken = null,
+        array $batchEligible = [],
+    ): string
     {
         $csrf = '';
         if ($csrfToken !== null) {
@@ -40,8 +45,42 @@ final class DecisionUi
             . '<p class="lede">Aprueba solo lo que requiere tu decisión. ControlBot no inventa decisiones ni ejecuta sin reautenticación reciente.</p>'
             . '</header>'
             . (!$actionEnabled && $decisions !== [] ? self::reauthBanner() : '')
+            . self::batchPanel($batchEligible, $actionEnabled, $csrf)
             . '<section class="decision-grid" aria-live="polite">' . $cards . '</section>'
             . '</main></body></html>';
+    }
+
+    private static function batchPanel(array $eligible, bool $actionEnabled, string $csrf): string
+    {
+        if ($eligible === []) {
+            return '';
+        }
+        $items = '';
+        foreach ($eligible as $entry) {
+            if (
+                !is_array($entry)
+                || !is_string($entry['repository'] ?? null)
+                || !is_int($entry['issue'] ?? null)
+                || ($entry['issue'] ?? 0) < 1
+                || !is_string($entry['title'] ?? null)
+            ) {
+                throw new InvalidArgumentException('Lote de decisiones inválido.');
+            }
+            $items .= '<li><span>' . self::e($entry['repository']) . ' #' . $entry['issue'] . '</span>'
+                . '<strong>' . self::e($entry['title']) . '</strong></li>';
+        }
+        $disabled = $actionEnabled ? '' : ' disabled aria-disabled="true"';
+        $csrfField = $csrf !== '' ? '<input type="hidden" name="_csrf" value="' . $csrf . '">' : '';
+
+        return '<section class="panel batch-panel" aria-labelledby="batch-title">'
+            . '<p class="eyebrow">LOTE SEGURO</p>'
+            . '<h2 id="batch-title">Recomendadas de bajo riesgo</h2>'
+            . '<p>ControlBot recalcula este lote en el servidor antes de ejecutar. Estas son las decisiones incluidas ahora:</p>'
+            . '<ul class="batch-list">' . $items . '</ul>'
+            . '<form method="post" action="/approvals/batch">'
+            . $csrfField
+            . '<button class="batch-action" type="submit"' . $disabled . '>Aprobar recomendadas de bajo riesgo</button>'
+            . '</form></section>';
     }
 
     private static function decisionCard(array $decision, bool $actionEnabled, string $csrf): string
@@ -255,6 +294,19 @@ h1, h2 { font-family: Orbitron, Rajdhani, system-ui, sans-serif; margin: 0; }
 h1 { font-size: clamp(1.9rem, 10vw, 3.4rem); letter-spacing: .03em; }
 .lede { color: var(--muted); max-width: 64ch; line-height: 1.55; }
 .decision-grid { display: grid; gap: 16px; }
+.batch-panel { margin-bottom: 16px; }
+.batch-panel h2 { margin-top: 8px; }
+.batch-panel p { color: var(--cyan-soft); line-height: 1.5; }
+.batch-list { display: grid; gap: 8px; margin: 14px 0; padding: 0; list-style: none; }
+.batch-list li { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid #294d56; border-radius: 9px; }
+.batch-list span { color: var(--muted); font: 700 .72rem/1.2 "JetBrains Mono", ui-monospace, monospace; }
+.batch-action {
+  min-height: 52px; width: 100%; border: 1px solid var(--cyan); border-radius: 10px;
+  background: rgba(8,28,35,.92); color: var(--text); padding: 12px 14px;
+  font: 800 1rem/1.2 Rajdhani, system-ui, sans-serif; cursor: pointer;
+}
+.batch-action:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+.batch-action:disabled { opacity: .5; cursor: not-allowed; }
 .panel {
   position: relative;
   overflow: hidden;

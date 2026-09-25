@@ -55,6 +55,8 @@ class DecisionBatchTests(unittest.TestCase):
         self.assertNotIn(5, [row["issue"] for row in data["eligible"]])
         self.assertNotIn(6, [row["issue"] for row in data["eligible"]])
         self.assertNotIn(7, [row["issue"] for row in data["eligible"]])
+        self.assertNotIn(8, [row["issue"] for row in data["eligible"]])
+        self.assertNotIn(9, [row["issue"] for row in data["eligible"]])
 
 if __name__ == "__main__":
     unittest.main()

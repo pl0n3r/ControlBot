@@ -69,13 +69,13 @@ final class OwnerApprovalService
             $this->port->compareAndMoveChannel($previous, $sha);
             $this->port->dispatchRelease($sha, $issue);
             $this->record($actor, $issue, 'factory-release', 'dispatched');
-        } catch (\Throwable $error) {
+        } catch (\Throwable) {
             try {
                 $this->record($actor, $issue, 'factory-release', 'reconcile-required');
             } catch (\Throwable) {
                 // No untrusted exception text or credentials are written to logs.
             }
-            throw new ApprovalDenied('Aprobación no concluida; reconciliar antes de reintentar', 0, $error);
+            throw new ApprovalDenied('Aprobación no concluida; reconciliar antes de reintentar');
         }
         return ['status' => 'dispatched', 'category' => 'factory-release', 'sha' => $sha];
     }
@@ -156,8 +156,8 @@ final class OwnerApprovalService
                 'target_id' => (string) $issue, 'result' => $result,
                 'created_at' => gmdate('c', ($this->clock)()),
             ]);
-        } catch (\Throwable $error) {
-            throw new ApprovalDenied('Bitácora no disponible', 0, $error);
+        } catch (\Throwable) {
+            throw new ApprovalDenied('Bitácora no disponible');
         }
     }
 }

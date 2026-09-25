@@ -51,10 +51,23 @@ class StuckDetectorTests(unittest.TestCase):
         first = run("same-approach")[0]
         second = run("same-approach")[0]
         different = run("same-approach-different")
+        stability = run("fingerprint-stability")
         self.assertEqual(first["fingerprint"], second["fingerprint"])
         self.assertNotEqual(
             different["a"][0]["fingerprint"],
             different["b"][0]["fingerprint"],
+        )
+        self.assertEqual(
+            stability["same_error_a"][0]["fingerprint"],
+            stability["same_error_b"][0]["fingerprint"],
+        )
+        self.assertNotEqual(
+            stability["same_error_a"][0]["fingerprint"],
+            stability["same_error_different"][0]["fingerprint"],
+        )
+        self.assertEqual(
+            stability["stale_a"][0]["fingerprint"],
+            stability["stale_b"][0]["fingerprint"],
         )
 
     def test_invalid_snapshot_fails_closed(self):

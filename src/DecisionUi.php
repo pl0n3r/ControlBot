@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace ControlBot\Decisions;
 
+require_once __DIR__ . '/UiTheme.php';
+
 use ControlBot\Ui\UiTheme;
 use InvalidArgumentException;
 

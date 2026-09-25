@@ -5,7 +5,7 @@ Centro de control web **privado** de la fábrica de software de pl0n3r. Es una h
 ## Estado actual
 
 - Fase: **construcción**.
-- Versión actual: **0.1.5** (candidato #31: inbox multi-repo y seguimiento de release).ndidato #30: adapter GitHub + endpoint seguro).
+- Versión actual: **0.1.7** (candidato #38: inbox paginado y fail-closed).
 - Stack objetivo: PHP 8.5 + MariaDB.
 - Hosting objetivo: Hostinger, junto a Condor pero con app, base y deploy independientes.
 - Deploy y observer: instalados en modo **fail-closed**; no actúan sin variables/configuración explícita.
@@ -37,4 +37,4 @@ Todo agente debe leer primero `pl0n3r/factory/PLAN-AGENTES.md` y luego `AGENTES.
 
 ## Inbox de decisiones
 
-El slice #31 descubre puertas humanas abiertas y confiables en los repos configurados, conserva solo datos reales de GitHub y en `factory-release` muestra el SHA exacto de `main`, estado de checks y evidencia disponible. El seguimiento de release correlaciona la corrida por workflow, SHA y momento del dispatch; estados ausentes permanecen pendientes en vez de inventarse.
+El inbox descubre puertas humanas abiertas y confiables en los repos configurados, recorre Issues abiertos con paginación acotada y falla cerrado si no puede completar la lectura. En `factory-release` conserva el SHA exacto de `main`, estado de checks y evidencia disponible. El seguimiento de release correlaciona la corrida por workflow, SHA y momento del dispatch; estados ausentes permanecen pendientes en vez de inventarse.

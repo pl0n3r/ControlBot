@@ -45,25 +45,61 @@ function issue(int $number, string $association, string $body, string $title, st
     ], $extra);
 }
 
+function issuesUrl(string $repository, int $page = 1): string
+{
+    return "https://api.github.com/repos/{$repository}/issues?state=open&per_page=100&page={$page}";
+}
+
 $scenario = $argv[1] ?? '';
 $responses = [];
 if ($scenario === 'trusted') {
     $responses = [
-        'https://api.github.com/repos/pl0n3r/ControlBot/issues' => ['status' => 200, 'body' => json_encode([
+        issuesUrl('pl0n3r/ControlBot') => ['status' => 200, 'body' => json_encode([
             issue(5, 'MEMBER', gateBody('legal', 'Puerta confiable.', 'Bloquea un flujo.'), 'Confiable', '2026-09-25T10:00:00Z'),
             issue(6, 'NONE', gateBody('legal'), 'No confiable', '2026-09-25T09:00:00Z'),
             issue(7, 'OWNER', 'Issue normal sin marker.', 'Normal', '2026-09-25T08:00:00Z'),
             issue(8, 'OWNER', gateBody('legal'), 'PR', '2026-09-25T07:00:00Z', ['pull_request' => ['url' => 'x']]),
             issue(9, 'OWNER', gateBody('legal'), 'Cerrada', '2026-09-25T06:00:00Z', ['state' => 'closed']),
         ], JSON_THROW_ON_ERROR)],
-        'https://api.github.com/repos/pl0n3r/factory/issues' => ['status' => 200, 'body' => json_encode([
+        issuesUrl('pl0n3r/factory') => ['status' => 200, 'body' => json_encode([
             issue(10, 'OWNER', gateBody('brand'), 'Segunda puerta', '2026-09-25T05:00:00Z'),
         ], JSON_THROW_ON_ERROR)],
+    ];
+} elseif ($scenario === 'pagination' || $scenario === 'pagination-failure') {
+    $firstPage = [];
+    for ($i = 1; $i <= 100; $i++) {
+        $firstPage[] = issue(
+            1000 + $i,
+            'OWNER',
+            'Issue normal sin marker.',
+            "Normal {$i}",
+            '2026-09-25T09:00:00Z',
+        );
+    }
+    $responses = [
+        issuesUrl('pl0n3r/ControlBot', 1) => [
+            'status' => 200,
+            'body' => json_encode($firstPage, JSON_THROW_ON_ERROR),
+        ],
+        issuesUrl('pl0n3r/ControlBot', 2) => $scenario === 'pagination'
+            ? [
+                'status' => 200,
+                'body' => json_encode([
+                    issue(
+                        2201,
+                        'OWNER',
+                        gateBody('legal', 'Puerta en página dos.'),
+                        'Decisión paginada',
+                        '2026-09-25T08:00:00Z',
+                    ),
+                ], JSON_THROW_ON_ERROR),
+            ]
+            : ['status' => 500, 'body' => '{"message":"fixture failure"}'],
     ];
 } elseif ($scenario === 'release') {
     $sha = str_repeat('a', 40);
     $responses = [
-        'https://api.github.com/repos/pl0n3r/factory/issues' => ['status' => 200, 'body' => json_encode([
+        issuesUrl('pl0n3r/factory') => ['status' => 200, 'body' => json_encode([
             issue(137, 'OWNER', gateBody('factory-release', 'Publicar Factory.', 'Desbloquea adopciones.'), 'Release Factory', '2026-09-25T10:00:00Z'),
         ], JSON_THROW_ON_ERROR)],
         'https://api.github.com/repos/pl0n3r/factory/branches/main' => ['status' => 200, 'body' => json_encode(['commit' => ['sha' => $sha]], JSON_THROW_ON_ERROR)],
@@ -81,8 +117,8 @@ if ($scenario === 'trusted') {
     ];
 } elseif ($scenario === 'empty') {
     $responses = [
-        'https://api.github.com/repos/pl0n3r/ControlBot/issues' => ['status' => 200, 'body' => '[]'],
-        'https://api.github.com/repos/pl0n3r/factory/issues' => ['status' => 200, 'body' => '[]'],
+        issuesUrl('pl0n3r/ControlBot') => ['status' => 200, 'body' => '[]'],
+        issuesUrl('pl0n3r/factory') => ['status' => 200, 'body' => '[]'],
     ];
 } elseif ($scenario === 'tracker-success' || $scenario === 'tracker-failure') {
     $sha = str_repeat('b', 40);
@@ -127,6 +163,10 @@ if (str_starts_with($scenario, 'tracker-')) {
 }
 
 $inbox = new GateInbox($api, $gateway);
-$repos = $scenario === 'release' ? ['pl0n3r/factory'] : ['pl0n3r/ControlBot', 'pl0n3r/factory'];
+$repos = match ($scenario) {
+    'release' => ['pl0n3r/factory'],
+    'pagination', 'pagination-failure' => ['pl0n3r/ControlBot'],
+    default => ['pl0n3r/ControlBot', 'pl0n3r/factory'],
+};
 $result = $inbox->load($repos);
 echo json_encode(['decisions' => $result, 'seen' => $seen], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

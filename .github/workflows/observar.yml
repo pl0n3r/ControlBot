@@ -1,0 +1,22 @@
+name: Observar producción
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 * * * *'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  observar:
+    if: vars.DOMAIN != ''
+    uses: pl0n3r/factory/.github/workflows/observar.yml@v1
+    with:
+      domain: ${{ vars.DOMAIN }}
+      health_path: ${{ vars.HEALTH_PATH || '/health.php' }}
+      paths: '["/"]'
+      version_source: config/version.json
+      version_format: json
+      require_schema: false

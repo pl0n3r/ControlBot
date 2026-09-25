@@ -1,0 +1,24 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_ENABLED == 'true'
+    uses: pl0n3r/factory/.github/workflows/deploy.yml@v1
+    with:
+      domain: ${{ vars.DOMAIN }}
+      health_path: ${{ vars.HEALTH_PATH || '/health.php' }}
+      version_source: config/version.json
+      version_format: json
+      phase: ${{ vars.PRODUCTION_STAGE || 'construccion' }}
+      migration_mode: ${{ vars.MIGRATION_MODE || 'none' }}
+      live_migration_approved: ${{ vars.LIVE_MIGRATION_APPROVED == 'true' }}
+    secrets:
+      DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}

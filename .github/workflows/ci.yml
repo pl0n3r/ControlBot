@@ -1,0 +1,57 @@
+name: CI ControlBot
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-controlbot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  factory:
+    name: CI Factory v1
+    uses: pl0n3r/factory/.github/workflows/ci.yml@v1
+    with:
+      stack: php
+      version_source: config/version.json
+      label_language: es
+      phase: construccion
+      php_version: '8.5'
+      node_enabled: false
+      working_directory: .
+      kit_ref: v1
+
+  contrato:
+    name: Contrato ControlBot
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Ejecutar regresión de bootstrap
+        run: python3 -m unittest tests.test_controlbot_bootstrap
+
+  validar:
+    name: Validar
+    if: always()
+    needs: [factory, contrato]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Exigir gates previos
+        env:
+          RESULTADOS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          for r in $RESULTADOS; do
+            case "$r" in success|skipped) ;; *) echo "::error::Gate previo con resultado $r"; exit 1 ;; esac
+          done

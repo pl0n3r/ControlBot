@@ -141,6 +141,24 @@ class LabelsWorkflowTests(unittest.TestCase):
         self.assertNotIn("--method DELETE", calls)
         self.assertNotIn("/issues?state=all&labels=", calls)
 
+
+    def test_cleanup_supports_multiple_legacy_pairs(self):
+        self.test_cleanup_covers_exact_factory_legacy_aliases()
+
+    def test_legacy_cleanup_fails_closed_when_any_label_is_used(self):
+        self.test_cleanup_fails_closed_when_legacy_alias_is_used()
+
+    def test_legacy_cleanup_is_idempotent_for_absent_or_orphaned_labels(self):
+        absent, absent_calls = self.run_cleanup("aliases-absent")
+        orphaned, orphaned_calls = self.run_cleanup("unused")
+
+        self.assertEqual(absent.returncode, 0, absent.stderr)
+        self.assertNotIn("--method DELETE", absent_calls)
+        self.assertNotIn("/issues?state=all&labels=", absent_calls)
+
+        self.assertEqual(orphaned.returncode, 0, orphaned.stderr)
+        self.assertEqual(orphaned_calls.count("--method DELETE"), len(ALIASES))
+
     def test_sync_depends_on_cleanup_and_keeps_factory_reusable(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         cleanup_at = workflow.index("  limpiar_etiqueta_legacy:")

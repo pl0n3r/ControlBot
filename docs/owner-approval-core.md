@@ -16,13 +16,15 @@ La verificación real de passkey/TOTP y CSRF no pertenece a este corte.
 GitHub autenticada, nunca acepta texto suministrado por el navegador. El
 servicio acepta únicamente una puerta `factory-human-gate` válida, con
 opciones A–D únicas, categoría `factory-release` o `money` y default
-existente. `go-live` y cualquier otra categoría fallan cerrado en esta fase.
+existente. El adapter del servidor debe aportar `approval_option` verificada por política
+confiable. No se deduce de recomendación o default: elegir otra opción solo
+registra rechazo. `go-live` y cualquier otra categoría fallan cerrado en esta fase.
 
 ## Secuencia de release
 
 1. Verificar sesión/reautenticación y puerta confiable.
 2. Comparar SHA exacto de `main`; leer identidad exacta del canal actual.
-3. Registrar intención en bitácora append-only **antes de mutaciones**.
+3. Registrar intención, opción seleccionada y SHA en bitácora append-only **antes de mutaciones**.
 4. Registrar `factory-release-approval` del dueño en la puerta.
 5. Comprobar otra vez que `main` mantiene el SHA.
 6. `compareAndMoveChannel(previousSha, targetSha)` debe usar una operación

@@ -32,7 +32,7 @@ class OwnerApprovalCoreTests(unittest.TestCase):
         self.assertEqual(["approval", "move", "dispatch"], result["mutations"])
         self.assertEqual("a" * 40, result["channel"])
         self.assertEqual(
-            ["prepared", "dispatched"],
+            ["prepared:option:A:" + "a" * 40, "dispatched:option:A:" + "a" * 40],
             [event["result"] for event in result["audits"]],
         )
         self.assertEqual("pl0n3r", result["audits"][0]["actor"])
@@ -52,7 +52,7 @@ class OwnerApprovalCoreTests(unittest.TestCase):
         self.assertTrue(changed["denied"])
         self.assertEqual(["approval"], changed["mutations"])
         self.assertEqual(
-            ["prepared", "reconcile-required"],
+            ["prepared:option:A:" + "a" * 40, "reconcile-required:option:A:" + "a" * 40],
             [event["result"] for event in changed["audits"]],
         )
 
@@ -66,11 +66,16 @@ class OwnerApprovalCoreTests(unittest.TestCase):
             [event["action"] for event in result["audits"]],
         )
         self.assertEqual("recorded", result["outcome"]["status"])
+        decline = self.scenario("decline")
+        self.assertFalse(decline["denied"])
+        self.assertEqual([], decline["mutations"])
+        self.assertEqual(["factory-release-declined"], [x["action"] for x in decline["audits"]])
 
     def test_contract_negative_cases(self) -> None:
         for name in (
             "invalid_sha", "invalid_option", "untrusted_gate",
             "malformed_gate", "go_live", "money_sha",
+            "missing_approval_mapping", "invalid_approval_mapping",
         ):
             with self.subTest(name=name):
                 result = self.scenario(name)
@@ -80,7 +85,7 @@ class OwnerApprovalCoreTests(unittest.TestCase):
         self.assertTrue(failed_move["denied"])
         self.assertEqual(["approval"], failed_move["mutations"])
         self.assertEqual(
-            ["prepared", "reconcile-required"],
+            ["prepared:option:A:" + "a" * 40, "reconcile-required:option:A:" + "a" * 40],
             [event["result"] for event in failed_move["audits"]],
         )
         for result in (failed_move, self.scenario("audit_failure")):

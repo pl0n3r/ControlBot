@@ -27,7 +27,7 @@ Producto: `pl0n3r/ControlBot`
 ## audit_log
 
 - Categoría: `usage`
-- Campos de software: `actor`, `action`, `target_type`, `target_id`, `result`, `created_at`
+- Campos de software: `actor`, `action`, `repository`, `issue`, `category`, `option`, `sha`, `result`, `evidence`, `at`
 - Finalidad: `security_audit`
 - Base documentada: `review_required` (revisión jurídica requerida)
 - Consentimiento: `review_required`

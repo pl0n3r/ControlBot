@@ -96,6 +96,14 @@ if ($scenario === 'trusted') {
             ]
             : ['status' => 500, 'body' => '{"message":"fixture failure"}'],
     ];
+} elseif ($scenario === 'ordering') {
+    $responses = [
+        issuesUrl('pl0n3r/ControlBot') => ['status' => 200, 'body' => json_encode([
+            issue(21, 'OWNER', gateBody('legal'), 'No bloquea y es más antigua', '2026-09-25T05:00:00Z'),
+            issue(22, 'OWNER', gateBody('legal', 'Bloqueo nuevo.', 'Bloquea producción.'), 'Bloquea nueva', '2026-09-25T09:00:00Z'),
+            issue(23, 'OWNER', gateBody('legal', 'Bloqueo antiguo.', 'Bloquea despliegue.'), 'Bloquea antigua', '2026-09-25T07:00:00Z'),
+        ], JSON_THROW_ON_ERROR)],
+    ];
 } elseif ($scenario === 'release') {
     $sha = str_repeat('a', 40);
     $responses = [
@@ -175,7 +183,7 @@ if (str_starts_with($scenario, 'tracker-')) {
 $inbox = new GateInbox($api, $gateway);
 $repos = match ($scenario) {
     'release' => ['pl0n3r/factory'],
-    'pagination', 'pagination-failure' => ['pl0n3r/ControlBot'],
+    'pagination', 'pagination-failure', 'ordering' => ['pl0n3r/ControlBot'],
     default => ['pl0n3r/ControlBot', 'pl0n3r/factory'],
 };
 $result = $inbox->load($repos);

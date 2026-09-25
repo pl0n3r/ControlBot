@@ -46,6 +46,10 @@ class GateInboxTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, "")
 
+    def test_blockers_sort_before_older_non_blockers(self):
+        data = scenario("ordering")
+        self.assertEqual([item["issue"] for item in data["decisions"]], [23, 22, 21])
+
     def test_factory_release_contains_sha_ci_and_evidence(self):
         data = scenario("release")
         self.assertEqual(len(data["decisions"]), 1)

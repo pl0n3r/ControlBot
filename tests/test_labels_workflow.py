@@ -75,7 +75,7 @@ class LabelsWorkflowTests(unittest.TestCase):
                     print("unexpected gh invocation: " + rendered, file=sys.stderr)
                     raise SystemExit(9)
                     """
-                ),
+                ).lstrip(),
                 encoding="utf-8",
             )
             stub.chmod(0o755)

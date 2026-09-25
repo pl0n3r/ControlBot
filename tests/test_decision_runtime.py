@@ -43,6 +43,15 @@ class DecisionRuntimeTests(unittest.TestCase):
         self.assertEqual(data["status"]["state"], "blocked")
         self.assertIsNone(data["status"]["run_url"])
 
+    def test_runtime_exposes_owner_history(self):
+        data = scenario("history")
+        self.assertEqual(data["response"]["status"], 200)
+        payload = json.loads(data["response"]["body"])
+        self.assertEqual(len(payload["history"]), 1)
+        self.assertEqual(payload["history"][0]["repository"], "pl0n3r/factory")
+        self.assertEqual(payload["history"][0]["category"], "factory-release")
+        self.assertEqual(payload["history"][0]["actions"], ["comment", "close-issue"])
+
     def test_repository_allowlist_is_server_side(self):
         result = raw("untrusted-repo")
         self.assertNotEqual(result.returncode, 0)

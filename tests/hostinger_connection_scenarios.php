@@ -56,7 +56,7 @@ if ($scenario === 'reuse') {
     $requests = [];
     $checked = $service($expectedFingerprint, $requests)->verify($profile(), $now);
     $public = json_encode(
-        ['snapshot' => $checked['profile']->safeSnapshot(), 'health' => $checked['health'], 'request' => $requests[0]],
+        ['snapshot' => $checked['profile']->safeSnapshot(), 'health' => $checked['connection'], 'request' => $requests[0]],
         JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
     );
     $out = [
@@ -76,10 +76,10 @@ if ($scenario === 'reuse') {
     ))->verify($profile(), $now);
     $out = [
         'mismatch_status' => $mismatch['profile']->status(),
-        'mismatch_healthy' => $mismatch['health']['healthy'],
-        'mismatch_code' => $mismatch['health']['code'],
+        'mismatch_healthy' => $mismatch['connection']['healthy'],
+        'mismatch_code' => $mismatch['connection']['code'],
         'missing_status' => $missing['profile']->status(),
-        'missing_healthy' => $missing['health']['healthy'],
+        'missing_healthy' => $missing['connection']['healthy'],
         'probe_count' => count($requests) + count($missingRequests),
     ];
 } elseif ($scenario === 'readonly') {
@@ -90,8 +90,8 @@ if ($scenario === 'reuse') {
         'operation' => $request['operation'],
         'effect' => $request['effect'],
         'request_keys' => array_keys($request),
-        'identity_confirmed' => $checked['health']['identity_confirmed'],
-        'destination' => $checked['health']['destination'],
+        'identity_confirmed' => $checked['connection']['identity_confirmed'],
+        'destination' => $checked['connection']['destination'],
         'status' => $checked['profile']->status(),
     ];
 } elseif ($scenario === 'revoked') {

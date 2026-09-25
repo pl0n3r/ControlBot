@@ -34,7 +34,7 @@ final class HostingerConnectionHealth
         $connected = $profile->markConnected($now);
         return [
             'profile' => $connected,
-            'health' => [
+            'connection' => [
                 'status' => 'connected',
                 'healthy' => true,
                 'identity_confirmed' => true,
@@ -57,7 +57,7 @@ final class HostingerConnectionHealth
         $unavailable = $profile->markUnavailable($now);
         return [
             'profile' => $unavailable,
-            'health' => [
+            'connection' => [
                 'status' => 'unavailable',
                 'healthy' => false,
                 'identity_confirmed' => false,

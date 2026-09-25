@@ -22,6 +22,7 @@ final class DecisionRuntime
     public function __construct(
         private readonly OwnerSessionService $sessions,
         private readonly ApprovalEndpoint $approvals,
+        private readonly AppendOnlyAuditLog $audit,
         private readonly \Closure $githubFactory,
         array $repositories,
     ) {
@@ -56,6 +57,7 @@ final class DecisionRuntime
         return new self(
             $sessions,
             new ApprovalEndpoint($sessions, $audit, $factory),
+            $audit,
             $factory,
             $repositories,
         );
@@ -71,6 +73,13 @@ final class DecisionRuntime
         $method = strtoupper($method);
         if ($method === 'GET' && $path === '/decisions') {
             return self::response(200, 'text/html; charset=utf-8', $this->render($session, $now));
+        }
+        if ($method === 'GET' && $path === '/decisions/history') {
+            $this->sessions->githubToken($session);
+            $repository = self::optionalFilter($request, 'repository');
+            $category = self::optionalFilter($request, 'category');
+            $history = (new DecisionHistory($this->audit, $this->repositories))->load($repository, $category);
+            return self::jsonResponse(200, ['history' => $history]);
         }
         if ($method === 'POST' && $path === '/approvals/execute') {
             return self::jsonResponse(200, $this->approve($session, $request, $now));
@@ -171,6 +180,17 @@ final class DecisionRuntime
             throw new RuntimeException('Integración GitHub runtime inválida.');
         }
         return $components;
+    }
+
+    private static function optionalFilter(array $request, string $key): ?string
+    {
+        if (!array_key_exists($key, $request) || $request[$key] === '') {
+            return null;
+        }
+        if (!is_string($request[$key]) || strlen($request[$key]) > 120 || preg_match('/[\r\n]/', $request[$key]) === 1) {
+            throw new InvalidArgumentException('Filtro de historial inválido.');
+        }
+        return $request[$key];
     }
 
     private static function response(int $status, string $contentType, string $body): array

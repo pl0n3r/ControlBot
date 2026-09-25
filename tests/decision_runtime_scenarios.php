@@ -7,6 +7,7 @@ require __DIR__ . '/../src/GitHub.php';
 require __DIR__ . '/../src/ApprovalEndpoint.php';
 require __DIR__ . '/../src/GateInbox.php';
 require __DIR__ . '/../src/DecisionUi.php';
+require __DIR__ . '/../src/DecisionHistory.php';
 require __DIR__ . '/../src/DecisionRuntime.php';
 
 use ControlBot\Approvals\AppendOnlyAuditLog;
@@ -85,9 +86,11 @@ $session=[];
 $sessions->establishTrustedOAuthSession($session,'pl0n3r','fixture-server-value');
 $sessions->reauthenticateTotp($session,Totp::code('JBSWY3DPEHPK3PXP',$now),'JBSWY3DPEHPK3PXP',$now);
 $auditPath=tempnam(sys_get_temp_dir(),'controlbot-runtime-');
+$audit=new AppendOnlyAuditLog($auditPath);
 $runtime=new DecisionRuntime(
     $sessions,
-    new ApprovalEndpoint($sessions,new AppendOnlyAuditLog($auditPath),$factory),
+    new ApprovalEndpoint($sessions,$audit,$factory),
+    $audit,
     $factory,
     ['pl0n3r/factory'],
 );
@@ -111,6 +114,23 @@ try {
             'status'=>json_decode($status['body'],true,32,JSON_THROW_ON_ERROR),
             'seen'=>$seen,'session_keys'=>array_keys($session),
         ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        exit;
+    }
+    if ($scenario==='history') {
+        $audit->record([
+            'actor'=>'pl0n3r','action'=>'comment','repository'=>'pl0n3r/factory','issue'=>137,
+            'category'=>'factory-release','option'=>'A','sha'=>$sha,'result'=>'success',
+            'evidence'=>'https://github.com/pl0n3r/factory/issues/137#issuecomment-1','at'=>$now,
+        ]);
+        $audit->record([
+            'actor'=>'pl0n3r','action'=>'close-issue','repository'=>'pl0n3r/factory','issue'=>137,
+            'category'=>'factory-release','option'=>'A','sha'=>$sha,'result'=>'success',
+            'evidence'=>'https://github.com/pl0n3r/factory/issues/137','at'=>$now,
+        ]);
+        $response=$runtime->handle('GET','/decisions/history',$session,[
+            'repository'=>'pl0n3r/factory','category'=>'factory-release',
+        ],$now);
+        echo json_encode(['response'=>$response],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
         exit;
     }
     if ($scenario==='untrusted-repo') {

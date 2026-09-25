@@ -193,7 +193,7 @@ final class AppendOnlyAuditLog
 
     public function record(array $entry): void
     {
-        $allowed = ['actor', 'action', 'repository', 'issue', 'option', 'sha', 'result', 'evidence', 'at'];
+        $allowed = ['actor', 'action', 'repository', 'issue', 'category', 'option', 'sha', 'result', 'evidence', 'at'];
         if (array_diff(array_keys($entry), $allowed) !== []) {
             throw new InvalidArgumentException('Campo de auditoría no permitido.');
         }
@@ -201,6 +201,51 @@ final class AppendOnlyAuditLog
         if (file_put_contents($this->path, $line, FILE_APPEND | LOCK_EX) === false) {
             throw new RuntimeException('No fue posible escribir la bitácora.');
         }
+    }
+
+    public function entries(): array
+    {
+        if (!is_file($this->path)) {
+            return [];
+        }
+        $size = filesize($this->path);
+        if ($size === false || $size > 10 * 1024 * 1024) {
+            throw new RuntimeException('Bitácora demasiado grande o ilegible.');
+        }
+        $handle = fopen($this->path, 'rb');
+        if ($handle === false || !flock($handle, LOCK_SH)) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            throw new RuntimeException('No fue posible leer la bitácora.');
+        }
+        try {
+            $contents = stream_get_contents($handle);
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
+        if ($contents === false || trim($contents) === '') {
+            return [];
+        }
+
+        $lines = preg_split('/\R/', trim($contents));
+        if (!is_array($lines) || count($lines) > 5000) {
+            throw new RuntimeException('Bitácora inválida.');
+        }
+        $allowed = ['actor', 'action', 'repository', 'issue', 'category', 'option', 'sha', 'result', 'evidence', 'at'];
+        $entries = [];
+        foreach ($lines as $line) {
+            if ($line === '' || strlen($line) > 8192) {
+                throw new RuntimeException('Entrada de bitácora inválida.');
+            }
+            $entry = json_decode($line, true, 32, JSON_THROW_ON_ERROR);
+            if (!is_array($entry) || array_diff(array_keys($entry), $allowed) !== []) {
+                throw new RuntimeException('Entrada de bitácora inválida.');
+            }
+            $entries[] = $entry;
+        }
+        return $entries;
     }
 }
 
@@ -236,7 +281,7 @@ final class OwnerApprovalService
             $sha = $displayedSha;
             $current = $this->github->mainSha($repository);
             if (!hash_equals($sha, $current)) {
-                $this->log($owner, 'preflight-sha', $repository, $issue, $optionId, $sha, 'blocked', null, $now);
+                $this->log($owner, $gate->category, 'preflight-sha', $repository, $issue, $optionId, $sha, 'blocked', null, $now);
                 throw new RuntimeException('main cambió desde que se mostró la decisión.');
             }
         }
@@ -248,6 +293,7 @@ final class OwnerApprovalService
 
         $commentUrl = $this->step(
             $owner,
+            $gate->category,
             'comment',
             $repository,
             $issue,
@@ -261,6 +307,7 @@ final class OwnerApprovalService
         if ($release) {
             $tagUrl = $this->step(
                 $owner,
+                $gate->category,
                 'move-v1',
                 $repository,
                 $issue,
@@ -271,6 +318,7 @@ final class OwnerApprovalService
             );
             $runUrl = $this->step(
                 $owner,
+                $gate->category,
                 'dispatch-release',
                 $repository,
                 $issue,
@@ -287,6 +335,7 @@ final class OwnerApprovalService
 
         $closeUrl = $this->step(
             $owner,
+            $gate->category,
             'close-issue',
             $repository,
             $issue,
@@ -302,6 +351,7 @@ final class OwnerApprovalService
 
     private function step(
         OwnerContext $owner,
+        string $category,
         string $action,
         string $repository,
         int $issue,
@@ -313,16 +363,17 @@ final class OwnerApprovalService
         try {
             $evidence = $call();
         } catch (\Throwable $error) {
-            $this->log($owner, $action, $repository, $issue, $option, $sha, 'failed', null, $at);
+            $this->log($owner, $category, $action, $repository, $issue, $option, $sha, 'failed', null, $at);
             throw $error;
         }
 
-        $this->log($owner, $action, $repository, $issue, $option, $sha, 'success', $evidence, $at);
+        $this->log($owner, $category, $action, $repository, $issue, $option, $sha, 'success', $evidence, $at);
         return $evidence;
     }
 
     private function log(
         OwnerContext $owner,
+        string $category,
         string $action,
         string $repository,
         int $issue,
@@ -337,6 +388,7 @@ final class OwnerApprovalService
             'action' => $action,
             'repository' => $repository,
             'issue' => $issue,
+            'category' => $category,
             'option' => $option,
             'sha' => $sha,
             'result' => $result,

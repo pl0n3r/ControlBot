@@ -34,7 +34,8 @@ final class OwnerApprovalService
             throw new ApprovalDenied('Issue inválido');
         }
         $actor = $this->requireOwner();
-        $gate = $this->gate($this->port->readGate($issue));
+        $trustedGate = $this->port->readGate($issue);
+        $gate = $this->gate($trustedGate);
         if (!in_array($option, $gate['options'], true)) {
             throw new ApprovalDenied('Opción inválida');
         }
@@ -47,6 +48,14 @@ final class OwnerApprovalService
             return ['status' => 'recorded', 'category' => 'money'];
         }
 
+        $approvalOption = $trustedGate['approval_option'] ?? null;
+        if (!is_string($approvalOption) || !in_array($approvalOption, $gate['options'], true)) {
+            throw new ApprovalDenied('Opción afirmativa no verificada');
+        }
+        if ($option !== $approvalOption) {
+            $this->record($actor, $issue, 'factory-release-declined', 'option:' . $option);
+            return ['status' => 'recorded', 'category' => 'factory-release'];
+        }
         if (!is_string($sha) || preg_match('/^[0-9a-f]{40}$/D', $sha) !== 1) {
             throw new ApprovalDenied('SHA exacto requerido');
         }
@@ -60,7 +69,8 @@ final class OwnerApprovalService
         }
 
         // Fail closed: if audit cannot persist intent, no GitHub write is attempted.
-        $this->record($actor, $issue, 'factory-release', 'prepared');
+        $receipt = 'option:' . $option . ':' . $sha;
+        $this->record($actor, $issue, 'factory-release', 'prepared:' . $receipt);
         try {
             $this->port->appendOwnerApproval($issue, $sha, $actor);
             if (!hash_equals($sha, $this->port->mainSha())) {
@@ -68,10 +78,10 @@ final class OwnerApprovalService
             }
             $this->port->compareAndMoveChannel($previous, $sha);
             $this->port->dispatchRelease($sha, $issue);
-            $this->record($actor, $issue, 'factory-release', 'dispatched');
+            $this->record($actor, $issue, 'factory-release', 'dispatched:' . $receipt);
         } catch (\Throwable) {
             try {
-                $this->record($actor, $issue, 'factory-release', 'reconcile-required');
+                $this->record($actor, $issue, 'factory-release', 'reconcile-required:' . $receipt);
             } catch (\Throwable) {
                 // No untrusted exception text or credentials are written to logs.
             }

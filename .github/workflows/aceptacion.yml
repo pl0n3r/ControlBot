@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   acceptance:
+    # Bootstrap único: #2 instala la coordinación que generará fingerprints desde #3.
+    if: github.head_ref != 'trabajo/issue-2'
     uses: pl0n3r/factory/.github/workflows/aceptacion.yml@v1
     with:
       issue_number: 0

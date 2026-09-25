@@ -5,7 +5,8 @@
 Rol(es): <slugs separados por coma>
 Rol primario: <slug>
 Revisión cruzada: <slug>
-Closes #N
+Closes #N · Reserva: <UUID>
+<!-- condor-reserva-id: <UUID> -->
 
 ## Criterios de aceptación
 

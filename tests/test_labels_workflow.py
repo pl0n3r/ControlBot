@@ -102,7 +102,7 @@ class LabelsWorkflowTests(unittest.TestCase):
         script = SCRIPT.read_text(encoding="utf-8")
         match = re.search(r"^ALIASES=\$'(.*?)'$", script, re.MULTILINE)
         self.assertIsNotNone(match)
-        decoded = bytes(match.group(1), "utf-8").decode("unicode_escape")
+        decoded = match.group(1).replace("\\n", "\n").replace("\\t", "\t")
         pairs = dict(line.split("\t", 1) for line in decoded.splitlines())
         self.assertEqual(pairs, ALIASES)
 

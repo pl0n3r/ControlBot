@@ -69,7 +69,7 @@ try {
             'comment',
             'success',
             300,
-            'https://evil.example/?token=supersecret',
+            'https://github.com/pl0n3r/ControlBot/issues/41?token=supersecret',
             'owner-secret-value',
         );
         echo json_encode($history->load(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

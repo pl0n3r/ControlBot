@@ -102,7 +102,7 @@ class LabelsWorkflowTests(unittest.TestCase):
 
     def test_cleanup_job_has_minimum_permissions(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        cleanup_at = workflow.index("  limpiar-etiqueta-legacy:")
+        cleanup_at = workflow.index("  limpiar_etiqueta_legacy:")
         sync_at = workflow.index("  sync:")
         cleanup = workflow[cleanup_at:sync_at]
 

@@ -34,7 +34,7 @@ class GitHubGatewayTests(unittest.TestCase):
 
     def test_transport_rejects_untrusted_destination(self):
         errors = scenario("destination")["errors"]
-        self.assertEqual(len(errors), 4)
+        self.assertEqual(len(errors), 7)
         self.assertTrue(all("no permitid" in error.lower() for error in errors))
 
 

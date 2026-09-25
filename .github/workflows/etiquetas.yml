@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   limpiar_etiqueta_legacy:
-    name: Limpiar etiqueta legacy huérfana
+    name: Limpiar aliases legacy huérfanos
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -29,7 +29,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Eliminar prioridad legacy solo si está huérfana
+      - name: Eliminar aliases legacy solo si están huérfanos
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORIO: ${{ github.repository }}

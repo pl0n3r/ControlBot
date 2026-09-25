@@ -1,7 +1,6 @@
 <?php
 declare(strict_types=1);
 
-require __DIR__ . '/../src/UiTheme.php';
 require __DIR__ . '/../src/DashboardUi.php';
 
 use ControlBot\Dashboard\DashboardUi;

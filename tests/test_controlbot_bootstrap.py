@@ -1,4 +1,5 @@
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -44,6 +45,21 @@ class ControlBotBootstrapTests(unittest.TestCase):
         self.assertIn("operation: validate", workflow)
         self.assertIn("github.event.comment.body == '/tomar'", workflow)
         self.assertIn("require_reservation:", workflow)
+
+    def test_coordination_permissions_cover_reusable_envelope(self) -> None:
+        workflow = self.read(".github/workflows/coordinacion.yml")
+        for job in ("comentario", "etiqueta", "pr", "validar-pr", "issue", "sweep"):
+            with self.subTest(job=job):
+                match = re.search(
+                    rf"(?ms)^  {re.escape(job)}:\n(.*?)(?=^  [a-zA-Z0-9_-]+:\n|\Z)",
+                    workflow,
+                )
+                self.assertIsNotNone(match)
+                block = match.group(1)
+                self.assertIn("contents: write", block)
+                self.assertIn("issues: write", block)
+                self.assertIn("pull-requests: write", block)
+                self.assertIn("uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1", block)
 
     def test_deploy_stays_construction_only(self) -> None:
         deploy = self.read(".github/workflows/deploy.yml")

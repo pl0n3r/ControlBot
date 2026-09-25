@@ -6,6 +6,7 @@ require __DIR__ . '/../src/DecisionUi.php';
 use ControlBot\Decisions\DecisionUi;
 
 $scenario = $argv[1] ?? '';
+$csrf = str_repeat('c', 40);
 $decision = [[
     'repository' => 'pl0n3r/factory',
     'issue' => 114,
@@ -20,10 +21,12 @@ $decision = [[
 ]];
 
 if ($scenario === 'empty') {
-    echo DecisionUi::render([], true);
+    echo DecisionUi::render([], true, $csrf);
 } elseif ($scenario === 'reauth') {
-    echo DecisionUi::render($decision, false);
+    echo DecisionUi::render($decision, false, $csrf);
 } elseif ($scenario === 'ready') {
+    echo DecisionUi::render($decision, true, $csrf);
+} elseif ($scenario === 'no-csrf') {
     echo DecisionUi::render($decision, true);
 } elseif ($scenario === 'enriched' || $scenario === 'enriched-escape' || $scenario === 'invalid-risk' || $scenario === 'default-id' || $scenario === 'zero-copy') {
     $decision[0]['title_simple'] = '¿Publicar la versión 1.0.4?';
@@ -53,10 +56,10 @@ if ($scenario === 'empty') {
         $decision[0]['title_simple'] = '0';
         $decision[0]['summary_simple'] = '0';
     }
-    echo DecisionUi::render($decision, true);
+    echo DecisionUi::render($decision, true, $csrf);
 } elseif ($scenario === 'escape') {
     $decision[0]['title'] = '<script>alert(1)</script>';
-    echo DecisionUi::render($decision, true);
+    echo DecisionUi::render($decision, true, $csrf);
 } else {
     fwrite(STDERR, "scenario inválido\n");
     exit(2);

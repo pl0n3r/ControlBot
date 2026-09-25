@@ -7,12 +7,25 @@ use InvalidArgumentException;
 
 final class DecisionUi
 {
-    public static function render(array $decisions, bool $reauthenticated): string
+    public static function render(array $decisions, bool $reauthenticated, ?string $csrfToken = null): string
     {
+        $csrf = '';
+        if ($csrfToken !== null) {
+            if (
+                strlen($csrfToken) < 32
+                || strlen($csrfToken) > 256
+                || preg_match('/[\r\n]/', $csrfToken) === 1
+            ) {
+                throw new InvalidArgumentException('CSRF de UI inválido.');
+            }
+            $csrf = self::e($csrfToken);
+        }
+        $actionEnabled = $reauthenticated && $csrf !== '';
+
         $cards = $decisions === []
             ? self::emptyState()
             : implode('', array_map(
-                static fn (array $decision): string => self::decisionCard($decision, $reauthenticated),
+                static fn (array $decision): string => self::decisionCard($decision, $actionEnabled, $csrf),
                 $decisions
             ));
 
@@ -26,12 +39,12 @@ final class DecisionUi
             . '<h1 id="page-title">Te toca decidir</h1>'
             . '<p class="lede">Aprueba solo lo que requiere tu decisión. ControlBot no inventa decisiones ni ejecuta sin reautenticación reciente.</p>'
             . '</header>'
-            . (!$reauthenticated && $decisions !== [] ? self::reauthBanner() : '')
+            . (!$actionEnabled && $decisions !== [] ? self::reauthBanner() : '')
             . '<section class="decision-grid" aria-live="polite">' . $cards . '</section>'
             . '</main></body></html>';
     }
 
-    private static function decisionCard(array $decision, bool $reauthenticated): string
+    private static function decisionCard(array $decision, bool $actionEnabled, string $csrf): string
     {
         $required = ['repository', 'issue', 'title', 'context', 'options', 'recommendation'];
         foreach ($required as $key) {
@@ -76,7 +89,7 @@ final class DecisionUi
             $id = self::e($option['id']);
             $label = self::e($option['label']);
             $recommended = hash_equals($decision['recommendation'], $option['id']);
-            $disabled = $reauthenticated ? '' : ' disabled aria-disabled="true"';
+            $disabled = $actionEnabled ? '' : ' disabled aria-disabled="true"';
             $badge = $recommended ? '<span class="badge">RECOMENDADA</span>' : '';
             $effect = self::optionalText($option, 'effect', 240);
             $risk = self::riskLabel($option);
@@ -101,7 +114,9 @@ final class DecisionUi
                 . '</div>';
         }
 
-        return '<article class="panel decision-card" data-state="' . ($reauthenticated ? 'ready' : 'reauth-required') . '">'
+        $csrfField = $csrf !== '' ? '<input type="hidden" name="_csrf" value="' . $csrf . '">' : '';
+
+        return '<article class="panel decision-card" data-state="' . ($actionEnabled ? 'ready' : 'reauth-required') . '">'
             . '<div class="panel-line" aria-hidden="true"></div>'
             . '<div class="meta"><span>' . $repository . '</span><span>#' . $issue . '</span></div>'
             . '<h2>' . $title . '</h2>'
@@ -111,6 +126,7 @@ final class DecisionUi
             . ($blocks !== '' ? '<p class="blocker"><strong>Trabajo en espera:</strong> ' . $blocks . '</p>' : '')
             . ($shaEscaped !== '' ? '<details class="technical"><summary>Ver detalles técnicos</summary><p class="sha"><span>SHA</span><code>' . $shaEscaped . '</code></p></details>' : '')
             . '<form method="post" action="/approvals/execute" class="actions">'
+            . $csrfField
             . '<input type="hidden" name="repository" value="' . $repository . '">'
             . '<input type="hidden" name="issue" value="' . $issue . '">'
             . '<input type="hidden" name="displayed_sha" value="' . $shaEscaped . '">'

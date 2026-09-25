@@ -39,8 +39,15 @@ class DecisionUiTests(unittest.TestCase):
         self.assertIn('name="repository" value="pl0n3r/factory"', html)
         self.assertIn('name="issue" value="114"', html)
         self.assertIn('name="displayed_sha" value="' + ("a" * 40) + '"', html)
+        self.assertIn('name="_csrf" value="' + ("c" * 40) + '"', html)
         self.assertIn('name="option" value="A"', html)
         self.assertNotIn('disabled aria-disabled="true"', html)
+
+    def test_missing_csrf_keeps_actions_disabled(self):
+        html = render("no-csrf")
+        self.assertIn('data-state="reauth-required"', html)
+        self.assertIn('disabled aria-disabled="true"', html)
+        self.assertNotIn('name="_csrf"', html)
 
     def test_empty_state_has_no_fake_decision(self):
         html = render("empty")

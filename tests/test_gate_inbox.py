@@ -68,6 +68,11 @@ class GateInboxTests(unittest.TestCase):
         self.assertTrue(failure["terminal"])
         self.assertEqual(failure["conclusion"], "failure")
 
+    def test_ambiguous_matching_runs_fail_closed(self):
+        result = scenario_raw("tracker-ambiguous")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+
     def test_empty_inbox_has_no_synthetic_items(self):
         data = scenario("empty")
         self.assertEqual(data["decisions"], [])

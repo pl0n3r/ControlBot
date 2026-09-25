@@ -249,7 +249,9 @@ final class ReleaseRunTracker
         if ($matches === []) {
             return ['state' => 'pending', 'terminal' => false, 'run_url' => null];
         }
-        usort($matches, static fn (array $a, array $b): int => $a['created'] <=> $b['created']);
+        if (count($matches) !== 1) {
+            throw new RuntimeException('Correlación de release ambigua.');
+        }
         $run = $matches[0]['run'];
         $status = $run['status'] ?? null;
         $conclusion = $run['conclusion'] ?? null;

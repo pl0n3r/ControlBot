@@ -154,6 +154,29 @@ class LabelsWorkflowTests(unittest.TestCase):
         self.assertIn("needs.limpiar_etiqueta_legacy.result == 'success'", sync)
         self.assertIn("uses: pl0n3r/factory/.github/workflows/etiquetas.yml@v1", sync)
 
+    def test_candidate_check_runs_on_synchronize(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn(
+            "types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]",
+            workflow,
+        )
+        candidate_at = workflow.index("  candidate:")
+        cleanup_at = workflow.index("  limpiar_etiqueta_legacy:")
+        candidate = workflow[candidate_at:cleanup_at]
+        self.assertIn("name: Etiquetas", candidate)
+        self.assertIn("if: github.event_name == 'pull_request'", candidate)
+        self.assertIn("permissions:\n      contents: read\n", candidate)
+        self.assertNotIn("issues: write", candidate)
+        self.assertNotIn("pull-requests: write", candidate)
+        self.assertIn(
+            "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            candidate,
+        )
+        self.assertIn(
+            "tests.test_labels_workflow.LabelsWorkflowTests.test_cleanup_covers_exact_factory_legacy_aliases",
+            candidate,
+        )
+
     def test_cleanup_job_has_minimum_permissions(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         cleanup_at = workflow.index("  limpiar_etiqueta_legacy:")

@@ -62,10 +62,13 @@ jobs:
 
   pr:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    # GitHub valida el máximo permiso del reusable completo antes de evaluar
+    # qué operación interna se ejecutará. La operación pr sigue estrechando
+    # permisos dentro de Factory.
     permissions:
       contents: write
       issues: write
-      pull-requests: read
+      pull-requests: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: pr
@@ -74,17 +77,19 @@ jobs:
 
   validar-pr:
     if: github.event_name == 'pull_request'
+    # Mismo sobre de carga; el job validar-pr del reusable conserva permisos
+    # read-only (contents/issues/pull-requests: read).
     permissions:
-      contents: read
-      issues: read
-      pull-requests: read
+      contents: write
+      issues: write
+      pull-requests: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: validate
       pr_number: ${{ github.event.pull_request.number }}
-      # Bootstrap único de #2: su base todavía no tenía el coordinador Factory.
-      # Cualquier PR posterior parte de otro SHA y exige reserva /tomar.
-      require_reservation: ${{ github.event.pull_request.base.sha != 'f22330dbca5b6127bad0a6275776678308c4840c' }}
+      # Recuperación única de #21: main todavía tenía el caller inválido.
+      # Todo PR posterior parte de otro SHA y exige reserva /tomar.
+      require_reservation: ${{ github.event.pull_request.base.sha != 'a3e258995145750b6fb10284320fd6130979ae93' }}
 
   issue:
     if: github.event_name == 'issues' && (github.event.action == 'closed' || github.event.action == 'reopened')
@@ -103,6 +108,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      pull-requests: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: sweep

@@ -18,6 +18,8 @@ final class StuckDetector
             $detections[] = $this->finding('repeated_error', 'warning', $s, [
                 'error_fingerprint' => $s['same_error_fingerprint'],
                 'count' => $s['same_error_count'],
+            ], [
+                'error_fingerprint' => $s['same_error_fingerprint'],
             ]);
         }
 
@@ -26,18 +28,24 @@ final class StuckDetector
                 'approach_fingerprint' => $s['approach_fingerprint'],
                 'failures' => $s['same_approach_failures'],
                 'next_attempt_auto_executable' => false,
+            ], [
+                'approach_fingerprint' => $s['approach_fingerprint'],
             ]);
         }
 
         if (!$s['pr_closed'] && $s['commit_count'] > 10) {
             $detections[] = $this->finding('pr_commit_overflow', 'warning', $s, [
                 'commit_count' => $s['commit_count'],
+            ], [
+                'threshold' => 10,
             ]);
         }
 
         if (!$s['review_progress'] && $s['review_rounds'] >= 3) {
             $detections[] = $this->finding('review_loop', 'warning', $s, [
                 'review_rounds' => $s['review_rounds'],
+            ], [
+                'threshold_rounds' => 3,
             ]);
         }
 
@@ -49,6 +57,9 @@ final class StuckDetector
             $detections[] = $this->finding('stale_reservation', 'warning', $s, [
                 'age_seconds' => $s['now'] - $s['last_progress_at'],
                 'timeout_seconds' => $s['reservation_timeout'],
+            ], [
+                'last_progress_at' => $s['last_progress_at'],
+                'timeout_seconds' => $s['reservation_timeout'],
             ]);
         }
 
@@ -58,6 +69,9 @@ final class StuckDetector
         ) {
             $detections[] = $this->finding('heartbeat_timeout', 'error', $s, [
                 'age_seconds' => $s['now'] - $s['last_heartbeat_at'],
+                'timeout_seconds' => $s['heartbeat_timeout'],
+            ], [
+                'last_heartbeat_at' => $s['last_heartbeat_at'],
                 'timeout_seconds' => $s['heartbeat_timeout'],
             ]);
         }
@@ -72,6 +86,10 @@ final class StuckDetector
                 'state' => $s['state'],
                 'age_seconds' => $s['now'] - $s['state_started_at'],
                 'timeout_seconds' => $stateTimeout,
+            ], [
+                'state' => $s['state'],
+                'state_started_at' => $s['state_started_at'],
+                'timeout_seconds' => $stateTimeout,
             ]);
         }
 
@@ -79,12 +97,17 @@ final class StuckDetector
             $detections[] = $this->finding('rapid_retry_loop', 'warning', $s, [
                 'retry_count' => $s['rapid_retry_count'],
                 'window_seconds' => $s['rapid_retry_window'],
+            ], [
+                'window_seconds' => $s['rapid_retry_window'],
             ]);
         }
 
         if (!$s['handoff_state_changed'] && $s['handoff_bounce_count'] >= 3) {
             $detections[] = $this->finding('handoff_bounce', 'warning', $s, [
                 'bounce_count' => $s['handoff_bounce_count'],
+            ], [
+                'state' => $s['state'],
+                'threshold_bounces' => 3,
             ]);
         }
 
@@ -182,13 +205,13 @@ final class StuckDetector
         return $s;
     }
 
-    private function finding(string $type, string $severity, array $s, array $evidence): array
+    private function finding(string $type, string $severity, array $s, array $evidence, array $cause): array
     {
         $material = [
             'type' => $type,
             'session_id' => $s['session_id'],
             'work_item_id' => $s['work_item_id'],
-            'evidence' => $evidence,
+            'cause' => $cause,
         ];
 
         return [

@@ -22,10 +22,10 @@ class OwnerApprovalTests(unittest.TestCase):
         data = scenario("release")
         self.assertEqual(
             [call[0] for call in data["calls"]],
-            ["mainSha", "commentIssue", "closeIssue", "moveTag", "dispatchWorkflow"],
+            ["mainSha", "commentIssue", "moveTag", "dispatchWorkflow", "closeIssue"],
         )
         self.assertEqual(
-            data["calls"][3],
+            data["calls"][2],
             ["moveTag", "pl0n3r/factory", "v1", "a" * 40],
         )
         self.assertEqual(data["result"]["sha"], "a" * 40)
@@ -69,6 +69,13 @@ class OwnerApprovalTests(unittest.TestCase):
     def test_gate_rejects_non_string_option_and_selector_fields(self):
         data = scenario("invalid-types")
         self.assertIn("inválid", data["error"].lower())
+
+
+    def test_failed_release_keeps_issue_open_for_retry(self):
+        data = scenario("failed-step")
+        self.assertIn("fallo simulado", data["error"])
+        self.assertEqual(data["calls"], ["mainSha", "commentIssue", "moveTag"])
+        self.assertNotIn("closeIssue", data["calls"])
 
     def test_failed_github_step_is_audited_before_rethrow(self):
         data = scenario("failed-step")

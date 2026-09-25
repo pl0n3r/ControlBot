@@ -5,7 +5,7 @@ Centro de control web **privado** de la fábrica de software de pl0n3r. Es una h
 ## Estado actual
 
 - Fase: **construcción**.
-- Versión base: **0.1.0**.
+- Versión actual: **0.1.5** (candidato #31: inbox multi-repo y seguimiento de release).ndidato #30: adapter GitHub + endpoint seguro).
 - Stack objetivo: PHP 8.5 + MariaDB.
 - Hosting objetivo: Hostinger, junto a Condor pero con app, base y deploy independientes.
 - Deploy y observer: instalados en modo **fail-closed**; no actúan sin variables/configuración explícita.
@@ -34,3 +34,7 @@ Especificación completa: #1. Puente del navegador: `pl0n3r/AutoFactory#1`.
 ## Desarrollo
 
 Todo agente debe leer primero `pl0n3r/factory/PLAN-AGENTES.md` y luego `AGENTES.md`. Desde #3 en adelante, cada Issue se reserva con `/tomar`, se trabaja en `trabajo/issue-N` y se valida con Factory v1.
+
+## Inbox de decisiones
+
+El slice #31 descubre puertas humanas abiertas y confiables en los repos configurados, conserva solo datos reales de GitHub y en `factory-release` muestra el SHA exacto de `main`, estado de checks y evidencia disponible. El seguimiento de release correlaciona la corrida por workflow, SHA y momento del dispatch; estados ausentes permanecen pendientes en vez de inventarse.

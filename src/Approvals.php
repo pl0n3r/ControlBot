@@ -36,13 +36,15 @@ final class HumanGate
         }
 
         $required = ['category', 'context', 'options', 'recommendation', 'safe_default'];
-        $keys = array_keys($raw);
-        sort($keys);
-        $expected = $required;
-        sort($expected);
-        if ($keys !== $expected || !in_array($raw['category'] ?? null, self::CATEGORIES, true)) {
+        $allowed = array_merge($required, ['title_simple', 'summary_simple', 'why_recommended', 'blocks']);
+        if (
+            array_diff($required, array_keys($raw)) !== []
+            || array_diff(array_keys($raw), $allowed) !== []
+            || !in_array($raw['category'] ?? null, self::CATEGORIES, true)
+        ) {
             throw new InvalidArgumentException('Esquema o categoría de puerta inválidos.');
         }
+        self::validateSimpleFields($raw);
         if (!is_string($raw['context']) || trim($raw['context']) === '' || strlen($raw['context']) > 500 || str_contains($raw['context'], "\n")) {
             throw new InvalidArgumentException('Contexto inválido.');
         }
@@ -56,10 +58,16 @@ final class HumanGate
                 throw new InvalidArgumentException('Opción inválida.');
             }
             $optionKeys = array_keys($option);
-            sort($optionKeys);
-            if ($optionKeys !== ['id', 'label'] || !is_string($option['id']) || !is_string($option['label'])) {
+            $allowedOption = ['id', 'label', 'effect', 'pros', 'cons', 'risk', 'cost', 'reversible'];
+            if (
+                !isset($option['id'], $option['label'])
+                || array_diff($optionKeys, $allowedOption) !== []
+                || !is_string($option['id'])
+                || !is_string($option['label'])
+            ) {
                 throw new InvalidArgumentException('Opción inválida.');
             }
+            self::validateOptionMetadata($option);
             $id = $option['id'];
             $label = trim($option['label']);
             if (preg_match('/^[A-D]$/', $id) !== 1 || isset($options[$id]) || $label === '' || strlen($label) > 240 || str_contains($label, "\n")) {
@@ -78,6 +86,70 @@ final class HumanGate
         }
 
         return new self($raw['category'], trim($raw['context']), $options, $recommendation, $safeDefault);
+    }
+
+    private static function validateSimpleFields(array $raw): void
+    {
+        foreach ([
+            'title_simple' => [180, 1],
+            'summary_simple' => [600, 3],
+            'why_recommended' => [300, 1],
+            'blocks' => [300, 1],
+        ] as $field => [$maxLength, $maxLines]) {
+            if (!array_key_exists($field, $raw)) {
+                continue;
+            }
+            $value = $raw[$field];
+            if (
+                !is_string($value)
+                || trim($value) === ''
+                || strlen(trim($value)) > $maxLength
+                || str_contains($value, "\r")
+                || count(explode("\n", trim($value))) > $maxLines
+            ) {
+                throw new InvalidArgumentException('Campo simple de puerta inválido.');
+            }
+        }
+    }
+
+    private static function validateOptionMetadata(array $option): void
+    {
+        foreach (['effect' => 300, 'cost' => 120] as $field => $maxLength) {
+            if (!array_key_exists($field, $option)) {
+                continue;
+            }
+            if (
+                !is_string($option[$field])
+                || strlen(trim($option[$field])) > $maxLength
+                || ($field === 'effect' && trim($option[$field]) === '')
+                || str_contains($option[$field], "\n")
+                || str_contains($option[$field], "\r")
+            ) {
+                throw new InvalidArgumentException('Metadata de opción inválida.');
+            }
+        }
+        foreach (['pros', 'cons'] as $field) {
+            if (!array_key_exists($field, $option)) {
+                continue;
+            }
+            if (!is_array($option[$field]) || count($option[$field]) < 1 || count($option[$field]) > 5) {
+                throw new InvalidArgumentException('Metadata de opción inválida.');
+            }
+            foreach ($option[$field] as $item) {
+                if (!is_string($item) || trim($item) === '' || strlen(trim($item)) > 180 || str_contains($item, "\n")) {
+                    throw new InvalidArgumentException('Metadata de opción inválida.');
+                }
+            }
+        }
+        if (
+            array_key_exists('risk', $option)
+            && (!is_string($option['risk']) || !in_array($option['risk'], ['low', 'medium', 'high'], true))
+        ) {
+            throw new InvalidArgumentException('Metadata de opción inválida.');
+        }
+        if (array_key_exists('reversible', $option) && !is_bool($option['reversible'])) {
+            throw new InvalidArgumentException('Metadata de opción inválida.');
+        }
     }
 
     public function option(string $id): string
@@ -185,18 +257,7 @@ final class OwnerApprovalService
             fn (): string => $this->github->commentIssue($repository, $issue, $comment),
         );
 
-        $closeUrl = $this->step(
-            $owner,
-            'close-issue',
-            $repository,
-            $issue,
-            $optionId,
-            $sha,
-            $now,
-            fn (): string => $this->github->closeIssue($repository, $issue),
-        );
-
-        $evidence = ['comment' => $commentUrl, 'issue' => $closeUrl];
+        $evidence = ['comment' => $commentUrl];
         if ($release) {
             $tagUrl = $this->step(
                 $owner,
@@ -223,6 +284,18 @@ final class OwnerApprovalService
             );
             $evidence += ['tag' => $tagUrl, 'run' => $runUrl];
         }
+
+        $closeUrl = $this->step(
+            $owner,
+            'close-issue',
+            $repository,
+            $issue,
+            $optionId,
+            $sha,
+            $now,
+            fn (): string => $this->github->closeIssue($repository, $issue),
+        );
+        $evidence['issue'] = $closeUrl;
 
         return ['category' => $gate->category, 'option' => $optionId, 'sha' => $sha, 'evidence' => $evidence];
     }

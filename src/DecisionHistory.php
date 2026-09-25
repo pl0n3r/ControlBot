@@ -131,7 +131,14 @@ final class DecisionHistory
         $safeEvidence = null;
         if ($evidence !== null) {
             $parts = parse_url($evidence);
-            if (is_array($parts) && ($parts['scheme'] ?? null) === 'https' && ($parts['host'] ?? null) === 'github.com') {
+            if (
+                is_array($parts)
+                && ($parts['scheme'] ?? null) === 'https'
+                && ($parts['host'] ?? null) === 'github.com'
+                && !isset($parts['user'], $parts['pass'], $parts['query'], $parts['fragment'])
+                && is_string($parts['path'] ?? null)
+                && str_starts_with($parts['path'], '/')
+            ) {
                 $safeEvidence = $evidence;
             }
         }

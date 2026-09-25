@@ -26,7 +26,7 @@ class ApprovalEndpointTests(unittest.TestCase):
     def test_release_flows_through_session_gateway(self):
         data = scenario("flow")
         names = [row[0] for row in data["gateway_calls"]]
-        self.assertEqual(names, ["mainSha", "commentIssue", "closeIssue", "moveTag", "dispatchWorkflow"])
+        self.assertEqual(names, ["mainSha", "commentIssue", "moveTag", "dispatchWorkflow", "closeIssue"])
         self.assertEqual(data["result"]["sha"], "a" * 40)
         self.assertGreaterEqual(len(data["audit"]), 4)
 

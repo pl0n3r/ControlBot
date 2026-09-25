@@ -18,6 +18,7 @@ final class FakePort implements ApprovalPort
     public string $association = 'OWNER';
     public bool $failMove = false;
     public bool $changeMain = false;
+    public ?string $approvalOption = 'A';
 
     public function __construct()
     {
@@ -26,7 +27,7 @@ final class FakePort implements ApprovalPort
     }
     public function readGate(int $issue): array
     {
-        return ['body' => $this->gateBody, 'author_association' => $this->association];
+        return ['body' => $this->gateBody, 'author_association' => $this->association, 'approval_option' => $this->approvalOption];
     }
     public function mainSha(): string
     {
@@ -66,6 +67,8 @@ if ($scenario === 'go_live') $marker['category'] = 'go-live';
 if ($scenario === 'malformed_gate') $marker['extra'] = 'invalid';
 $port->gateBody = '<!-- factory-human-gate ' . json_encode($marker, JSON_THROW_ON_ERROR) . ' -->';
 if ($scenario === 'untrusted_gate') $port->association = 'NONE';
+if ($scenario === 'missing_approval_mapping') $port->approvalOption = null;
+if ($scenario === 'invalid_approval_mapping') $port->approvalOption = 'D';
 if ($scenario === 'changed_after_approval') $port->changeMain = true;
 if ($scenario === 'tag_move_failure') $port->failMove = true;
 if ($scenario === 'stale') $port->main = str_repeat('c', 40);
@@ -87,7 +90,7 @@ $service = new OwnerApprovalService(
 );
 $sha = $scenario === 'money' ? null : str_repeat('a', 40);
 if ($scenario === 'invalid_sha') $sha = 'short';
-$option = $scenario === 'invalid_option' ? 'D' : 'A';
+$option = $scenario === 'invalid_option' ? 'D' : ($scenario === 'decline' ? 'B' : 'A');
 try {
     $outcome = $service->approve(42, $option, $sha);
     $denied = false;

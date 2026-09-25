@@ -47,8 +47,11 @@ final class DecisionUi
 
         $repository = self::e($decision['repository']);
         $issue = $decision['issue'];
-        $title = self::e($decision['title']);
-        $context = self::e($decision['context']);
+        $title = self::optionalText($decision, 'title_simple', 120) ?: self::e($decision['title']);
+        $context = self::optionalText($decision, 'summary_simple', 400) ?: self::e($decision['context']);
+        $why = self::optionalText($decision, 'why_recommended', 180);
+        $blocks = self::optionalText($decision, 'blocks', 180);
+        $safeDefault = self::optionalText($decision, 'safe_default', 40);
         $sha = isset($decision['sha']) && is_string($decision['sha']) ? $decision['sha'] : '';
         $shaEscaped = self::e($sha);
         $options = '';
@@ -63,9 +66,24 @@ final class DecisionUi
             $recommended = hash_equals($decision['recommendation'], $option['id']);
             $disabled = $reauthenticated ? '' : ' disabled aria-disabled="true"';
             $badge = $recommended ? '<span class="badge">RECOMENDADA</span>' : '';
+            $effect = self::optionalText($option, 'effect', 240);
+            $risk = self::riskLabel($option);
+            $cost = self::optionalText($option, 'cost', 80);
+            $pros = self::optionList($option, 'pros');
+            $cons = self::optionList($option, 'cons');
+            $reversible = self::reversibility($option);
+            $details = $effect === '' ? '' : '<span class="effect">' . $effect . '</span>';
+            $impact = array_filter([$risk, $cost === '' ? '' : 'Costo: ' . $cost, $reversible], static fn (string $v): bool => $v !== '');
+            if ($impact !== []) {
+                $details .= '<span class="impact">' . implode(' · ', $impact) . '</span>';
+            }
+            if ($pros !== '' || $cons !== '') {
+                $details .= '<span class="tradeoffs">' . $pros . $cons . '</span>';
+            }
             $options .= '<button class="decision-action' . ($recommended ? ' recommended' : '') . '"'
                 . ' type="submit" name="option" value="' . $id . '"' . $disabled . '>'
-                . '<span>' . $label . '</span>' . $badge . '</button>';
+                . '<span class="option-copy"><span class="option-label">' . $label . '</span>' . $details . '</span>'
+                . $badge . '</button>';
         }
 
         return '<article class="panel decision-card" data-state="' . ($reauthenticated ? 'ready' : 'reauth-required') . '">'
@@ -73,7 +91,10 @@ final class DecisionUi
             . '<div class="meta"><span>' . $repository . '</span><span>#' . $issue . '</span></div>'
             . '<h2>' . $title . '</h2>'
             . '<p class="context">' . $context . '</p>'
-            . ($shaEscaped !== '' ? '<p class="sha"><span>SHA</span><code>' . $shaEscaped . '</code></p>' : '')
+            . ($why !== '' ? '<p class="explain"><strong>Por qué se recomienda:</strong> ' . $why . '</p>' : '')
+            . ($safeDefault !== '' ? '<p class="safe-default"><strong>Si no decides:</strong> ' . $safeDefault . '</p>' : '')
+            . ($blocks !== '' ? '<p class="blocker"><strong>Trabajo en espera:</strong> ' . $blocks . '</p>' : '')
+            . ($shaEscaped !== '' ? '<details class="technical"><summary>Ver detalles técnicos</summary><p class="sha"><span>SHA</span><code>' . $shaEscaped . '</code></p></details>' : '')
             . '<form method="post" action="/approvals/execute" class="actions">'
             . '<input type="hidden" name="repository" value="' . $repository . '">'
             . '<input type="hidden" name="issue" value="' . $issue . '">'
@@ -81,6 +102,65 @@ final class DecisionUi
             . $options
             . '</form>'
             . '</article>';
+    }
+
+    private static function optionalText(array $source, string $key, int $limit): string
+    {
+        if (!array_key_exists($key, $source)) {
+            return '';
+        }
+        if (!is_string($source[$key]) || strlen($source[$key]) > $limit) {
+            throw new InvalidArgumentException('Campo descriptivo inválido.');
+        }
+        return self::e(trim($source[$key]));
+    }
+
+    private static function riskLabel(array $option): string
+    {
+        if (!array_key_exists('risk', $option)) {
+            return '';
+        }
+        return match ($option['risk']) {
+            'low' => 'Riesgo bajo',
+            'medium' => 'Riesgo medio',
+            'high' => 'Riesgo alto',
+            default => throw new InvalidArgumentException('Riesgo inválido.'),
+        };
+    }
+
+    private static function reversibility(array $option): string
+    {
+        if (!array_key_exists('reversible', $option)) {
+            return '';
+        }
+        if (!is_bool($option['reversible'])) {
+            throw new InvalidArgumentException('Reversibilidad inválida.');
+        }
+        return $option['reversible'] ? 'Reversible' : 'No reversible';
+    }
+
+    private static function optionList(array $option, string $key): string
+    {
+        if (!array_key_exists($key, $option)) {
+            return '';
+        }
+        $values = $option[$key];
+        if (!is_array($values) || !array_is_list($values) || count($values) > 3) {
+            throw new InvalidArgumentException('Lista de impacto inválida.');
+        }
+        $items = '';
+        foreach ($values as $value) {
+            if (!is_string($value) || trim($value) === '' || strlen($value) > 120) {
+                throw new InvalidArgumentException('Elemento de impacto inválido.');
+            }
+            $items .= '<span>' . self::e($value) . '</span>';
+        }
+        if ($items === '') {
+            return '';
+        }
+        return '<span class="' . $key . '"><strong>'
+            . ($key === 'pros' ? '✓ Ventajas' : '✗ Desventajas')
+            . '</strong>' . $items . '</span>';
     }
 
     private static function emptyState(): string
@@ -166,7 +246,19 @@ h1 { font-size: clamp(1.9rem, 10vw, 3.4rem); letter-spacing: .03em; }
 .context { color: var(--cyan-soft); line-height: 1.5; }
 .sha { display: grid; gap: 5px; color: var(--muted); font-size: .72rem; }
 .sha code { overflow-wrap: anywhere; color: var(--text); }
+.explain, .safe-default, .blocker { line-height: 1.45; color: var(--cyan-soft); }
+.safe-default { border-left: 3px solid var(--amber); padding-left: 12px; }
+.technical { margin-top: 10px; color: var(--muted); }
+.technical summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.technical summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 .actions { display: grid; gap: 12px; margin-top: 18px; }
+.option-copy { display: grid; gap: 7px; min-width: 0; }
+.option-label { font-weight: 800; }
+.effect { color: var(--cyan-soft); font-size: .93rem; line-height: 1.4; }
+.impact { font-size: .83rem; color: var(--amber); line-height: 1.4; }
+.tradeoffs { display: grid; gap: 8px; font-size: .82rem; }
+.tradeoffs .pros, .tradeoffs .cons { display: grid; gap: 3px; }
+.tradeoffs strong { color: var(--cyan); }
 .decision-action {
   min-height: 52px;
   width: 100%;

@@ -5,7 +5,7 @@ Centro de control web **privado** de la fábrica de software de pl0n3r. Es una h
 ## Estado actual
 
 - Fase: **construcción**.
-- Versión actual: **0.1.8** (candidato #39: runtime privado de decisiones y seguimiento de release).
+- Versión actual: **0.1.9** (candidato #43: historial filtrable y orden verificable del centro de decisiones).
 - Stack objetivo: PHP 8.5 + MariaDB.
 - Hosting objetivo: Hostinger, junto a Condor pero con app, base y deploy independientes.
 - Deploy y observer: instalados en modo **fail-closed**; no actúan sin variables/configuración explícita.
@@ -43,3 +43,7 @@ El inbox descubre puertas humanas abiertas y confiables en los repos configurado
 ## Runtime privado de decisiones
 
 El runtime de #39 vive en `src/DecisionRuntime.php`: carga el inbox real desde GitHub con allowlist configurada en servidor, inyecta CSRF en las acciones, delega aprobaciones al endpoint seguro existente y conserva en la sesión server-side la correlación del release. No crea `public/`, no habilita deploy y no expone una cabina pública. El seguimiento devuelve evidencia terminal cuando existe una única corrida compatible y bloquea correlaciones ambiguas sin atribuir una ejecución arbitraria.
+
+## Historial de decisiones
+
+El corte #43 reutiliza la bitácora append-only existente para exponer un historial privado consolidado por decisión, con filtros server-side por repositorio y categoría. La salida omite actor y campos no allowlisted, solo conserva evidencia HTTPS de GitHub y falla cerrado ante filtros o entradas inválidas. El inbox mantiene prioridad para decisiones que bloquean trabajo y, dentro de esa clase, ordena por antigüedad.

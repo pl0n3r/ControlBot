@@ -76,10 +76,7 @@ final class DecisionSnooze
         }
 
         $latest = [];
-        foreach ($this->audit->entries() as $entry) {
-            if (($entry['action'] ?? null) !== 'snooze') {
-                continue;
-            }
+        foreach ($this->audit->entriesByAction('snooze') as $entry) {
             $repository = $entry['repository'] ?? null;
             $issue = $entry['issue'] ?? null;
             $at = $entry['at'] ?? null;

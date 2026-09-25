@@ -5,69 +5,47 @@ require __DIR__ . '/../src/DailyBriefing.php';
 
 use ControlBot\Briefing\DailyBriefing;
 
+function item(string $text, string $evidence = 'https://github.com/pl0n3r/ControlBot/issues/5', bool $attention = false): array
+{
+    $item = ['text' => $text, 'evidence' => $evidence];
+    if ($attention) {
+        $item['requires_attention'] = true;
+    }
+    return $item;
+}
+
 $scenario = $argv[1] ?? '';
 $briefing = new DailyBriefing(['github.com', 'control.condorapp.com.co']);
 
 $facts = [];
 if ($scenario === 'full') {
     $facts = [
-        'delivered' => [[
-            'text' => 'Se fusionó el PR #42.',
-            'evidence' => 'https://github.com/pl0n3r/ControlBot/pull/42',
-        ]],
-        'today' => [[
-            'text' => 'Continúa el centro de decisiones.',
-            'evidence' => 'https://github.com/pl0n3r/ControlBot/issues/4',
-        ]],
-        'broken' => [[
-            'text' => 'CI de main está bloqueado.',
-            'evidence' => 'https://github.com/pl0n3r/ControlBot/actions',
-            'requires_attention' => true,
-        ]],
-        'decisions' => [[
-            'text' => 'Hay una decisión de privacidad pendiente.',
-            'evidence' => 'https://github.com/pl0n3r/ControlBot/issues/20',
-        ]],
-        'spend' => [[
-            'text' => 'Costo registrado: 12.34 USD.',
-            'evidence' => 'https://control.condorapp.com.co/evidence/costs/2026-09-25',
-        ]],
+        'delivered' => [item('Se fusionó el PR #42.', 'https://github.com/pl0n3r/ControlBot/pull/42')],
+        'today' => [item('Continúa el centro de decisiones.', 'https://github.com/pl0n3r/ControlBot/issues/4')],
+        'broken' => [item('CI de main está bloqueado.', 'https://github.com/pl0n3r/ControlBot/actions', true)],
+        'decisions' => [item('Hay una decisión de privacidad pendiente.', 'https://github.com/pl0n3r/ControlBot/issues/20')],
+        'spend' => [item('Costo registrado: 12.34 USD.', 'https://control.condorapp.com.co/evidence/costs/2026-09-25')],
     ];
 } elseif ($scenario === 'text-says-urgent') {
     $facts = [
-        'today' => [[
-            'text' => 'URGENTE: palabras alarmantes sin flag estructurado.',
-            'evidence' => 'https://github.com/pl0n3r/ControlBot/issues/5',
-        ]],
+        'today' => [item('URGENTE: palabras alarmantes sin flag estructurado.')],
     ];
 } elseif ($scenario === 'escape') {
     $facts = [
-        'today' => [[
-            'text' => '<script>alert(1)</script>',
-            'evidence' => 'https://github.com/pl0n3r/ControlBot/issues/5?x=%22%3E%3Cscript%3E',
-        ]],
+        'today' => [item('<script>alert(1)</script>', 'https://github.com/pl0n3r/ControlBot/issues/5?x=%22%3E%3Cscript%3E')],
     ];
 } elseif ($scenario === 'invalid-http') {
     $facts = [
-        'today' => [[
-            'text' => 'Dato inválido',
-            'evidence' => 'http://github.com/pl0n3r/ControlBot/issues/5',
-        ]],
+        'today' => [item('Dato inválido', 'http://github.com/pl0n3r/ControlBot/issues/5')],
     ];
 } elseif ($scenario === 'invalid-host') {
     $facts = [
-        'today' => [[
-            'text' => 'Dato inválido',
-            'evidence' => 'https://evil.example/evidence',
-        ]],
+        'today' => [item('Dato inválido', 'https://evil.example/evidence')],
     ];
 } elseif ($scenario === 'too-many') {
     $items = [];
     for ($i = 0; $i < 5; $i++) {
-        $items[] = [
-            'text' => "Línea {$i}",
-            'evidence' => 'https://github.com/pl0n3r/ControlBot/issues/5',
-        ];
+        $items[] = item("Línea {$i}");
     }
     $facts = ['today' => $items];
 } elseif ($scenario !== 'empty') {

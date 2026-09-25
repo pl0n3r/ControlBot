@@ -44,7 +44,7 @@ class LabelsWorkflowTests(unittest.TestCase):
                 "with open(os.environ['GH_STUB_LOG'], 'a', encoding='utf-8') as handle:",
                 "    handle.write(rendered + '\\n')",
                 "scenario = os.environ['GH_STUB_SCENARIO']",
-                "url = args[-1] if args else ''",
+                "url = next((item for item in args if item.startswith('repos/')), '')",
                 "",
                 "if '/issues?state=all&labels=' in url:",
                 "    if scenario == 'used':",

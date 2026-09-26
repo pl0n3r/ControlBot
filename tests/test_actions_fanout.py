@@ -21,6 +21,13 @@ class ActionsFanoutTests(unittest.TestCase):
         self.assertIn("cron: '17 */6 * * *'", workflow)
         self.assertNotIn("cron: '17 * * * *'", workflow)
 
+    def test_production_observer_avoids_hourly_baseline_in_construction(self):
+        workflow = (ROOT / ".github" / "workflows" / "observar.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("cron: '23 */6 * * *'", workflow)
+        self.assertNotIn("cron: '23 * * * *'", workflow)
+
     def test_issue_and_pr_validation_workflows_debounce_bursts(self):
         expected = (
             "concurrency:\n"

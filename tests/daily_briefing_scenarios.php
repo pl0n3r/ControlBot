@@ -18,6 +18,7 @@ $scenario = $argv[1] ?? '';
 $briefing = new DailyBriefing(['github.com', 'control.condorapp.com.co']);
 
 $facts = [];
+$tamper = null;
 if ($scenario === 'full') {
     $facts = [
         'delivered' => [item('Se fusionó el PR #42.', 'https://github.com/pl0n3r/ControlBot/pull/42')],
@@ -42,6 +43,15 @@ if ($scenario === 'full') {
     $facts = [
         'today' => [item('Dato inválido', 'https://evil.example/evidence')],
     ];
+} elseif ($scenario === 'tampered-render-url') {
+    $facts = ['today' => [item('Dato inicialmente seguro')]];
+    $tamper = 'url';
+} elseif ($scenario === 'tampered-render-empty') {
+    $facts = ['today' => [item('Dato inicialmente seguro')]];
+    $tamper = 'empty';
+} elseif ($scenario === 'tampered-render-attention') {
+    $facts = ['today' => [item('Dato inicialmente seguro')]];
+    $tamper = 'attention';
 } elseif ($scenario === 'too-many') {
     $items = [];
     for ($i = 0; $i < 5; $i++) {
@@ -55,6 +65,14 @@ if ($scenario === 'full') {
 
 try {
     $built = $briefing->build($facts);
+    if ($tamper === 'url') {
+        $built['sections']['today']['items'][0]['evidence'] = 'javascript:alert(1)';
+    } elseif ($tamper === 'empty') {
+        $built['sections']['today']['empty'] = true;
+    } elseif ($tamper === 'attention') {
+        $built['sections']['today']['items'][0]['requires_attention'] = true;
+    }
+
     echo json_encode([
         'built' => $built,
         'html' => $briefing->renderHtml($built),

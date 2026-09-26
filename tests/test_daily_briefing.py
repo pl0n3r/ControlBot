@@ -58,6 +58,19 @@ class DailyBriefingTests(unittest.TestCase):
         full_html = run("full")["html"]
         self.assertEqual(full_html.count(">Ver evidencia</a>"), 5)
 
+    def test_render_revalidates_tampered_briefing_items(self):
+        invalid_url = run("tampered-render-url", check=False)
+        self.assertNotEqual(invalid_url.returncode, 0)
+        self.assertIn("allowlist", invalid_url.stderr)
+
+        invalid_empty = run("tampered-render-empty", check=False)
+        self.assertNotEqual(invalid_empty.returncode, 0)
+        self.assertIn("estructurado inválido", invalid_empty.stderr)
+
+        invalid_attention = run("tampered-render-attention", check=False)
+        self.assertNotEqual(invalid_attention.returncode, 0)
+        self.assertIn("Acción del dueño inconsistente", invalid_attention.stderr)
+
     def test_explicit_owner_action_sentence(self):
         empty_html = run("empty")["html"]
         full_html = run("full")["html"]

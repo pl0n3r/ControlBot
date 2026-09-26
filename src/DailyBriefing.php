@@ -181,6 +181,34 @@ final class DailyBriefing
         if (!hash_equals($expectedAction, $briefing['owner_action'])) {
             throw new InvalidArgumentException('Acción del dueño inconsistente.');
         }
+
+        $attentionRequired = false;
+        $total = 0;
+        foreach (self::SECTIONS as $section) {
+            $payload = $briefing['sections'][$section];
+            if (
+                !is_array($payload)
+                || !is_array($payload['items'] ?? null)
+                || !array_is_list($payload['items'])
+                || ($payload['empty'] ?? null) !== ($payload['items'] === [])
+                || count($payload['items']) > self::MAX_ITEMS_PER_SECTION
+            ) {
+                throw new InvalidArgumentException('Briefing estructurado inválido.');
+            }
+
+            foreach ($payload['items'] as $item) {
+                $normalized = $this->normalizeItem($item);
+                $attentionRequired = $attentionRequired || $normalized['requires_attention'];
+                $total++;
+                if ($total > self::MAX_ITEMS_TOTAL) {
+                    throw new InvalidArgumentException('El briefing excede el límite de lectura.');
+                }
+            }
+        }
+
+        if ($attentionRequired !== $briefing['attention_required']) {
+            throw new InvalidArgumentException('Acción del dueño inconsistente.');
+        }
     }
 
     private static function e(string $value): string

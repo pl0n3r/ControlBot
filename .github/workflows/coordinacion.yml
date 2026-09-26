@@ -2,7 +2,9 @@ name: Coordinación
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    # Housekeeping: /tomar recupera reservas stale bajo demanda; el barrido
+    # periódico solo mantiene visible el estado de recuperación sin quemar cuota.
+    - cron: '17 */6 * * *'
   workflow_dispatch:
   pull_request:
     types: [opened, ready_for_review, converted_to_draft, closed]
@@ -36,6 +38,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: comment
@@ -53,6 +56,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: label
@@ -62,13 +66,12 @@ jobs:
 
   pr:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    # GitHub valida el máximo permiso del reusable completo antes de evaluar
-    # qué operación interna se ejecutará. La operación pr sigue estrechando
-    # permisos dentro de Factory.
+    # El sync de estado/reserva sí corre para drafts; no ejecuta el gate pesado.
     permissions:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: pr
@@ -76,20 +79,21 @@ jobs:
       action: ${{ github.event.action }}
 
   validar-pr:
-    if: github.event_name == 'pull_request'
-    # Mismo sobre de carga; el job validar-pr del reusable conserva permisos
-    # read-only (contents/issues/pull-requests: read).
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    # El gate completo se ejecuta al abrir un PR listo o con ready_for_review.
     permissions:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: validate
       pr_number: ${{ github.event.pull_request.number }}
-      # Recuperación única de #21: main todavía tenía el caller inválido.
-      # Todo PR posterior parte de otro SHA y exige reserva /tomar.
-      require_reservation: ${{ github.event.pull_request.base.sha != 'a3e258995145750b6fb10284320fd6130979ae93' }}
+      # Bootstraps exactos: #21 y #78 reparan callers que impiden crear la
+      # propia reserva. La excepción #78 exige rama + base SHA exactos y se
+      # autodesactiva al moverse main.
+      require_reservation: ${{ github.event.pull_request.base.sha != 'a3e258995145750b6fb10284320fd6130979ae93' && !(github.event.pull_request.number == 86 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'trabajo/issue-78' && github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07') }}
 
   issue:
     if: github.event_name == 'issues' && (github.event.action == 'closed' || github.event.action == 'reopened')
@@ -97,6 +101,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: issue
@@ -109,6 +114,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: sweep

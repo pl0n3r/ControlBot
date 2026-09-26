@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.issue.number || github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   sync:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -37,7 +41,7 @@ jobs:
       language: es
 
   validar-pr:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     # El reusable contiene también el job mutador (skipped en mode=validate).
     # GitHub valida el máximo permiso del workflow llamado antes de arrancar;
     # por eso el caller debe permitir issues:write aunque validate permanezca

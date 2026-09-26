@@ -77,6 +77,12 @@ class DecisionSnoozeTests(unittest.TestCase):
             for method, url in data["seen"]
         ))
 
+    def test_oversized_audit_line_fails_closed(self):
+        data = scenario("render-oversized-audit-line")
+
+        self.assertTrue(data["blocked"])
+        self.assertIn("Entrada de bitácora inválida", data["message"])
+
     def test_large_audit_without_snoozes_does_not_break_visibility(self):
         data = scenario("render-large-audit")
 

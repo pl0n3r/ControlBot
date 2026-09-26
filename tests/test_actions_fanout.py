@@ -53,6 +53,34 @@ class ActionsFanoutTests(unittest.TestCase):
                 jobs = content.index("jobs:\n")
                 self.assertLess(concurrency, jobs)
 
+    def test_expensive_pr_gates_wait_until_ready_for_review(self):
+        expected_trigger = "ready_for_review"
+        expected_gate = "github.event.pull_request.draft == false"
+        workflows = [
+            ROOT / ".github" / "workflows" / "ci.yml",
+            ROOT / ".github" / "workflows" / "politica.yml",
+            ROOT / ".github" / "workflows" / "privacidad.yml",
+            ROOT / ".github" / "workflows" / "aceptacion.yml",
+            *ISSUE_AND_PR_WORKFLOWS,
+            ROOT / ".github" / "workflows" / "coordinacion.yml",
+        ]
+        for workflow in workflows:
+            with self.subTest(workflow=workflow.name):
+                content = workflow.read_text(encoding="utf-8")
+                self.assertIn(expected_trigger, content)
+                self.assertIn(expected_gate, content)
+
+    def test_coordination_keeps_pr_state_sync_for_drafts(self):
+        workflow = (ROOT / ".github" / "workflows" / "coordinacion.yml").read_text(
+            encoding="utf-8"
+        )
+        pr_block = workflow.split("  pr:\n", 1)[1].split("  validar-pr:\n", 1)[0]
+        validate_block = workflow.split("  validar-pr:\n", 1)[1].split(
+            "  issue:\n", 1
+        )[0]
+        self.assertNotIn("draft == false", pr_block)
+        self.assertIn("draft == false", validate_block)
+
 
 if __name__ == "__main__":
     unittest.main()

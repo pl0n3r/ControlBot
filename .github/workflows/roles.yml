@@ -41,7 +41,7 @@ jobs:
       language: es
 
   validar-pr:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     # El reusable contiene también el job mutador (skipped en mode=validate).
     # GitHub valida el máximo permiso del workflow llamado antes de arrancar;
     # por eso el caller debe permitir issues:write aunque validate permanezca

@@ -2,6 +2,7 @@ name: Aceptación ejecutable
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -14,9 +15,12 @@ concurrency:
 
 jobs:
   acceptance:
-    # Excepciones de bootstrap: #2 instaló coordinación y #21 repara su caller.
-    # Desde #3 todo PR requiere fingerprint real de /tomar.
-    if: github.head_ref != 'trabajo/issue-2' && github.head_ref != 'trabajo/issue-21'
+    # Los gates completos se reservan para PRs listos; ready_for_review
+    # garantiza una validación fresca del mismo HEAD tras salir de draft.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.head_ref != 'trabajo/issue-2' &&
+      github.head_ref != 'trabajo/issue-21'
     uses: pl0n3r/factory/.github/workflows/aceptacion.yml@v1
     with:
       issue_number: 0

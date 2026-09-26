@@ -66,9 +66,7 @@ jobs:
 
   pr:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    # GitHub valida el máximo permiso del reusable completo antes de evaluar
-    # qué operación interna se ejecutará. La operación pr sigue estrechando
-    # permisos dentro de Factory.
+    # El sync de estado/reserva sí corre para drafts; no ejecuta el gate pesado.
     permissions:
       contents: write
       issues: write
@@ -81,9 +79,8 @@ jobs:
       action: ${{ github.event.action }}
 
   validar-pr:
-    if: github.event_name == 'pull_request'
-    # Mismo sobre de carga; el job validar-pr del reusable conserva permisos
-    # read-only (contents/issues/pull-requests: read).
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    # El gate completo se ejecuta al abrir un PR listo o con ready_for_review.
     permissions:
       contents: write
       issues: write

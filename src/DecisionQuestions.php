@@ -16,7 +16,7 @@ final class DecisionQuestions
 {
     private const SESSION_KEY = '_controlbot_decision_questions';
     private const MAX_ENTRIES = 20;
-    private const MAX_QUESTION_BYTES = 500;
+    private const MAX_QUESTION_CHARS = 500;
     private const MAX_ANSWER_BYTES = 2000;
 
     public function __construct(
@@ -31,7 +31,7 @@ final class DecisionQuestions
         string $question,
         int $now,
     ): array {
-        $question = self::cleanText($question, self::MAX_QUESTION_BYTES, 5, 'Pregunta inválida.');
+        $question = self::cleanQuestion($question);
         if ($issue < 1 || $now < 1) {
             throw new InvalidArgumentException('Contexto de pregunta inválido.');
         }
@@ -108,7 +108,7 @@ final class DecisionQuestions
                 !is_string($repository)
                 || !is_int($issue) || $issue < 1
                 || !is_string($question)
-                || strlen($question) > self::MAX_QUESTION_BYTES
+                || self::utf8Length($question) > self::MAX_QUESTION_CHARS
                 || ($answer !== null && (!is_string($answer) || strlen($answer) > self::MAX_ANSWER_BYTES))
                 || !in_array($status, ['answered', 'unavailable'], true)
                 || ($status === 'answered' && $answer === null)
@@ -147,6 +147,29 @@ final class DecisionQuestions
             'summary' => trim($summary),
             'category' => $category,
         ];
+    }
+
+    private static function cleanQuestion(string $value): string
+    {
+        $value = trim($value);
+        if (
+            $value === ''
+            || self::utf8Length($value) > self::MAX_QUESTION_CHARS
+            || substr_count($value, "\n") + 1 > 5
+            || preg_match('/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]/', $value) === 1
+        ) {
+            throw new InvalidArgumentException('Pregunta inválida.');
+        }
+        return $value;
+    }
+
+    private static function utf8Length(string $value): int
+    {
+        $count = preg_match_all('/./us', $value, $matches);
+        if ($count === false) {
+            throw new InvalidArgumentException('Texto UTF-8 inválido.');
+        }
+        return $count;
     }
 
     private static function cleanText(string $value, int $maxBytes, int $maxLines, string $error): string

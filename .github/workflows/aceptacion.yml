@@ -8,6 +8,10 @@ permissions:
   issues: read
   checks: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   acceptance:
     # Excepciones de bootstrap: #2 instaló coordinación y #21 repara su caller.

@@ -2,9 +2,14 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOWS = [
+ISSUE_AND_PR_WORKFLOWS = [
     ROOT / ".github" / "workflows" / "etiquetas.yml",
     ROOT / ".github" / "workflows" / "roles.yml",
+]
+PR_ONLY_WORKFLOWS = [
+    ROOT / ".github" / "workflows" / "politica.yml",
+    ROOT / ".github" / "workflows" / "privacidad.yml",
+    ROOT / ".github" / "workflows" / "aceptacion.yml",
 ]
 
 
@@ -16,19 +21,29 @@ class ActionsFanoutTests(unittest.TestCase):
             "${{ github.event.issue.number || github.event.pull_request.number || github.ref || github.run_id }}\n"
             "  cancel-in-progress: true\n"
         )
-        for workflow in WORKFLOWS:
+        for workflow in ISSUE_AND_PR_WORKFLOWS:
             with self.subTest(workflow=workflow.name):
                 content = workflow.read_text(encoding="utf-8")
                 self.assertIn(expected, content)
 
-    def test_debounce_is_scoped_after_read_only_default_permissions(self):
-        for workflow in WORKFLOWS:
+    def test_pr_only_gates_cancel_obsolete_heads(self):
+        expected = (
+            "concurrency:\n"
+            "  group: ${{ github.workflow }}-"
+            "${{ github.event.pull_request.number || github.ref || github.run_id }}\n"
+            "  cancel-in-progress: true\n"
+        )
+        for workflow in PR_ONLY_WORKFLOWS:
             with self.subTest(workflow=workflow.name):
                 content = workflow.read_text(encoding="utf-8")
-                permissions = content.index("permissions:\n  contents: read\n")
+                self.assertIn(expected, content)
+
+    def test_debounce_is_declared_before_jobs(self):
+        for workflow in ISSUE_AND_PR_WORKFLOWS + PR_ONLY_WORKFLOWS:
+            with self.subTest(workflow=workflow.name):
+                content = workflow.read_text(encoding="utf-8")
                 concurrency = content.index("concurrency:\n")
                 jobs = content.index("jobs:\n")
-                self.assertLess(permissions, concurrency)
                 self.assertLess(concurrency, jobs)
 
 

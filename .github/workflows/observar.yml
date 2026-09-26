@@ -3,7 +3,8 @@ name: Observar producción
 on:
   workflow_dispatch:
   schedule:
-    - cron: '23 * * * *'
+    # Fase de construcción: señal periódica suficiente sin sostener un job horario.
+    - cron: '23 */6 * * *'
 
 permissions:
   contents: read

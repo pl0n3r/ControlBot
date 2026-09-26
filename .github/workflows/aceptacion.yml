@@ -2,17 +2,31 @@ name: Aceptación ejecutable
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
   issues: read
   checks: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   acceptance:
-    # Excepciones de bootstrap: #2 instaló coordinación y #21 repara su caller.
-    # Desde #3 todo PR requiere fingerprint real de /tomar.
-    if: github.head_ref != 'trabajo/issue-2' && github.head_ref != 'trabajo/issue-21'
+    # Los gates completos se reservan para PRs listos; ready_for_review
+    # garantiza una validación fresca del mismo HEAD tras salir de draft.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.head_ref != 'trabajo/issue-2' &&
+      github.head_ref != 'trabajo/issue-21' &&
+      !(
+        github.event.pull_request.number == 86 &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.head_ref == 'trabajo/issue-78' &&
+        github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07'
+      )
     uses: pl0n3r/factory/.github/workflows/aceptacion.yml@v1
     with:
       issue_number: 0

@@ -159,6 +159,12 @@ if ($scenario === 'stale-reauth') {
 if ($scenario === 'too-long') {
     $request['question'] = str_repeat('x', 501);
 }
+if ($scenario === 'unicode-limit') {
+    $request['question'] = str_repeat('á', 500);
+}
+if ($scenario === 'unicode-too-long') {
+    $request['question'] = str_repeat('á', 501);
+}
 
 try {
     $response = $runtime->handle('POST', '/decisions/question', $session, $request, $at);

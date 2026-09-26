@@ -7,93 +7,140 @@ use InvalidArgumentException;
 
 final class RunnerGateway
 {
-    private const MODES = ['idle', 'busy', 'paused', 'offline'];
+    private const HEARTBEAT_STATUSES = ['ready', 'busy', 'draining', 'offline'];
 
-    private static function fields(array $record, array $expected): void
+    private static function fields(array $record, array $expected, string $label): void
     {
         $actual = array_keys($record);
         sort($actual);
         sort($expected);
         if ($actual !== $expected) {
-            throw new InvalidArgumentException('Runner record fields invalid.');
+            throw new InvalidArgumentException($label . ' fields invalid.');
         }
     }
 
-    private static function identifier(mixed $value): string
+    private static function uuid(mixed $value, string $label): string
     {
-        if (!is_string($value) || preg_match('/^[a-z][a-z0-9_-]{2,63}$/D', $value) !== 1) {
-            throw new InvalidArgumentException('Runner identifier invalid.');
+        if (!is_string($value)
+            || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/Di', $value) !== 1) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+        return strtolower($value);
+    }
+
+    private static function slug(mixed $value, string $label): string
+    {
+        if (!is_string($value) || preg_match('/^[a-z][a-z0-9.-]{0,63}$/D', $value) !== 1) {
+            throw new InvalidArgumentException($label . ' invalid.');
         }
         return $value;
     }
 
-    private static function identifiers(mixed $values, int $limit): array
+    private static function ref(mixed $value, string $label, int $max = 160): string
+    {
+        if (!is_string($value) || strlen($value) > $max
+            || preg_match('/^[A-Za-z0-9][A-Za-z0-9._:\/#@-]*$/D', $value) !== 1) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+        return $value;
+    }
+
+    private static function uniqueSlugs(mixed $values, int $limit): array
+    {
+        if (!is_array($values) || !array_is_list($values) || $values === [] || count($values) > $limit) {
+            throw new InvalidArgumentException('Capabilities invalid.');
+        }
+        $result = [];
+        foreach ($values as $value) {
+            $id = self::slug($value, 'Capability');
+            if (isset($result[$id])) {
+                throw new InvalidArgumentException('Capabilities duplicated.');
+            }
+            $result[$id] = true;
+        }
+        $values = array_keys($result);
+        sort($values);
+        return $values;
+    }
+
+    private static function uniqueRefs(mixed $values, int $limit, string $label): array
     {
         if (!is_array($values) || !array_is_list($values) || count($values) > $limit) {
-            throw new InvalidArgumentException('Runner list invalid.');
+            throw new InvalidArgumentException($label . ' invalid.');
         }
-        $ids = [];
+        $result = [];
         foreach ($values as $value) {
-            $id = self::identifier($value);
-            if (isset($ids[$id])) {
-                throw new InvalidArgumentException('Duplicate runner list entry.');
+            $id = self::ref($value, $label);
+            if (isset($result[$id])) {
+                throw new InvalidArgumentException($label . ' duplicated.');
             }
-            $ids[$id] = true;
+            $result[$id] = true;
         }
-        return array_keys($ids);
+        $values = array_keys($result);
+        sort($values);
+        return $values;
     }
 
     public static function identity(array $record): array
     {
         self::fields($record, [
-            'version', 'runner_id', 'runtime', 'runtime_version', 'platform', 'capabilities',
-        ]);
-        if ($record['version'] !== 1 || !is_string($record['runtime_version'])
-            || preg_match('/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/D', $record['runtime_version']) !== 1) {
-            throw new InvalidArgumentException('Runner identity version invalid.');
+            'version', 'runner_id', 'protocol_version', 'runtime', 'runtime_version',
+            'platform', 'location', 'capabilities', 'max_parallel',
+        ], 'RunnerIdentity');
+        if ($record['version'] !== 1 || $record['protocol_version'] !== 1
+            || !is_string($record['runtime_version'])
+            || preg_match('/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/D', $record['runtime_version']) !== 1
+            || !is_int($record['max_parallel']) || $record['max_parallel'] < 1 || $record['max_parallel'] > 64) {
+            throw new InvalidArgumentException('RunnerIdentity version or capacity invalid.');
         }
-        $id = self::identifier($record['runner_id']);
-        $runtime = self::identifier($record['runtime']);
-        $platform = self::identifier($record['platform']);
-        $capabilities = self::identifiers($record['capabilities'], 32);
-        if ($capabilities === []) {
-            throw new InvalidArgumentException('Runner needs an explicit capability.');
-        }
+
         return [
             'version' => 1,
-            'runner_id' => $id,
-            'runtime' => $runtime,
+            'runner_id' => self::uuid($record['runner_id'], 'runner_id'),
+            'protocol_version' => 1,
+            'runtime' => self::slug($record['runtime'], 'runtime'),
             'runtime_version' => $record['runtime_version'],
-            'platform' => $platform,
-            'capabilities' => $capabilities,
+            'platform' => self::slug($record['platform'], 'platform'),
+            'location' => self::slug($record['location'], 'location'),
+            'capabilities' => self::uniqueSlugs($record['capabilities'], 64),
+            'max_parallel' => $record['max_parallel'],
         ];
     }
 
     public static function heartbeat(array $record): array
     {
         self::fields($record, [
-            'version', 'runner_id', 'seen_at', 'mode', 'capacity_total',
-            'capacity_used', 'active_sessions',
-        ]);
-        if ($record['version'] !== 1 || !is_int($record['seen_at'])
-            || $record['seen_at'] < 0 || !in_array($record['mode'], self::MODES, true)
-            || !is_int($record['capacity_total']) || $record['capacity_total'] < 1
-            || $record['capacity_total'] > 64 || !is_int($record['capacity_used'])
-            || $record['capacity_used'] < 0 || $record['capacity_used'] > $record['capacity_total']) {
-            throw new InvalidArgumentException('Runner heartbeat invalid.');
+            'version', 'runner_id', 'sequence', 'observed_at', 'status',
+            'capacity', 'active_sessions',
+        ], 'RunnerHeartbeat');
+        if ($record['version'] !== 1
+            || !is_int($record['sequence']) || $record['sequence'] < 0
+            || !is_int($record['observed_at']) || $record['observed_at'] < 0
+            || !is_string($record['status']) || !in_array($record['status'], self::HEARTBEAT_STATUSES, true)
+            || !is_array($record['capacity'])) {
+            throw new InvalidArgumentException('RunnerHeartbeat invalid.');
         }
-        $id = self::identifier($record['runner_id']);
-        $sessions = self::identifiers($record['active_sessions'], 64);
-        if (count($sessions) > $record['capacity_used']) {
-            throw new InvalidArgumentException('Runner sessions exceed used capacity.');
+        self::fields($record['capacity'], ['max', 'active'], 'RunnerHeartbeat capacity');
+        if (!is_int($record['capacity']['max']) || $record['capacity']['max'] < 1 || $record['capacity']['max'] > 64
+            || !is_int($record['capacity']['active']) || $record['capacity']['active'] < 0
+            || $record['capacity']['active'] > $record['capacity']['max']) {
+            throw new InvalidArgumentException('RunnerHeartbeat capacity invalid.');
         }
+        $sessions = self::uniqueRefs($record['active_sessions'], 64, 'active_session');
+        if (count($sessions) > $record['capacity']['active']) {
+            throw new InvalidArgumentException('active_sessions inconsistent.');
+        }
+
         return [
             'version' => 1,
-            'runner_id' => $id,
-            'seen_at' => $record['seen_at'],
-            'mode' => $record['mode'],
-            'capacity_total' => $record['capacity_total'],
-            'capacity_used' => $record['capacity_used'],
+            'runner_id' => self::uuid($record['runner_id'], 'runner_id'),
+            'sequence' => $record['sequence'],
+            'observed_at' => $record['observed_at'],
+            'status' => $record['status'],
+            'capacity' => [
+                'max' => $record['capacity']['max'],
+                'active' => $record['capacity']['active'],
+            ],
             'active_sessions' => $sessions,
         ];
     }
@@ -102,28 +149,38 @@ final class RunnerGateway
         array $identity,
         ?array $heartbeat,
         int $now,
-        int $ttl,
+        int $staleAfterSeconds,
         array $assignmentIds = [],
     ): array {
         $runner = self::identity($identity);
-        if ($now < 0 || $ttl < 1 || $ttl > 3600) {
+        if ($now < 0 || $staleAfterSeconds < 1 || $staleAfterSeconds > 1200) {
             throw new InvalidArgumentException('Runner clock or TTL invalid.');
         }
-        $assignments = self::identifiers($assignmentIds, 64);
+        $assignments = self::uniqueRefs($assignmentIds, 64, 'assignment_id');
         $signal = $heartbeat === null ? null : self::heartbeat($heartbeat);
-        if ($signal !== null && $signal['runner_id'] !== $runner['runner_id']) {
-            throw new InvalidArgumentException('Runner heartbeat identity mismatch.');
-        }
-        $status = 'offline';
-        $free = 0;
-        if ($signal !== null && !in_array($signal['mode'], ['offline', 'paused'], true)
-            && $signal['seen_at'] <= $now) {
-            $age = $now - $signal['seen_at'];
-            $status = $age <= $ttl ? 'healthy' : ($age <= $ttl * 3 ? 'stale' : 'offline');
-            if ($status === 'healthy') {
-                $free = $signal['capacity_total'] - $signal['capacity_used'];
+
+        if ($signal !== null) {
+            if ($signal['runner_id'] !== $runner['runner_id']) {
+                throw new InvalidArgumentException('Runner heartbeat identity mismatch.');
+            }
+            if ($signal['capacity']['max'] !== $runner['max_parallel']) {
+                throw new InvalidArgumentException('Runner heartbeat capacity mismatch.');
             }
         }
+
+        $status = 'offline';
+        $free = 0;
+        if ($signal !== null && $signal['status'] !== 'offline' && $signal['observed_at'] <= $now) {
+            $age = $now - $signal['observed_at'];
+            $status = $age <= $staleAfterSeconds
+                ? 'healthy'
+                : ($age <= $staleAfterSeconds * 3 ? 'stale' : 'offline');
+
+            if ($status === 'healthy' && $signal['status'] !== 'draining') {
+                $free = $signal['capacity']['max'] - $signal['capacity']['active'];
+            }
+        }
+
         return [
             'runner_id' => $runner['runner_id'],
             'status' => $status,

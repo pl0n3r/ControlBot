@@ -15,23 +15,28 @@ function rejected(callable $work): bool
     }
 }
 
+$runnerId = '11111111-1111-7111-8111-111111111111';
 $identity = [
     'version' => 1,
-    'runner_id' => 'runner_001',
-    'runtime' => 'php_cli',
+    'runner_id' => $runnerId,
+    'protocol_version' => 1,
+    'runtime' => 'php',
     'runtime_version' => '1.0.0',
-    'platform' => 'macos_local',
-    'capabilities' => ['test_php', 'review_code'],
+    'platform' => 'linux-arm64',
+    'location' => 'hostinger-shared',
+    'capabilities' => ['test-php', 'review-code'],
+    'max_parallel' => 3,
 ];
 $signal = [
     'version' => 1,
-    'runner_id' => 'runner_001',
-    'seen_at' => 1_000,
-    'mode' => 'busy',
-    'capacity_total' => 3,
-    'capacity_used' => 1,
+    'runner_id' => $runnerId,
+    'sequence' => 7,
+    'observed_at' => 1_000,
+    'status' => 'busy',
+    'capacity' => ['max' => 3, 'active' => 1],
     'active_sessions' => ['session_001'],
 ];
+
 $scenario = $argv[1] ?? '';
 if ($scenario === 'identity') {
     $canonical = RunnerGateway::identity(array_reverse($identity, true));
@@ -40,11 +45,12 @@ if ($scenario === 'identity') {
     ));
     $bad = [
         'extra' => $identity + ['secret' => 'not-allowed'],
-        'duplicate' => array_replace($identity, ['capabilities' => ['test_php', 'test_php']]),
+        'duplicate' => array_replace($identity, ['capabilities' => ['test-php', 'test-php']]),
         'invalid' => array_replace($identity, ['runner_id' => '../runner']),
         'version' => array_replace($identity, ['runtime_version' => 'v1']),
         'empty' => array_replace($identity, ['capabilities' => []]),
-        'secret' => array_replace($identity, ['capabilities' => ['test_php'], 'secret' => 'value']),
+        'protocol' => array_replace($identity, ['protocol_version' => 2]),
+        'capacity' => array_replace($identity, ['max_parallel' => 0]),
     ];
     echo json_encode([
         'stable' => $canonical === $roundtrip,
@@ -57,6 +63,7 @@ if ($scenario === 'identity') {
     ], JSON_THROW_ON_ERROR), PHP_EOL;
     exit;
 }
+
 if ($scenario === 'heartbeat') {
     $readings = [];
     foreach ([
@@ -65,18 +72,20 @@ if ($scenario === 'heartbeat') {
         'offline' => [1_181, $signal],
         'future' => [999, $signal],
         'missing' => [1_000, null],
-        'paused' => [1_000, array_replace($signal, ['mode' => 'paused'])],
-        'full' => [1_000, array_replace($signal, ['capacity_used' => 3])],
+        'draining' => [1_000, array_replace($signal, ['status' => 'draining'])],
+        'full' => [1_000, array_replace($signal, ['capacity' => ['max' => 3, 'active' => 3]])],
     ] as $name => [$now, $beat]) {
         $readings[$name] = RunnerGateway::health($identity, $beat, $now, 60, ['work_001']);
     }
+
     $bad = [
-        'unknown_runner' => array_replace($signal, ['runner_id' => 'runner_002']),
+        'unknown_runner' => array_replace($signal, ['runner_id' => '22222222-2222-7222-8222-222222222222']),
         'extra' => $signal + ['token' => 'bad'],
-        'negative' => array_replace($signal, ['capacity_used' => -1]),
-        'over_capacity' => array_replace($signal, ['capacity_used' => 4]),
+        'negative' => array_replace($signal, ['capacity' => ['max' => 3, 'active' => -1]]),
+        'over_capacity' => array_replace($signal, ['capacity' => ['max' => 3, 'active' => 4]]),
         'duplicate_sessions' => array_replace($signal, ['active_sessions' => ['session_001', 'session_001']]),
-        'session_overflow' => array_replace($signal, ['capacity_used' => 0]),
+        'session_overflow' => array_replace($signal, ['capacity' => ['max' => 3, 'active' => 0]]),
+        'identity_capacity_mismatch' => array_replace($signal, ['capacity' => ['max' => 2, 'active' => 1]]),
     ];
     echo json_encode([
         'readings' => $readings,
@@ -88,14 +97,16 @@ if ($scenario === 'heartbeat') {
     ], JSON_THROW_ON_ERROR), PHP_EOL;
     exit;
 }
+
 if ($scenario === 'portable') {
     $a = RunnerGateway::health($identity, $signal, 1_020, 60, ['work_001']);
     $b = RunnerGateway::health(
-        array_replace($identity, ['platform' => 'hostinger_shared']),
+        array_replace($identity, ['location' => 'macos-local']),
         $signal, 1_020, 60, ['work_001']
     );
     echo json_encode(['same' => $a === $b, 'health' => $a], JSON_THROW_ON_ERROR), PHP_EOL;
     exit;
 }
+
 fwrite(STDERR, "Unknown runner scenario\n");
 exit(2);

@@ -62,12 +62,17 @@ class DecisionQuestionTests(unittest.TestCase):
         )
 
     def test_question_requires_csrf_reauth_and_bounds(self):
-        for name in ("no-csrf", "stale-reauth", "too-long"):
+        for name in ("no-csrf", "stale-reauth", "too-long", "unicode-too-long"):
             with self.subTest(name=name):
                 data = scenario(name)
                 self.assertTrue(data["blocked"])
                 self.assertEqual(data["stored"], [])
                 self.assertEqual(data["provider_calls"], [])
+
+    def test_question_limit_counts_utf8_characters(self):
+        data = scenario("unicode-limit")
+        self.assertFalse(data["blocked"])
+        self.assertEqual(len(data["response"]["question"]), 500)
 
     def test_question_and_answer_are_bound_without_secrets(self):
         data = scenario("success")

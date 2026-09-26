@@ -14,6 +14,13 @@ PR_ONLY_WORKFLOWS = [
 
 
 class ActionsFanoutTests(unittest.TestCase):
+    def test_coordination_sweep_is_housekeeping_not_hourly_baseline(self):
+        workflow = (ROOT / ".github" / "workflows" / "coordinacion.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("cron: '17 */6 * * *'", workflow)
+        self.assertNotIn("cron: '17 * * * *'", workflow)
+
     def test_issue_and_pr_validation_workflows_debounce_bursts(self):
         expected = (
             "concurrency:\n"

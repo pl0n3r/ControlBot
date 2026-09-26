@@ -2,7 +2,9 @@ name: Coordinación
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    # Housekeeping: /tomar recupera reservas stale bajo demanda; el barrido
+    # periódico solo mantiene visible el estado de recuperación sin quemar cuota.
+    - cron: '17 */6 * * *'
   workflow_dispatch:
   pull_request:
     types: [opened, ready_for_review, converted_to_draft, closed]

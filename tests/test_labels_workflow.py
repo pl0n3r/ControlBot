@@ -20,7 +20,7 @@ ALIASES = {
 
 
 class LabelsWorkflowTests(unittest.TestCase):
-    def run_cleanup(self, scenario: str):
+    def run_cleanup(self, scenario: str, repeats: int = 1):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             log = tmp_path / "gh.log"
@@ -45,6 +45,11 @@ class LabelsWorkflowTests(unittest.TestCase):
                 "    handle.write(rendered + '\\n')",
                 "scenario = os.environ['GH_STUB_SCENARIO']",
                 "url = next((item for item in args if item.startswith('repos/')), '')",
+                "state_path = os.environ['GH_STUB_STATE']",
+                "deleted = set()",
+                "if os.path.exists(state_path):",
+                "    with open(state_path, encoding='utf-8') as handle:",
+                "        deleted = {line.strip() for line in handle if line.strip()}",
                 "",
                 "if '/issues?state=all&labels=' in url:",
                 "    used = scenario == 'used'",
@@ -55,12 +60,19 @@ class LabelsWorkflowTests(unittest.TestCase):
                 "    raise SystemExit(0)",
                 "",
                 "if '--method' in args and 'DELETE' in args:",
+                "    if '/labels/' in url:",
+                "        label = url.rsplit('/labels/', 1)[1]",
+                "        with open(state_path, 'a', encoding='utf-8') as handle:",
+                "            handle.write(label + '\\n')",
                 "    raise SystemExit(0)",
                 "",
                 "if '/labels/' in url:",
                 "    label = url.rsplit('/labels/', 1)[1]",
                 "    legacy = {quote(name, safe='') for name in aliases}",
                 "    canonical = {quote(name, safe='') for name in aliases.values()}",
+                "    if label in deleted:",
+                "        print('gh: Not Found (HTTP 404)', file=sys.stderr)",
+                "        raise SystemExit(1)",
                 "    if scenario == 'aliases-absent' and label in legacy:",
                 "        print('gh: Not Found (HTTP 404)', file=sys.stderr)",
                 "        raise SystemExit(1)",
@@ -81,18 +93,27 @@ class LabelsWorkflowTests(unittest.TestCase):
                     "GH_BIN": str(stub),
                     "GH_STUB_LOG": str(log),
                     "GH_STUB_SCENARIO": scenario,
+                    "GH_STUB_STATE": str(tmp_path / "gh.state"),
                     "REPOSITORIO": "pl0n3r/ControlBot",
                 }
             )
-            result = subprocess.run(
-                ["bash", str(SCRIPT)],
-                cwd=ROOT,
-                env=env,
-                text=True,
-                capture_output=True,
-            )
-            calls = log.read_text(encoding="utf-8") if log.exists() else ""
-            return result, calls
+            results = []
+            call_batches = []
+            for _ in range(repeats):
+                if log.exists():
+                    log.unlink()
+                result = subprocess.run(
+                    ["bash", str(SCRIPT)],
+                    cwd=ROOT,
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                )
+                results.append(result)
+                call_batches.append(log.read_text(encoding="utf-8") if log.exists() else "")
+            if repeats == 1:
+                return results[0], call_batches[0]
+            return results, call_batches
 
     def test_cleanup_covers_exact_factory_legacy_aliases(self):
         script = SCRIPT.read_text(encoding="utf-8")
@@ -160,14 +181,20 @@ class LabelsWorkflowTests(unittest.TestCase):
 
     def test_legacy_cleanup_is_idempotent_for_absent_or_orphaned_labels(self):
         absent, absent_calls = self.run_cleanup("aliases-absent")
-        orphaned, orphaned_calls = self.run_cleanup("unused")
+        results, call_batches = self.run_cleanup("unused", repeats=2)
+        first, second = results
+        first_calls, second_calls = call_batches
 
         self.assertEqual(absent.returncode, 0, absent.stderr)
         self.assertNotIn("--method DELETE", absent_calls)
         self.assertNotIn("/issues?state=all&labels=", absent_calls)
 
-        self.assertEqual(orphaned.returncode, 0, orphaned.stderr)
-        self.assertEqual(orphaned_calls.count("--method DELETE"), len(ALIASES))
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(first_calls.count("--method DELETE"), len(ALIASES))
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertNotIn("--method DELETE", second_calls)
+        self.assertNotIn("/issues?state=all&labels=", second_calls)
+        self.assertIn("ausente; no-op", second.stdout)
 
     def test_sync_depends_on_cleanup_and_keeps_factory_reusable(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")

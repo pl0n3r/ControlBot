@@ -111,8 +111,10 @@ final class DecisionUi
             throw new InvalidArgumentException('Decisión inválida.');
         }
 
-        $repository = self::e($decision['repository']);
+        $repositoryRaw = $decision['repository'];
+        $repository = self::e($repositoryRaw);
         $issue = $decision['issue'];
+        $questionId = substr(hash('sha256', $repositoryRaw . '#' . $issue), 0, 12);
         $simpleTitle = self::optionalText($decision, 'title_simple', 120);
         $simpleSummary = self::optionalText($decision, 'summary_simple', 400);
         $title = $simpleTitle !== '' ? $simpleTitle : self::e($decision['title']);
@@ -180,8 +182,8 @@ final class DecisionUi
             . $csrfField
             . '<input type="hidden" name="repository" value="' . $repository . '">'
             . '<input type="hidden" name="issue" value="' . $issue . '">'
-            . '<label for="question-' . $issue . '">Tu pregunta</label>'
-            . '<textarea id="question-' . $issue . '" name="question" maxlength="500" rows="3"'
+            . '<label for="question-' . $questionId . '">Tu pregunta</label>'
+            . '<textarea id="question-' . $questionId . '" name="question" maxlength="500" rows="3"'
             . $questionDisabled . '></textarea>'
             . '<button class="question-action" type="submit"' . $questionDisabled . '>Preguntar</button>'
             . '</form></section>';
@@ -218,7 +220,7 @@ final class DecisionUi
             || ($entry['repository'] ?? null) !== $repository
             || ($entry['issue'] ?? null) !== $issue
             || !is_string($entry['question'] ?? null)
-            || strlen($entry['question']) > 500
+            || self::utf8Length($entry['question']) > 500
             || !in_array($entry['status'] ?? null, ['answered', 'unavailable'], true)
             || !is_int($entry['at'] ?? null)
             || ($entry['at'] ?? 0) < 1
@@ -234,6 +236,15 @@ final class DecisionUi
             throw new InvalidArgumentException('Estado de pregunta inválido.');
         }
         return $entry;
+    }
+
+    private static function utf8Length(string $value): int
+    {
+        $count = preg_match_all('/./us', $value, $matches);
+        if ($count === false) {
+            throw new InvalidArgumentException('Texto UTF-8 inválido.');
+        }
+        return $count;
     }
 
     private static function questionResult(array $entry): string

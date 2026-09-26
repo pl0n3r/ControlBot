@@ -69,7 +69,7 @@ if ($scenario === 'heartbeat') {
     foreach ([
         'fresh' => [1_060, $signal],
         'stale' => [1_061, $signal],
-        'offline' => [1_181, $signal],
+        'offline' => [1_301, $signal],
         'future' => [999, $signal],
         'missing' => [1_000, null],
         'draining' => [1_000, array_replace($signal, ['status' => 'draining'])],
@@ -77,6 +77,11 @@ if ($scenario === 'heartbeat') {
     ] as $name => [$now, $beat]) {
         $readings[$name] = RunnerGateway::health($identity, $beat, $now, 60, ['work_001']);
     }
+
+    $ttlRejects = [
+        'equal' => rejected(static fn(): array => RunnerGateway::health($identity, $signal, 1_000, 60, [], 60)),
+        'lower' => rejected(static fn(): array => RunnerGateway::health($identity, $signal, 1_000, 60, [], 30)),
+    ];
 
     $bad = [
         'unknown_runner' => array_replace($signal, ['runner_id' => '22222222-2222-7222-8222-222222222222']),
@@ -94,6 +99,7 @@ if ($scenario === 'heartbeat') {
                 static fn(): array => RunnerGateway::health($identity, $row, 1_000, 60)
             ), $bad
         ),
+        'ttl_rejects' => $ttlRejects,
     ], JSON_THROW_ON_ERROR), PHP_EOL;
     exit;
 }

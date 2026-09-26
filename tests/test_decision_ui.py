@@ -25,7 +25,8 @@ class DecisionUiTests(unittest.TestCase):
         self.assertIn(":focus-visible", html)
         self.assertIn("@media (prefers-reduced-motion: reduce)", html)
         self.assertIn("@media (min-width: 760px)", html)
-        self.assertIn("CONTROLBOT / DECISIONES", html)
+        self.assertIn('class="brand-mark">CONTROLBOT</span>', html)
+        self.assertIn("/ DECISIONES</p>", html)
 
     def test_canonical_hud_palette_is_sober_and_non_neon(self):
         html = render("ready")

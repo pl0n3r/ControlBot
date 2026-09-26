@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -119,6 +120,14 @@ class DecisionUiTests(unittest.TestCase):
         html = render("escape")
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
         self.assertNotIn("<script>alert(1)</script>", html)
+
+    def test_question_ids_are_unique_across_repositories(self):
+        html = render("duplicate-question-ids")
+        ids = re.findall(r'id="question-([a-f0-9]{12})"', html)
+        labels = re.findall(r'for="question-([a-f0-9]{12})"', html)
+        self.assertEqual(len(ids), 2)
+        self.assertEqual(len(set(ids)), 2)
+        self.assertEqual(sorted(ids), sorted(labels))
 
     def test_question_content_is_escaped(self):
         result = subprocess.run(

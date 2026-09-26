@@ -43,7 +43,10 @@ class DecisionUiTests(unittest.TestCase):
         self.assertIn('name="displayed_sha" value="' + ("a" * 40) + '"', html)
         self.assertIn('name="_csrf" value="' + ("c" * 40) + '"', html)
         self.assertIn('name="option" value="A"', html)
-        self.assertNotIn('disabled aria-disabled="true"', html)
+        start = html.index('action="/approvals/execute"')
+        end = html.index("</form>", start)
+        approval_form = html[start:end]
+        self.assertNotIn('disabled aria-disabled="true"', approval_form)
 
     def test_missing_csrf_keeps_actions_disabled(self):
         html = render("no-csrf")

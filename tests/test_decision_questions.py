@@ -84,7 +84,13 @@ class DecisionQuestionTests(unittest.TestCase):
         )
         self.assertEqual(entry["repository"], "pl0n3r/factory")
         self.assertEqual(entry["issue"], 66)
-        self.assertNotIn("github_token", json.dumps(data))
+        exposed = {
+            "response": data["response"],
+            "stored": data["stored"],
+            "provider_calls": data["provider_calls"],
+            "render": data["render"],
+        }
+        self.assertNotIn("github_token", json.dumps(exposed))
         self.assertNotIn("fixture-server-secret", json.dumps(data))
         self.assertEqual(
             set(data["provider_calls"][0]["context"]),

@@ -64,11 +64,15 @@ class ControlBotBootstrapTests(unittest.TestCase):
     def test_issue_78_bootstrap_is_exact_and_self_expiring(self) -> None:
         acceptance = self.read(".github/workflows/aceptacion.yml")
         coordination = self.read(".github/workflows/coordinacion.yml")
+        self.assertIn("github.event.pull_request.number == 86", acceptance)
+        self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", acceptance)
         self.assertIn("github.head_ref == 'trabajo/issue-78'", acceptance)
         self.assertIn(
             "github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07'",
             acceptance,
         )
+        self.assertIn("github.event.pull_request.number == 86", coordination)
+        self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", coordination)
         self.assertIn(
             "github.event.pull_request.head.ref == 'trabajo/issue-78'",
             coordination,

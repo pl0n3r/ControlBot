@@ -36,6 +36,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: comment
@@ -53,6 +54,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: label
@@ -69,6 +71,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: pr
@@ -83,6 +86,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: validate
@@ -97,6 +101,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: issue
@@ -109,6 +114,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      checks: write
     uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1
     with:
       operation: sweep

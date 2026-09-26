@@ -26,6 +26,17 @@ class CoordinationWorkflowTests(unittest.TestCase):
             for permission in required:
                 self.assertIn(permission, permissions)
 
+    def test_issue_78_bootstrap_does_not_disable_reservations_globally(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        line = next(
+            value.strip()
+            for value in workflow.splitlines()
+            if value.strip().startswith("require_reservation:")
+        )
+        self.assertIn("trabajo/issue-78", line)
+        self.assertIn("996802183248f84ee8f28c7cb25221247e52dd07", line)
+        self.assertIn("&& !(", line)
+
     def test_workflow_default_remains_read_only(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         header = workflow.split("\njobs:\n", 1)[0]

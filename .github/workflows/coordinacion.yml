@@ -90,9 +90,10 @@ jobs:
     with:
       operation: validate
       pr_number: ${{ github.event.pull_request.number }}
-      # Recuperación única de #21: main todavía tenía el caller inválido.
-      # Todo PR posterior parte de otro SHA y exige reserva /tomar.
-      require_reservation: ${{ github.event.pull_request.base.sha != 'a3e258995145750b6fb10284320fd6130979ae93' }}
+      # Bootstraps exactos: #21 y #78 reparan callers que impiden crear la
+      # propia reserva. La excepción #78 exige rama + base SHA exactos y se
+      # autodesactiva al moverse main.
+      require_reservation: ${{ github.event.pull_request.base.sha != 'a3e258995145750b6fb10284320fd6130979ae93' && !(github.event.pull_request.head.ref == 'trabajo/issue-78' && github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07') }}
 
   issue:
     if: github.event_name == 'issues' && (github.event.action == 'closed' || github.event.action == 'reopened')

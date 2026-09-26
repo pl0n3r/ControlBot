@@ -61,6 +61,23 @@ class ControlBotBootstrapTests(unittest.TestCase):
                 self.assertIn("pull-requests: write", block)
                 self.assertIn("uses: pl0n3r/factory/.github/workflows/coordinacion.yml@v1", block)
 
+    def test_issue_78_bootstrap_is_exact_and_self_expiring(self) -> None:
+        acceptance = self.read(".github/workflows/aceptacion.yml")
+        coordination = self.read(".github/workflows/coordinacion.yml")
+        self.assertIn("github.head_ref == 'trabajo/issue-78'", acceptance)
+        self.assertIn(
+            "github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07'",
+            acceptance,
+        )
+        self.assertIn(
+            "github.event.pull_request.head.ref == 'trabajo/issue-78'",
+            coordination,
+        )
+        self.assertIn(
+            "github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07'",
+            coordination,
+        )
+
     def test_deploy_stays_construction_only(self) -> None:
         deploy = self.read(".github/workflows/deploy.yml")
         observe = self.read(".github/workflows/observar.yml")

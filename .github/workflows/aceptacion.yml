@@ -20,7 +20,11 @@ jobs:
     if: >-
       github.event.pull_request.draft == false &&
       github.head_ref != 'trabajo/issue-2' &&
-      github.head_ref != 'trabajo/issue-21'
+      github.head_ref != 'trabajo/issue-21' &&
+      !(
+        github.head_ref == 'trabajo/issue-78' &&
+        github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07'
+      )
     uses: pl0n3r/factory/.github/workflows/aceptacion.yml@v1
     with:
       issue_number: 0

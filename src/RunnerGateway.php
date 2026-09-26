@@ -151,9 +151,13 @@ final class RunnerGateway
         int $now,
         int $staleAfterSeconds,
         array $assignmentIds = [],
+        int $offlineAfterSeconds = 300,
     ): array {
         $runner = self::identity($identity);
-        if ($now < 0 || $staleAfterSeconds < 1 || $staleAfterSeconds > 1200) {
+        if ($now < 0
+            || $staleAfterSeconds < 1
+            || $offlineAfterSeconds <= $staleAfterSeconds
+            || $offlineAfterSeconds > 3600) {
             throw new InvalidArgumentException('Runner clock or TTL invalid.');
         }
         $assignments = self::uniqueRefs($assignmentIds, 64, 'assignment_id');
@@ -174,7 +178,7 @@ final class RunnerGateway
             $age = $now - $signal['observed_at'];
             $status = $age <= $staleAfterSeconds
                 ? 'healthy'
-                : ($age <= $staleAfterSeconds * 3 ? 'stale' : 'offline');
+                : ($age <= $offlineAfterSeconds ? 'stale' : 'offline');
 
             if ($status === 'healthy' && $signal['status'] !== 'draining') {
                 $free = $signal['capacity']['max'] - $signal['capacity']['active'];

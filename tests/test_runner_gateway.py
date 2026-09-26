@@ -46,6 +46,7 @@ class RunnerGatewayTests(unittest.TestCase):
         self.assertEqual(data["readings"]["full"]["status"], "healthy")
         self.assertFalse(data["readings"]["full"]["eligible"])
         self.assertTrue(all(data["rejects"].values()), data["rejects"])
+        self.assertTrue(all(data["ttl_rejects"].values()), data["ttl_rejects"])
 
     def test_stale_runner_preserves_assignment_identity(self):
         rows = scenario("heartbeat")["readings"]

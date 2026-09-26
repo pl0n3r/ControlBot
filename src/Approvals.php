@@ -269,7 +269,7 @@ final class AppendOnlyAuditLog
         }
 
         try {
-            while (($line = fgets($handle)) !== false) {
+            while (($line = fgets($handle, 8195)) !== false) {
                 $line = rtrim($line, "\r\n");
                 if ($line === '' || strlen($line) > 8192) {
                     throw new RuntimeException('Entrada de bitácora inválida.');

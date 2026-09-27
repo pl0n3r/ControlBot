@@ -1,3 +1,5 @@
+import json
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -41,7 +43,10 @@ class DecisionUiTests(unittest.TestCase):
         self.assertIn('name="displayed_sha" value="' + ("a" * 40) + '"', html)
         self.assertIn('name="_csrf" value="' + ("c" * 40) + '"', html)
         self.assertIn('name="option" value="A"', html)
-        self.assertNotIn('disabled aria-disabled="true"', html)
+        start = html.index('action="/approvals/execute"')
+        end = html.index("</form>", start)
+        approval_form = html[start:end]
+        self.assertNotIn('disabled aria-disabled="true"', approval_form)
 
     def test_missing_csrf_keeps_actions_disabled(self):
         html = render("no-csrf")
@@ -118,6 +123,30 @@ class DecisionUiTests(unittest.TestCase):
         html = render("escape")
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
         self.assertNotIn("<script>alert(1)</script>", html)
+
+    def test_question_ids_are_unique_across_repositories(self):
+        html = render("duplicate-question-ids")
+        ids = re.findall(r'id="question-([a-f0-9]{12})"', html)
+        labels = re.findall(r'for="question-([a-f0-9]{12})"', html)
+        self.assertEqual(len(ids), 2)
+        self.assertEqual(len(set(ids)), 2)
+        self.assertEqual(sorted(ids), sorted(labels))
+
+    def test_question_content_is_escaped(self):
+        result = subprocess.run(
+            ["php", str(ROOT / "tests/decision_question_scenarios.php"), "provider-html"],
+            cwd=ROOT,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        data = json.loads(result.stdout)
+        html = data["render"]
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt; respuesta", html)
+        self.assertNotIn("<script>alert(1)</script>", html)
+        self.assertNotIn("<img src=x onerror=alert(1)>", html)
+        self.assertIn('action="/decisions/question"', html)
 
 
 if __name__ == "__main__":

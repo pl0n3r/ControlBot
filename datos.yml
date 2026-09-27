@@ -42,7 +42,7 @@
     {
       "id": "chat_response_opt_in",
       "category": "usage",
-      "fields": ["agent_id", "tab_id", "response_text", "received_at", "opt_in"],
+      "fields": ["agent_id", "tab_id", "repository", "issue_number", "question_text", "response_text", "status", "received_at", "opt_in"],
       "purpose": "agent_response_relay",
       "basis": "review_required",
       "retention": "review_required",

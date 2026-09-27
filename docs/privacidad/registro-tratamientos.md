@@ -37,7 +37,7 @@ Producto: `pl0n3r/ControlBot`
 ## chat_response_opt_in
 
 - Categoría: `usage`
-- Campos de software: `agent_id`, `tab_id`, `response_text`, `received_at`, `opt_in`
+- Campos de software: `agent_id`, `tab_id`, `repository`, `issue_number`, `question_text`, `response_text`, `status`, `received_at`, `opt_in`
 - Finalidad: `agent_response_relay`
 - Base documentada: `review_required` (revisión jurídica requerida)
 - Consentimiento: `review_required`

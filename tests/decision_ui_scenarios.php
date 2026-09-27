@@ -69,6 +69,10 @@ if ($scenario === 'empty') {
         $decision[0]['summary_simple'] = '0';
     }
     echo DecisionUi::render($decision, true, $csrf);
+} elseif ($scenario === 'duplicate-question-ids') {
+    $other = $decision[0];
+    $other['repository'] = 'pl0n3r/other';
+    echo DecisionUi::render([$decision[0], $other], true, $csrf);
 } elseif ($scenario === 'escape') {
     $decision[0]['title'] = '<script>alert(1)</script>';
     echo DecisionUi::render($decision, true, $csrf);

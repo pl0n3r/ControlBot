@@ -34,7 +34,15 @@ if ($scenario === 'availability') {
 if ($scenario === 'handoff') {
     $row=['version'=>1,'handoff_id'=>'handoff_116','assignment_id'=>'work_116','from_session_id'=>'session_1','to_session_id'=>'session_2','objective'=>'Continuar implementación del runtime','issue_ref'=>'pl0n3r/ControlBot#116','pr_ref'=>'pl0n3r/ControlBot#117','sha'=>str_repeat('a',40),'last_result'=>'Tests relevantes en verde','evidence_ref'=>'controlbot:runtime/116/evidence','blocker'=>'Pendiente revisión','next_action'=>'Revisar diff y ejecutar AC exactos'];
     $parsed=AgentRuntime::handoff($row);
-    echo json_encode(['handoff'=>$parsed,'no_transcript'=>!array_key_exists('transcript',$parsed),'secret'=>rejected(fn()=>AgentRuntime::handoff(array_replace($row,['last_result'=>'token=supersecret'])))], JSON_THROW_ON_ERROR), PHP_EOL; exit;
+    echo json_encode([
+        'handoff'=>$parsed,
+        'no_transcript'=>!array_key_exists('transcript',$parsed),
+        'secret'=>rejected(fn()=>AgentRuntime::handoff(array_replace($row,['last_result'=>'token=supersecret']))),
+        'ambiguous_issue'=>rejected(fn()=>AgentRuntime::handoff(array_replace($row,['issue_ref'=>'issue-116']))),
+        'ambiguous_pr'=>rejected(fn()=>AgentRuntime::handoff(array_replace($row,['pr_ref'=>'117']))),
+        'external_evidence'=>rejected(fn()=>AgentRuntime::handoff(array_replace($row,['evidence_ref'=>'https://example.com/evidence']))),
+        'sensitive_evidence'=>rejected(fn()=>AgentRuntime::handoff(array_replace($row,['evidence_ref'=>'https://github.com/pl0n3r/ControlBot/token/value']))),
+    ], JSON_THROW_ON_ERROR), PHP_EOL; exit;
 }
 if ($scenario === 'privacy') {
     echo json_encode(['account_password'=>rejected(fn()=>AgentRuntime::account($account+['password'=>'x'])),'session_token'=>rejected(fn()=>AgentRuntime::session(sessionRow('session_1')+['session_token'=>'x'])),'secret_alias'=>rejected(fn()=>AgentRuntime::account(array_replace($account,['account_alias'=>'token=supersecret']))),'handoff_transcript'=>rejected(fn()=>AgentRuntime::handoff(['version'=>1,'handoff_id'=>'handoff_116','assignment_id'=>'work_116','from_session_id'=>'session_1','to_session_id'=>null,'objective'=>'Continuar','issue_ref'=>'pl0n3r/ControlBot#116','pr_ref'=>null,'sha'=>str_repeat('a',40),'last_result'=>'ok','evidence_ref'=>'controlbot:runtime/116','blocker'=>null,'next_action'=>'seguir','transcript'=>'chat completo']))], JSON_THROW_ON_ERROR), PHP_EOL; exit;

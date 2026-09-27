@@ -62,6 +62,37 @@ final class AgentRuntime
         return $value === null ? null : self::safeText($value, $label, $max);
     }
 
+    private static function workRef(mixed $value, string $label): string
+    {
+        $value = self::safeText($value, $label, 180);
+        if (preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#[1-9][0-9]*$/D', $value) !== 1) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+        return $value;
+    }
+
+    private static function evidenceRef(mixed $value): string
+    {
+        $value = self::safeText($value, 'evidence_ref', 240);
+        if (str_starts_with($value, 'controlbot:')) {
+            return self::ref($value, 'evidence_ref', 240);
+        }
+        $parts = parse_url($value);
+        if (!is_array($parts)
+            || ($parts['scheme'] ?? null) !== 'https'
+            || ($parts['host'] ?? null) !== 'github.com'
+            || isset($parts['user']) || isset($parts['pass'])
+            || isset($parts['query']) || isset($parts['fragment'])
+            || str_contains($value, '%')) {
+            throw new InvalidArgumentException('evidence_ref invalid.');
+        }
+        $path = $parts['path'] ?? '';
+        if ($path === '' || preg_match('/(?:^|\/)(?:token|secret|password|passwd|cookie|authorization|private[_-]?key|api[_-]?key|dsn)(?:\/|$)/i', $path) === 1) {
+            throw new InvalidArgumentException('evidence_ref invalid.');
+        }
+        return $value;
+    }
+
     private static function positiveInt(mixed $value, string $label, int $max = PHP_INT_MAX): int
     {
         if (!is_int($value) || $value < 1 || $value > $max) {
@@ -261,11 +292,11 @@ final class AgentRuntime
             'from_session_id' => self::ref($record['from_session_id'], 'from_session_id'),
             'to_session_id' => self::nullableRef($record['to_session_id'], 'to_session_id'),
             'objective' => self::safeText($record['objective'], 'objective', 240),
-            'issue_ref' => self::ref($record['issue_ref'], 'issue_ref'),
-            'pr_ref' => self::nullableRef($record['pr_ref'], 'pr_ref'),
+            'issue_ref' => self::workRef($record['issue_ref'], 'issue_ref'),
+            'pr_ref' => $record['pr_ref'] === null ? null : self::workRef($record['pr_ref'], 'pr_ref'),
             'sha' => $record['sha'],
             'last_result' => self::safeText($record['last_result'], 'last_result', 400),
-            'evidence_ref' => self::ref($record['evidence_ref'], 'evidence_ref', 240),
+            'evidence_ref' => self::evidenceRef($record['evidence_ref']),
             'blocker' => self::nullableText($record['blocker'], 'blocker', 240),
             'next_action' => self::safeText($record['next_action'], 'next_action', 300),
         ];

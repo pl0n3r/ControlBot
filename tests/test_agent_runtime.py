@@ -49,6 +49,8 @@ class AgentRuntimeTests(unittest.TestCase):
         data = scenario("handoff")
         self.assertTrue(data["no_transcript"])
         self.assertTrue(data["secret"])
+        for key in ("ambiguous_issue", "ambiguous_pr", "external_evidence", "sensitive_evidence"):
+            self.assertTrue(data[key], (key, data))
         self.assertEqual(data["handoff"]["assignment_id"], "work_116")
         self.assertEqual(data["handoff"]["issue_ref"], "pl0n3r/ControlBot#116")
         self.assertEqual(data["handoff"]["next_action"], "Revisar diff y ejecutar AC exactos")

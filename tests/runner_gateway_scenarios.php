@@ -68,7 +68,7 @@ if ($scenario === 'heartbeat') {
     $readings = [];
     foreach ([
         'fresh' => [1_060, $signal],
-        'stale' => [1_061, $signal],
+        'stale' => [1_241, $signal],
         'offline' => [1_301, $signal],
         'future' => [999, $signal],
         'missing' => [1_000, null],

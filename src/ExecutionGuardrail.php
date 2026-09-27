@@ -1,10 +1,7 @@
 <?php
 declare(strict_types=1);
-
 namespace ControlBot\Guardrail;
-
 use InvalidArgumentException;
-
 final class ExecutionGuardrail
 {
     public static function analyze(array $s, array $t, int $now): array
@@ -21,7 +18,6 @@ final class ExecutionGuardrail
         if ($now < 0 || !is_bool($s['non_preemptible'] ?? null)) {
             throw new InvalidArgumentException('Guardrail clock or preemption invalid.');
         }
-
         $issue = self::ref($s['issue_ref'], 'issue_ref');
         $pr = self::ref($s['pr_ref'], 'pr_ref');
         $sha = self::sha($s['sha']);
@@ -39,7 +35,6 @@ final class ExecutionGuardrail
         $attempts = self::attempts($s['attempts'], $now);
         $retries = self::retries($s['retry_events'], $now);
         $handoffs = self::handoffs($s['handoffs'], $now);
-
         $issueTtl = self::integer($t['issue_stale_seconds'], 'issue_stale_seconds', 1, 604800);
         $reservationTtl = self::integer($t['reservation_stale_seconds'], 'reservation_stale_seconds', 1, 604800);
         $heartbeatTtl = self::integer($t['heartbeat_stale_seconds'], 'heartbeat_stale_seconds', 1, 86400);
@@ -48,7 +43,6 @@ final class ExecutionGuardrail
             throw new InvalidArgumentException('state_timeouts invalid.');
         }
         $stateTimeout = self::integer($t['state_timeouts'][$state], 'state_timeout', 1, 86400);
-
         $signals = [];
         $lastTwo = array_slice($attempts, -2);
         if (count($lastTwo) === 2) {
@@ -85,7 +79,6 @@ final class ExecutionGuardrail
             $signals[] = 'handoff_bounce';
         }
         sort($signals);
-
         $hard = array_intersect($signals, [
             'same_approach_twice','same_error_without_new_evidence','heartbeat_lost',
             'state_timeout','duplicate_retry','handoff_bounce',
@@ -93,7 +86,6 @@ final class ExecutionGuardrail
         $health = $signals === [] ? 'healthy' : ($hard ? 'stuck' : 'degraded');
         $pause = $health === 'stuck' && !$s['non_preemptible'];
         $fingerprint = hash('sha256', json_encode([$issue,$pr,$sha,$signals], JSON_THROW_ON_ERROR));
-
         return [
             'health' => $health,
             'signals' => $signals,
@@ -111,7 +103,6 @@ final class ExecutionGuardrail
             ],
         ];
     }
-
     private static function attempts(mixed $rows, int $now): array
     {
         if (!is_array($rows) || !array_is_list($rows) || count($rows) > 20) {
@@ -134,7 +125,6 @@ final class ExecutionGuardrail
         }
         return $out;
     }
-
     private static function retries(mixed $rows, int $now): array
     {
         if (!is_array($rows) || !array_is_list($rows) || count($rows) > 50) {
@@ -147,7 +137,6 @@ final class ExecutionGuardrail
         }
         return $out;
     }
-
     private static function handoffs(mixed $rows, int $now): array
     {
         if (!is_array($rows) || !array_is_list($rows) || count($rows) > 20) {
@@ -164,7 +153,6 @@ final class ExecutionGuardrail
         }
         return $out;
     }
-
     private static function hasRapidRetry(array $rows, int $window): bool
     {
         for ($i = 1; $i < count($rows); $i++) {
@@ -177,7 +165,6 @@ final class ExecutionGuardrail
         }
         return false;
     }
-
     private static function hasBounce(array $rows): bool
     {
         if (count($rows) < 3) {
@@ -187,7 +174,6 @@ final class ExecutionGuardrail
         return $a['agent'] === $c['agent'] && $a['agent'] !== $b['agent']
             && $a['state'] === $b['state'] && $b['state'] === $c['state'];
     }
-
     private static function fields(mixed $row, array $expected, string $label): void
     {
         if (!is_array($row)) {
@@ -199,7 +185,6 @@ final class ExecutionGuardrail
             throw new InvalidArgumentException($label . ' fields invalid.');
         }
     }
-
     private static function integer(mixed $value, string $label, int $min, int $max = PHP_INT_MAX): int
     {
         if (!is_int($value) || $value < $min || $value > $max) {
@@ -207,7 +192,6 @@ final class ExecutionGuardrail
         }
         return $value;
     }
-
     private static function pastTime(mixed $value, string $label, int $now): int
     {
         $value = self::integer($value, $label, 0);
@@ -216,7 +200,6 @@ final class ExecutionGuardrail
         }
         return $value;
     }
-
     private static function slug(mixed $value, string $label): string
     {
         if (!is_string($value) || preg_match('/^[a-z][a-z0-9._-]{0,63}$/D', $value) !== 1) {
@@ -224,7 +207,6 @@ final class ExecutionGuardrail
         }
         return $value;
     }
-
     private static function ref(mixed $value, string $label): string
     {
         $value = self::text($value, $label, 180);
@@ -233,7 +215,6 @@ final class ExecutionGuardrail
         }
         return $value;
     }
-
     private static function sha(mixed $value): string
     {
         if (!is_string($value) || preg_match('/^[0-9a-f]{40}$/D', $value) !== 1) {
@@ -241,12 +222,10 @@ final class ExecutionGuardrail
         }
         return $value;
     }
-
     private static function nullableText(mixed $value, string $label, int $max): ?string
     {
         return $value === null ? null : self::text($value, $label, $max);
     }
-
     private static function text(mixed $value, string $label, int $max): string
     {
         if (!is_string($value) || trim($value) === '' || strlen($value) > $max

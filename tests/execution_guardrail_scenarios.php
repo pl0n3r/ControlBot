@@ -1,13 +1,9 @@
 <?php
 declare(strict_types=1);
-
 require __DIR__ . '/../src/ExecutionGuardrail.php';
-
 use ControlBot\Guardrail\ExecutionGuardrail;
-
 $name = $argv[1] ?? '';
 $now = 2000;
-
 function thresholds(array $overrides = []): array {
     return array_replace([
         'issue_stale_seconds' => 600,
@@ -17,7 +13,6 @@ function thresholds(array $overrides = []): array {
         'state_timeouts' => ['working' => 300, 'reviewing' => 600],
     ], $overrides);
 }
-
 function base_snapshot(array $overrides = []): array {
     return array_replace([
         'issue_ref' => 'pl0n3r/ControlBot#109',
@@ -40,7 +35,6 @@ function base_snapshot(array $overrides = []): array {
         'non_preemptible' => false,
     ], $overrides);
 }
-
 if ($name === 'healthy') {
     $out = ExecutionGuardrail::analyze(base_snapshot(), thresholds(), $now);
 } elseif ($name === 'all-patterns') {
@@ -95,5 +89,4 @@ if ($name === 'healthy') {
     fwrite(STDERR, "scenario inválido\n");
     exit(2);
 }
-
 echo json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

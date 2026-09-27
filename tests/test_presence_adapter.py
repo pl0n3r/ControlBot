@@ -24,6 +24,9 @@ class PresenceAdapterTests(unittest.TestCase):
         self.assertEqual(data["degraded"]["capacity_state"], "degraded")
         self.assertEqual(data["unknown"]["presence_state"], "unknown")
         self.assertEqual(data["unknown"]["capacity_state"], "unknown")
+        self.assertEqual(data["rateLimitedIdle"]["capacity_state"], "degraded")
+        self.assertEqual(data["rateLimitedIdle"]["idle_capacity"], 0)
+        self.assertFalse(data["rateLimitedIdle"]["accounts"][0]["eligible"])
 
     def test_stale_or_missing_heartbeat_never_creates_free_capacity_and_preserves_assignment(self):
         data = scenario("heartbeat")
@@ -78,6 +81,8 @@ class PresenceAdapterTests(unittest.TestCase):
         self.assertFalse(data["preemptBlocked"]["allowed"])
         self.assertIn("non_preemptible_outside_safe_point", data["preemptBlocked"]["reasons"])
         self.assertTrue(data["preemptSafe"]["allowed"])
+        self.assertFalse(data["recoverUnhealthy"]["allowed"])
+        self.assertIn("session_not_healthy", data["recoverUnhealthy"]["reasons"])
 
     def test_presence_simulation_is_deterministic_and_side_effect_free(self):
         data = scenario("deterministic")

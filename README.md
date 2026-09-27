@@ -5,7 +5,7 @@ Centro de control web **privado** de la fábrica de software de pl0n3r. Es una h
 ## Estado actual
 
 - Fase: **construcción**.
-- Versión actual: **0.1.12** (candidato #118: Scheduler core de WorkItem, readiness y fencing; selección delegada a Factory Dispatcher V2).
+- Versión actual: **0.1.13** (candidato #120: Presence Contract + adapter adaptativo fail-closed; priorización delegada a Factory Dispatcher V2).
 - Stack objetivo: PHP 8.5 + MariaDB.
 - Hosting objetivo: Hostinger, junto a Condor pero con app, base y deploy independientes.
 - Deploy y observer: instalados en modo **fail-closed**; no actúan sin variables/configuración explícita.

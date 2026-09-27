@@ -217,6 +217,34 @@ if (array_key_exists($name, $invalidScenarios)) {
         'result' => $result,
         'calls' => $calls,
     ];
+} elseif ($name === 'provision-real-adapter-invalid') {
+    $calls = [];
+    $sender = static function (string $method, string $url, array $headers, ?string $body) use (&$calls): array {
+        $calls[] = [$method, $url, $headers, $body];
+        return ['status' => 204, 'body' => ''];
+    };
+    $gateway = new Gateway(new ApiClient('ghp_test_only_token', new ApiTransport($sender)));
+    $adapter = new GitHubFactoryProvisioningAdapter($gateway);
+    $base = [
+        'project_id' => 'project-controlbot',
+        'project_slug' => 'controlbot',
+        'target_repository' => 'pl0n3r/NewProduct',
+        'governance_ref' => 'pl0n3r/factory@v1',
+        'idempotency_key' => str_repeat('a', 64),
+    ];
+    $blocked = [];
+    foreach ([
+        array_diff_key($base, ['governance_ref' => true]),
+        [...$base, 'unexpected' => 'value'],
+    ] as $inputs) {
+        try {
+            $adapter->dispatch($inputs);
+            $blocked[] = false;
+        } catch (InvalidArgumentException) {
+            $blocked[] = true;
+        }
+    }
+    $out = ['blocked' => $blocked, 'calls' => $calls];
 } elseif ($name === 'provision-unapproved') {
     try {
         $adapter = new FakeProjectProvisioningAdapter();

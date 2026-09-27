@@ -64,7 +64,10 @@ class CoordinationWorkflowTests(unittest.TestCase):
 
         caller = self._job_block(workflow, "pr")
         self.assertIn("operation: pr", caller)
-        self.assertIn("action: ${{ github.event.action }}", caller)
+        self.assertIn("github.event.action == 'reopened'", caller)
+        self.assertIn("github.event.action == 'synchronize'", caller)
+        self.assertIn("github.event.pull_request.draft && 'converted_to_draft'", caller)
+        self.assertIn("'ready_for_review'", caller)
         self.assertIn(
             "github.event.pull_request.head.repo.full_name == github.repository",
             caller,
@@ -83,7 +86,10 @@ class CoordinationWorkflowTests(unittest.TestCase):
 
         caller = self._job_block(workflow, "pr")
         self.assertIn("operation: pr", caller)
-        self.assertIn("action: ${{ github.event.action }}", caller)
+        self.assertIn("github.event.action == 'synchronize'", caller)
+        self.assertIn("github.event.pull_request.draft && 'converted_to_draft'", caller)
+        self.assertIn("'ready_for_review'", caller)
+        self.assertIn("|| github.event.action", caller)
 
     def test_reopened_or_synchronized_pr_without_trusted_marker_fails_closed(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")

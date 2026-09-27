@@ -40,6 +40,18 @@ class DecisionUiTests(unittest.TestCase):
         self.assertNotIn("box-shadow", html)
         self.assertNotIn("scanline", html)
 
+    def test_empty_state_orb_has_no_animation(self):
+        html = render("empty")
+        css_start = html.index("<style>") + len("<style>")
+        css_end = html.index("</style>", css_start)
+        orb_rules = [
+            block
+            for block in html[css_start:css_end].split("}")
+            if ".status-orb" in block
+        ]
+        self.assertTrue(orb_rules)
+        self.assertTrue(all("animation:" not in block for block in orb_rules))
+
     def test_inter_is_primary_and_orbitron_is_brand_only(self):
         html = render("ready")
         self.assertIn('font-family: Inter, system-ui', html)

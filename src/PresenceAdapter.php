@@ -23,7 +23,7 @@ final class PresenceAdapter
             $accounts[$id]=$account; $sessionsByAccount[$id]=[];
         }
 
-        $sessions=[]; $seen=[]; $unknown=$rows===[]; $degraded=false; $healthy=0; $idle=0;
+        $sessions=[]; $seen=[]; $unknown=$rows===[]; $degraded=false; $healthy=0; $idleByAccount=[];
         foreach($rows as $raw){
             self::fields($raw,['session','agent','assignment','claims','generation','attempt','safe_point','non_preemptible'],'PresenceRow');
             if(!is_array($raw['session'])||!is_array($raw['agent'])) throw new InvalidArgumentException('Presence row invalid.');
@@ -51,7 +51,7 @@ final class PresenceAdapter
             $freshness=($heartbeat===null||$heartbeat>$now)?'unknown':$health['health'];
             if($freshness==='unknown') $unknown=true;
             elseif($freshness!=='healthy') $degraded=true;
-            else { $healthy++; if($session['status']==='idle') $idle++; }
+            else { $healthy++; if($session['status']==='idle') $idleByAccount[$aid]=($idleByAccount[$aid]??0)+1; }
 
             if(!is_bool($raw['safe_point'])||!is_bool($raw['non_preemptible']))
                 throw new InvalidArgumentException('Preemption flags invalid.');
@@ -70,26 +70,27 @@ final class PresenceAdapter
             ];
         }
 
-        $accountViews=[]; $trustedFree=0;
+        $accountViews=[]; $trustedFree=0; $trustedIdle=0;
         foreach($accounts as $id=>$account){
             $view=AgentRuntime::capacitySnapshot($account,$sessionsByAccount[$id]);
             $hasHealthy=false;
             foreach($sessions as $row) if($row['account_id']===$id&&$row['freshness']==='healthy'){$hasHealthy=true;break;}
             if($account['status']!=='active') $degraded=true;
             $free=($account['status']==='active'&&$hasHealthy)?$view['free_capacity']:0;
-            $trustedFree+=$free;
-            $accountViews[]=['account_id'=>$id,'eligible'=>$free>0,'free_capacity'=>$free];
+            $idle=$account['status']==='active'?($idleByAccount[$id]??0):0;
+            $trustedFree+=$free; $trustedIdle+=$idle;
+            $accountViews[]=['account_id'=>$id,'eligible'=>($free+$idle)>0,'free_capacity'=>$free,'idle_sessions'=>$idle];
         }
 
         usort($sessions,static fn(array $a,array $b):int=>$a['session_id']<=>$b['session_id']);
         usort($accountViews,static fn(array $a,array $b):int=>$a['account_id']<=>$b['account_id']);
         $presence=$unknown||$healthy===0?'unknown':($healthy===1?'solo':'multi');
-        $capacity=$unknown?'unknown':($degraded?'degraded':(($idle+$trustedFree)>0?'idle_capacity':'saturated'));
+        $capacity=$unknown?'unknown':($degraded?'degraded':(($trustedIdle+$trustedFree)>0?'idle_capacity':'saturated'));
 
         return [
             'version'=>1,'policy_ref'=>self::POLICY,'observed_at'=>$now,
             'presence_state'=>$presence,'capacity_state'=>$capacity,
-            'healthy_sessions'=>$healthy,'idle_capacity'=>$idle+$trustedFree,
+            'healthy_sessions'=>$healthy,'idle_capacity'=>$trustedIdle+$trustedFree,
             'sessions'=>$sessions,'accounts'=>$accountViews,
         ];
     }
@@ -120,10 +121,12 @@ final class PresenceAdapter
     public static function replanGuard(array $snapshot,string $sessionId,int $expectedGeneration,string $operation): array
     {
         if(!in_array($operation,self::OPERATIONS,true)) throw new InvalidArgumentException('Operation invalid.');
+        $expected=self::positive($expectedGeneration,'expected_generation');
         $row=self::findSession($snapshot,self::opaque($sessionId,'session_id')); $reasons=[];
         if($row===null) $reasons[]='session_unknown';
         else {
-            if($row['generation']!==self::positive($expectedGeneration,'expected_generation')) $reasons[]='stale_generation';
+            if($row['generation']!==$expected) $reasons[]='stale_generation';
+            if($operation==='recover'&&$row['freshness']!=='healthy') $reasons[]='session_not_healthy';
             if(in_array($operation,['reassign','preempt'],true)&&$row['non_preemptible']&&!$row['safe_point'])
                 $reasons[]='non_preemptible_outside_safe_point';
         }

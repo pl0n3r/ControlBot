@@ -32,7 +32,8 @@ jobs:
         github.event.comment.body == '/adoptar-contrato-huerfana' ||
         startsWith(github.event.comment.body, '/liberar ') ||
         startsWith(github.event.comment.body, '/transferir ') ||
-        startsWith(github.event.comment.body, '/migrar-contrato ')
+        startsWith(github.event.comment.body, '/migrar-contrato ') ||
+        startsWith(github.event.comment.body, '/renovar-contrato ')
       )
     permissions:
       contents: write
@@ -90,10 +91,10 @@ jobs:
     with:
       operation: validate
       pr_number: ${{ github.event.pull_request.number }}
-      # Bootstraps exactos: #21 y #78 reparan callers que impiden crear la
-      # propia reserva. La excepción #78 exige rama + base SHA exactos y se
-      # autodesactiva al moverse main.
-      require_reservation: ${{ github.event.pull_request.base.sha != 'a3e258995145750b6fb10284320fd6130979ae93' && !(github.event.pull_request.number == 86 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'trabajo/issue-78' && github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07') }}
+      # Bootstraps exactos: #21, #78 y #105 reparan callers que impiden
+      # crear/renovar la propia reserva. Cada excepción exige identidad y base
+      # exactas y se autodesactiva al moverse main.
+      require_reservation: ${{ github.event.pull_request.base.sha != 'a3e258995145750b6fb10284320fd6130979ae93' && !(github.event.pull_request.number == 86 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'trabajo/issue-78' && github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07') && !(github.event.pull_request.number == 106 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'trabajo/issue-105' && github.event.pull_request.base.sha == 'e34fe2a327892e34f68f43a8d4b10fb6e935d275') }}
 
   issue:
     if: github.event_name == 'issues' && (github.event.action == 'closed' || github.event.action == 'reopened')

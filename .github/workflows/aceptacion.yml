@@ -26,6 +26,12 @@ jobs:
         github.event.pull_request.head.repo.full_name == github.repository &&
         github.head_ref == 'trabajo/issue-78' &&
         github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07'
+      ) &&
+      !(
+        github.event.pull_request.number == 106 &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.head_ref == 'trabajo/issue-105' &&
+        github.event.pull_request.base.sha == 'e34fe2a327892e34f68f43a8d4b10fb6e935d275'
       )
     uses: pl0n3r/factory/.github/workflows/aceptacion.yml@v1
     with:

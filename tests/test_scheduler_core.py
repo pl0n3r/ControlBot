@@ -26,6 +26,9 @@ class SchedulerCoreTests(unittest.TestCase):
         for key,reason in expected.items():
             self.assertFalse(data[key]["ready"],(key,data[key]))
             self.assertIn(reason,data[key]["reasons"])
+        self.assertTrue(data["independent"]["ready"])
+        self.assertEqual(data["independent"]["open_dependencies"],[])
+        self.assertEqual(data["independent"]["unknown_dependencies"],[])
 
     def test_reservation_and_generation_fencing_prevent_double_owner(self):
         data=scenario("fencing")
@@ -41,6 +44,8 @@ class SchedulerCoreTests(unittest.TestCase):
         for key in ("full","rate_limited"):
             self.assertFalse(data[key]["ready"])
             self.assertIn("account_capacity_unavailable",data[key]["reasons"])
+        self.assertEqual(data["numeric_session_ids"],["123"])
+        self.assertTrue(data["numeric_id_readiness"]["ready"])
 
     def test_candidate_targets_factory_dispatcher_v2_without_parallel_ranking(self):
         data=scenario("candidate")

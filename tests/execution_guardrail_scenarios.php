@@ -80,7 +80,7 @@ if ($name === 'healthy') {
     ]), thresholds(), $now);
 } elseif ($name === 'secret-handoff') {
     try {
-        ExecutionGuardrail::analyze(base_snapshot(['last_result'=>'token=do-not-log']), thresholds(), $now);
+        ExecutionGuardrail::analyze(base_snapshot(['last_result'=>'ghp_123456789012345678901234567890']), thresholds(), $now);
         $out = ['blocked'=>false];
     } catch (InvalidArgumentException $e) {
         $out = ['blocked'=>true];

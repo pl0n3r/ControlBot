@@ -37,6 +37,7 @@ if($scenario==='schema'){
         'generation'=>rejected(fn()=>SchedulerCore::workItem(item(['generation'=>0]))),
         'source'=>rejected(fn()=>SchedulerCore::workItem(item(['source_ref'=>'issue-118']))),
         'state'=>rejected(fn()=>SchedulerCore::workItem(item(['state'=>'mystery']))),
+        'reserved_without_owner'=>rejected(fn()=>SchedulerCore::workItem(item(['state'=>'reserved']))),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='readiness'){

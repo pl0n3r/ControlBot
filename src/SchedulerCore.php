@@ -23,6 +23,9 @@ final class SchedulerCore
         $reservation=self::nullableRef($raw['reservation_id'],'reservation_id');
         $assigned=self::nullableRef($raw['assigned_session_id'],'assigned_session_id');
         if($assigned!==null && $reservation===null) throw new InvalidArgumentException('Assigned WorkItem requires reservation.');
+        if($raw['state']==='reserved' && $reservation===null) throw new InvalidArgumentException('Reserved WorkItem requires reservation.');
+        if(in_array($raw['state'],['assigned','running','review'],true) && $assigned===null)
+            throw new InvalidArgumentException('Active WorkItem requires assigned session.');
         return [
             'version'=>1,
             'work_item_id'=>self::id($raw['work_item_id'],'work_item_id'),
@@ -168,7 +171,7 @@ final class SchedulerCore
 
     private static function ref(mixed $value,string $label): string
     {
-        if(!is_string($value)||preg_match('/^[A-Za-z0-9][A-Za-z0-9._:@\/-]{0,179}$/D',$value)!==1)
+        if(!is_string($value)||preg_match('/^[A-Za-z0-9][A-Za-z0-9._:@\/#-]{0,179}$/D',$value)!==1)
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }

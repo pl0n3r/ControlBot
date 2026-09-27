@@ -409,6 +409,7 @@ h1 { font-size: clamp(1.9rem, 9vw, 3.2rem); letter-spacing: -.035em; line-height
   opacity: .55;
 }
 .meta { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .76rem; }
+.meta > span { min-width: 0; overflow-wrap: anywhere; }
 .decision-card h2 { margin-top: 14px; font-size: 1.35rem; letter-spacing: -.015em; }
 .context { color: #c4ced5; line-height: 1.55; }
 .sha { display: grid; gap: 5px; color: var(--muted); font-size: .72rem; }

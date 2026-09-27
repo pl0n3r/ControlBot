@@ -183,7 +183,7 @@ final class ProjectModel
     private static function repoName(mixed $value): string
     {
         if (!is_string($value) || preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/D', $value) !== 1) {
-            throw new InvalidArgumentException('Repository full_name invalid.');
+            throw new InvalidArgumentException('Repository name invalid.');
         }
         return $value;
     }

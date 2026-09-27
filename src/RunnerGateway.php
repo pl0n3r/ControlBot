@@ -85,7 +85,7 @@ final class RunnerGateway
     {
         self::fields($record, [
             'version', 'runner_id', 'protocol_version', 'runtime', 'runtime_version',
-            'platform', 'location', 'capabilities', 'max_parallel',
+            'platform', 'placement', 'capabilities', 'max_parallel',
         ], 'RunnerIdentity');
         if ($record['version'] !== 1 || $record['protocol_version'] !== 1
             || !is_string($record['runtime_version'])
@@ -101,7 +101,7 @@ final class RunnerGateway
             'runtime' => self::slug($record['runtime'], 'runtime'),
             'runtime_version' => $record['runtime_version'],
             'platform' => self::slug($record['platform'], 'platform'),
-            'location' => self::slug($record['location'], 'location'),
+            'placement' => self::slug($record['placement'], 'placement'),
             'capabilities' => self::uniqueSlugs($record['capabilities'], 64),
             'max_parallel' => $record['max_parallel'],
         ];

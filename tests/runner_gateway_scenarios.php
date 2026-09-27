@@ -23,7 +23,7 @@ $identity = [
     'runtime' => 'php',
     'runtime_version' => '1.0.0',
     'platform' => 'linux-arm64',
-    'location' => 'hostinger-shared',
+    'placement' => 'hostinger-shared',
     'capabilities' => ['test-php', 'review-code'],
     'max_parallel' => 3,
 ];
@@ -107,7 +107,7 @@ if ($scenario === 'heartbeat') {
 if ($scenario === 'portable') {
     $a = RunnerGateway::health($identity, $signal, 1_020, 60, ['work_001']);
     $b = RunnerGateway::health(
-        array_replace($identity, ['location' => 'macos-local']),
+        array_replace($identity, ['placement' => 'macos-local']),
         $signal, 1_020, 60, ['work_001']
     );
     echo json_encode(['same' => $a === $b, 'health' => $a], JSON_THROW_ON_ERROR), PHP_EOL;

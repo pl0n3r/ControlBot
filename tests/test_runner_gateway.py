@@ -25,6 +25,8 @@ class RunnerGatewayTests(unittest.TestCase):
             "11111111-1111-7111-8111-111111111111",
         )
         self.assertEqual(data["identity"]["runtime"], "php")
+        self.assertEqual(data["identity"]["placement"], "hostinger-shared")
+        self.assertNotIn("location", data["identity"])
         self.assertEqual(
             data["identity"]["capabilities"], ["review-code", "test-php"]
         )
@@ -58,7 +60,7 @@ class RunnerGatewayTests(unittest.TestCase):
             self.assertEqual(rows[key]["assignment_ids"], ["work_001"])
             self.assertEqual(rows[key]["free_capacity"], 0)
 
-    def test_contract_is_location_agnostic(self):
+    def test_contract_is_placement_agnostic(self):
         result = scenario("portable")
         self.assertTrue(result["same"])
         self.assertEqual(result["health"]["free_capacity"], 2)

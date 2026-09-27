@@ -82,6 +82,10 @@ class ProjectModelTests(unittest.TestCase):
         self.assertEqual(payload["inputs"]["governance_ref"], "pl0n3r/factory@v1")
         self.assertEqual(payload["inputs"]["target_repository"], "pl0n3r/NewProduct")
 
+        invalid = scenario("provision-real-adapter-invalid")
+        self.assertEqual(invalid["blocked"], [True, True])
+        self.assertEqual(invalid["calls"], [])
+
     def test_repository_reassociation_preserves_history_and_identity(self):
         data = scenario("reassociate")
         self.assertEqual(data["project_id"], "project-controlbot")

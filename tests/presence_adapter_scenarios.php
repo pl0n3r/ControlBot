@@ -41,7 +41,8 @@ if($case==='states'){
     $saturated=snap([row()],[account(1)]);
     $degraded=snap([row('session_1','working',850)],[account(1)]);
     $unknown=snap([row('session_1','working',null)],[account(1)]);
-    echo json_encode(compact('solo','multi','idle','saturated','degraded','unknown'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+    $rateLimitedIdle=snap([row('session_1','idle',990,false)],[account(1,'rate_limited')]);
+    echo json_encode(compact('solo','multi','idle','saturated','degraded','unknown','rateLimitedIdle'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='heartbeat'){
     $stale=snap([row('session_1','working',850)],[account(1)]);
@@ -74,7 +75,9 @@ if($case==='guard'){
     $safe=snap([row('session_1','working',990,true,120,1,true,true)],[account(2)]);
     $preemptBlocked=PresenceAdapter::replanGuard($blocked,'session_1',1,'preempt');
     $preemptSafe=PresenceAdapter::replanGuard($safe,'session_1',1,'preempt');
-    echo json_encode(compact('ok','stale','preemptBlocked','preemptSafe'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+    $unhealthy=snap([row('session_1','working',850)],[account(2)]);
+    $recoverUnhealthy=PresenceAdapter::replanGuard($unhealthy,'session_1',1,'recover');
+    echo json_encode(compact('ok','stale','preemptBlocked','preemptSafe','recoverUnhealthy'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='deterministic'){
     $a=snap([row()],[account(2)]); $b=snap([row()],[account(2)]);

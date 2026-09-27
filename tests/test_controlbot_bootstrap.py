@@ -46,6 +46,14 @@ class ControlBotBootstrapTests(unittest.TestCase):
         self.assertIn("github.event.comment.body == '/tomar'", workflow)
         self.assertIn("require_reservation:", workflow)
 
+    def test_coordination_supports_contract_renewal(self) -> None:
+        workflow = self.read(".github/workflows/coordinacion.yml")
+        self.assertIn(
+            "startsWith(github.event.comment.body, '/renovar-contrato ')",
+            workflow,
+        )
+        self.assertIn("body: ${{ github.event.comment.body }}", workflow)
+
     def test_coordination_permissions_cover_reusable_envelope(self) -> None:
         workflow = self.read(".github/workflows/coordinacion.yml")
         for job in ("comentario", "etiqueta", "pr", "validar-pr", "issue", "sweep"):
@@ -81,6 +89,21 @@ class ControlBotBootstrapTests(unittest.TestCase):
             "github.event.pull_request.base.sha == '996802183248f84ee8f28c7cb25221247e52dd07'",
             coordination,
         )
+
+    def test_issue_105_bootstrap_is_exact_and_self_expiring(self) -> None:
+        acceptance = self.read(".github/workflows/aceptacion.yml")
+        coordination = self.read(".github/workflows/coordinacion.yml")
+        for workflow in (acceptance, coordination):
+            self.assertIn("github.event.pull_request.number == 106", workflow)
+            self.assertIn(
+                "github.event.pull_request.head.repo.full_name == github.repository",
+                workflow,
+            )
+            self.assertIn("trabajo/issue-105", workflow)
+            self.assertIn(
+                "github.event.pull_request.base.sha == 'e34fe2a327892e34f68f43a8d4b10fb6e935d275'",
+                workflow,
+            )
 
     def test_deploy_stays_construction_only(self) -> None:
         deploy = self.read(".github/workflows/deploy.yml")

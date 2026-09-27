@@ -1,12 +1,8 @@
 <?php
 declare(strict_types=1);
-
 require __DIR__ . '/../src/ProjectModel.php';
-
 use ControlBot\Project\ProjectModel;
-
 $name = $argv[1] ?? '';
-
 function aggregates(array $overrides = []): array {
     return array_replace([
         'roadmap' => null,
@@ -17,7 +13,6 @@ function aggregates(array $overrides = []): array {
         'costs' => null,
     ], $overrides);
 }
-
 function project(array $overrides = []): array {
     return array_replace([
         'version' => 1,
@@ -32,7 +27,6 @@ function project(array $overrides = []): array {
         'history_refs' => [],
     ], $overrides);
 }
-
 function repo(string $id, string $name, int $at = 2000): array {
     return [
         'repository_id' => $id,
@@ -41,7 +35,6 @@ function repo(string $id, string $name, int $at = 2000): array {
         'observed_at' => $at,
     ];
 }
-
 if ($name === 'empty') {
     $out = ProjectModel::normalize(project());
 } elseif ($name === 'multiple') {
@@ -87,6 +80,18 @@ if ($name === 'empty') {
     } catch (InvalidArgumentException $e) {
         $out = ['blocked'=>true];
     }
+} elseif ($name === 'duplicate-environment') {
+    try {
+        ProjectModel::normalize(project([
+            'environments' => [
+                ['environment_id'=>'env-prod','kind'=>'prod','source_ref'=>'controlbot:env/controlbot/prod','observed_at'=>2000],
+                ['environment_id'=>'env-prod','kind'=>'staging','source_ref'=>'controlbot:env/controlbot/staging','observed_at'=>2000],
+            ],
+        ]));
+        $out = ['blocked'=>false];
+    } catch (InvalidArgumentException $e) {
+        $out = ['blocked'=>true];
+    }
 } elseif ($name === 'reassociate') {
     $base = project([
         'repositories' => [
@@ -102,5 +107,4 @@ if ($name === 'empty') {
     fwrite(STDERR, "scenario inválido\n");
     exit(2);
 }
-
 echo json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

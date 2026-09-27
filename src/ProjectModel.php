@@ -62,27 +62,18 @@ final class ProjectModel
 
     private static function repositories(mixed $rows): array
     {
-        if (!is_array($rows) || !array_is_list($rows) || count($rows) > 50) {
-            throw new InvalidArgumentException('repositories invalid.');
-        }
-
         $out = [];
-        $seenIds = [];
-        $seenNames = [];
-        foreach ($rows as $row) {
+        $seen = [];
+        foreach (self::rows($rows, 50, 'repositories') as $row) {
             self::fields($row, ['repository_id','repository','source_ref','observed_at'], 'Repository');
             $id = self::id($row['repository_id'], 'repository_id');
             $name = self::repoName($row['repository']);
             $source = self::githubRef($row['source_ref']);
-            $nameKey = strtolower($name);
-            if (isset($seenIds[$id]) || isset($seenNames[$nameKey])) {
-                throw new InvalidArgumentException('Repository duplicated.');
-            }
+            self::unique($seen, 'id:' . $id, 'Repository duplicated.');
+            self::unique($seen, 'name:' . strtolower($name), 'Repository duplicated.');
             if ($source !== 'https://github.com/' . $name) {
                 throw new InvalidArgumentException('Repository source mismatch.');
             }
-            $seenIds[$id] = true;
-            $seenNames[$nameKey] = true;
             $out[] = [
                 'repository_id' => $id,
                 'repository' => $name,
@@ -95,22 +86,14 @@ final class ProjectModel
 
     private static function environments(mixed $rows): array
     {
-        if (!is_array($rows) || !array_is_list($rows) || count($rows) > 20) {
-            throw new InvalidArgumentException('environments invalid.');
-        }
-
         $out = [];
-        $seenIds = [];
-        $seenSources = [];
-        foreach ($rows as $row) {
+        $seen = [];
+        foreach (self::rows($rows, 20, 'environments') as $row) {
             self::fields($row, ['environment_id','kind','source_ref','observed_at'], 'Environment');
             $id = self::id($row['environment_id'], 'environment_id');
             $source = self::reference($row['source_ref'], 'environment.source_ref');
-            if (isset($seenIds[$id]) || isset($seenSources[$source])) {
-                throw new InvalidArgumentException('Environment duplicated.');
-            }
-            $seenIds[$id] = true;
-            $seenSources[$source] = true;
+            self::unique($seen, 'id:' . $id, 'Environment duplicated.');
+            self::unique($seen, 'source:' . $source, 'Environment duplicated.');
             $out[] = [
                 'environment_id' => $id,
                 'kind' => self::enum($row['kind'], self::ENVIRONMENTS, 'environment.kind'),
@@ -119,6 +102,22 @@ final class ProjectModel
             ];
         }
         return $out;
+    }
+
+    private static function rows(mixed $rows, int $max, string $label): array
+    {
+        if (!is_array($rows) || !array_is_list($rows) || count($rows) > $max) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+        return $rows;
+    }
+
+    private static function unique(array &$seen, string $key, string $message): void
+    {
+        if (isset($seen[$key])) {
+            throw new InvalidArgumentException($message);
+        }
+        $seen[$key] = true;
     }
 
     private static function aggregates(mixed $raw): array
@@ -164,7 +163,7 @@ final class ProjectModel
             throw new InvalidArgumentException($label . ' invalid.');
         }
         if (str_starts_with($value, 'controlbot:')) {
-            if (preg_match('/^controlbot:[A-Za-z0-9][A-Za-z0-9._:\/#@-]*$/D', $value) !== 1) {
+            if (preg_match('/^controlbot:[A-Za-z0-9][A-Za-z0-9._:\\/#@-]*$/D', $value) !== 1) {
                 throw new InvalidArgumentException($label . ' invalid.');
             }
             return $value;
@@ -174,7 +173,7 @@ final class ProjectModel
 
     private static function githubRef(mixed $value): string
     {
-        if (!is_string($value) || preg_match('#^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/(?:issues|pull)/[1-9][0-9]*)?$#D', $value) !== 1) {
+        if (!is_string($value) || preg_match('#^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/(?:issues|pull)/[1-9][0-9]*)?$#D', $value) !== 1) {
             throw new InvalidArgumentException('GitHub ref invalid.');
         }
         return $value;
@@ -182,7 +181,7 @@ final class ProjectModel
 
     private static function repoName(mixed $value): string
     {
-        if (!is_string($value) || preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/D', $value) !== 1) {
+        if (!is_string($value) || preg_match('/^[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+$/D', $value) !== 1) {
             throw new InvalidArgumentException('Repository name invalid.');
         }
         return $value;
@@ -220,7 +219,7 @@ final class ProjectModel
     private static function text(mixed $value, string $label, int $max): string
     {
         if (!is_string($value) || trim($value) === '' || strlen($value) > $max
-            || preg_match('/[\x00-\x1f\x7f]/', $value) === 1) {
+            || preg_match('/[\\x00-\\x1f\\x7f]/', $value) === 1) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
         return trim($value);

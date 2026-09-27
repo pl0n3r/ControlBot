@@ -66,5 +66,49 @@ class RunnerGatewayTests(unittest.TestCase):
         self.assertEqual(result["health"]["free_capacity"], 2)
 
 
+    def test_order_is_idempotent_and_rejects_secret_shaped_fields(self):
+        data = scenario("order")
+        self.assertTrue(data["stable"])
+        self.assertTrue(data["fingerprint_same"])
+        self.assertTrue(data["idempotent"])
+        self.assertTrue(data["generation_conflict"])
+        self.assertEqual(data["order"]["generation"], 1)
+        self.assertEqual(
+            data["order"]["attempt_id"],
+            "44444444-4444-7444-8444-444444444444",
+        )
+        self.assertEqual(data["order"]["scope"], "repo:pl0n3r/ControlBot")
+        self.assertTrue(all(data["rejects"].values()), data["rejects"])
+
+    def test_event_state_machine_and_sanitized_evidence(self):
+        data = scenario("event")
+        self.assertEqual(data["completed"]["state"], "completed")
+        self.assertEqual(data["completed"]["generation"], 1)
+        self.assertEqual(data["next_owner"]["generation"], 2)
+        self.assertEqual(
+            data["next_owner"]["runner_id"],
+            "99999999-9999-7999-8999-999999999999",
+        )
+        self.assertTrue(data["rejects"]["terminal_reopen"])
+        self.assertTrue(data["rejects"]["sequence_gap"])
+        self.assertTrue(data["rejects"]["stale_after_handoff"])
+        self.assertFalse(data["rejects"]["new_owner_accepts"])
+        for key in [
+            "secret_summary",
+            "evil_ref",
+            "query_ref",
+            "encoded_secret_ref",
+            "backslash_ref",
+            "dot_segment_ref",
+        ]:
+            self.assertTrue(data["rejects"][key], (key, data["rejects"]))
+
+    def test_orders_and_events_are_placement_agnostic(self):
+        data = scenario("portable-execution")
+        self.assertTrue(data["same_order"])
+        self.assertTrue(data["same_event"])
+        self.assertTrue(data["identity_only_differs_in_placement"])
+
+
 if __name__ == "__main__":
     unittest.main()

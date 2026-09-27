@@ -60,6 +60,7 @@ final class SchedulerCore
 
         $reasons=[];
         if(!in_array($work['state'],['queued','eligible','reserved'],true)) $reasons[]='workitem_not_assignable';
+        if($work['priority']==='low') $reasons[]='factory_priority_unsupported';
         $open=array_keys(array_filter($deps,static fn(string $v):bool=>$v==='open'));
         $unknown=array_keys(array_filter($deps,static fn(string $v):bool=>$v==='unknown'));
         if($open!==[]) $reasons[]='open_dependencies';

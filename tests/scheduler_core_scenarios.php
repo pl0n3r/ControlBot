@@ -79,6 +79,7 @@ if($scenario==='candidate'){
     echo json_encode([
         'ready'=>SchedulerCore::candidate(item(),context()),
         'blocked'=>SchedulerCore::candidate(item(),context(['dependency_states'=>['dep-runtime'=>'open']])),
+        'low'=>SchedulerCore::candidate(item(['priority'=>'low']),context()),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='deterministic'){

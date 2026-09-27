@@ -49,6 +49,8 @@ class SchedulerCoreTests(unittest.TestCase):
         self.assertEqual(ready["priority"],"critical")
         self.assertTrue(ready["readiness"]["ready"])
         self.assertEqual(data["blocked"]["readiness"]["open_dependencies"],["dep-runtime"])
+        self.assertFalse(data["low"]["readiness"]["ready"])
+        self.assertIn("factory_priority_unsupported",data["low"]["readiness"]["reasons"])
         for forbidden in ("score","rank","selected","authority_class"):
             self.assertNotIn(forbidden,ready)
 

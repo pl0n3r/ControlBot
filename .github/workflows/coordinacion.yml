@@ -76,7 +76,7 @@ jobs:
     with:
       operation: pr
       pr_number: ${{ github.event.pull_request.number }}
-      action: ${{ github.event.action }}
+      action: ${{ (github.event.action == 'reopened' || github.event.action == 'synchronize') && (github.event.pull_request.draft && 'converted_to_draft' || 'ready_for_review') || github.event.action }}
 
   validar-pr:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false

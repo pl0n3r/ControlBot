@@ -1,10 +1,16 @@
 <?php
 declare(strict_types=1);
 
+require __DIR__ . '/../src/Approvals.php';
+require __DIR__ . '/../src/GitHub.php';
 require __DIR__ . '/../src/ProjectModel.php';
 require __DIR__ . '/../src/ProjectProvisioning.php';
 require __DIR__ . '/../src/ProjectBackfill.php';
 
+use ControlBot\GitHub\ApiClient;
+use ControlBot\GitHub\ApiTransport;
+use ControlBot\GitHub\Gateway;
+use ControlBot\Project\GitHubFactoryProvisioningAdapter;
 use ControlBot\Project\ProjectBackfill;
 use ControlBot\Project\ProjectModel;
 use ControlBot\Project\ProjectProvisioner;
@@ -194,6 +200,51 @@ if (array_key_exists($name, $invalidScenarios)) {
         'dispatches' => $adapter->dispatches,
         'inputs' => $adapter->lastInputs,
     ];
+} elseif ($name === 'provision-real-adapter') {
+    $calls = [];
+    $sender = static function (string $method, string $url, array $headers, ?string $body) use (&$calls): array {
+        $calls[] = [$method, $url, $headers, $body];
+        if (str_contains((string) parse_url($url, PHP_URL_PATH), '/actions/workflows/provision-project.yml/dispatches')) {
+            return ['status' => 204, 'body' => ''];
+        }
+        return ['status' => 404, 'body' => '{}'];
+    };
+    $gateway = new Gateway(new ApiClient('ghp_test_only_token', new ApiTransport($sender)));
+    $adapter = new GitHubFactoryProvisioningAdapter($gateway);
+    $base = project(['phase' => 'planned']);
+    $result = ProjectProvisioner::request($base, 'pl0n3r/NewProduct', true, $adapter, 2000);
+    $out = [
+        'result' => $result,
+        'calls' => $calls,
+    ];
+} elseif ($name === 'provision-real-adapter-invalid') {
+    $calls = [];
+    $sender = static function (string $method, string $url, array $headers, ?string $body) use (&$calls): array {
+        $calls[] = [$method, $url, $headers, $body];
+        return ['status' => 204, 'body' => ''];
+    };
+    $gateway = new Gateway(new ApiClient('ghp_test_only_token', new ApiTransport($sender)));
+    $adapter = new GitHubFactoryProvisioningAdapter($gateway);
+    $base = [
+        'project_id' => 'project-controlbot',
+        'project_slug' => 'controlbot',
+        'target_repository' => 'pl0n3r/NewProduct',
+        'governance_ref' => 'pl0n3r/factory@v1',
+        'idempotency_key' => str_repeat('a', 64),
+    ];
+    $blocked = [];
+    foreach ([
+        array_diff_key($base, ['governance_ref' => true]),
+        [...$base, 'unexpected' => 'value'],
+    ] as $inputs) {
+        try {
+            $adapter->dispatch($inputs);
+            $blocked[] = false;
+        } catch (InvalidArgumentException) {
+            $blocked[] = true;
+        }
+    }
+    $out = ['blocked' => $blocked, 'calls' => $calls];
 } elseif ($name === 'provision-unapproved') {
     try {
         $adapter = new FakeProjectProvisioningAdapter();

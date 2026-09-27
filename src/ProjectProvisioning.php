@@ -15,19 +15,32 @@ interface ProjectProvisioningAdapter
 final class GitHubFactoryProvisioningAdapter implements ProjectProvisioningAdapter
 {
     private const FACTORY_REPOSITORY = 'pl0n3r/factory';
+    private const FACTORY_WORKFLOW = 'provision-project.yml';
+    private const INPUTS = [
+        'project_id',
+        'project_slug',
+        'target_repository',
+        'governance_ref',
+        'idempotency_key',
+    ];
 
-    public function __construct(
-        private readonly Gateway $github,
-        private readonly string $workflow,
-    ) {
-        if (preg_match('/^[A-Za-z0-9_.-]+\.ya?ml$/D', $workflow) !== 1) {
-            throw new InvalidArgumentException('Workflow de provisión inválido.');
-        }
-    }
+    public function __construct(private readonly Gateway $github) {}
 
     public function dispatch(array $inputs): string
     {
-        return $this->github->dispatchWorkflow(self::FACTORY_REPOSITORY, $this->workflow, $inputs);
+        $keys = array_keys($inputs);
+        sort($keys);
+        $expected = self::INPUTS;
+        sort($expected);
+        if ($keys !== $expected) {
+            throw new InvalidArgumentException('Contrato Factory de provisión inválido.');
+        }
+
+        return $this->github->dispatchWorkflow(
+            self::FACTORY_REPOSITORY,
+            self::FACTORY_WORKFLOW,
+            $inputs,
+        );
     }
 }
 

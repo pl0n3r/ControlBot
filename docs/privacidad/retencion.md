@@ -10,3 +10,4 @@ Producto: `pl0n3r/ControlBot`
 | agent_status | usage | review_required | review_required |
 | audit_log | usage | review_required | review_required |
 | chat_response_opt_in | usage | review_required | review_required |
+| dashboard_health_status | usage | review_required | review_required |

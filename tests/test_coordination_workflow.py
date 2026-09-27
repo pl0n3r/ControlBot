@@ -44,5 +44,78 @@ class CoordinationWorkflowTests(unittest.TestCase):
         self.assertNotIn("checks: write", header)
 
 
+    def _pull_request_types(self, workflow: str) -> list[str]:
+        match = re.search(r"(?m)^  pull_request:\n    types: \[(.*?)\]$", workflow)
+        self.assertIsNotNone(match)
+        return [item.strip() for item in match.group(1).split(",")]
+
+    def _job_block(self, workflow: str, job: str) -> str:
+        jobs = workflow.split("\njobs:\n", 1)[1]
+        match = re.search(
+            rf"(?ms)^  {re.escape(job)}:\n(.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)",
+            jobs,
+        )
+        self.assertIsNotNone(match)
+        return match.group(1)
+
+    def test_reopened_pr_triggers_coordination_without_rotating_reservation(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("reopened", self._pull_request_types(workflow))
+
+        caller = self._job_block(workflow, "pr")
+        self.assertIn("operation: pr", caller)
+        self.assertIn("action: ${{ github.event.action }}", caller)
+        self.assertIn(
+            "github.event.pull_request.head.repo.full_name == github.repository",
+            caller,
+        )
+        self.assertNotIn("reservation_id", caller)
+        self.assertNotIn("condor-reserva", caller)
+
+    def test_synchronize_pr_triggers_coordination_and_preserves_reservation(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("synchronize", self._pull_request_types(workflow))
+        self.assertIn(
+            "group: coordinacion-${{ github.event.issue.number || github.event.pull_request.head.ref || github.run_id }}",
+            workflow,
+        )
+        self.assertIn("cancel-in-progress: false", workflow)
+
+        caller = self._job_block(workflow, "pr")
+        self.assertIn("operation: pr", caller)
+        self.assertIn("action: ${{ github.event.action }}", caller)
+
+    def test_reopened_or_synchronized_pr_without_trusted_marker_fails_closed(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        caller = self._job_block(workflow, "pr")
+
+        # El caller local no fabrica ownership ni labels derivados. Delega el
+        # evento crudo al contrato Factory v1, que valida marker/rama/PR.
+        self.assertIn(REUSABLE, caller)
+        self.assertIn(
+            "github.event.pull_request.head.repo.full_name == github.repository",
+            caller,
+        )
+        self.assertNotIn("estado: en revisión", workflow)
+        self.assertNotIn("condor-reserva-id", workflow)
+
+    def test_pull_request_trigger_keeps_existing_coordination_events(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        event_types = self._pull_request_types(workflow)
+        self.assertEqual(
+            [
+                "opened",
+                "reopened",
+                "synchronize",
+                "ready_for_review",
+                "converted_to_draft",
+                "closed",
+            ],
+            event_types,
+        )
+        self.assertEqual(1, workflow.count("\n  pr:\n"))
+        self.assertEqual(1, workflow.count("\n  validar-pr:\n"))
+
+
 if __name__ == "__main__":
     unittest.main()

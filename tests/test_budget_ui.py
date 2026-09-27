@@ -26,7 +26,7 @@ class BudgetUiTests(unittest.TestCase):
         self.assertIn("1800 / 2000", html)
         self.assertIn("90%", html)
         self.assertIn("1440", html)
-        self.assertIn("200", html)
+        self.assertIn("Headroom</span><strong>200</strong>", html)
         self.assertIn("2026-10-01", html)
         self.assertIn("FactoryRunner", html)
         self.assertIn("pl0n3r/FactoryRunner", html)
@@ -36,7 +36,8 @@ class BudgetUiTests(unittest.TestCase):
         self.assertNotIn(">source<", html.lower())
 
         unknown = render("unknown")
-        self.assertIn("unknown", unknown)
+        self.assertIn('class="state state-unknown">unknown</strong>', unknown)
+        self.assertIn("unknown / unknown", unknown)
         self.assertIn("Sin atribuciones disponibles.", unknown)
 
         escaped = render("escape")

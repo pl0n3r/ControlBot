@@ -38,12 +38,7 @@ final class OwnerBriefing
     private static function section(mixed $value): array
     {
         if ($value === null) {
-            return [
-                'status' => 'unknown',
-                'items' => [],
-                'total' => 0,
-                'overflow_count' => 0,
-            ];
+            return self::emptySection('unknown');
         }
 
         if (!is_array($value) || !array_is_list($value) || count($value) > self::MAX_ITEMS) {
@@ -51,12 +46,7 @@ final class OwnerBriefing
         }
 
         if ($value === []) {
-            return [
-                'status' => 'empty',
-                'items' => [],
-                'total' => 0,
-                'overflow_count' => 0,
-            ];
+            return self::emptySection('empty');
         }
 
         $items = array_map([self::class, 'item'], $value);
@@ -67,6 +57,16 @@ final class OwnerBriefing
             'items' => array_slice($items, 0, self::VISIBLE_ITEMS),
             'total' => $total,
             'overflow_count' => max(0, $total - self::VISIBLE_ITEMS),
+        ];
+    }
+
+    private static function emptySection(string $status): array
+    {
+        return [
+            'status' => $status,
+            'items' => [],
+            'total' => 0,
+            'overflow_count' => 0,
         ];
     }
 

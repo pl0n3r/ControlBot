@@ -76,6 +76,7 @@ class ProjectModelTests(unittest.TestCase):
     def test_existing_projects_backfill_idempotently(self):
         data = scenario("backfill")
         self.assertEqual(data["first"], data["second"])
+        self.assertTrue(scenario("backfill-conflict")["blocked"])
         self.assertEqual(
             [project["project_id"] for project in data["first"]],
             ["project-brvtal", "project-condor", "project-controlbot", "project-grindflow"],

@@ -2,10 +2,28 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../src/ProjectModel.php';
+require __DIR__ . '/../src/ProjectProvisioning.php';
+require __DIR__ . '/../src/ProjectBackfill.php';
 
+use ControlBot\Project\ProjectBackfill;
 use ControlBot\Project\ProjectModel;
+use ControlBot\Project\ProjectProvisioner;
+use ControlBot\Project\ProjectProvisioningAdapter;
 
 $name = $argv[1] ?? '';
+
+final class FakeProjectProvisioningAdapter implements ProjectProvisioningAdapter
+{
+    public int $dispatches = 0;
+    public array $lastInputs = [];
+
+    public function dispatch(array $inputs): string
+    {
+        $this->dispatches++;
+        $this->lastInputs = $inputs;
+        return 'https://github.com/pl0n3r/factory/actions/workflows/provision-project.yml';
+    }
+}
 
 function aggregates(array $overrides = []): array
 {
@@ -63,6 +81,44 @@ function blockedNormalize(array $overrides): array
     } catch (InvalidArgumentException) {
         return ['blocked' => true];
     }
+}
+
+function existingProjectDefinitions(): array
+{
+    return [
+        [
+            'project_id' => 'project-controlbot',
+            'slug' => 'controlbot',
+            'title' => 'ControlBot',
+            'phase' => 'building',
+            'priority' => 'critical',
+            'repository' => 'pl0n3r/ControlBot',
+        ],
+        [
+            'project_id' => 'project-condor',
+            'slug' => 'condor',
+            'title' => 'Condor',
+            'phase' => 'building',
+            'priority' => 'high',
+            'repository' => 'pl0n3r/Condor',
+        ],
+        [
+            'project_id' => 'project-brvtal',
+            'slug' => 'brvtal',
+            'title' => 'BRVTAL',
+            'phase' => 'building',
+            'priority' => 'high',
+            'repository' => 'pl0n3r/brvtal',
+        ],
+        [
+            'project_id' => 'project-grindflow',
+            'slug' => 'grindflow',
+            'title' => 'GrindFlow',
+            'phase' => 'building',
+            'priority' => 'high',
+            'repository' => 'pl0n3r/GrindFlow',
+        ],
+    ];
 }
 
 $invalidScenarios = [
@@ -125,6 +181,40 @@ if (array_key_exists($name, $invalidScenarios)) {
             'costs' => ['ref' => 'controlbot:budget/project-controlbot', 'observed_at' => 1970],
         ]),
     ]));
+} elseif ($name === 'provision') {
+    $adapter = new FakeProjectProvisioningAdapter();
+    $base = project(['phase' => 'planned']);
+    $first = ProjectProvisioner::request($base, 'pl0n3r/NewProduct', true, $adapter, 2000);
+    $confirmed = ProjectProvisioner::confirm($base, $first['repository']);
+    $second = ProjectProvisioner::request($confirmed, 'pl0n3r/NewProduct', true, $adapter, 3000);
+    $out = [
+        'first' => $first,
+        'confirmed_project' => $confirmed,
+        'second' => $second,
+        'dispatches' => $adapter->dispatches,
+        'inputs' => $adapter->lastInputs,
+    ];
+} elseif ($name === 'provision-unapproved') {
+    try {
+        $adapter = new FakeProjectProvisioningAdapter();
+        ProjectProvisioner::request(project(['phase' => 'planned']), 'pl0n3r/NewProduct', false, $adapter, 2000);
+        $out = ['blocked' => false];
+    } catch (InvalidArgumentException) {
+        $out = ['blocked' => true];
+    }
+} elseif ($name === 'backfill') {
+    $definitions = existingProjectDefinitions();
+    $first = ProjectBackfill::apply([], $definitions, 2000);
+    $second = ProjectBackfill::apply($first, $definitions, 3000);
+    $out = ['first' => $first, 'second' => $second];
+} elseif ($name === 'backfill-conflict') {
+    try {
+        $existing = [project(['repositories' => [repo('repo-condor', 'pl0n3r/Condor')]])];
+        ProjectBackfill::apply($existing, existingProjectDefinitions(), 2000);
+        $out = ['blocked' => false];
+    } catch (InvalidArgumentException) {
+        $out = ['blocked' => true];
+    }
 } elseif ($name === 'reassociate') {
     $base = project([
         'repositories' => [

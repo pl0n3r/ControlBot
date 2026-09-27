@@ -92,6 +92,30 @@ if ($name === 'empty') {
     } catch (InvalidArgumentException $e) {
         $out = ['blocked'=>true];
     }
+} elseif ($name === 'duplicate-environment-source') {
+    try {
+        ProjectModel::normalize(project([
+            'environments' => [
+                ['environment_id'=>'env-prod','kind'=>'prod','source_ref'=>'controlbot:env/controlbot/shared','observed_at'=>2000],
+                ['environment_id'=>'env-staging','kind'=>'staging','source_ref'=>'controlbot:env/controlbot/shared','observed_at'=>2000],
+            ],
+        ]));
+        $out = ['blocked'=>false];
+    } catch (InvalidArgumentException $e) {
+        $out = ['blocked'=>true];
+    }
+} elseif ($name === 'duplicate-repository-case') {
+    try {
+        ProjectModel::normalize(project([
+            'repositories' => [
+                repo('repo-controlbot', 'pl0n3r/ControlBot'),
+                repo('repo-controlbot-copy', 'pl0n3r/controlbot'),
+            ],
+        ]));
+        $out = ['blocked'=>false];
+    } catch (InvalidArgumentException $e) {
+        $out = ['blocked'=>true];
+    }
 } elseif ($name === 'reassociate') {
     $base = project([
         'repositories' => [
@@ -103,6 +127,23 @@ if ($name === 'empty') {
     $out = ProjectModel::reassociateRepositories($base, [
         repo('repo-controlbot', 'pl0n3r/ControlBot', 2100),
     ]);
+} elseif ($name === 'reassociate-renamed') {
+    $base = project([
+        'repositories' => [repo('repo-controlbot', 'pl0n3r/ControlBot')],
+    ]);
+    $out = ProjectModel::reassociateRepositories($base, [
+        repo('repo-controlbot', 'pl0n3r/controlbot-renamed', 2100),
+    ]);
+} elseif ($name === 'reassociate-full-history') {
+    $history = [];
+    for ($i = 1; $i <= 100; $i++) {
+        $history[] = "controlbot:history/{$i}";
+    }
+    $base = project([
+        'repositories' => [repo('repo-runner', 'pl0n3r/FactoryRunner')],
+        'history_refs' => $history,
+    ]);
+    $out = ProjectModel::reassociateRepositories($base, []);
 } else {
     fwrite(STDERR, "scenario inválido\n");
     exit(2);

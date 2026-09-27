@@ -42,10 +42,15 @@ final class ProjectModel
         $project = self::normalize($raw);
         $next = self::repositories($repositories);
 
-        $nextIds = array_column($next, 'repository_id');
+        $nextById = [];
+        foreach ($next as $repository) {
+            $nextById[$repository['repository_id']] = $repository;
+        }
+
         $history = $project['history_refs'];
         foreach ($project['repositories'] as $repository) {
-            if (!in_array($repository['repository_id'], $nextIds, true)) {
+            $replacement = $nextById[$repository['repository_id']] ?? null;
+            if ($replacement === null || $replacement['source_ref'] !== $repository['source_ref']) {
                 $history[] = $repository['source_ref'];
             }
         }
@@ -69,14 +74,15 @@ final class ProjectModel
             $id = self::id($row['repository_id'], 'repository_id');
             $name = self::repoName($row['repository']);
             $source = self::githubRef($row['source_ref']);
-            if (isset($seenIds[$id]) || isset($seenNames[$name])) {
+            $nameKey = strtolower($name);
+            if (isset($seenIds[$id]) || isset($seenNames[$nameKey])) {
                 throw new InvalidArgumentException('Repository duplicated.');
             }
             if ($source !== 'https://github.com/' . $name) {
                 throw new InvalidArgumentException('Repository source mismatch.');
             }
             $seenIds[$id] = true;
-            $seenNames[$name] = true;
+            $seenNames[$nameKey] = true;
             $out[] = [
                 'repository_id' => $id,
                 'repository' => $name,
@@ -94,18 +100,21 @@ final class ProjectModel
         }
 
         $out = [];
-        $seen = [];
+        $seenIds = [];
+        $seenSources = [];
         foreach ($rows as $row) {
             self::fields($row, ['environment_id','kind','source_ref','observed_at'], 'Environment');
             $id = self::id($row['environment_id'], 'environment_id');
-            if (isset($seen[$id])) {
+            $source = self::reference($row['source_ref'], 'environment.source_ref');
+            if (isset($seenIds[$id]) || isset($seenSources[$source])) {
                 throw new InvalidArgumentException('Environment duplicated.');
             }
-            $seen[$id] = true;
+            $seenIds[$id] = true;
+            $seenSources[$source] = true;
             $out[] = [
                 'environment_id' => $id,
                 'kind' => self::enum($row['kind'], self::ENVIRONMENTS, 'environment.kind'),
-                'source_ref' => self::reference($row['source_ref'], 'environment.source_ref'),
+                'source_ref' => $source,
                 'observed_at' => self::timestamp($row['observed_at'], 'environment.observed_at'),
             ];
         }
@@ -133,7 +142,7 @@ final class ProjectModel
 
     private static function historyRefs(mixed $refs): array
     {
-        if (!is_array($refs) || !array_is_list($refs) || count($refs) > 100) {
+        if (!is_array($refs) || !array_is_list($refs)) {
             throw new InvalidArgumentException('history_refs invalid.');
         }
         $out = [];

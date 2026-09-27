@@ -25,6 +25,8 @@ class ProjectModelTests(unittest.TestCase):
         self.assertEqual(data["project_id"], "project-controlbot")
         self.assertTrue(scenario("duplicate")["blocked"])
         self.assertTrue(scenario("duplicate-environment")["blocked"])
+        self.assertTrue(scenario("duplicate-environment-source")["blocked"])
+        self.assertTrue(scenario("duplicate-repository-case")["blocked"])
     def test_aggregate_view_references_authoritative_sources_without_duplicating_state(self):
         data = scenario("aggregate")
         refs = data["aggregate_refs"]
@@ -38,5 +40,13 @@ class ProjectModelTests(unittest.TestCase):
         self.assertEqual([row["repository"] for row in data["repositories"]], ["pl0n3r/ControlBot"])
         self.assertIn("https://github.com/pl0n3r/FactoryRunner", data["history_refs"])
         self.assertIn("controlbot:project/project-controlbot/created", data["history_refs"])
+
+        renamed = scenario("reassociate-renamed")
+        self.assertIn("https://github.com/pl0n3r/ControlBot", renamed["history_refs"])
+
+        full = scenario("reassociate-full-history")
+        self.assertEqual(full["repositories"], [])
+        self.assertEqual(len(full["history_refs"]), 101)
+        self.assertIn("https://github.com/pl0n3r/FactoryRunner", full["history_refs"])
 if __name__ == "__main__":
     unittest.main()

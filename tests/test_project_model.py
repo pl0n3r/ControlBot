@@ -58,6 +58,30 @@ class ProjectModelTests(unittest.TestCase):
         self.assertFalse(data["second"]["dispatched"])
         self.assertTrue(scenario("provision-unapproved")["blocked"])
 
+        real = scenario("provision-real-adapter")
+        self.assertEqual(real["result"]["status"], "requested")
+        self.assertEqual(len(real["calls"]), 1)
+        method, url, _headers, body = real["calls"][0]
+        self.assertEqual(method, "POST")
+        self.assertEqual(
+            url,
+            "https://api.github.com/repos/pl0n3r/factory/actions/workflows/provision-project.yml/dispatches",
+        )
+        payload = json.loads(body)
+        self.assertEqual(payload["ref"], "main")
+        self.assertEqual(
+            set(payload["inputs"]),
+            {
+                "project_id",
+                "project_slug",
+                "target_repository",
+                "governance_ref",
+                "idempotency_key",
+            },
+        )
+        self.assertEqual(payload["inputs"]["governance_ref"], "pl0n3r/factory@v1")
+        self.assertEqual(payload["inputs"]["target_repository"], "pl0n3r/NewProduct")
+
     def test_repository_reassociation_preserves_history_and_identity(self):
         data = scenario("reassociate")
         self.assertEqual(data["project_id"], "project-controlbot")

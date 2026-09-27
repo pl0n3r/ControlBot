@@ -5,7 +5,7 @@ Centro de control web **privado** de la fábrica de software de pl0n3r. Es una h
 ## Estado actual
 
 - Fase: **construcción**.
-- Versión actual: **0.1.9** (candidato #43: historial filtrable y orden verificable del centro de decisiones).
+- Versión actual: **0.1.11** (candidato #116: Agent Runtime de Accounts, Sessions y Handoff fail-closed).
 - Stack objetivo: PHP 8.5 + MariaDB.
 - Hosting objetivo: Hostinger, junto a Condor pero con app, base y deploy independientes.
 - Deploy y observer: instalados en modo **fail-closed**; no actúan sin variables/configuración explícita.

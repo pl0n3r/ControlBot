@@ -45,6 +45,7 @@ class SchedulerCoreTests(unittest.TestCase):
             self.assertFalse(data[key]["ready"])
             self.assertIn("account_capacity_unavailable",data[key]["reasons"])
         self.assertEqual(data["numeric_session_ids"],["123"])
+        self.assertEqual(data["scheduler_numeric_session_ids"],["123"])
         self.assertTrue(data["numeric_id_readiness"]["ready"])
 
     def test_candidate_targets_factory_dispatcher_v2_without_parallel_ranking(self):

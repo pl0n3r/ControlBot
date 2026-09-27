@@ -153,10 +153,10 @@ final class SchedulerCore
         $out=[];
         foreach($values as $value){
             $normalized=match($kind){'id'=>self::id($value,$label),'slug'=>self::slug($value,$label),'ref'=>self::ref($value,$label)};
-            if(isset($out[$normalized])) throw new InvalidArgumentException($label.' duplicated.');
-            $out[$normalized]=true;
+            if(in_array($normalized,$out,true)) throw new InvalidArgumentException($label.' duplicated.');
+            $out[]=$normalized;
         }
-        $values=array_keys($out); sort($values); return $values;
+        sort($out); return $out;
     }
 
     private static function fields(mixed $row,array $expected,string $label): void

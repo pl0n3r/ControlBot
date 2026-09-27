@@ -77,11 +77,14 @@ if($scenario==='capacity'){
         [['version'=>1,'session_id'=>'123','agent_id'=>'agent-1','account_id'=>'account_main','profile_alias'=>'Main','tab_id'=>'tab-1','status'=>'idle','assignment_id'=>null,'last_heartbeat_at'=>100,'mode'=>'web','repository'=>null,'issue_number'=>null]]
     );
     $numericIdReadiness=SchedulerCore::readiness($work,context(['capacity'=>$numericIdSnapshot]));
+    $capacityMethod=new ReflectionMethod(SchedulerCore::class,'capacity');
+    $normalizedCapacity=$capacityMethod->invoke(null,$numericIdSnapshot);
     echo json_encode([
         'before'=>$work,
         'full'=>SchedulerCore::readiness($work,context(['capacity'=>$full])),
         'rate_limited'=>SchedulerCore::readiness($work,context(['capacity'=>$rate])),
         'numeric_session_ids'=>$numericIdSnapshot['session_ids'],
+        'scheduler_numeric_session_ids'=>$normalizedCapacity['session_ids'],
         'numeric_id_readiness'=>$numericIdReadiness,
         'after'=>$work,
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;

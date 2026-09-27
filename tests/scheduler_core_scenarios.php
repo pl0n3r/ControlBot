@@ -38,6 +38,7 @@ if($scenario==='schema'){
         'source'=>rejected(fn()=>SchedulerCore::workItem(item(['source_ref'=>'issue-118']))),
         'state'=>rejected(fn()=>SchedulerCore::workItem(item(['state'=>'mystery']))),
         'reserved_without_owner'=>rejected(fn()=>SchedulerCore::workItem(item(['state'=>'reserved']))),
+        'secret_owner'=>rejected(fn()=>SchedulerCore::workItem(item(['reservation_id'=>'reservation-1','assigned_session_id'=>'ghp_12345678901234567890']))),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='readiness'){
@@ -75,7 +76,10 @@ if($scenario==='capacity'){
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='candidate'){
-    echo json_encode(SchedulerCore::candidate(item(),context()),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+    echo json_encode([
+        'ready'=>SchedulerCore::candidate(item(),context()),
+        'blocked'=>SchedulerCore::candidate(item(),context(['dependency_states'=>['dep-runtime'=>'open']])),
+    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='deterministic'){
     $a=SchedulerCore::candidate(item(),context());

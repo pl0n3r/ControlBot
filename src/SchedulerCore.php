@@ -100,7 +100,10 @@ final class SchedulerCore
             'version'=>1,'policy_ref'=>'factory-dispatcher-v2','key'=>$work['work_item_id'],
             'source_ref'=>$work['source_ref'],'priority'=>$work['priority'],'generation'=>$work['generation'],
             'required_capabilities'=>$work['required_capabilities'],'account_id'=>$ready['account_id'],
-            'readiness'=>['ready'=>$ready['ready'],'reasons'=>$ready['reasons']],
+            'readiness'=>[
+                'ready'=>$ready['ready'],'reasons'=>$ready['reasons'],
+                'open_dependencies'=>$ready['open_dependencies'],'unknown_dependencies'=>$ready['unknown_dependencies'],
+            ],
         ];
     }
 
@@ -164,14 +167,16 @@ final class SchedulerCore
 
     private static function workRef(mixed $value,string $label): string
     {
-        if(!is_string($value)||preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#[1-9][0-9]*$/D',$value)!==1)
+        if(!is_string($value)||strlen($value)>180
+            || preg_match('/^[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+#[1-9][0-9]*$/D',$value)!==1)
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
 
     private static function ref(mixed $value,string $label): string
     {
-        if(!is_string($value)||preg_match('/^[A-Za-z0-9][A-Za-z0-9._:@\/#-]{0,179}$/D',$value)!==1)
+        if(!is_string($value)||preg_match('/^[A-Za-z0-9][A-Za-z0-9._:@\\/#-]{0,179}$/D',$value)!==1
+            || preg_match('/(?:(?:github_pat_|ghp_|gho_)[A-Za-z0-9_]{20,}|(?:sk|rk|pk)-[A-Za-z0-9_-]{12,}|(?:token|secret|password|cookie|authorization|dsn):)/i',$value)===1)
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }

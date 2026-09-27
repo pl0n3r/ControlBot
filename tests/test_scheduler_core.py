@@ -13,7 +13,7 @@ class SchedulerCoreTests(unittest.TestCase):
     def test_workitem_schema_is_exact_and_fail_closed(self):
         data=scenario("schema")
         self.assertEqual(data["valid"]["work_item_id"],"work-118")
-        for key in ("extra","generation","source","state","reserved_without_owner"):
+        for key in ("extra","generation","source","state","reserved_without_owner","secret_owner"):
             self.assertTrue(data[key],(key,data))
 
     def test_dependencies_approval_and_freeze_fail_closed_with_structured_reasons(self):
@@ -44,11 +44,13 @@ class SchedulerCoreTests(unittest.TestCase):
 
     def test_candidate_targets_factory_dispatcher_v2_without_parallel_ranking(self):
         data=scenario("candidate")
-        self.assertEqual(data["policy_ref"],"factory-dispatcher-v2")
-        self.assertEqual(data["priority"],"critical")
-        self.assertTrue(data["readiness"]["ready"])
+        ready=data["ready"]
+        self.assertEqual(ready["policy_ref"],"factory-dispatcher-v2")
+        self.assertEqual(ready["priority"],"critical")
+        self.assertTrue(ready["readiness"]["ready"])
+        self.assertEqual(data["blocked"]["readiness"]["open_dependencies"],["dep-runtime"])
         for forbidden in ("score","rank","selected","authority_class"):
-            self.assertNotIn(forbidden,data)
+            self.assertNotIn(forbidden,ready)
 
     def test_scheduler_core_simulation_is_deterministic_and_side_effect_free(self):
         data=scenario("deterministic")

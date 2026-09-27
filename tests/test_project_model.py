@@ -35,7 +35,7 @@ class ProjectModelTests(unittest.TestCase):
     def test_repository_reassociation_preserves_history_and_identity(self):
         data = scenario("reassociate")
         self.assertEqual(data["project_id"], "project-controlbot")
-        self.assertEqual([row["full_name"] for row in data["repositories"]], ["pl0n3r/ControlBot"])
+        self.assertEqual([row["repository"] for row in data["repositories"]], ["pl0n3r/ControlBot"])
         self.assertIn("https://github.com/pl0n3r/FactoryRunner", data["history_refs"])
         self.assertIn("controlbot:project/project-controlbot/created", data["history_refs"])
 if __name__ == "__main__":

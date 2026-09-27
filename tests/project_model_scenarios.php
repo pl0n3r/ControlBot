@@ -18,7 +18,7 @@ function project(array $overrides = []): array {
         'version' => 1,
         'project_id' => 'project-controlbot',
         'slug' => 'controlbot',
-        'name' => 'ControlBot',
+        'title' => 'ControlBot',
         'phase' => 'building',
         'priority' => 'critical',
         'repositories' => [],
@@ -30,7 +30,7 @@ function project(array $overrides = []): array {
 function repo(string $id, string $name, int $at = 2000): array {
     return [
         'repository_id' => $id,
-        'full_name' => $name,
+        'repository' => $name,
         'source_ref' => 'https://github.com/' . $name,
         'observed_at' => $at,
     ];

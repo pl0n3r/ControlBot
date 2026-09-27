@@ -15,7 +15,7 @@ final class ProjectModel
     public static function normalize(array $raw): array
     {
         self::fields($raw, [
-            'version','project_id','slug','name','phase','priority',
+            'version','project_id','slug','title','phase','priority',
             'repositories','environments','aggregate_refs','history_refs',
         ], 'Project');
 
@@ -27,7 +27,7 @@ final class ProjectModel
             'version' => 1,
             'project_id' => self::id($raw['project_id'], 'project_id'),
             'slug' => self::slug($raw['slug'], 'slug'),
-            'name' => self::text($raw['name'], 'name', 120),
+            'title' => self::text($raw['title'], 'title', 120),
             'phase' => self::enum($raw['phase'], self::PHASES, 'phase'),
             'priority' => self::enum($raw['priority'], self::PRIORITIES, 'priority'),
             'repositories' => self::repositories($raw['repositories']),
@@ -65,9 +65,9 @@ final class ProjectModel
         $seenIds = [];
         $seenNames = [];
         foreach ($rows as $row) {
-            self::fields($row, ['repository_id','full_name','source_ref','observed_at'], 'Repository');
+            self::fields($row, ['repository_id','repository','source_ref','observed_at'], 'Repository');
             $id = self::id($row['repository_id'], 'repository_id');
-            $name = self::repoName($row['full_name']);
+            $name = self::repoName($row['repository']);
             $source = self::githubRef($row['source_ref']);
             if (isset($seenIds[$id]) || isset($seenNames[$name])) {
                 throw new InvalidArgumentException('Repository duplicated.');
@@ -79,7 +79,7 @@ final class ProjectModel
             $seenNames[$name] = true;
             $out[] = [
                 'repository_id' => $id,
-                'full_name' => $name,
+                'repository' => $name,
                 'source_ref' => $source,
                 'observed_at' => self::timestamp($row['observed_at'], 'repository.observed_at'),
             ];

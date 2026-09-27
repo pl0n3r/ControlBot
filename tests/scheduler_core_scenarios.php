@@ -48,7 +48,11 @@ if($scenario==='readiness'){
     $approvalUnknown=SchedulerCore::readiness(item(),context(['approval_state'=>'unknown']));
     $freeze=SchedulerCore::readiness(item(),context(['freeze_state'=>'active']));
     $freezeUnknown=SchedulerCore::readiness(item(),context(['freeze_state'=>'unknown']));
-    echo json_encode(compact('open','unknown','pending','approvalUnknown','freeze','freezeUnknown'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+    $independent=SchedulerCore::readiness(
+        item(['dependency_ids'=>[]]),
+        context(['dependency_states'=>[]])
+    );
+    echo json_encode(compact('open','unknown','pending','approvalUnknown','freeze','freezeUnknown','independent'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='fencing'){
     $reserved=item(['state'=>'reserved','reservation_id'=>'7c43b4b2-4ec5-4386-ab3b-95dcd9a4a076','assigned_session_id'=>'session_1']);
@@ -68,10 +72,17 @@ if($scenario==='capacity'){
         [['version'=>1,'session_id'=>'session_1','agent_id'=>'agent-1','account_id'=>'account_main','profile_alias'=>'Main','tab_id'=>'tab-1','status'=>'idle','assignment_id'=>null,'last_heartbeat_at'=>100,'mode'=>'web','repository'=>null,'issue_number'=>null]]
     );
     $rate=capacity(false);
+    $numericIdSnapshot=AgentRuntime::capacitySnapshot(
+        ['version'=>1,'account_id'=>'account_main','provider_id'=>'chatgpt-web','account_alias'=>'Principal','plan'=>'plus','capacity'=>2,'status'=>'active'],
+        [['version'=>1,'session_id'=>'123','agent_id'=>'agent-1','account_id'=>'account_main','profile_alias'=>'Main','tab_id'=>'tab-1','status'=>'idle','assignment_id'=>null,'last_heartbeat_at'=>100,'mode'=>'web','repository'=>null,'issue_number'=>null]]
+    );
+    $numericIdReadiness=SchedulerCore::readiness($work,context(['capacity'=>$numericIdSnapshot]));
     echo json_encode([
         'before'=>$work,
         'full'=>SchedulerCore::readiness($work,context(['capacity'=>$full])),
         'rate_limited'=>SchedulerCore::readiness($work,context(['capacity'=>$rate])),
+        'numeric_session_ids'=>$numericIdSnapshot['session_ids'],
+        'numeric_id_readiness'=>$numericIdReadiness,
         'after'=>$work,
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }

@@ -17,7 +17,7 @@ function item(array $replace=[]): array {
     ], $replace);
 }
 function capacity(bool $available=true): array {
-    $account=['version'=>1,'account_id'=>'account-main','provider_id'=>'chatgpt-web','account_alias'=>'Principal','plan'=>'plus','capacity'=>1,'status'=>$available?'active':'rate_limited'];
+    $account=['version'=>1,'account_id'=>'account_main','provider_id'=>'chatgpt-web','account_alias'=>'Principal','plan'=>'plus','capacity'=>1,'status'=>$available?'active':'rate_limited'];
     $sessions=$available?[]:[];
     return AgentRuntime::capacitySnapshot($account,$sessions);
 }
@@ -49,21 +49,21 @@ if($scenario==='readiness'){
     echo json_encode(compact('open','unknown','pending','approvalUnknown','freeze','freezeUnknown'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='fencing'){
-    $reserved=item(['state'=>'reserved','reservation_id'=>'reservation-1','assigned_session_id'=>'session-1']);
-    $compatible=['reservation_id'=>'reservation-1','owner_session_id'=>'session-1','generation'=>2,'active'=>true];
+    $reserved=item(['state'=>'reserved','reservation_id'=>'7c43b4b2-4ec5-4386-ab3b-95dcd9a4a076','assigned_session_id'=>'session_1']);
+    $compatible=['reservation_id'=>'7c43b4b2-4ec5-4386-ab3b-95dcd9a4a076','owner_session_id'=>'session_1','generation'=>2,'active'=>true];
     echo json_encode([
-        'ready'=>SchedulerCore::readiness($reserved,context(['reservations'=>[$compatible],'expected_owner_session_id'=>'session-1'])),
-        'stale_generation'=>SchedulerCore::readiness($reserved,context(['reservations'=>[$compatible],'expected_generation'=>1,'expected_owner_session_id'=>'session-1'])),
-        'stale_owner'=>SchedulerCore::readiness($reserved,context(['reservations'=>[$compatible],'expected_owner_session_id'=>'session-2'])),
-        'conflict'=>SchedulerCore::readiness($reserved,context(['reservations'=>[array_replace($compatible,['reservation_id'=>'reservation-2'])],'expected_owner_session_id'=>'session-1'])),
-        'double_owner'=>rejected(fn()=>SchedulerCore::readiness($reserved,context(['reservations'=>[$compatible,array_replace($compatible,['reservation_id'=>'reservation-2','owner_session_id'=>'session-2'])]]))),
+        'ready'=>SchedulerCore::readiness($reserved,context(['reservations'=>[$compatible],'expected_owner_session_id'=>'session_1'])),
+        'stale_generation'=>SchedulerCore::readiness($reserved,context(['reservations'=>[$compatible],'expected_generation'=>1,'expected_owner_session_id'=>'session_1'])),
+        'stale_owner'=>SchedulerCore::readiness($reserved,context(['reservations'=>[$compatible],'expected_owner_session_id'=>'session_2'])),
+        'conflict'=>SchedulerCore::readiness($reserved,context(['reservations'=>[array_replace($compatible,['reservation_id'=>'8d54c5c3-5fd6-5497-bc4c-a6edda15b187'])],'expected_owner_session_id'=>'session_1'])),
+        'double_owner'=>rejected(fn()=>SchedulerCore::readiness($reserved,context(['reservations'=>[$compatible,array_replace($compatible,['reservation_id'=>'8d54c5c3-5fd6-5497-bc4c-a6edda15b187','owner_session_id'=>'session_2'])]]))),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='capacity'){
     $work=item();
     $full=AgentRuntime::capacitySnapshot(
-        ['version'=>1,'account_id'=>'account-main','provider_id'=>'chatgpt-web','account_alias'=>'Principal','plan'=>'plus','capacity'=>1,'status'=>'active'],
-        [['version'=>1,'session_id'=>'session-1','agent_id'=>'agent-1','account_id'=>'account-main','profile_alias'=>'Main','tab_id'=>'tab-1','status'=>'idle','assignment_id'=>null,'last_heartbeat_at'=>100,'mode'=>'web','repository'=>null,'issue_number'=>null]]
+        ['version'=>1,'account_id'=>'account_main','provider_id'=>'chatgpt-web','account_alias'=>'Principal','plan'=>'plus','capacity'=>1,'status'=>'active'],
+        [['version'=>1,'session_id'=>'session_1','agent_id'=>'agent-1','account_id'=>'account_main','profile_alias'=>'Main','tab_id'=>'tab-1','status'=>'idle','assignment_id'=>null,'last_heartbeat_at'=>100,'mode'=>'web','repository'=>null,'issue_number'=>null]]
     );
     $rate=capacity(false);
     echo json_encode([

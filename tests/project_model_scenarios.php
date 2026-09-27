@@ -207,6 +207,14 @@ if (array_key_exists($name, $invalidScenarios)) {
     $first = ProjectBackfill::apply([], $definitions, 2000);
     $second = ProjectBackfill::apply($first, $definitions, 3000);
     $out = ['first' => $first, 'second' => $second];
+} elseif ($name === 'backfill-conflict') {
+    try {
+        $existing = [project(['repositories' => [repo('repo-condor', 'pl0n3r/Condor')]])];
+        ProjectBackfill::apply($existing, existingProjectDefinitions(), 2000);
+        $out = ['blocked' => false];
+    } catch (InvalidArgumentException) {
+        $out = ['blocked' => true];
+    }
 } elseif ($name === 'reassociate') {
     $base = project([
         'repositories' => [

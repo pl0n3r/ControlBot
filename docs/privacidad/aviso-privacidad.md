@@ -21,6 +21,7 @@
 | agent_status | usage | agent_id, account_alias, profile_alias, tab_id, status, last_heartbeat_at, mode, repository, issue_number | agent_orchestration | review_required | review_required | ninguno_declarado | review_required |
 | audit_log | usage | actor, action, repository, issue, category, option, sha, result, evidence, at | security_audit | review_required | review_required | ninguno_declarado | review_required |
 | chat_response_opt_in | usage | agent_id, tab_id, repository, issue_number, question_text, response_text, status, received_at, opt_in | agent_response_relay | review_required | review_required | ninguno_declarado | review_required |
+| dashboard_health_status | usage | health | dashboard_operational_status | review_required | review_required | ninguno_declarado | review_required |
 
 ## Autorización técnica pendiente
 

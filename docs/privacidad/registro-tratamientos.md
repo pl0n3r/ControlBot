@@ -43,3 +43,13 @@ Producto: `pl0n3r/ControlBot`
 - Consentimiento: `review_required`
 - Proveedores: ninguno_declarado
 - Retención: `review_required`
+
+## dashboard_health_status
+
+- Categoría: `usage`
+- Campos de software: `health`
+- Finalidad: `dashboard_operational_status`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `review_required`

@@ -36,10 +36,33 @@ final class RunnerGateway
         return $value;
     }
 
+    private static function safeText(mixed $value, string $label, int $max): string
+    {
+        if (!is_string($value) || $value === '' || strlen($value) > $max
+            || preg_match('/[\x00-\x1f\x7f]/', $value) === 1) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+        if (preg_match(
+            '/(?:-----BEGIN [^-]*PRIVATE KEY-----|\b(?:bearer\s+[A-Za-z0-9._~+\/-]{8,}|(?:password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn)\s*[:=]\s*\S+|(?:ghp_|gho_|github_pat_)[A-Za-z0-9_]{20,}|(?:sk|rk|pk)-[A-Za-z0-9_-]{12,}))/i',
+            $value
+        ) === 1) {
+            throw new InvalidArgumentException($label . ' contains sensitive material.');
+        }
+        return $value;
+    }
+
     private static function ref(mixed $value, string $label, int $max = 160): string
     {
-        if (!is_string($value) || strlen($value) > $max
-            || preg_match('/^[A-Za-z0-9][A-Za-z0-9._:\/#@-]*$/D', $value) !== 1) {
+        $value = self::safeText($value, $label, $max);
+        if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._:\/#@-]*$/D', $value) !== 1) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+        return $value;
+    }
+
+    private static function positiveInt(mixed $value, string $label, int $max = PHP_INT_MAX): int
+    {
+        if (!is_int($value) || $value < 1 || $value > $max) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
         return $value;
@@ -193,4 +216,187 @@ final class RunnerGateway
             'assignment_ids' => $assignments,
         ];
     }
+
+    public static function order(array $record): array
+    {
+        self::fields($record, [
+            'version', 'order_id', 'attempt_id', 'generation', 'work_item_id',
+            'runner_id', 'capability', 'attempt', 'scope', 'issued_at',
+            'expires_at', 'instruction_ref',
+        ], 'ExecutionOrder');
+        if ($record['version'] !== 1) {
+            throw new InvalidArgumentException('ExecutionOrder version invalid.');
+        }
+        $issuedAt = self::positiveInt($record['issued_at'], 'issued_at');
+        $expiresAt = self::positiveInt($record['expires_at'], 'expires_at');
+        if ($expiresAt <= $issuedAt || $expiresAt - $issuedAt > 86_400) {
+            throw new InvalidArgumentException('ExecutionOrder TTL invalid.');
+        }
+        $instructionRef = self::ref($record['instruction_ref'], 'instruction_ref', 256);
+        if (!str_starts_with($instructionRef, 'controlbot:')) {
+            throw new InvalidArgumentException('instruction_ref must belong to ControlBot.');
+        }
+
+        return [
+            'version' => 1,
+            'order_id' => self::uuid($record['order_id'], 'order_id'),
+            'attempt_id' => self::uuid($record['attempt_id'], 'attempt_id'),
+            'generation' => self::positiveInt($record['generation'], 'generation', 1_000_000_000),
+            'work_item_id' => self::ref($record['work_item_id'], 'work_item_id', 160),
+            'runner_id' => self::uuid($record['runner_id'], 'runner_id'),
+            'capability' => self::slug($record['capability'], 'capability'),
+            'attempt' => self::positiveInt($record['attempt'], 'attempt', 10),
+            'scope' => self::ref($record['scope'], 'scope', 160),
+            'issued_at' => $issuedAt,
+            'expires_at' => $expiresAt,
+            'instruction_ref' => $instructionRef,
+        ];
+    }
+
+    public static function orderFingerprint(array $record): string
+    {
+        $order = self::order($record);
+        return hash('sha256', json_encode($order, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+    }
+
+    public static function assertIdempotentOrder(array $existing, array $incoming): void
+    {
+        $left = self::order($existing);
+        $right = self::order($incoming);
+        if ($left['order_id'] !== $right['order_id']) {
+            throw new InvalidArgumentException('order_id differs.');
+        }
+        if ($left['attempt_id'] !== $right['attempt_id'] || $left['generation'] !== $right['generation']
+            || self::orderFingerprint($left) !== self::orderFingerprint($right)) {
+            throw new InvalidArgumentException('Conflicting order_id reuse.');
+        }
+    }
+
+    public static function event(array $record): array
+    {
+        self::fields($record, [
+            'version', 'event_id', 'order_id', 'attempt_id', 'runner_id',
+            'generation', 'sequence', 'state', 'occurred_at', 'evidence',
+        ], 'ExecutionEvent');
+        $states = [
+            'accepted', 'started', 'heartbeat', 'progress', 'checkpoint',
+            'waiting_human', 'blocked', 'failed', 'completed', 'cancelled',
+        ];
+        if ($record['version'] !== 1
+            || !is_string($record['state'])
+            || !in_array($record['state'], $states, true)
+            || !is_array($record['evidence'])) {
+            throw new InvalidArgumentException('ExecutionEvent invalid.');
+        }
+
+        return [
+            'version' => 1,
+            'event_id' => self::uuid($record['event_id'], 'event_id'),
+            'order_id' => self::uuid($record['order_id'], 'order_id'),
+            'attempt_id' => self::uuid($record['attempt_id'], 'attempt_id'),
+            'runner_id' => self::uuid($record['runner_id'], 'runner_id'),
+            'generation' => self::positiveInt($record['generation'], 'generation', 1_000_000_000),
+            'sequence' => self::positiveInt($record['sequence'], 'sequence'),
+            'state' => $record['state'],
+            'occurred_at' => self::positiveInt($record['occurred_at'], 'occurred_at'),
+            'evidence' => self::evidence($record['evidence']),
+        ];
+    }
+
+    public static function assertEventOwnedByOrder(array $event, array $currentOrder): void
+    {
+        $event = self::event($event);
+        $order = self::order($currentOrder);
+        if ($event['order_id'] !== $order['order_id']
+            || $event['attempt_id'] !== $order['attempt_id']
+            || $event['generation'] !== $order['generation']
+            || $event['runner_id'] !== $order['runner_id']) {
+            throw new InvalidArgumentException('Stale or foreign execution event.');
+        }
+    }
+
+    public static function assertEventTransition(array $previous, array $next, array $currentOrder): void
+    {
+        $left = self::event($previous);
+        $right = self::event($next);
+        self::assertEventOwnedByOrder($left, $currentOrder);
+        self::assertEventOwnedByOrder($right, $currentOrder);
+
+        if ($right['sequence'] !== $left['sequence'] + 1) {
+            throw new InvalidArgumentException('Execution event sequence invalid.');
+        }
+        if ($right['occurred_at'] < $left['occurred_at']) {
+            throw new InvalidArgumentException('Execution event timestamp regressed.');
+        }
+        if (!in_array($right['state'], self::transitionsFrom($left['state']), true)) {
+            throw new InvalidArgumentException(
+                'Invalid execution transition: ' . $left['state'] . ' -> ' . $right['state'] . '.'
+            );
+        }
+    }
+
+    private static function transitionsFrom(string $state): array
+    {
+        if (in_array($state, ['failed', 'completed', 'cancelled'], true)) {
+            return [];
+        }
+        return match ($state) {
+            'accepted' => ['started', 'cancelled', 'failed'],
+            'waiting_human', 'blocked' => ['started', 'cancelled', 'failed'],
+            default => ['heartbeat', 'progress', 'checkpoint', 'waiting_human', 'blocked', 'failed', 'completed', 'cancelled'],
+        };
+    }
+
+    private static function evidence(array $record): array
+    {
+        self::fields($record, ['code', 'summary', 'ref'], 'ExecutionEvidence');
+        $summary = self::safeText($record['summary'], 'evidence.summary', 500);
+        $ref = null;
+        if ($record['ref'] !== null) {
+            $ref = self::safeText($record['ref'], 'evidence.ref', 512);
+            if (str_contains($ref, '\\')
+                || preg_match('/(?:^|[:\/._-])(?:token|secret|password|passwd|cookie|authorization|private[_-]?key|api[_-]?key|dsn)(?:$|[:\/._=-])/i', $ref) === 1) {
+                throw new InvalidArgumentException('evidence.ref invalid.');
+            }
+            if (str_starts_with($ref, 'https://')) {
+                self::validateGithubEvidenceRef($ref);
+            } elseif (!str_starts_with($ref, 'controlbot:')) {
+                throw new InvalidArgumentException('evidence.ref invalid.');
+            }
+        }
+        return [
+            'code' => self::slug($record['code'], 'evidence.code'),
+            'summary' => $summary,
+            'ref' => $ref,
+        ];
+    }
+
+    private static function validateGithubEvidenceRef(string $ref): void
+    {
+        $parts = parse_url($ref);
+        if (!is_array($parts)
+            || ($parts['scheme'] ?? null) !== 'https'
+            || ($parts['host'] ?? null) !== 'github.com'
+            || isset($parts['user']) || isset($parts['pass'])
+            || isset($parts['query']) || isset($parts['fragment'])) {
+            throw new InvalidArgumentException('evidence.ref invalid.');
+        }
+
+        $decoded = $parts['path'] ?? '/';
+        for ($i = 0; $i < 3 && str_contains($decoded, '%'); $i++) {
+            $decoded = rawurldecode($decoded);
+        }
+        if (str_contains($decoded, '%')) {
+            throw new InvalidArgumentException('evidence.ref invalid.');
+        }
+        $segments = explode('/', $decoded);
+        if (in_array('.', $segments, true) || in_array('..', $segments, true)) {
+            throw new InvalidArgumentException('evidence.ref invalid.');
+        }
+        self::safeText($decoded, 'evidence.ref', 512);
+        if (preg_match('/(?:^|[:\/._-])(?:token|secret|password|passwd|cookie|authorization|private[_-]?key|api[_-]?key|dsn)(?:$|[:\/._=-])/i', $decoded) === 1) {
+            throw new InvalidArgumentException('evidence.ref invalid.');
+        }
+    }
+
 }

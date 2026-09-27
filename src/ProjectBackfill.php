@@ -17,11 +17,19 @@ final class ProjectBackfill
         }
 
         $projects = [];
+        $repositoryOwners = [];
         foreach ($existing as $raw) {
             $project = ProjectModel::normalize($raw);
             $id = $project['project_id'];
             if (isset($projects[$id])) {
                 throw new InvalidArgumentException('Proyecto duplicado en backfill.');
+            }
+            foreach ($project['repositories'] as $current) {
+                $key = strtolower($current['repository']);
+                if (isset($repositoryOwners[$key]) && $repositoryOwners[$key] !== $id) {
+                    throw new InvalidArgumentException('Repositorio asociado a múltiples proyectos.');
+                }
+                $repositoryOwners[$key] = $id;
             }
             $projects[$id] = $project;
         }
@@ -38,6 +46,10 @@ final class ProjectBackfill
             }
             $definitionIds[$id] = true;
             $definitionRepositories[$repositoryKey] = true;
+            if (isset($repositoryOwners[$repositoryKey]) && $repositoryOwners[$repositoryKey] !== $id) {
+                throw new InvalidArgumentException('Repositorio asociado a otro proyecto.');
+            }
+            $repositoryOwners[$repositoryKey] = $id;
 
             if (!isset($projects[$id])) {
                 $projects[$id] = ProjectModel::normalize(self::seed($definition, $observedAt));

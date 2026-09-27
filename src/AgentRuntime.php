@@ -257,15 +257,15 @@ final class AgentRuntime
             if ($session['account_id'] !== $account['account_id']) {
                 throw new InvalidArgumentException('Session belongs to another account.');
             }
-            if (isset($ids[$session['session_id']])) {
+            if (in_array($session['session_id'], $ids, true)) {
                 throw new InvalidArgumentException('Session duplicated.');
             }
-            $ids[$session['session_id']] = true;
+            $ids[] = $session['session_id'];
         }
         if (count($ids) > $account['capacity']) {
             throw new InvalidArgumentException('Account capacity exceeded.');
         }
-        $sessionIds = array_keys($ids);
+        $sessionIds = $ids;
         sort($sessionIds);
         $free = $account['status'] === 'active' ? $account['capacity'] - count($sessionIds) : 0;
         return [

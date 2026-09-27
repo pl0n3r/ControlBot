@@ -7,7 +7,7 @@ on:
     - cron: '17 */6 * * *'
   workflow_dispatch:
   pull_request:
-    types: [opened, ready_for_review, converted_to_draft, closed]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, closed]
   issues:
     types: [labeled, closed, reopened]
   issue_comment:

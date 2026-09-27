@@ -27,7 +27,51 @@ class DecisionUiTests(unittest.TestCase):
         self.assertIn(":focus-visible", html)
         self.assertIn("@media (prefers-reduced-motion: reduce)", html)
         self.assertIn("@media (min-width: 760px)", html)
-        self.assertIn("CONTROLBOT / DECISIONES", html)
+        self.assertIn('class="brand-mark">CONTROLBOT</span>', html)
+        self.assertIn("/ DECISIONES</p>", html)
+
+
+    def test_canonical_hud_palette_is_sober_and_non_neon(self):
+        html = render("ready")
+        self.assertIn("--bg: #0a0e13", html)
+        self.assertIn("--panel: #10161d", html)
+        self.assertIn("--cyan: #7cc9dd", html)
+        self.assertIn("--green: #6fcf9e", html)
+        self.assertIn("--amber: #e3a857", html)
+        self.assertIn("--red: #e0666f", html)
+        self.assertNotIn("text-shadow", html)
+        self.assertNotIn("box-shadow", html)
+        self.assertNotIn("scanline", html)
+
+    def test_empty_state_orb_has_no_animation(self):
+        html = render("empty")
+        css_start = html.index("<style>") + len("<style>")
+        css_end = html.index("</style>", css_start)
+        orb_rules = [
+            block
+            for block in html[css_start:css_end].split("}")
+            if ".status-orb" in block
+        ]
+        self.assertTrue(orb_rules)
+        self.assertTrue(all("animation:" not in block for block in orb_rules))
+
+    def test_inter_is_primary_and_orbitron_is_brand_only(self):
+        html = render("ready")
+        self.assertIn("font-family: Inter, system-ui", html)
+        self.assertIn('class="brand-mark">CONTROLBOT</span>', html)
+        self.assertIn("font-family: Orbitron, Inter, system-ui", html)
+        self.assertNotIn("h1, h2 { font-family: Orbitron", html)
+
+    def test_sober_theme_preserves_batch_and_question_controls(self):
+        batch = render("batch")
+        questions = render("duplicate-question-ids")
+        ready = render("ready")
+        self.assertIn('action="/approvals/batch"', batch)
+        self.assertIn("Aprobar recomendadas de bajo riesgo", batch)
+        self.assertIn('action="/decisions/question"', questions)
+        self.assertIn("Tengo una duda", questions)
+        self.assertIn('action="/approvals/execute"', ready)
+        self.assertIn(".question-panel", questions)
 
     def test_reauth_guard_disables_actions(self):
         html = render("reauth")

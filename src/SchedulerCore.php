@@ -110,7 +110,7 @@ final class SchedulerCore
 
     private static function dependencyStates(mixed $raw,array $ids): array
     {
-        if(!is_array($raw)||array_is_list($raw)) throw new InvalidArgumentException('dependency_states invalid.');
+        if(!is_array($raw)||($raw!==[] && array_is_list($raw))) throw new InvalidArgumentException('dependency_states invalid.');
         $keys=array_keys($raw); sort($keys);
         if($keys!==$ids) throw new InvalidArgumentException('dependency_states mismatch.');
         $out=[];

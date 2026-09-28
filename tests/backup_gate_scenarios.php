@@ -106,6 +106,7 @@ if ($name === 'missing') {
     $out = [
         'read' => BackupGate::evaluate('hostinger.read', scope(), null, WRITE_AT),
         'status' => BackupGate::evaluate('migration.status', scope(), null, WRITE_AT),
+        'owner' => BackupGate::evaluate('database.destructive', scope(), null, WRITE_AT),
     ];
 } elseif ($name === 'evidence') {
     $record = receipt();

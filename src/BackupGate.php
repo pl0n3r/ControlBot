@@ -35,6 +35,10 @@ final class BackupGate
             return self::deny('policy_denied');
         }
 
+        if ($policy['decision'] === 'owner_required') {
+            return self::deny('owner_approval_required');
+        }
+
         if (!$policy['requires_backup']) {
             return [
                 'allowed' => true,

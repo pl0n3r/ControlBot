@@ -40,10 +40,12 @@ class BackupGateTests(unittest.TestCase):
 
     def test_read_only_operation_does_not_require_backup(self):
         data = scenario("readonly")
-        for result in data.values():
-            self.assertTrue(result["allowed"])
-            self.assertFalse(result["backup_required"])
-            self.assertEqual(result["reason"], "backup_not_required")
+        for key in ("read", "status"):
+            self.assertTrue(data[key]["allowed"])
+            self.assertFalse(data[key]["backup_required"])
+            self.assertEqual(data[key]["reason"], "backup_not_required")
+        self.assertFalse(data["owner"]["allowed"])
+        self.assertEqual(data["owner"]["reason"], "owner_approval_required")
 
     def test_evidence_never_contains_backup_payload(self):
         data = scenario("evidence")

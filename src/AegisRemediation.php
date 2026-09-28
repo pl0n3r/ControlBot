@@ -277,7 +277,7 @@ final class AegisRemediation
         return self::validatedText(
             $value,
             'scope',
-            '/^(?:venture|project|institution):[a-z][a-z0-9-]{0,63}$/D',
+            '/^(?:group|venture|project|institution):[a-z][a-z0-9-]{1,63}$/D',
             80,
         );
     }

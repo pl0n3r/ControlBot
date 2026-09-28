@@ -96,10 +96,35 @@ if ($name === 'auto') {
     $mismatch = remediationInput([
         'proposal' => remediationProposal(['policy_ref' => 'controlbot:policy/other-policy']),
     ]);
+    $groupScope = remediationInput([
+        'finding' => [
+            'finding_id' => 'finding-group-policy',
+            'scope' => 'group:pl0n3r',
+        ],
+        'proposal' => remediationProposal(['scope' => 'group:pl0n3r']),
+        'verified_context' => remediationContext(['scope' => 'group:pl0n3r']),
+        'grant' => remediationGrant(['scope' => 'group:pl0n3r']),
+    ]);
+    $shortScopeRejected = false;
+    try {
+        AegisRemediation::plan(remediationInput([
+            'finding' => [
+                'finding_id' => 'finding-short-scope',
+                'scope' => 'venture:a',
+            ],
+            'proposal' => remediationProposal(['scope' => 'venture:a']),
+            'verified_context' => remediationContext(['scope' => 'venture:a']),
+            'grant' => remediationGrant(['scope' => 'venture:a']),
+        ]), $now);
+    } catch (Throwable) {
+        $shortScopeRejected = true;
+    }
     $out = [
         'unknown_policy' => AegisRemediation::plan($unknownPolicy, $now),
         'insufficient' => AegisRemediation::plan($insufficient, $now),
         'policy_mismatch' => AegisRemediation::plan($mismatch, $now),
+        'group_scope' => AegisRemediation::plan($groupScope, $now),
+        'short_scope_rejected' => $shortScopeRejected,
     ];
 } elseif ($name === 'high_risk') {
     $out = [];

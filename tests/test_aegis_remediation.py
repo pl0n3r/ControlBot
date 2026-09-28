@@ -40,6 +40,9 @@ class AegisRemediationTests(unittest.TestCase):
             data["insufficient"]["decision"],
             "owner_decision_required",
         )
+        self.assertEqual(data["group_scope"]["decision"], "auto_eligible")
+        self.assertEqual(data["group_scope"]["scope"], "group:pl0n3r")
+        self.assertTrue(data["short_scope_rejected"])
 
     def test_high_risk_categories_require_owner_decision(self):
         data = scenario("high_risk")

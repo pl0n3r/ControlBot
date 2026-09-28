@@ -26,6 +26,8 @@ Cada proposal declara:
 
 El `policy_ref` debe coincidir con el grant y estar activo en el contexto verificado.
 
+`scope` reutiliza el mismo contrato de Decision Rights: `group|venture|project|institution:<slug>`.
+
 ## Decisiones
 
 `auto_eligible` exige simultáneamente:

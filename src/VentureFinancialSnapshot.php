@@ -40,7 +40,7 @@ final class VentureFinancialSnapshot
     ];
 
     private const MAX_MINOR_UNITS = 9_000_000_000_000_000;
-    private const SENSITIVE = '/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|dsn|customer[_ -]?id|order[_ -]?id|payment[_ -]?id|email|phone|address|iban|account[_ -]?number)/i';
+    private const SENSITIVE = '/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|dsn|customer[_ -]?id|order[_ -]?id|payment[_ -]?id|iban|account[_ -]?number)/i';
 
     public static function normalize(array $input): array
     {

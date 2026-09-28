@@ -180,63 +180,73 @@ final class FinancialPlanning
         }
 
         $seen = [];
-        $out = [];
-        foreach ($value as $row) {
-            if (!is_array($row) || array_is_list($row)) {
-                throw new InvalidArgumentException('attribution invalid.');
-            }
-            self::fields($row, [
-                'attribution_id', 'kind', 'currency', 'amount_minor',
-                'target_scope', 'rule_ref', 'provenance_ref',
-            ], 'attribution');
-
-            $id = self::id($row['attribution_id'] ?? null, 'attribution_id');
-            if (isset($seen[$id])) {
-                throw new InvalidArgumentException('attribution duplicated.');
-            }
-            $seen[$id] = true;
-
-            $rowCurrency = self::currency($row['currency'] ?? null);
-            if ($rowCurrency !== $currency) {
-                throw new InvalidArgumentException('attribution currency mismatch.');
-            }
-
-            $target = self::nullableScope($row['target_scope'] ?? null);
-            $rule = self::nullableRef($row['rule_ref'] ?? null, 'attribution.rule_ref');
-            $provenance = self::nullableRef($row['provenance_ref'] ?? null, 'attribution.provenance_ref');
-            $attributed = $target !== null && $rule !== null && $provenance !== null;
-
-            $out[] = [
-                'attribution_id' => $id,
-                'kind' => self::enum($row['kind'] ?? null, self::ATTRIBUTION_KINDS, 'attribution.kind'),
-                'currency' => $rowCurrency,
-                'amount_minor' => self::money($row['amount_minor'] ?? null, 'attribution.amount_minor'),
-                'status' => $attributed ? 'attributed' : 'unattributed',
-                'target_scope' => $attributed ? $target : null,
-                'rule_ref' => $attributed ? $rule : null,
-                'provenance_ref' => $attributed ? $provenance : null,
-            ];
-        }
+        $out = array_map(
+            static function (mixed $row) use (&$seen, $currency): array {
+                $normalized = self::attribution($row, $currency);
+                $id = $normalized['attribution_id'];
+                if (array_key_exists($id, $seen)) {
+                    throw new InvalidArgumentException('attribution duplicated.');
+                }
+                $seen[$id] = true;
+                return $normalized;
+            },
+            $value,
+        );
 
         usort($out, static fn(array $a, array $b): int => $a['attribution_id'] <=> $b['attribution_id']);
         return $out;
     }
 
+    private static function attribution(mixed $row, string $expectedCurrency): array
+    {
+        if (!is_array($row) || array_is_list($row)) {
+            throw new InvalidArgumentException('attribution invalid.');
+        }
+
+        self::fields($row, [
+            'attribution_id', 'kind', 'currency', 'amount_minor',
+            'target_scope', 'rule_ref', 'provenance_ref',
+        ], 'attribution');
+
+        $currency = self::currency($row['currency'] ?? null);
+        if ($currency !== $expectedCurrency) {
+            throw new InvalidArgumentException('attribution currency mismatch.');
+        }
+
+        $evidence = [
+            'target_scope' => self::nullableScope($row['target_scope'] ?? null),
+            'rule_ref' => self::nullableRef($row['rule_ref'] ?? null, 'attribution.rule_ref'),
+            'provenance_ref' => self::nullableRef($row['provenance_ref'] ?? null, 'attribution.provenance_ref'),
+        ];
+        $isAttributed = !in_array(null, $evidence, true);
+
+        return [
+            'attribution_id' => self::id($row['attribution_id'] ?? null, 'attribution_id'),
+            'kind' => self::enum($row['kind'] ?? null, self::ATTRIBUTION_KINDS, 'attribution.kind'),
+            'currency' => $currency,
+            'amount_minor' => self::money($row['amount_minor'] ?? null, 'attribution.amount_minor'),
+            'status' => $isAttributed ? 'attributed' : 'unattributed',
+            'target_scope' => $isAttributed ? $evidence['target_scope'] : null,
+            'rule_ref' => $isAttributed ? $evidence['rule_ref'] : null,
+            'provenance_ref' => $isAttributed ? $evidence['provenance_ref'] : null,
+        ];
+    }
+
     private static function fields(array $row, array $expected, string $label): void
     {
-        $actual = array_keys($row);
-        sort($actual, SORT_STRING);
-        sort($expected, SORT_STRING);
-        if ($actual !== $expected) {
+        $allowed = array_fill_keys($expected, true);
+        if (count($row) !== count($allowed) || array_diff_key($row, $allowed) !== []) {
             throw new InvalidArgumentException($label . ' fields invalid.');
         }
     }
 
     private static function id(mixed $value, string $label): string
     {
-        if (!is_string($value) || strlen($value) > 120
-            || preg_match('/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D', $value) !== 1
-            || preg_match(self::SENSITIVE, $value) === 1) {
+        $valid = is_string($value)
+            && strlen($value) <= 120
+            && preg_match('/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D', $value) === 1
+            && preg_match(self::SENSITIVE, $value) !== 1;
+        if (!$valid) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
         return $value;
@@ -244,11 +254,17 @@ final class FinancialPlanning
 
     private static function period(mixed $value): string
     {
-        if (!is_string($value) || preg_match('/^(\d{4})-(0[1-9]|1[0-2])$/D', $value, $m) !== 1) {
+        if (!is_string($value) || strlen($value) !== 7 || $value[4] !== '-') {
             throw new InvalidArgumentException('period invalid.');
         }
-        $year = (int) $m[1];
-        if ($year < 2000 || $year > 2200) {
+        [$yearText, $monthText] = explode('-', $value, 2);
+        if (!ctype_digit($yearText) || !ctype_digit($monthText)) {
+            throw new InvalidArgumentException('period invalid.');
+        }
+        $year = (int) $yearText;
+        $month = (int) $monthText;
+        if ($year < 2000 || $year > 2200 || $month < 1 || $month > 12
+            || sprintf('%04d-%02d', $year, $month) !== $value) {
             throw new InvalidArgumentException('period invalid.');
         }
         return $value;
@@ -256,7 +272,7 @@ final class FinancialPlanning
 
     private static function currency(mixed $value): string
     {
-        if (!is_string($value) || preg_match('/^[A-Z]{3}$/D', $value) !== 1) {
+        if (!is_string($value) || strlen($value) !== 3 || !ctype_alpha($value) || strtoupper($value) !== $value) {
             throw new InvalidArgumentException('currency invalid.');
         }
         return $value;
@@ -264,15 +280,17 @@ final class FinancialPlanning
 
     private static function money(mixed $value, string $label): int
     {
-        if (!is_int($value) || $value < 0 || $value > self::MAX_MINOR_UNITS) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
-        return $value;
+        return self::boundedInteger($value, 0, self::MAX_MINOR_UNITS, $label);
     }
 
     private static function timestamp(mixed $value, string $label): int
     {
-        if (!is_int($value) || $value < 1) {
+        return self::boundedInteger($value, 1, PHP_INT_MAX, $label);
+    }
+
+    private static function boundedInteger(mixed $value, int $min, int $max, string $label): int
+    {
+        if (!is_int($value) || $value < $min || $value > $max) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
         return $value;
@@ -285,12 +303,14 @@ final class FinancialPlanning
 
     private static function ref(mixed $value, string $label): string
     {
-        if (!is_string($value)
-            || strlen($value) < 8
-            || strlen($value) > 180
-            || str_contains($value, '@')
-            || preg_match(self::SENSITIVE, $value) === 1
-            || preg_match('#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\#-]{1,178}$#D', $value) !== 1) {
+        $valid = is_string($value)
+            && strlen($value) >= 8
+            && strlen($value) <= 180
+            && str_starts_with($value, 'controlbot:')
+            && !str_contains($value, '@')
+            && preg_match(self::SENSITIVE, $value) !== 1
+            && preg_match('#^[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D', substr($value, 11)) === 1;
+        if (!$valid) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
         return $value;
@@ -306,8 +326,9 @@ final class FinancialPlanning
         if ($value === null) {
             return null;
         }
-        if (!is_string($value)
-            || preg_match('/^(group|venture|project|institution):[a-z][a-z0-9-]{1,63}$/D', $value) !== 1) {
+        $valid = is_string($value)
+            && preg_match('/^(?:group|venture|project|institution):[a-z][a-z0-9-]{1,63}$/D', $value) === 1;
+        if (!$valid) {
             throw new InvalidArgumentException('scope invalid.');
         }
         return $value;
@@ -315,9 +336,13 @@ final class FinancialPlanning
 
     private static function enum(mixed $value, array $allowed, string $label): string
     {
-        if (!is_string($value) || !in_array($value, $allowed, true)) {
+        if (!is_string($value)) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
-        return $value;
+        $index = array_search($value, $allowed, true);
+        if ($index === false) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+        return $allowed[$index];
     }
 }

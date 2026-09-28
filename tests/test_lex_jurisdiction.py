@@ -41,6 +41,7 @@ class LexJurisdictionTests(unittest.TestCase):
         self.assertIn("unknown", invalid["unknown_source"])
         self.assertIn("future", invalid["future_review"])
         self.assertIn("uri invalid", invalid["non_https_source"])
+        self.assertIn("kind mismatch", invalid["kind_mismatch"])
 
     def test_stale_or_unknown_pack_is_not_current(self):
         data = scenario("freshness")

@@ -39,6 +39,7 @@ class AegisEvidenceTests(unittest.TestCase):
         data = scenario("continuity")
         self.assertEqual(data["backup_evidence"]["state"], "healthy")
         self.assertEqual(data["restore_evidence"]["state"], "unknown")
+        self.assertEqual(data["restore_evidence"]["reported_state"], "verified")
         self.assertEqual(data["restore_evidence"]["freshness"], "unknown")
 
     def test_incident_impact_links_technical_and_business_scopes(self):

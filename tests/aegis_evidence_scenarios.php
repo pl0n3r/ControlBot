@@ -99,7 +99,7 @@ if ($name === 'compliance') {
     $out = AegisEvidence::normalize($input);
 } elseif ($name === 'continuity') {
     $input = baseEvidence();
-    $input['restore_evidence'] = restore(['state' => 'unknown', 'freshness' => 'unknown']);
+    $input['restore_evidence'] = restore(['state' => 'verified', 'freshness' => 'unknown']);
     $out = AegisEvidence::normalize($input);
 } elseif ($name === 'impact') {
     $input = baseEvidence();

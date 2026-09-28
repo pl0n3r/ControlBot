@@ -9,15 +9,15 @@ A request is evaluated for one exact `scope` and `currency` and must contain:
 - a budget envelope with integer minor-unit limits, spent and committed amounts;
 - a reserve/runway snapshot with integer minor-unit cash and minimum reserve;
 - one capital allocation proposal with amount, authority level and reversibility;
-- the current result of `BudgetGuard::workPolicy()`;
-- the current result of `DecisionRights::evaluate()`;
+- the raw server-side inputs needed by `BudgetGuard`, which CAPITAL evaluates itself;
+- the raw server-side context/grant/action needed by `DecisionRights`, which CAPITAL evaluates itself;
 - optional shared-cost rows with explicit allocation rule and provenance.
 
 All nested budget, reserve and proposal scopes/currencies must match the request exactly. Unknown financial state fails closed.
 
 ## Authority composition
 
-CAPITAL never raises authority.
+CAPITAL never raises authority and never trusts a caller-supplied decision string. It invokes both authority engines server-side before composing the final result.
 
 1. `DecisionRights=deny` stays `deny`.
 2. A restrictive `BudgetGuard` result stays `deny`.

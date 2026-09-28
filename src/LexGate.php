@@ -63,7 +63,6 @@ final class LexGate
 
         if ($kind === 'material_uncertainty') {
             return $base + [
-                'ready_hint' => false,
                 'human_gate' => self::humanGate(
                     $gapId,
                     $scope,
@@ -78,7 +77,7 @@ final class LexGate
 
         return $base + [
             'human_gate' => null,
-            'work_item' => self::workItem($input, $gapId, $scope, $freshness, $severity, $policyRef, $evidenceRefs, $observedAt),
+            'work_item' => self::workItem($input, $gapId, $scope, $severity, $policyRef, $evidenceRefs, $observedAt),
         ];
     }
 
@@ -161,7 +160,6 @@ final class LexGate
         array $input,
         string $gapId,
         string $scope,
-        string $freshness,
         string $severity,
         string $policyRef,
         array $evidenceRefs,
@@ -208,10 +206,6 @@ final class LexGate
         if ($projectId !== null) $item['project_id'] = $projectId;
         if ($repositoryRef !== null) $item['repository_ref'] = $repositoryRef;
 
-        if ($freshness !== 'fresh') {
-            $item['evidence_refs'] = $evidenceRefs;
-        }
-
         return $item;
     }
 
@@ -229,30 +223,33 @@ final class LexGate
         if (array_is_list($row)) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
-        $keys = array_keys($row);
-        sort($keys, SORT_STRING);
-        sort($expected, SORT_STRING);
-        if ($keys !== $expected) {
+
+        $actual = array_keys($row);
+        $missing = array_diff($expected, $actual);
+        $unexpected = array_diff($actual, $expected);
+        if ($missing !== [] || $unexpected !== []) {
             throw new InvalidArgumentException($label . ' fields invalid.');
         }
     }
 
     private static function scope(mixed $value): string
     {
-        return self::validatedText(
+        return self::token(
             $value,
             'scope',
             '/^(?:group|venture|project|institution):[a-z][a-z0-9-]{1,63}$/D',
+            3,
             80,
         );
     }
 
     private static function id(mixed $value, string $label): string
     {
-        return self::validatedText(
+        return self::token(
             $value,
             $label,
             '/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,9}$/D',
+            1,
             140,
         );
     }
@@ -267,75 +264,103 @@ final class LexGate
         if (!is_string($value)) {
             throw new InvalidArgumentException('question invalid.');
         }
+
         $normalized = trim(preg_replace('/\s+/', ' ', $value) ?? '');
-        if ($normalized === '' || strlen($normalized) > 140 || preg_match(self::SENSITIVE, $normalized) === 1) {
+        if ($normalized === ''
+            || strlen($normalized) > 140
+            || preg_match(self::SENSITIVE, $normalized) === 1) {
             throw new InvalidArgumentException('question invalid.');
         }
+
         return $normalized;
     }
 
     private static function ids(mixed $value, string $label, bool $allowEmpty): array
     {
-        if (!is_array($value) || !array_is_list($value) || count($value) > 50 || (!$allowEmpty && $value === [])) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
-        $out = [];
-        foreach ($value as $item) {
-            $out[self::id($item, $label)] = true;
-        }
-        $items = array_keys($out);
-        sort($items, SORT_STRING);
-        return $items;
+        return self::uniqueList($value, $label, $allowEmpty, 'id');
     }
 
     private static function refs(mixed $value, string $label, bool $allowEmpty): array
     {
-        if (!is_array($value) || !array_is_list($value) || count($value) > 50 || (!$allowEmpty && $value === [])) {
+        return self::uniqueList($value, $label, $allowEmpty, 'ref');
+    }
+
+    private static function uniqueList(
+        mixed $value,
+        string $label,
+        bool $allowEmpty,
+        string $kind,
+    ): array {
+        if (!is_array($value)
+            || !array_is_list($value)
+            || count($value) > 50
+            || (!$allowEmpty && $value === [])) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
-        $out = [];
+
+        $unique = [];
         foreach ($value as $item) {
-            $out[self::ref($item, $label)] = true;
+            $normalized = $kind === 'id'
+                ? self::id($item, $label)
+                : self::ref($item, $label);
+            $unique[$normalized] = true;
         }
-        $items = array_keys($out);
+
+        $items = array_keys($unique);
         sort($items, SORT_STRING);
         return $items;
     }
 
     private static function ref(mixed $value, string $label): string
     {
-        if (!is_string($value)
-            || strlen($value) < 8
-            || strlen($value) > 220
-            || str_contains($value, '@')
-            || str_contains($value, '..')
-            || preg_match(self::SENSITIVE, $value) === 1
-            || preg_match('#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D', $value) !== 1) {
+        $ref = self::token(
+            $value,
+            $label,
+            '#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D',
+            8,
+            220,
+        );
+        if (str_contains($ref, '..')) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
-        return $value;
+
+        return $ref;
     }
 
     private static function nullableRepository(mixed $value): ?string
     {
-        if ($value === null) return null;
+        if ($value === null) {
+            return null;
+        }
+
         if (!is_string($value)
             || strlen($value) > 160
             || preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/D', $value) !== 1) {
             throw new InvalidArgumentException('repository_ref invalid.');
         }
+
         return $value;
     }
 
-    private static function validatedText(mixed $value, string $label, string $pattern, int $maxLength): string
-    {
-        if (!is_string($value)
-            || $value === ''
-            || strlen($value) > $maxLength
+    private static function token(
+        mixed $value,
+        string $label,
+        string $pattern,
+        int $minLength,
+        int $maxLength,
+    ): string {
+        if (!is_string($value)) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+
+        $length = strlen($value);
+        if ($length < $minLength
+            || $length > $maxLength
             || preg_match($pattern, $value) !== 1
             || preg_match(self::SENSITIVE, $value) === 1) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
+
         return $value;
     }
 
@@ -344,6 +369,7 @@ final class LexGate
         if (!is_int($value) || $value < 1) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
+
         return $value;
     }
 
@@ -352,6 +378,8 @@ final class LexGate
         if (!is_string($value) || !in_array($value, $allowed, true)) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
+
         return $value;
     }
+
 }

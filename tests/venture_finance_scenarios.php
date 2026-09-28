@@ -58,6 +58,7 @@ if ($name === 'base') {
         'extra_ref' => ['revenue_streams' => [
             ['stream_id' => 'subscriptions', 'revenue' => 10_000_000, 'refunds' => 500_000, 'customers' => 120, 'transactions' => 180, 'order_ref' => 'o-1'],
         ]],
+        'empty_nonzero' => ['revenue_streams' => []],
     ];
     foreach ($cases as $key => $replace) {
         try {
@@ -84,6 +85,8 @@ if ($name === 'base') {
     $out = [];
     foreach ([
         'bad_source' => ['source_ref' => 'token:supersecretvalue'],
+        'email_source' => ['source_ref' => 'alice@example.com'],
+        'credential_url' => ['source_ref' => 'https://alice:hunter2@example.com'],
         'bad_time' => ['observed_at' => '2026-99-99T99:99:99Z'],
     ] as $key => $replace) {
         try {

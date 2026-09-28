@@ -3,8 +3,6 @@ declare(strict_types=1);
 
 namespace ControlBot\Production;
 
-use DateTimeImmutable;
-use DateTimeZone;
 use InvalidArgumentException;
 
 final class SecretReference
@@ -14,7 +12,16 @@ final class SecretReference
         'provider', 'secret_kind', 'generation', 'issued_at', 'revoked_at',
     ];
 
+    private const CONTEXT_FIELDS = [
+        'executor_id', 'reference_id', 'capability', 'project', 'environment', 'generation',
+    ];
+
     private const KINDS = ['password', 'private_key', 'api_token', 'dsn', 'cookie'];
+
+    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iD';
+    private const CAPABILITY_PATTERN = '/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D';
+    private const SLUG_PATTERN = '/^[a-z][a-z0-9-]+$/D';
+    private const UTC_PATTERN = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D';
 
     private function __construct(private readonly array $record)
     {
@@ -22,23 +29,17 @@ final class SecretReference
 
     public static function fromRecord(array $record): self
     {
-        if (array_is_list($record)) {
-            throw new InvalidArgumentException('SecretReference inválida.');
+        self::exactKeys($record, self::FIELDS, 'SecretReference');
+
+        if (($record['version'] ?? null) !== 1) {
+            throw new InvalidArgumentException('SecretReference version inválida.');
         }
 
-        $keys = array_keys($record);
-        $expected = self::FIELDS;
-        sort($keys);
-        sort($expected);
-        if ($keys !== $expected || ($record['version'] ?? null) !== 1) {
-            throw new InvalidArgumentException('SecretReference fields inválidos.');
-        }
-
-        self::uuid($record['reference_id'] ?? null, 'reference_id');
-        self::capability($record['capability'] ?? null);
-        self::slug($record['project'] ?? null, 'project', 64);
-        self::slug($record['environment'] ?? null, 'environment', 32);
-        self::slug($record['provider'] ?? null, 'provider', 64);
+        self::matching($record['reference_id'] ?? null, 'reference_id', self::UUID_PATTERN, 36);
+        self::matching($record['capability'] ?? null, 'capability', self::CAPABILITY_PATTERN, 120);
+        self::matching($record['project'] ?? null, 'project', self::SLUG_PATTERN, 64);
+        self::matching($record['environment'] ?? null, 'environment', self::SLUG_PATTERN, 32);
+        self::matching($record['provider'] ?? null, 'provider', self::SLUG_PATTERN, 64);
 
         if (!is_string($record['secret_kind'] ?? null)
             || !in_array($record['secret_kind'], self::KINDS, true)) {
@@ -51,12 +52,10 @@ final class SecretReference
             throw new InvalidArgumentException('generation inválida.');
         }
 
-        self::timestampString($record['issued_at'] ?? null, 'issued_at');
-        if ($record['revoked_at'] !== null) {
-            self::timestampString($record['revoked_at'], 'revoked_at');
-            if (self::timestamp($record['revoked_at']) < self::timestamp($record['issued_at'])) {
-                throw new InvalidArgumentException('revoked_at inválido.');
-            }
+        $issued = self::utcEpoch($record['issued_at'] ?? null, 'issued_at');
+        if ($record['revoked_at'] !== null
+            && self::utcEpoch($record['revoked_at'], 'revoked_at') < $issued) {
+            throw new InvalidArgumentException('revoked_at inválido.');
         }
 
         return new self($record);
@@ -89,21 +88,23 @@ final class SecretReference
 
     public function matchesContext(array $context): bool
     {
-        self::context($context);
-        foreach (['reference_id', 'capability', 'project', 'environment', 'generation'] as $key) {
-            if ($context[$key] !== $this->record[$key]) {
+        self::validateContext($context);
+
+        foreach (['reference_id', 'capability', 'project', 'environment', 'generation'] as $field) {
+            if ($context[$field] !== $this->record[$field]) {
                 return false;
             }
         }
+
         return true;
     }
 
     public function revoke(string $revokedAt): self
     {
-        self::timestampString($revokedAt, 'revoked_at');
-        if (self::timestamp($revokedAt) < self::timestamp($this->record['issued_at'])) {
+        if (self::utcEpoch($revokedAt, 'revoked_at') < self::utcEpoch($this->record['issued_at'], 'issued_at')) {
             throw new InvalidArgumentException('revoked_at inválido.');
         }
+
         $copy = $this->record;
         $copy['revoked_at'] = $revokedAt;
         return new self($copy);
@@ -111,11 +112,11 @@ final class SecretReference
 
     public function rotate(string $newReferenceId, string $issuedAt): self
     {
-        self::uuid($newReferenceId, 'reference_id');
-        self::timestampString($issuedAt, 'issued_at');
-        if (self::timestamp($issuedAt) <= self::timestamp($this->record['issued_at'])) {
+        self::matching($newReferenceId, 'reference_id', self::UUID_PATTERN, 36);
+        if (self::utcEpoch($issuedAt, 'issued_at') <= self::utcEpoch($this->record['issued_at'], 'issued_at')) {
             throw new InvalidArgumentException('issued_at de rotación inválido.');
         }
+
         $copy = $this->record;
         $copy['reference_id'] = $newReferenceId;
         $copy['generation']++;
@@ -139,72 +140,56 @@ final class SecretReference
         ];
     }
 
-    private static function context(array $context): void
+    private static function validateContext(array $context): void
     {
-        $expected = ['executor_id', 'reference_id', 'capability', 'project', 'environment', 'generation'];
-        $keys = array_keys($context);
-        sort($keys);
-        sort($expected);
-        if ($keys !== $expected) {
-            throw new InvalidArgumentException('Executor context inválido.');
-        }
+        self::exactKeys($context, self::CONTEXT_FIELDS, 'Executor context');
+        self::matching($context['executor_id'] ?? null, 'executor_id', self::SLUG_PATTERN, 80);
+        self::matching($context['reference_id'] ?? null, 'reference_id', self::UUID_PATTERN, 36);
+        self::matching($context['capability'] ?? null, 'capability', self::CAPABILITY_PATTERN, 120);
+        self::matching($context['project'] ?? null, 'project', self::SLUG_PATTERN, 64);
+        self::matching($context['environment'] ?? null, 'environment', self::SLUG_PATTERN, 32);
 
-        self::slug($context['executor_id'] ?? null, 'executor_id', 80);
-        self::uuid($context['reference_id'] ?? null, 'reference_id');
-        self::capability($context['capability'] ?? null);
-        self::slug($context['project'] ?? null, 'project', 64);
-        self::slug($context['environment'] ?? null, 'environment', 32);
         if (!is_int($context['generation'] ?? null) || $context['generation'] < 1) {
             throw new InvalidArgumentException('generation de contexto inválida.');
         }
     }
 
-    private static function uuid(mixed $value, string $key): void
+    private static function exactKeys(array $value, array $expected, string $label): void
     {
-        if (!is_string($value)
-            || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iD', $value) !== 1) {
-            throw new InvalidArgumentException($key . ' inválido.');
+        if (array_is_list($value)
+            || count($value) !== count($expected)
+            || array_diff($expected, array_keys($value)) !== []) {
+            throw new InvalidArgumentException($label . ' fields inválidos.');
         }
     }
 
-    private static function capability(mixed $value): void
-    {
+    private static function matching(
+        mixed $value,
+        string $field,
+        string $pattern,
+        int $maxLength,
+    ): string {
         if (!is_string($value)
-            || strlen($value) > 120
-            || preg_match('/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D', $value) !== 1) {
-            throw new InvalidArgumentException('capability inválida.');
+            || $value === ''
+            || strlen($value) > $maxLength
+            || preg_match($pattern, $value) !== 1) {
+            throw new InvalidArgumentException($field . ' inválido.');
         }
+
+        return $value;
     }
 
-    private static function slug(mixed $value, string $key, int $max): void
+    private static function utcEpoch(mixed $value, string $field): int
     {
-        if (!is_string($value)
-            || strlen($value) > $max
-            || preg_match('/^[a-z][a-z0-9-]{1,79}$/D', $value) !== 1) {
-            throw new InvalidArgumentException($key . ' inválido.');
+        if (!is_string($value) || preg_match(self::UTC_PATTERN, $value) !== 1) {
+            throw new InvalidArgumentException($field . ' inválido.');
         }
-    }
 
-    private static function timestampString(mixed $value, string $key): void
-    {
-        if (!is_string($value)
-            || preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D', $value) !== 1
-            || self::timestamp($value) < 1) {
-            throw new InvalidArgumentException($key . ' inválido.');
+        $epoch = strtotime($value);
+        if ($epoch === false || gmdate('Y-m-d\TH:i:s\Z', $epoch) !== $value) {
+            throw new InvalidArgumentException($field . ' inválido.');
         }
-    }
 
-    private static function timestamp(string $value): int
-    {
-        $date = DateTimeImmutable::createFromFormat(
-            '!Y-m-d\TH:i:s\Z',
-            $value,
-            new DateTimeZone('UTC'),
-        );
-        $errors = DateTimeImmutable::getLastErrors();
-        if ($date === false || (is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
-            throw new InvalidArgumentException('Timestamp inválido.');
-        }
-        return $date->getTimestamp();
+        return $epoch;
     }
 }

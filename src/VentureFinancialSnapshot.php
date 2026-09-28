@@ -66,12 +66,10 @@ final class VentureFinancialSnapshot
         $transactions = self::nonNegativeInteger($input['transactions'] ?? null, 'transactions', 10_000_000_000);
 
         $streams = self::streams($input['revenue_streams'] ?? null);
-        if ($streams !== []) {
-            $streamRevenue = array_sum(array_column($streams, 'revenue'));
-            $streamRefunds = array_sum(array_column($streams, 'refunds'));
-            if ($streamRevenue !== $money['revenue'] || $streamRefunds !== $money['refunds']) {
-                throw new InvalidArgumentException('Revenue streams inconsistentes con snapshot.');
-            }
+        $streamRevenue = array_sum(array_column($streams, 'revenue'));
+        $streamRefunds = array_sum(array_column($streams, 'refunds'));
+        if ($streamRevenue !== $money['revenue'] || $streamRefunds !== $money['refunds']) {
+            throw new InvalidArgumentException('Revenue streams inconsistentes con snapshot.');
         }
 
         $sourceRef = self::sourceRef($input['source_ref'] ?? null);
@@ -204,6 +202,7 @@ final class VentureFinancialSnapshot
         if (!is_string($value) || strlen($value) < 8 || strlen($value) > 180
             || preg_match('/^[A-Za-z0-9][A-Za-z0-9._:@\/-]+$/D', $value) !== 1
             || str_contains($value, '..')
+            || str_contains($value, '@')
             || preg_match(self::SENSITIVE, $value) === 1) {
             throw new InvalidArgumentException('source_ref inválido.');
         }

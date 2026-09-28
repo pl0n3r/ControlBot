@@ -144,7 +144,7 @@ final class SecretsBroker
                 '$1=[REDACTED]',
                 $clean,
             );
-            return mb_substr((string) $clean, 0, 2_000);
+            return substr((string) $clean, 0, 2_000);
         }
 
         if (is_array($value)) {
@@ -154,7 +154,7 @@ final class SecretsBroker
                 if (++$count > 50) {
                     break;
                 }
-                $safeKey = is_string($key) ? mb_substr($key, 0, 80) : $key;
+                $safeKey = is_string($key) ? substr($key, 0, 80) : $key;
                 if (is_string($safeKey)
                     && preg_match('/(?i)password|passwd|token|bearer|authorization|cookie|private[_ -]?key|dsn/', $safeKey) === 1) {
                     $out[$safeKey] = '[REDACTED]';

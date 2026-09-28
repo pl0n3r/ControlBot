@@ -212,32 +212,31 @@ final class LexWatch
     private static function fields(array $row, array $expected, string $label): void
     {
         $actual = array_keys($row);
-        sort($actual, SORT_STRING);
-        sort($expected, SORT_STRING);
-        if ($actual !== $expected) {
+        if (array_diff($expected, $actual) !== [] || array_diff($actual, $expected) !== []) {
             throw new InvalidArgumentException($label . ' fields invalid.');
         }
     }
 
     private static function jurisdiction(mixed $value): string
     {
-        if (!is_string($value)
-            || preg_match('/^[A-Z][A-Z0-9-]{1,11}$/D', $value) !== 1
-            || preg_match(self::SENSITIVE, $value) === 1) {
-            throw new InvalidArgumentException('jurisdiction invalid.');
-        }
-        return $value;
+        return self::checkedString(
+            $value,
+            'jurisdiction',
+            2,
+            12,
+            '/^[A-Z][A-Z0-9-]{1,11}$/D',
+        );
     }
 
     private static function id(mixed $value, string $label): string
     {
-        if (!is_string($value)
-            || strlen($value) > 120
-            || preg_match('/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D', $value) !== 1
-            || preg_match(self::SENSITIVE, $value) === 1) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
-        return $value;
+        return self::checkedString(
+            $value,
+            $label,
+            1,
+            120,
+            '/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D',
+        );
     }
 
     private static function refs(mixed $value, string $label, bool $allowEmpty): array
@@ -260,15 +259,38 @@ final class LexWatch
 
     private static function ref(mixed $value, string $label): string
     {
-        if (!is_string($value)
-            || strlen($value) < 8
-            || strlen($value) > 220
-            || str_contains($value, '@')
-            || str_contains($value, '..')
-            || preg_match(self::SENSITIVE, $value) === 1
-            || preg_match('#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D', $value) !== 1) {
+        $ref = self::checkedString(
+            $value,
+            $label,
+            8,
+            220,
+            '#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D',
+        );
+        if (str_contains($ref, '@') || str_contains($ref, '..')) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
+        return $ref;
+    }
+
+    private static function checkedString(
+        mixed $value,
+        string $label,
+        int $minLength,
+        int $maxLength,
+        string $pattern,
+    ): string {
+        if (!is_string($value)) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+
+        $length = strlen($value);
+        if ($length < $minLength
+            || $length > $maxLength
+            || preg_match($pattern, $value) !== 1
+            || preg_match(self::SENSITIVE, $value) === 1) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+
         return $value;
     }
 

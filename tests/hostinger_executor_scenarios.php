@@ -261,7 +261,7 @@ if ($name === 'missing_grant') {
     $out = [
         'result' => $executor->execute(
             ProductionOperation::fromId('health.check'),
-            grant('health.check', 'health.check'),
+            grant('health.check', 'health.check', 'idem:brvtal-health-001'),
             profile(),
             $ref,
             request('idem:brvtal-health-001'),

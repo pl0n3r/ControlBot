@@ -257,8 +257,17 @@ final class AegisPosture
         foreach ($findings as $finding) {
             if ($finding['freshness'] !== 'fresh' || $finding['state'] === 'unknown') return true;
         }
+        $identityMetrics = array_column($identity, 'metric');
+        foreach (self::IDENTITY_METRICS as $metric) {
+            if (!in_array($metric, $identityMetrics, true)) return true;
+        }
         foreach ($identity as $signal) {
             if ($signal['state'] === 'unknown') return true;
+        }
+
+        $vulnerabilitySeverities = array_column($vulnerabilities, 'severity');
+        foreach (self::SEVERITIES as $severity) {
+            if (!in_array($severity, $vulnerabilitySeverities, true)) return true;
         }
         foreach ($vulnerabilities as $signal) {
             if ($signal['state'] === 'unknown') return true;

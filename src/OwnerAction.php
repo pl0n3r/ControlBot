@@ -88,7 +88,7 @@ final class OwnerAction
             || trim($value) === ''
             || strlen($value) > $max
             || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $value) === 1
-            || preg_match('/(?:password|secret|token|credential|cookie|authorization|dsn|private[_ -]?key)\s*[:=]/i', $value) === 1
+            || preg_match('/(?:password|secret(?:[_ -]?ref)?|token|credential|cookie|authorization|dsn|payload|private[_ -]?key)\\s*[:=]/i', $value) === 1
             || preg_match('/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/i', $value) === 1
             || stripos($value, '-----BEGIN PRIVATE KEY-----') !== false) {
             throw new InvalidArgumentException($field . ' contiene material no permitido.');

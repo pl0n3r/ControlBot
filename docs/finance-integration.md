@@ -53,6 +53,8 @@ Derived technical work is emitted for the existing Factory Queue v1 contract. Th
 
 The WorkItem does not contain revenue amounts, cash values, customer counts, transaction counts, revenue streams, credentials or raw financial payloads.
 
+ControlBot authority levels are adapted explicitly to Factory's WorkItem vocabulary: `L0_AI_AUTONOMOUS → autonomous`, `L1_OPERATOR → operational`, `L2_VENTURE_ADMIN → venture_admin`, `L3_GROUP_INSTITUTION → group_institution`, and `L4_OWNER → owner`.
+
 The runtime provides a conservative `ready_hint` only. Factory remains the authority for canonical WorkItem validation, readiness, ranking, claims and dispatch.
 
 If finance evidence is stale or unknown, the WorkItem may still be represented for traceability but `ready_hint` is false. Stale/unknown is never promoted to green.

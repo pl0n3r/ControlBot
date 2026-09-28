@@ -38,6 +38,7 @@ class VentureFinanceTests(unittest.TestCase):
         self.assertIn("duplicado", data["duplicate"])
         self.assertIn("stream_id inválido", data["pii"])
         self.assertIn("campos inválidos", data["extra_ref"])
+        self.assertIn("inconsistentes", data["empty_nonzero"])
 
     def test_stale_or_unknown_never_becomes_verified(self):
         data = scenario("freshness")
@@ -49,6 +50,8 @@ class VentureFinanceTests(unittest.TestCase):
     def test_provenance_and_observed_at_are_required(self):
         data = scenario("provenance")
         self.assertIn("source_ref inválido", data["bad_source"])
+        self.assertIn("source_ref inválido", data["email_source"])
+        self.assertIn("source_ref inválido", data["credential_url"])
         self.assertIn("observed_at inválido", data["bad_time"])
 
     def test_invalid_or_sensitive_financial_payloads_fail_closed(self):

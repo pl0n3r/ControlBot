@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace ControlBot\Business;
 
+use ControlBot\Budget\BudgetGuard;
 use InvalidArgumentException;
 use LogicException;
 

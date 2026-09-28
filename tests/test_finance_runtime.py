@@ -55,6 +55,7 @@ class FinanceRuntimeTests(unittest.TestCase):
         self.assertEqual(item["venture_id"], "condor")
         self.assertEqual(item["repository_ref"], "pl0n3r/Condor")
         self.assertEqual(item["work_type"], "finance_analysis")
+        self.assertEqual(item["authority_level"], "operational")
         self.assertEqual(item["producer_ref"], "controlbot:finance/runtime")
         self.assertEqual(item["observed_at"], "2026-09-28T15:00:00Z")
         self.assertIn("controlbot:finance/snapshot-condor", item["evidence_refs"])

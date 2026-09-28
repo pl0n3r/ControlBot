@@ -62,7 +62,11 @@ if ($name === 'base') {
     ];
     foreach ($cases as $key => $replace) {
         try {
-            VentureFinancialSnapshot::normalize(baseSnapshot($replace));
+            $snapshot = baseSnapshot($replace);
+            if ($key === 'empty_nonzero') {
+                $snapshot['revenue_streams'] = [];
+            }
+            VentureFinancialSnapshot::normalize($snapshot);
             $out[$key] = 'accepted';
         } catch (Throwable $e) {
             $out[$key] = $e->getMessage();

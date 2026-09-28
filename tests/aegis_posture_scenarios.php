@@ -127,6 +127,22 @@ if ($name === 'findings') {
         vulnerability('critical', 0),
     ];
     $out = AegisPosture::summarize($input);
+} elseif ($name === 'unknown_finding') {
+    $input = basePosture();
+    $input['identity_signals'][] = identitySignal('orphan_accounts', 0);
+    $input['vulnerability_signals'] = [
+        vulnerability('info', 0),
+        vulnerability('low', 0),
+        vulnerability('medium', 0),
+        vulnerability('high', 0),
+        vulnerability('critical', 0),
+    ];
+    $input['findings'] = [
+        finding('finding-unknown-critical', 'critical', [
+            'state' => 'unknown',
+        ]),
+    ];
+    $out = AegisPosture::summarize($input);
 } elseif ($name === 'missing_certainty') {
     $identityMissing = basePosture();
     $identityMissing['identity_signals'] = [

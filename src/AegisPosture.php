@@ -283,7 +283,7 @@ final class AegisPosture
     ): bool {
         foreach ($findings as $finding) {
             if (in_array($finding['severity'], ['high', 'critical'], true)
-                && in_array($finding['state'], ['open', 'unknown'], true)) {
+                && $finding['state'] === 'open') {
                 return true;
             }
         }

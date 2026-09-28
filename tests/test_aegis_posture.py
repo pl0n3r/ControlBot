@@ -52,6 +52,12 @@ class AegisPostureTests(unittest.TestCase):
         self.assertNotEqual(by_severity["high"]["state"], "clear")
         self.assertEqual(data["posture_state"], "unknown")
 
+    def test_unknown_critical_finding_remains_unknown(self):
+        data = scenario("unknown_finding")
+        self.assertEqual(data["findings"][0]["severity"], "critical")
+        self.assertEqual(data["findings"][0]["state"], "unknown")
+        self.assertEqual(data["posture_state"], "unknown")
+
     def test_missing_supported_signals_keep_posture_unknown(self):
         data = scenario("missing_certainty")
         self.assertEqual(data["identity_missing"]["posture_state"], "unknown")

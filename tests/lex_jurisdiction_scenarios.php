@@ -83,11 +83,14 @@ if ($name === 'co') {
     $future['reviewed_at'] = 1900000000;
     $http = coPack();
     $http['sources'][0]['uri'] = 'http://example.invalid/source';
+    $kindMismatch = coPack();
+    $kindMismatch['kind'] = 'region';
     $out = [
         'missing_field' => rejected(fn() => LexJurisdiction::normalize($missing, 1790557200)),
         'unknown_source' => rejected(fn() => LexJurisdiction::normalize($unknownSource, 1790557200)),
         'future_review' => rejected(fn() => LexJurisdiction::normalize($future, 1790557200)),
         'non_https_source' => rejected(fn() => LexJurisdiction::normalize($http, 1790557200)),
+        'kind_mismatch' => rejected(fn() => LexJurisdiction::normalize($kindMismatch, 1790557200)),
     ];
 } else {
     fwrite(STDERR, "scenario invalid\n");

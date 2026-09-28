@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "pack_id": "pack-co-v1",
+  "jurisdiction": "country:CO",
+  "kind": "country",
+  "pack_version": "1.0.0",
+  "state": "active",
+  "freshness": "fresh",
+  "reviewed_at": 1790553600,
+  "expires_at": 1822089600,
+  "responsible_refs": [
+    "controlbot:role/legal-privacy"
+  ],
+  "sources": [
+    {
+      "source_id": "co-decree-1074-2015",
+      "authority": "Departamento Administrativo de la Funcion Publica",
+      "title": "Decreto 1074 de 2015 - Sector Comercio, Industria y Turismo",
+      "uri": "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=76608",
+      "reviewed_at": 1790553600
+    },
+    {
+      "source_id": "co-law-1480-2011",
+      "authority": "Departamento Administrativo de la Funcion Publica",
+      "title": "Ley 1480 de 2011 - Estatuto del Consumidor",
+      "uri": "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=44306",
+      "reviewed_at": 1790553600
+    },
+    {
+      "source_id": "co-law-1581-2012",
+      "authority": "Superintendencia de Industria y Comercio",
+      "title": "Ley Estatutaria 1581 de 2012 - Proteccion de datos personales",
+      "uri": "https://sedeelectronica.sic.gov.co/transparencia/normativa/ley-estatutaria-1581-de-2012",
+      "reviewed_at": 1790553600
+    },
+    {
+      "source_id": "co-law-2439-2024",
+      "authority": "Departamento Administrativo de la Funcion Publica",
+      "title": "Ley 2439 de 2024 - Proteccion del consumidor de comercio electronico",
+      "uri": "https://www1.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=257116",
+      "reviewed_at": 1790553600
+    }
+  ],
+  "controls": [
+    {
+      "control_id": "co-consumer-ecommerce-framework",
+      "domain": "consumer",
+      "requirement_ref": "controlbot:lex/requirement/co/consumer-ecommerce-framework",
+      "source_refs": [
+        "co-law-1480-2011",
+        "co-law-2439-2024"
+      ],
+      "human_review_required": true
+    },
+    {
+      "control_id": "co-personal-data-framework",
+      "domain": "privacy",
+      "requirement_ref": "controlbot:lex/requirement/co/personal-data-framework",
+      "source_refs": [
+        "co-decree-1074-2015",
+        "co-law-1581-2012"
+      ],
+      "human_review_required": true
+    }
+  ],
+  "assumption_refs": [
+    "controlbot:lex/assumption/co-market-or-operation"
+  ],
+  "exclusion_refs": [
+    "controlbot:lex/exclusion/sector-specific-special-regimes"
+  ],
+  "compatibility": {
+    "lex_core_contract": 1,
+    "deprecated_by": null
+  }
+}

@@ -141,7 +141,7 @@ if ($scenario === 'approve') {
     }
 } elseif ($scenario === 'surface') {
     $invalid = actionRecord();
-    $invalid['summary'] = 'token=super-secret-value';
+    $invalid['summary'] = 'secret_ref=production/database-root';
     try {
         OwnerAction::fromRecord($invalid);
         $out['unsafe'] = 'accepted';

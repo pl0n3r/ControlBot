@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace ControlBot\Business;
 
 use InvalidArgumentException;
-use Throwable;
 
 final class DecisionRights
 {
@@ -17,99 +16,61 @@ final class DecisionRights
     ];
 
     /**
-     * Evaluates one verified identity/grant against a server-defined action.
-     *
-     * The caller must derive $verifiedContext and $serverAction from trusted
-     * server-side sources. Client claims such as identity_id or scope are not
-     * accepted by this contract.
+     * Evaluate one verified identity/grant against a server-defined action.
+     * Client identity/scope claims are deliberately outside this contract.
      */
-    public static function evaluate(
-        array $verifiedContext,
-        array $grant,
-        array $serverAction,
-        int $now,
-    ): array {
+    public static function evaluate(array $context, array $grant, array $action, int $now): array
+    {
         try {
-            self::now($now);
-            self::fields($verifiedContext, ['identity', 'scope', 'active_policy_refs'], 'VerifiedContext');
-            $serverAction += ['budget_amount' => null];
-            self::fields(
-                $serverAction,
-                ['capability', 'required_authority_level', 'budget_amount'],
-                'ServerAction',
-            );
-
-            if (!is_array($verifiedContext['identity'])) {
+            self::validNow($now);
+            self::fields($context, ['identity', 'scope', 'active_policy_refs'], 'VerifiedContext');
+            $action += ['budget_amount' => null];
+            self::fields($action, ['capability', 'required_authority_level', 'budget_amount'], 'ServerAction');
+            if (!is_array($context['identity'])) {
                 throw new InvalidArgumentException('identity invalid.');
             }
 
-            $identity = VentureIdentity::normalizeIdentity($verifiedContext['identity']);
-            $scope = self::scope($verifiedContext['scope']);
-            $activePolicies = self::policyRefs($verifiedContext['active_policy_refs']);
-            $capability = self::capability($serverAction['capability']);
-            $requiredAuthority = self::authority($serverAction['required_authority_level']);
-            $budgetAmount = self::nullableMoney($serverAction['budget_amount']);
-        } catch (Throwable) {
+            $identity = VentureIdentity::normalizeIdentity($context['identity']);
+            $scope = self::scope($context['scope']);
+            $policies = self::policyRefs($context['active_policy_refs']);
+            $capability = self::capability($action['capability']);
+            $required = self::authority($action['required_authority_level']);
+            $budget = self::money($action['budget_amount']);
+        } catch (InvalidArgumentException) {
             return self::result('deny', ['invalid_input']);
         }
 
         try {
             $grant = VentureIdentity::normalizeGrant($grant, $now);
-        } catch (Throwable) {
+        } catch (InvalidArgumentException) {
             return self::result('deny', ['invalid_grant']);
         }
 
-        $denyReasons = [];
-        if ($identity['state'] !== 'active') {
-            $denyReasons[] = 'identity_inactive';
-        }
-        if ($grant['identity_id'] !== $identity['identity_id']) {
-            $denyReasons[] = 'identity_mismatch';
-        }
-        if ($grant['scope'] !== $scope) {
-            $denyReasons[] = 'scope_mismatch';
-        }
-        if ($grant['capability'] !== $capability) {
-            $denyReasons[] = 'capability_not_granted';
-        }
-        if (!in_array($grant['policy_ref'], $activePolicies, true)) {
-            $denyReasons[] = 'policy_not_active';
-        }
+        $deny = [];
+        if ($identity['state'] !== 'active') $deny[] = 'identity_inactive';
+        if ($grant['identity_id'] !== $identity['identity_id']) $deny[] = 'identity_mismatch';
+        if ($grant['scope'] !== $scope) $deny[] = 'scope_mismatch';
+        if ($grant['capability'] !== $capability) $deny[] = 'capability_not_granted';
+        if (!in_array($grant['policy_ref'], $policies, true)) $deny[] = 'policy_not_active';
+        if ($deny !== []) return self::result('deny', $deny);
 
-        if ($denyReasons !== []) {
-            return self::result('deny', $denyReasons);
+        $escalate = [];
+        if (self::AUTHORITY_RANK[$required] > self::AUTHORITY_RANK[$grant['authority_level']]) {
+            $escalate[] = 'authority_escalation_required';
         }
+        if ($budget !== null && ($grant['budget_limit'] === null || $budget > $grant['budget_limit'])) {
+            $escalate[] = 'budget_approval_required';
+        }
+        if ($required === 'L4_OWNER') $escalate[] = 'owner_authority_required';
 
-        $escalationReasons = [];
-        $grantRank = self::AUTHORITY_RANK[$grant['authority_level']];
-        $requiredRank = self::AUTHORITY_RANK[$requiredAuthority];
-
-        if ($requiredRank > $grantRank) {
-            $escalationReasons[] = 'authority_escalation_required';
-        }
-        if (
-            $budgetAmount !== null
-            && ($grant['budget_limit'] === null || $budgetAmount > $grant['budget_limit'])
-        ) {
-            $escalationReasons[] = 'budget_approval_required';
-        }
-        if ($requiredAuthority === 'L4_OWNER') {
-            $escalationReasons[] = 'owner_authority_required';
-        }
-
-        if ($escalationReasons !== []) {
-            return self::result('owner_decision_required', array_values(array_unique($escalationReasons)));
-        }
-
-        return self::result('allow', ['authorized']);
+        return $escalate === []
+            ? self::result('allow', ['authorized'])
+            : self::result('owner_decision_required', array_values(array_unique($escalate)));
     }
 
     private static function result(string $decision, array $reasons): array
     {
-        return [
-            'decision' => $decision,
-            'reasons' => $reasons,
-        ];
+        return ['decision' => $decision, 'reasons' => $reasons];
     }
 
     private static function policyRefs(mixed $refs): array
@@ -117,31 +78,23 @@ final class DecisionRights
         if (!is_array($refs) || !array_is_list($refs) || count($refs) > 50) {
             throw new InvalidArgumentException('active_policy_refs invalid.');
         }
-        $out = [];
+        $seen = [];
         foreach ($refs as $ref) {
-            if (
-                !is_string($ref)
-                || preg_match('#^controlbot:policy/[a-z][a-z0-9._/-]{1,119}$#D', $ref) !== 1
-            ) {
+            if (!is_string($ref) || preg_match('#^controlbot:policy/[a-z][a-z0-9._/-]{1,119}$#D', $ref) !== 1) {
                 throw new InvalidArgumentException('active_policy_refs invalid.');
             }
-            if (isset($out[$ref])) {
-                throw new InvalidArgumentException('active_policy_refs duplicated.');
-            }
-            $out[$ref] = true;
+            if (isset($seen[$ref])) throw new InvalidArgumentException('active_policy_refs duplicated.');
+            $seen[$ref] = true;
         }
-        $refs = array_keys($out);
+        $refs = array_keys($seen);
         sort($refs);
         return $refs;
     }
 
     private static function capability(mixed $value): string
     {
-        if (
-            !is_string($value)
-            || strlen($value) > 120
-            || preg_match('/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D', $value) !== 1
-        ) {
+        if (!is_string($value) || strlen($value) > 120
+            || preg_match('/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D', $value) !== 1) {
             throw new InvalidArgumentException('capability invalid.');
         }
         return $value;
@@ -149,10 +102,8 @@ final class DecisionRights
 
     private static function scope(mixed $value): string
     {
-        if (
-            !is_string($value)
-            || preg_match('/^(group|venture|project|institution):[a-z][a-z0-9-]{1,63}$/D', $value) !== 1
-        ) {
+        if (!is_string($value)
+            || preg_match('/^(group|venture|project|institution):[a-z][a-z0-9-]{1,63}$/D', $value) !== 1) {
             throw new InvalidArgumentException('scope invalid.');
         }
         return $value;
@@ -166,35 +117,26 @@ final class DecisionRights
         return $value;
     }
 
-    private static function nullableMoney(mixed $value): ?float
+    private static function money(mixed $value): ?float
     {
-        if ($value === null) {
-            return null;
-        }
+        if ($value === null) return null;
         if ((!is_int($value) && !is_float($value)) || !is_finite((float) $value) || $value < 0) {
             throw new InvalidArgumentException('budget_amount invalid.');
         }
         return (float) $value;
     }
 
-    private static function now(int $value): int
+    private static function validNow(int $value): void
     {
-        if ($value < 1) {
-            throw new InvalidArgumentException('now invalid.');
-        }
-        return $value;
+        if ($value < 1) throw new InvalidArgumentException('now invalid.');
     }
 
-    private static function fields(mixed $row, array $expected, string $label): void
+    private static function fields(array $row, array $expected, string $label): void
     {
-        if (!is_array($row) || array_is_list($row)) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
+        if (array_is_list($row)) throw new InvalidArgumentException($label . ' invalid.');
         $actual = array_keys($row);
         sort($actual);
         sort($expected);
-        if ($actual !== $expected) {
-            throw new InvalidArgumentException($label . ' fields invalid.');
-        }
+        if ($actual !== $expected) throw new InvalidArgumentException($label . ' fields invalid.');
     }
 }

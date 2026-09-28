@@ -32,27 +32,34 @@ final class VentureAccessRuntime
         try {
             $core=IdentityCenter::execute($state,$command,$context,$trusted['grant'],$now);
         } catch (InvalidArgumentException) {
-            return self::result('deny',$state,$command,'deny','lifecycle_denied',$now,null);
+            return self::result('deny',$state,$command,'deny','lifecycle_denied',$now,null,'deny');
         }
 
+        if ($core['status'] === 'already_applied') {
+            $event=$core['audit_event'];
+            return self::result('already_applied',$core['state'],$command,self::kind($command['operation']),
+                $event['reason_code'],$event['occurred_at'],null,$event['outcome']);
+        }
         if ($core['status'] !== 'applied') {
-            $gate=$core['status']==='owner_decision_required' ? self::ownerGate($command,'decision_rights_escalation') : null;
+            $event=$core['audit_event'];
+            $reason=$event['reason_code'];
+            $gate=$core['status']==='owner_decision_required' ? self::ownerGate($command,$reason) : null;
             return self::result($core['status'],$core['state'],$command,
                 $core['status']==='owner_decision_required'?'override':'deny',
-                $core['status']==='owner_decision_required'?'decision_rights_escalation':'decision_rights_denied',
-                $now,$gate);
+                $reason,$event['occurred_at'],$gate,$event['outcome']);
         }
 
         $restriction=self::mostRestrictive($budget,$production);
         if ($restriction['decision'] !== 'allow') {
+            $blocked=self::restrictedState($state,$core['audit_event'],$restriction);
             $gate=$restriction['decision']==='owner_decision_required'
                 ? self::ownerGate($command,$restriction['reason_code']) : null;
-            return self::result($restriction['decision'],$state,$command,
+            return self::result($restriction['decision'],$blocked,$command,
                 $restriction['decision']==='owner_decision_required'?'override':'deny',
-                $restriction['reason_code'],$now,$gate);
+                $restriction['reason_code'],$now,$gate,$restriction['decision']);
         }
 
-        return self::result('applied',$core['state'],$command,self::kind($command['operation']),'authorized',$now,null);
+        return self::result('applied',$core['state'],$command,self::kind($command['operation']),'authorized',$now,null,'applied');
     }
 
     private static function restriction(mixed $raw,string $label): array
@@ -96,7 +103,15 @@ final class VentureAccessRuntime
             ."\n<!-- venture-access-owner-decision ".json_encode(['command_id'=>$id,'scope'=>$scope,'reason_code'=>$reason],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES).' -->';
     }
 
-    private static function result(string $status,array $state,array $command,string $kind,string $reason,int $now,?string $gate): array
+    private static function restrictedState(array $state,array $event,array $restriction): array
+    {
+        $event['outcome']=$restriction['decision'];
+        $event['reason_code']=$restriction['reason_code'];
+        $state['audit'][]=$event;
+        return $state;
+    }
+
+    private static function result(string $status,array $state,array $command,string $kind,string $reason,int $now,?string $gate,string $auditOutcome): array
     {
         return [
             'status'=>$status,'state'=>$state,'owner_decision_gate'=>$gate,
@@ -104,7 +119,7 @@ final class VentureAccessRuntime
                 'event_id'=>'venture-access-'.$command['command_id'],
                 'command_id'=>$command['command_id'],'actor_identity_id'=>$command['actor_identity_id'],
                 'scope'=>$command['scope'],'operation'=>$command['operation'],'kind'=>$kind,
-                'outcome'=>$status,'reason_code'=>$reason,'occurred_at'=>$now,
+                'outcome'=>$auditOutcome,'reason_code'=>$reason,'occurred_at'=>$now,
             ],
         ];
     }

@@ -28,11 +28,19 @@ if($n==='scope'){
  $out['parsed_gate']=gate($out['owner_decision_gate']);
 }elseif($n==='restrictions'){
  $base=state();$request=req('suspend01','suspend');
+ $budget=VentureAccessRuntime::execute($base,$request,ctx('identity.lifecycle','L2_VENTURE_ADMIN',guard('deny','budget_blocked')),NOW);
+ $production=VentureAccessRuntime::execute($base,$request,ctx('identity.lifecycle','L2_VENTURE_ADMIN',[],guard('owner_decision_required','production_override_required')),NOW);
  $out=[
-   'budget'=>VentureAccessRuntime::execute($base,$request,ctx('identity.lifecycle','L2_VENTURE_ADMIN',guard('deny','budget_blocked')),NOW),
-   'production'=>VentureAccessRuntime::execute($base,$request,ctx('identity.lifecycle','L2_VENTURE_ADMIN',[],guard('owner_decision_required','production_override_required')),NOW),
+   'budget'=>$budget,
+   'budget_replay'=>VentureAccessRuntime::execute($budget['state'],$request,ctx('identity.lifecycle'),NOW+1),
+   'production'=>$production,
+   'production_replay'=>VentureAccessRuntime::execute($production['state'],$request,ctx('identity.lifecycle'),NOW+1),
    'allow'=>VentureAccessRuntime::execute($base,$request,ctx('identity.lifecycle'),NOW),
  ];
+}elseif($n==='replay'){
+ $request=req('suspend-replay','suspend');
+ $first=VentureAccessRuntime::execute(state(),$request,ctx('identity.lifecycle'),NOW);
+ $out=['first'=>$first,'replay'=>VentureAccessRuntime::execute($first['state'],$request,ctx('identity.lifecycle'),NOW+1)];
 }elseif($n==='trusted'){
  $r=req('suspend01','suspend');
  $out=['actor'=>blocked(static fn()=>VentureAccessRuntime::execute(state(),[...$r,'actor_identity_id'=>'identity-other'],ctx('identity.lifecycle'),NOW)),

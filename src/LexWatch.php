@@ -31,10 +31,14 @@ final class LexWatch
                 'regulation_ref' => $signal['regulation_ref'],
                 'change_ref' => $signal['change_ref'],
                 'impact_refs' => $signal['impact_refs'],
+                'source_state' => $signal['source_state'],
                 'source_refs' => $signal['source_refs'],
                 'evidence_refs' => $signal['evidence_refs'],
                 'published_at' => $signal['published_at'],
                 'effective_at' => $signal['effective_at'],
+                'observed_at' => $signal['observed_at'],
+                'freshness' => $signal['freshness'],
+                'publication_state' => $signal['publication_state'],
                 'effective_state' => $signal['effective_state'],
             ];
         }

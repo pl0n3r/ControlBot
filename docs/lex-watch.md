@@ -46,7 +46,7 @@ Un candidato de revisión existe solo cuando:
 4. `impact_state=plausible`;
 5. existen `impact_refs` trazables.
 
-El candidato contiene referencias, fechas y estado efectivo. No contiene `compliant`, aprobación, recomendación jurídica ni autoridad para ejecutar trabajo. Los slices posteriores deciden si una señal trazable requiere reevaluación, human gate o WorkItem Factory.
+El candidato conserva source/evidence refs, `source_state`, `freshness`, `published_at`, `effective_at`, `observed_at` y los estados derivados de publicación/vigencia. No contiene `compliant`, aprobación, recomendación jurídica ni autoridad para ejecutar trabajo. Los slices posteriores deciden si una señal trazable requiere reevaluación, human gate o WorkItem Factory.
 
 Rumor, UNKNOWN, stale, impacto `none` o impacto `unknown` nunca se convierten en hecho vigente ni candidato ejecutable.
 

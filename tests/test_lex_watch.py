@@ -51,8 +51,10 @@ class LexWatchTests(unittest.TestCase):
     def test_equivalent_regulatory_signals_are_deduplicated(self):
         data = scenario("dedupe")
 
-        self.assertEqual(1, len(data["signals"]))
-        row = data["signals"][0]
+        self.assertTrue(data["same"])
+        self.assertEqual(data["first"], data["second"])
+        self.assertEqual(1, len(data["first"]["signals"]))
+        row = data["first"]["signals"][0]
         self.assertEqual(["signal-a", "signal-b"], row["signal_ids"])
         self.assertEqual(
             ["controlbot:lex/source/a", "controlbot:lex/source/b"],
@@ -63,7 +65,7 @@ class LexWatchTests(unittest.TestCase):
             row["evidence_refs"],
         )
         self.assertEqual(1070, row["observed_at"])
-        self.assertEqual(1, len(data["review_candidates"]))
+        self.assertEqual(1, len(data["first"]["review_candidates"]))
 
     def test_only_traceable_impact_produces_review_candidate(self):
         data = scenario("impact")
@@ -76,6 +78,10 @@ class LexWatchTests(unittest.TestCase):
             ["controlbot:venture/condor"],
             candidate["impact_refs"],
         )
+        self.assertEqual("verified", candidate["source_state"])
+        self.assertEqual("fresh", candidate["freshness"])
+        self.assertEqual(1050, candidate["observed_at"])
+        self.assertEqual("published", candidate["publication_state"])
         self.assertNotIn("compliant", candidate)
         self.assertNotIn("legal_conclusion", candidate)
 

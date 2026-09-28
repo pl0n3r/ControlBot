@@ -87,7 +87,13 @@ if ($name === 'publication') {
         'evidence_refs' => ['controlbot:lex/evidence/a'],
         'observed_at' => 1070,
     ]);
-    $out = LexWatch::normalize(watchInput([$first, $second]), $now);
+    $firstResult = LexWatch::normalize(watchInput([$first, $second]), $now);
+    $secondResult = LexWatch::normalize(watchInput([$second, $first]), $now);
+    $out = [
+        'first' => $firstResult,
+        'second' => $secondResult,
+        'same' => $firstResult === $secondResult,
+    ];
 } elseif ($name === 'impact') {
     $out = LexWatch::normalize(watchInput([
         watchSignal('signal-traceable'),

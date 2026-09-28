@@ -20,13 +20,18 @@ if($n==='commands'){
  $out=IdentityCenter::execute(state([grant('grant-main','identity-user','venture.manage'),grant('grant-other','identity-user','venture.read')]),cmd('revoke01','revoke_scope',['grant_id'=>'grant-main']),ctx(),authority('identity.access.manage'),NOW);
 }elseif($n==='role-change'){
  $g=grant('grant-main','identity-user','venture.manage');$c=cmd('role01','change_role',['grant_id'=>'grant-main','role'=>'viewer']);
- $out=['denied'=>IdentityCenter::execute(state([$g]),$c,ctx(),authority('identity.access.manage','L1_OPERATOR'),NOW),'allowed'=>IdentityCenter::execute(state([$g]),$c,ctx(),authority('identity.access.manage'),NOW)];
+ $denied=IdentityCenter::execute(state([$g]),$c,ctx(),authority('identity.access.manage','L1_OPERATOR'),NOW);$allowed=IdentityCenter::execute(state([$g]),$c,ctx(),authority('identity.access.manage'),NOW);
+ $cap=cmd('cap02','change_capability',['grant_id'=>'grant-main','capability'=>'identity.security.manage']);$capability=IdentityCenter::execute(state([$g]),$cap,ctx(),authority('identity.access.manage'),NOW);
+ $out=['denied'=>$denied,'allowed'=>$allowed,'capability'=>$capability];
 }elseif($n==='requests'){
  $a=IdentityCenter::execute(state(),cmd('reset01','request_reset',[],3000),ctx(),authority('identity.auth.request','L1_OPERATOR'),NOW);$b=IdentityCenter::execute(state(),cmd('reauth01','request_reauth',[],3000),ctx(),authority('identity.auth.request','L1_OPERATOR'),NOW);$out=['reset'=>$a,'reauth'=>$b,'serialized'=>json_encode([$a,$b],JSON_THROW_ON_ERROR)];
 }elseif($n==='mfa'){
  $out=IdentityCenter::execute(state(),cmd('mfa01','set_mfa_required',['required'=>true,'status'=>'required']),ctx(),authority('identity.security.manage'),NOW);
 }elseif($n==='deterministic'){
  $c=cmd('suspend01','suspend');$a=IdentityCenter::execute(state(),$c,ctx(),authority('identity.lifecycle'),NOW);$b=IdentityCenter::execute(state(),$c,ctx(),authority('identity.lifecycle'),NOW);$r=IdentityCenter::execute($a['state'],$c,ctx(),authority('identity.lifecycle'),NOW);
- $out=['first'=>$a,'second'=>$b,'same'=>$a===$b,'replay'=>$r,'actor_scope_blocked'=>blocked(static fn()=>IdentityCenter::execute(state(),[...$c,'actor_identity_id'=>'identity-other'],ctx(),authority('identity.lifecycle'),NOW)),'serialized'=>json_encode([$a,$b,$r],JSON_THROW_ON_ERROR)];
+ $denyCmd=cmd('role-denied','change_role',['grant_id'=>'grant-main','role'=>'viewer']);$target=grant('grant-main','identity-user','venture.manage');$denied=IdentityCenter::execute(state([$target]),$denyCmd,ctx(),authority('identity.access.manage','L1_OPERATOR'),NOW);$deniedReplay=IdentityCenter::execute($denied['state'],$denyCmd,ctx(),authority('identity.access.manage'),NOW);
+ $expired=[...grant('grant-expired','identity-user','venture.read'),'expires_at'=>1900];$expiredSuspend=IdentityCenter::execute(state([$expired]),cmd('suspend-expired','suspend'),ctx(),authority('identity.lifecycle'),NOW);$expiredRevoke=IdentityCenter::execute(state([$expired]),cmd('revoke-expired','revoke_scope',['grant_id'=>'grant-expired']),ctx(),authority('identity.access.manage'),NOW);
+ $full=$a['state'];$full['audit']=array_fill(0,500,$a['audit_event']);$auditFullBlocked=blocked(static fn()=>IdentityCenter::execute($full,cmd('suspend-full','suspend'),ctx(),authority('identity.lifecycle'),NOW));
+ $out=['first'=>$a,'second'=>$b,'same'=>$a===$b,'replay'=>$r,'denied_replay'=>$deniedReplay,'expired_suspend'=>$expiredSuspend,'expired_revoke'=>$expiredRevoke,'audit_full_blocked'=>$auditFullBlocked,'actor_scope_blocked'=>blocked(static fn()=>IdentityCenter::execute(state(),[...$c,'actor_identity_id'=>'identity-other'],ctx(),authority('identity.lifecycle'),NOW)),'serialized'=>json_encode([$a,$b,$r,$deniedReplay,$expiredSuspend,$expiredRevoke],JSON_THROW_ON_ERROR)];
 }else{fwrite(STDERR,"scenario inválido\n");exit(2);}
 echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;

@@ -139,7 +139,7 @@ final class CapabilityGrant
             || preg_match('/^[a-z][a-z0-9._:-]{1,79}$/D', $record['operation']) !== 1) {
             throw new InvalidArgumentException('resource/operation inválido.');
         }
-        if (preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*$#D', $record['issue']) !== 1) {
+        if (preg_match('~^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*$~D', $record['issue']) !== 1) {
             throw new InvalidArgumentException('issue inválido.');
         }
         if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{2,119}$/D', $record['subject']) !== 1

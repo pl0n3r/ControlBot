@@ -5,6 +5,8 @@ namespace ControlBot\Decisions;
 
 use ControlBot\Approvals\AppendOnlyAuditLog;
 use ControlBot\Approvals\ApprovalEndpoint;
+use ControlBot\Approvals\HumanGate;
+use ControlBot\Business\VentureAccessRuntime;
 use ControlBot\GitHub\ApiClient;
 use ControlBot\GitHub\ApiTransport;
 use ControlBot\GitHub\Gateway;
@@ -17,6 +19,12 @@ use RuntimeException;
 final class DecisionRuntime
 {
     private const TRACKING_KEY = '_controlbot_release_tracking';
+    private const VENTURE_PAGE_SIZE = 100;
+    private const VENTURE_MAX_PAGES = 10;
+    private const VENTURE_LABEL = 'factory-human-gate';
+    private const VENTURE_LEDGER_REPOSITORY = '__controlbot_venture__/idempotency';
+    private const VENTURE_LEDGER_ACTOR_PREFIX = 'venture-idem:';
+    private const VENTURE_TRUSTED_AUTHORS = ['OWNER', 'MEMBER', 'COLLABORATOR'];
     private array $repositories;
 
     public function __construct(
@@ -95,6 +103,50 @@ final class DecisionRuntime
             return self::jsonResponse(200, $this->safeReleaseStatus($session));
         }
         return self::jsonResponse(404, ['error' => 'not-found']);
+    }
+
+    public function executeVentureAccess(
+        array &$session,
+        string $repository,
+        array $state,
+        array $request,
+        array $trusted,
+        int $now,
+    ): array {
+        if (!in_array($repository, $this->repositories, true)) {
+            throw new InvalidArgumentException('Repositorio fuera de la allowlist runtime.');
+        }
+
+        // Writer authority is resolved server-side before lifecycle evaluation.
+        $components = $this->components($this->sessions->githubToken($session));
+        $result = VentureAccessRuntime::execute($state, $request, $trusted, $now);
+        $result['owner_decision'] = null;
+
+        $gateBody = $result['owner_decision_gate'] ?? null;
+        if ($gateBody === null) {
+            return $result;
+        }
+        if (!is_string($gateBody) || $gateBody === '') {
+            throw new RuntimeException('Owner Decision inválida.');
+        }
+
+        $gate = HumanGate::fromIssueBody($gateBody);
+        if (
+            $gate->category !== 'product-direction'
+            || $gate->safeDefault !== 'B'
+            || $gate->recommendation !== 'B'
+        ) {
+            throw new RuntimeException('Owner Decision fuera del contrato Venture.');
+        }
+
+        $result['owner_decision'] = $this->materializeVentureDecision(
+            $components['api'],
+            $repository,
+            $request,
+            $gateBody,
+            $now,
+        );
+        return $result;
     }
 
     private function render(array $session, int $now): string
@@ -243,6 +295,130 @@ final class DecisionRuntime
         } catch (RuntimeException) {
             return ['state' => 'blocked', 'terminal' => false, 'run_url' => null];
         }
+    }
+
+    private function materializeVentureDecision(ApiClient $api, string $repository, array $request, string $gateBody, int $now): array
+    {
+        $key=self::ventureTrackingKey($repository,$request); $marker=self::ventureMarker($request);
+        $ledger=$this->ventureLedgerState($key,$repository);
+        if (($ledger['status']??null)==='finalized') return $ledger['evidence']+['created'=>false];
+        if (($ledger['status']??null)==='pending') {
+            $existing=$this->findVentureDecision($api,$repository,$marker);
+            if ($existing===null) throw new RuntimeException('Owner Decision pendiente sin evidencia recuperable.');
+            $this->recordVentureFinalized($key,$existing,$now); return $existing+['created'=>false];
+        }
+        $existing=$this->findVentureDecision($api,$repository,$marker);
+        if ($existing!==null) { $this->recordVentureFinalized($key,$existing,$now); return $existing+['created'=>false]; }
+
+        $claim=bin2hex(random_bytes(8)); $this->recordVenturePending($key,$claim,$now);
+        $claimed=$this->ventureLedgerState($key,$repository);
+        if (($claimed['status']??null)!=='pending'||($claimed['claim']??null)!==$claim) {
+            $existing=$this->findVentureDecision($api,$repository,$marker);
+            if ($existing===null) throw new RuntimeException('Owner Decision reclamada por otra ejecución.');
+            $this->recordVentureFinalized($key,$existing,$now); return $existing+['created'=>false];
+        }
+
+        $body=$gateBody."\n".$marker;
+        if (strlen($body)>65536) throw new RuntimeException('Owner Decision excede límite de Issue.');
+        $created=$api->json('POST',Gateway::repoPath($repository).'/issues',[
+            'title'=>'Venture access owner decision: '.$request['command_id'],
+            'body'=>$body,'labels'=>[self::VENTURE_LABEL],
+        ],[201]);
+        $evidence=self::ventureIssueEvidence($repository,$created);
+        $this->recordVentureFinalized($key,$evidence,$now);
+        return $evidence+['created'=>true];
+    }
+
+    private function findVentureDecision(ApiClient $api, string $repository, string $marker): ?array
+    {
+        $match=null; $path=Gateway::repoPath($repository).'/issues';
+        for ($page=1;$page<=self::VENTURE_MAX_PAGES;$page++) {
+            $issues=$api->json('GET',$path,null,[200],[
+                'state'=>'all','labels'=>self::VENTURE_LABEL,'per_page'=>self::VENTURE_PAGE_SIZE,'page'=>$page,
+            ]);
+            if (!array_is_list($issues)||count($issues)>self::VENTURE_PAGE_SIZE) throw new RuntimeException('Página de Owner Decisions inválida.');
+            foreach ($issues as $issue) {
+                if (!is_array($issue)||isset($issue['pull_request'])||!is_string($issue['body']??null)
+                    ||!str_contains($issue['body'],$marker)
+                    ||!in_array($issue['author_association']??null,self::VENTURE_TRUSTED_AUTHORS,true)) continue;
+                $gate=HumanGate::fromIssueBody($issue['body']);
+                if ($gate->category!=='product-direction'||$gate->safeDefault!=='B'||$gate->recommendation!=='B') continue;
+                $candidate=self::ventureIssueEvidence($repository,$issue);
+                if ($match!==null&&$match['issue']!==$candidate['issue']) throw new RuntimeException('Owner Decision idempotente ambigua.');
+                $match=$candidate;
+            }
+            if (count($issues)<self::VENTURE_PAGE_SIZE) return $match;
+        }
+        throw new RuntimeException('Búsqueda de Owner Decision excede límite defensivo.');
+    }
+
+    private static function ventureTrackingKey(string $repository, array $request): string
+    {
+        foreach (['command_id','idempotency_key'] as $field)
+            if (!is_string($request[$field]??null)||preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/D',$request[$field])!==1)
+                throw new InvalidArgumentException('Identificador Venture inválido.');
+        return hash('sha256',$repository."\0".$request['command_id']."\0".$request['idempotency_key']);
+    }
+
+    private static function ventureMarker(array $request): string
+    {
+        return '<!-- venture-access-materialization '.json_encode([
+            'version'=>1,'command_id'=>$request['command_id'],'idempotency_key'=>$request['idempotency_key'],
+        ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES).' -->';
+    }
+
+    private function ventureLedgerState(string $key, string $repository): ?array
+    {
+        $prefix=self::VENTURE_LEDGER_ACTOR_PREFIX.$key.':'; $pending=null; $finalized=null;
+        foreach ($this->audit->entries() as $entry) {
+            $actor=$entry['actor']??null;
+            if (!is_string($actor)||!str_starts_with($actor,$prefix)) continue;
+            if (($entry['repository']??null)!==self::VENTURE_LEDGER_REPOSITORY||($entry['action']??null)!=='comment'
+                ||($entry['category']??null)!=='product-direction'||($entry['option']??null)!=='B'
+                ||($entry['sha']??null)!==null||!is_int($entry['at']??null)||$entry['at']<1)
+                throw new RuntimeException('Ledger Venture inválido.');
+            $suffix=substr($actor,strlen($prefix));
+            if (($entry['result']??null)==='blocked') {
+                if (preg_match('/^[0-9a-f]{16}$/D',$suffix)!==1||($entry['issue']??null)!==1||($entry['evidence']??null)!==null)
+                    throw new RuntimeException('Ledger Venture pending inválido.');
+                $pending??=$suffix; continue;
+            }
+            if (($entry['result']??null)!=='success'||$suffix!=='final') throw new RuntimeException('Ledger Venture final inválido.');
+            $candidate=self::ventureIssueEvidence($repository,['number'=>$entry['issue']??null,'html_url'=>$entry['evidence']??null]);
+            if ($finalized!==null&&$finalized['issue']!==$candidate['issue']) throw new RuntimeException('Ledger Venture final ambiguo.');
+            $finalized=$candidate;
+        }
+        if ($finalized!==null) return ['status'=>'finalized','evidence'=>$finalized];
+        return $pending===null?null:['status'=>'pending','claim'=>$pending];
+    }
+
+    private function recordVenturePending(string $key, string $claim, int $now): void
+    {
+        if ($now<1||preg_match('/^[0-9a-f]{16}$/D',$claim)!==1) throw new RuntimeException('Claim Venture inválido.');
+        $this->audit->record([
+            'actor'=>self::VENTURE_LEDGER_ACTOR_PREFIX.$key.':'.$claim,'action'=>'comment',
+            'repository'=>self::VENTURE_LEDGER_REPOSITORY,'issue'=>1,'category'=>'product-direction',
+            'option'=>'B','sha'=>null,'result'=>'blocked','evidence'=>null,'at'=>$now,
+        ]);
+    }
+
+    private function recordVentureFinalized(string $key, array $evidence, int $now): void
+    {
+        if ($now<1) throw new RuntimeException('Timestamp Venture inválido.');
+        $this->audit->record([
+            'actor'=>self::VENTURE_LEDGER_ACTOR_PREFIX.$key.':final','action'=>'comment',
+            'repository'=>self::VENTURE_LEDGER_REPOSITORY,'issue'=>$evidence['issue'],'category'=>'product-direction',
+            'option'=>'B','sha'=>null,'result'=>'success','evidence'=>$evidence['issue_url'],'at'=>$now,
+        ]);
+    }
+
+    private static function ventureIssueEvidence(string $repository, array $issue): array
+    {
+        $number=$issue['number']??null; $url=$issue['html_url']??null;
+        if (!is_int($number)||$number<1||!is_string($url)
+            ||!str_starts_with($url,'https://github.com/'.$repository.'/issues/')||preg_match('/[\r\n]/',$url)===1)
+            throw new RuntimeException('Evidencia GitHub de Owner Decision inválida.');
+        return ['repository'=>$repository,'issue'=>$number,'issue_url'=>$url];
     }
 
     private function components(string $token): array

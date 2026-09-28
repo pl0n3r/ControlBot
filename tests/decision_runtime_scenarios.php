@@ -10,6 +10,10 @@ require __DIR__ . '/../src/DecisionBatch.php';
 require __DIR__ . '/../src/DecisionUi.php';
 require __DIR__ . '/../src/DecisionHistory.php';
 require __DIR__ . '/../src/DecisionQuestions.php';
+require __DIR__ . '/../src/VentureIdentity.php';
+require __DIR__ . '/../src/DecisionRights.php';
+require __DIR__ . '/../src/IdentityCenter.php';
+require __DIR__ . '/../src/VentureAccessRuntime.php';
 require __DIR__ . '/../src/DecisionRuntime.php';
 
 use ControlBot\Approvals\AppendOnlyAuditLog;
@@ -50,6 +54,15 @@ function runtimeBatchGateBody(): string {
     return '<!-- factory-human-gate '.json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES).' -->';
 }
 
+function ventureIdentity(string $id='identity-admin'): array { return ['version'=>1,'identity_id'=>$id,'kind'=>'human','display_name'=>strtoupper($id),'state'=>'active','source_ref'=>'controlbot:identity/'.$id,'observed_at'=>1700000000]; }
+function ventureGrant(string $id,string $who,string $cap,string $auth='L2_VENTURE_ADMIN'): array { return ['version'=>1,'grant_id'=>$id,'identity_id'=>$who,'role'=>$auth==='L1_OPERATOR'?'operator':'venture_admin','capability'=>$cap,'scope'=>'venture:alpha','authority_level'=>$auth,'policy_ref'=>'controlbot:policy/business-os-v1','budget_limit'=>null,'granted_at'=>1700000000,'expires_at'=>1900000000]; }
+function ventureState(array $grants=[]): array { return ['identity'=>ventureIdentity('identity-user'),'grants'=>$grants,'requests'=>[],'audit'=>[],'mfa'=>['required'=>false,'status'=>'unknown']]; }
+function ventureGuard(string $decision='allow',string $reason='eligible'): array { return ['decision'=>$decision,'reason_code'=>$reason]; }
+function ventureTrusted(): array { return ['identity'=>ventureIdentity(),'scope'=>'venture:alpha','active_policy_refs'=>['controlbot:policy/business-os-v1'],'grant'=>ventureGrant('grant-authority','identity-admin','identity.access.manage'),'budget_guard'=>ventureGuard(),'production_authority'=>ventureGuard()]; }
+function ventureRequest(string $id='capowner'): array { return ['version'=>1,'command_id'=>$id,'idempotency_key'=>'idem_'.$id,'operation'=>'change_capability','reason_code'=>'staff_request','expires_at'=>null,'payload'=>['grant_id'=>'grant-main','capability'=>'venture.read']]; }
+function ventureBaseState(): array { return ventureState([ventureGrant('grant-main','identity-user','venture.manage')]); }
+function ventureSession(OwnerSessionService $sessions,int $now): array { $s=[]; $sessions->establishTrustedOAuthSession($s,'pl0n3r','fixture-server-value'); $sessions->reauthenticateTotp($s,Totp::code('JBSWY3DPEHPK3PXP',$now),'JBSWY3DPEHPK3PXP',$now); return $s; }
+
 $scenario=$argv[1]??'';
 $now=strtotime('2026-09-25T10:00:00Z');
 $sha=str_repeat('a',40);
@@ -61,16 +74,58 @@ $gate=[
 ];
 $workflowCalls=0;
 $seen=[];
+$materializedIssues=[];
+$nextIssue=200;
+$createdIssues=0;
+$lostResponseThrown=false;
 
-$sender=static function(string $method,string $url,array $headers,?string $body) use (&$workflowCalls,&$seen,$gate,$sha,$scenario): array {
+$sender=static function(string $method,string $url,array $headers,?string $body) use (&$workflowCalls,&$seen,&$materializedIssues,&$nextIssue,&$createdIssues,&$lostResponseThrown,$gate,$sha,$scenario): array {
     $seen[]=[$method,$url];
     $base='https://api.github.com/repos/pl0n3r/factory';
-    if ($url===$base.'/issues?state=open&per_page=100&page=1') return ['status'=>200,'body'=>json_encode([$gate],JSON_THROW_ON_ERROR)];
+    if ($url===$base.'/issues?state=open&per_page=100&page=1') {
+        $open=array_values(array_filter($materializedIssues,static fn(array $row):bool=>($row['state']??null)==='open'));
+        return ['status'=>200,'body'=>json_encode(array_merge([$gate],$open),JSON_THROW_ON_ERROR)];
+    }
+    if ($url===$base.'/issues?state=all&labels=factory-human-gate&per_page=100&page=1') {
+        $labeled=array_values(array_filter($materializedIssues,static fn(array $row):bool=>in_array('factory-human-gate',$row['labels']??[],true)));
+        return ['status'=>200,'body'=>json_encode($labeled,JSON_THROW_ON_ERROR)];
+    }
+    if ($method==='POST' && $url===$base.'/issues') {
+        $payload=json_decode((string)$body,true,32,JSON_THROW_ON_ERROR);
+        if (!is_array($payload)||!is_string($payload['title']??null)||!is_string($payload['body']??null)) {
+            throw new RuntimeException('fixture Issue inválida');
+        }
+        $number=$nextIssue++;
+        $createdIssues++;
+        $materializedIssues[$number]=[
+            'number'=>$number,'state'=>'open','author_association'=>'OWNER',
+            'body'=>$payload['body'],'title'=>$payload['title'],'labels'=>$payload['labels']??[],
+            'created_at'=>'2026-09-25T10:00:01Z',
+            'html_url'=>'https://github.com/pl0n3r/factory/issues/'.$number,
+        ];
+        if ($scenario==='venture-response-lost' && !$lostResponseThrown) {
+            $lostResponseThrown=true;
+            throw new RuntimeException('fixture: respuesta POST perdida');
+        }
+        return ['status'=>201,'body'=>json_encode($materializedIssues[$number],JSON_THROW_ON_ERROR)];
+    }
     if ($url===$base.'/issues/'.$gate['number']) return ['status'=>200,'body'=>json_encode($gate,JSON_THROW_ON_ERROR)];
+    if (preg_match('#^'.preg_quote($base,'#').'/issues/(\\d+)$#',$url,$match)===1) {
+        $number=(int)$match[1];
+        if (isset($materializedIssues[$number]) && $method==='GET') {
+            return ['status'=>200,'body'=>json_encode($materializedIssues[$number],JSON_THROW_ON_ERROR)];
+        }
+        if (isset($materializedIssues[$number]) && $method==='PATCH') {
+            $materializedIssues[$number]['state']='closed';
+            return ['status'=>200,'body'=>json_encode($materializedIssues[$number],JSON_THROW_ON_ERROR)];
+        }
+    }
     if ($url===$base.'/branches/main') return ['status'=>200,'body'=>json_encode(['commit'=>['sha'=>$sha]],JSON_THROW_ON_ERROR)];
     if ($url===$base."/commits/{$sha}/check-runs") return ['status'=>200,'body'=>json_encode(['check_runs'=>[['status'=>'completed','conclusion'=>'success','html_url'=>'https://github.com/check/1']]],JSON_THROW_ON_ERROR)];
     if ($url===$base."/commits/{$sha}") return ['status'=>200,'body'=>json_encode(['html_url'=>"https://github.com/pl0n3r/factory/commit/{$sha}"],JSON_THROW_ON_ERROR)];
-    if ($method==='POST' && $url===$base.'/issues/'.$gate['number'].'/comments') return ['status'=>201,'body'=>json_encode(['html_url'=>'https://github.com/comment/1'],JSON_THROW_ON_ERROR)];
+    if ($method==='POST' && preg_match('#^'.preg_quote($base,'#').'/issues/(\\d+)/comments$#',$url,$match)===1) {
+        return ['status'=>201,'body'=>json_encode(['html_url'=>'https://github.com/comment/'.$match[1]],JSON_THROW_ON_ERROR)];
+    }
     if ($method==='PATCH' && $url===$base.'/git/refs/tags/v1') return ['status'=>200,'body'=>json_encode(['ref'=>'https://api.github.com/ref/v1'],JSON_THROW_ON_ERROR)];
     if ($method==='POST' && $url===$base.'/actions/workflows/release-bootstrap.yml/dispatches') return ['status'=>204,'body'=>''];
     if ($method==='PATCH' && $url===$base.'/issues/'.$gate['number']) return ['status'=>200,'body'=>json_encode(['html_url'=>'https://github.com/pl0n3r/factory/issues/'.$gate['number']],JSON_THROW_ON_ERROR)];
@@ -98,9 +153,7 @@ $factory=static function(string $token) use($transport): array {
 };
 $vault=new TokenVault(base64_encode(str_repeat('K',SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));
 $sessions=new OwnerSessionService('pl0n3r',$vault);
-$session=[];
-$sessions->establishTrustedOAuthSession($session,'pl0n3r','fixture-server-value');
-$sessions->reauthenticateTotp($session,Totp::code('JBSWY3DPEHPK3PXP',$now),'JBSWY3DPEHPK3PXP',$now);
+$session=ventureSession($sessions,$now);
 $auditPath=tempnam(sys_get_temp_dir(),'controlbot-runtime-');
 $audit=new AppendOnlyAuditLog($auditPath);
 $runtime=new DecisionRuntime(
@@ -154,6 +207,107 @@ try {
         } catch (Throwable) {
             echo json_encode(['blocked'=>true,'seen'=>$seen],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
         }
+        exit;
+    }
+    if ($scenario==='venture-materialize') {
+        $result=$runtime->executeVentureAccess(
+            $session,'pl0n3r/factory',ventureBaseState(),ventureRequest(),ventureTrusted(),$now
+        );
+        $page=$runtime->handle('GET','/decisions',$session,[],$now);
+        echo json_encode([
+            'result'=>$result,'page'=>$page,'created_issues'=>$createdIssues,
+            'materialized'=>array_values($materializedIssues),'seen'=>$seen,
+        ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        exit;
+    }
+    if ($scenario==='venture-replay') {
+        $request=ventureRequest('capreplay');
+        $first=$runtime->executeVentureAccess(
+            $session,'pl0n3r/factory',ventureBaseState(),$request,ventureTrusted(),$now
+        );
+        $secondSession=ventureSession($sessions,$now+1);
+        $second=$runtime->executeVentureAccess(
+            $secondSession,'pl0n3r/factory',$first['state'],$request,ventureTrusted(),$now+1
+        );
+        echo json_encode([
+            'first'=>$first,'second'=>$second,'created_issues'=>$createdIssues,
+            'materialized'=>array_values($materializedIssues),
+        ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        exit;
+    }
+    if ($scenario==='venture-untrusted-recovery') {
+        $request=ventureRequest('capuntrusted');
+        $marker='<!-- venture-access-materialization '.json_encode([
+            'version'=>1,'command_id'=>$request['command_id'],'idempotency_key'=>$request['idempotency_key'],
+        ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES).' -->';
+        $materializedIssues[199]=[
+            'number'=>199,'state'=>'open','author_association'=>'NONE',
+            'body'=>runtimeGateBody()."\n".$marker,'title'=>'spoofed','labels'=>['factory-human-gate'],
+            'created_at'=>'2026-09-25T09:59:59Z',
+            'html_url'=>'https://github.com/pl0n3r/factory/issues/199',
+        ];
+        $result=$runtime->executeVentureAccess(
+            $session,'pl0n3r/factory',ventureBaseState(),$request,ventureTrusted(),$now
+        );
+        echo json_encode(['result'=>$result,'created_issues'=>$createdIssues,'issues'=>array_values($materializedIssues)],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        exit;
+    }
+    if ($scenario==='venture-response-lost') {
+        $request=ventureRequest('caplost');
+        $firstFailed=false;
+        try {
+            $runtime->executeVentureAccess($session,'pl0n3r/factory',ventureBaseState(),$request,ventureTrusted(),$now);
+        } catch (Throwable) { $firstFailed=true; }
+        $secondSession=ventureSession($sessions,$now+1);
+        $second=$runtime->executeVentureAccess(
+            $secondSession,'pl0n3r/factory',ventureBaseState(),$request,ventureTrusted(),$now+1
+        );
+        echo json_encode(['first_failed'=>$firstFailed,'second'=>$second,'created_issues'=>$createdIssues,'issues'=>array_values($materializedIssues)],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        exit;
+    }
+    if ($scenario==='venture-client-authority') {
+        $extra=ventureRequest('capclient');
+        $extra['repository']='evil/example';
+        $extra['github_token']='fixture-client-value';
+        $extraBlocked=false; $repoBlocked=false;
+        try {
+            $runtime->executeVentureAccess($session,'pl0n3r/factory',ventureBaseState(),$extra,ventureTrusted(),$now);
+        } catch (Throwable) { $extraBlocked=true; }
+        try {
+            $runtime->executeVentureAccess($session,'evil/example',ventureBaseState(),ventureRequest('caprepo'),ventureTrusted(),$now);
+        } catch (Throwable) { $repoBlocked=true; }
+        echo json_encode([
+            'extra_blocked'=>$extraBlocked,'repo_blocked'=>$repoBlocked,
+            'created_issues'=>$createdIssues,'seen'=>$seen,
+        ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        exit;
+    }
+    if ($scenario==='venture-no-writer') {
+        $noWriter=[]; $blocked=false;
+        try {
+            $runtime->executeVentureAccess($noWriter,'pl0n3r/factory',ventureBaseState(),ventureRequest('capwriter'),ventureTrusted(),$now);
+        } catch (Throwable) { $blocked=true; }
+        echo json_encode(['blocked'=>$blocked,'created_issues'=>$createdIssues,'seen'=>$seen],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+        exit;
+    }
+    if ($scenario==='venture-approve') {
+        $request=ventureRequest('capapprove');
+        $result=$runtime->executeVentureAccess(
+            $session,'pl0n3r/factory',ventureBaseState(),$request,ventureTrusted(),$now
+        );
+        $issue=(string)$result['owner_decision']['issue'];
+        $approval=$runtime->handle('POST','/approvals/execute',$session,[
+            '_csrf'=>$sessions->csrfToken($session),'repository'=>'pl0n3r/factory',
+            'issue'=>$issue,'option'=>'A','displayed_sha'=>'',
+        ],$now);
+        $number=(int)$issue;
+        echo json_encode([
+            'result'=>$result,
+            'approval'=>json_decode($approval['body'],true,32,JSON_THROW_ON_ERROR),
+            'created_issues'=>$createdIssues,
+            'issue_state'=>$materializedIssues[$number]['state']??null,
+            'seen'=>$seen,
+        ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
         exit;
     }
     if ($scenario==='history') {

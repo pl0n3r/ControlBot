@@ -41,7 +41,8 @@ final class IdentityCenter
         foreach ($state['audit'] as $event) {
             if ($event['idempotency_key'] !== $command['idempotency_key']) continue;
             if ($event['command_id'] !== $command['command_id']) throw new InvalidArgumentException('idempotency collision.');
-            return ['status'=>'already_applied','state'=>$state,'audit_event'=>$event];
+            $status=$event['outcome']==='applied'?'already_applied':$event['outcome'];
+            return ['status'=>$status,'state'=>$state,'audit_event'=>$event];
         }
 
         $target = self::target($state,$command);
@@ -139,7 +140,7 @@ final class IdentityCenter
         $grants=[]; $seen=[];
         foreach ($raw['grants'] as $row) {
             if (!is_array($row)) throw new InvalidArgumentException('grant invalid.');
-            $g=VentureIdentity::normalizeGrant($row,$now);
+            $g=self::storedGrant($row,$now);
             if (isset($seen[$g['grant_id']])) throw new InvalidArgumentException('grant duplicated.');
             $seen[$g['grant_id']]=true; $grants[]=$g;
         }
@@ -162,6 +163,7 @@ final class IdentityCenter
 
     private static function finish(array $state, array $command, string $target, string $outcome, int $now): array
     {
+        if (count($state['audit'])>=500) throw new InvalidArgumentException('audit capacity exceeded.');
         $event=['event_id'=>$command['command_id'],'command_id'=>$command['command_id'],'idempotency_key'=>$command['idempotency_key'],
             'operation'=>$command['operation'],'actor_identity_id'=>$command['actor_identity_id'],'target_identity_id'=>$target,
             'scope'=>$command['scope'],'outcome'=>$outcome,'reason_code'=>$command['reason_code'],'occurred_at'=>$now,'expires_at'=>$command['expires_at']];
@@ -205,7 +207,8 @@ final class IdentityCenter
         'grant_scope','revoke_scope','change_role','change_capability'=>'identity.access.manage',
         'request_reauth','request_reset'=>'identity.auth.request','set_mfa_required'=>'identity.security.manage',
     }; }
-    private static function requiredAuthority(array $c): string { return $c['operation']==='grant_scope' ? $c['payload']['grant']['authority_level'] : (in_array($c['operation'],['request_reauth','request_reset'],true)?'L1_OPERATOR':'L2_VENTURE_ADMIN'); }
+    private static function requiredAuthority(array $c): string { if($c['operation']==='change_capability')return 'L4_OWNER'; return $c['operation']==='grant_scope' ? $c['payload']['grant']['authority_level'] : (in_array($c['operation'],['request_reauth','request_reset'],true)?'L1_OPERATOR':'L2_VENTURE_ADMIN'); }
+    private static function storedGrant(array $row,int $now): array { $at=$now; if(isset($row['expires_at'])&&is_int($row['expires_at'])&&$row['expires_at']<=$now)$at=max(1,$row['expires_at']-1); return VentureIdentity::normalizeGrant($row,$at); }
     private static function grantOrder(array $a,array $b): int { return $a['grant_id'] <=> $b['grant_id']; }
     private static function noSecrets(mixed $v): void { if(!is_array($v))return; foreach($v as $k=>$n){ if(is_string($k)&&preg_match('/password|hash|token|cookie|otp|recovery|secret|credential|session/i',$k)) throw new InvalidArgumentException('sensitive field rejected.'); self::noSecrets($n); } }
     private static function capability(mixed $v): string { if(!is_string($v)||preg_match('/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D',$v)!==1||strlen($v)>120) throw new InvalidArgumentException('capability invalid.'); return $v; }

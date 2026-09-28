@@ -46,7 +46,7 @@ final class CapabilityGrant
     }
 
     /**
-     * @param array{capability:string,project:string,environment:string,resource:string,operation:string,run_id:string,subject:string} $scope
+     * @param array{capability:string,project:string,environment:string,resource:string,operation:string,issue:string,run_id:string,subject:string} $scope
      * @param list<string> $restrictions
      */
     public function authorize(array $scope, int $now, array $restrictions = []): array
@@ -77,7 +77,7 @@ final class CapabilityGrant
             return self::deny('owner_approval_required');
         }
 
-        foreach (['capability', 'project', 'environment', 'resource', 'operation', 'run_id', 'subject'] as $key) {
+        foreach (['capability', 'project', 'environment', 'resource', 'operation', 'issue', 'run_id', 'subject'] as $key) {
             if ($scope[$key] !== $this->record[$key]) {
                 return self::deny($key . '_mismatch');
             }
@@ -164,7 +164,7 @@ final class CapabilityGrant
 
     private static function scope(array $scope): void
     {
-        $expected = ['capability', 'project', 'environment', 'resource', 'operation', 'run_id', 'subject'];
+        $expected = ['capability', 'project', 'environment', 'resource', 'operation', 'issue', 'run_id', 'subject'];
         $keys = array_keys($scope);
         sort($keys);
         sort($expected);
@@ -175,6 +175,9 @@ final class CapabilityGrant
             if (!is_string($scope[$key]) || trim($scope[$key]) === '' || str_contains($scope[$key], '*')) {
                 throw new InvalidArgumentException('Execution scope inválido.');
             }
+        }
+        if (preg_match('~^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*$~D', $scope['issue']) !== 1) {
+            throw new InvalidArgumentException('Execution issue inválido.');
         }
         self::uuid($scope['run_id'], 'run_id');
     }

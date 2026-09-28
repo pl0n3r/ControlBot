@@ -48,7 +48,7 @@ class CapabilityPolicyTests(unittest.TestCase):
 
     def test_grant_scope_cannot_cross_project_or_environment(self):
         data = scenario("scope")
-        for key in ("project", "environment", "resource", "operation", "run_id", "subject"):
+        for key in ("project", "environment", "resource", "operation", "issue", "run_id", "subject"):
             self.assertFalse(data[key]["authorized"])
             self.assertEqual(data[key]["reason"], f"{key}_mismatch")
 

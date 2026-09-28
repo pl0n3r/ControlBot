@@ -54,6 +54,7 @@ function scope(array $record, array $replace = []): array
         'environment' => $record['environment'],
         'resource' => $record['resource'],
         'operation' => $record['operation'],
+        'issue' => $record['issue'],
         'run_id' => $record['run_id'],
         'subject' => $record['subject'],
     ], $replace);
@@ -117,6 +118,7 @@ if ($scenario === 'unknown') {
         'environment' => 'staging',
         'resource' => 'site:secondary',
         'operation' => 'status',
+        'issue' => 'pl0n3r/condor#999',
         'run_id' => 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff',
         'subject' => 'agent-controlbot-02',
     ] as $key => $value) {
@@ -124,6 +126,7 @@ if ($scenario === 'unknown') {
     }
     $out = $cases;
 } elseif ($scenario === 'lifecycle') {
+    date_default_timezone_set('America/Bogota');
     $record = grantRecord('hostinger.read', 'read');
     $grant = CapabilityGrant::issue($record);
     $out = [

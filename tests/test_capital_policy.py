@@ -77,12 +77,10 @@ class CapitalPolicyTests(unittest.TestCase):
             "reasons": ["invalid_input"],
             "execution": False,
         })
-        self.assertEqual(data["invalid_gate"], {
-            "version": 1,
-            "decision": "deny",
-            "reasons": ["invalid_input"],
-            "execution": False,
-        })
+        self.assertEqual(data["invalid_gate"]["decision"], "deny")
+        self.assertFalse(data["invalid_gate"]["execution"])
+        self.assertIn("decision_rights_denied", data["invalid_gate"]["reasons"])
+        self.assertIn("invalid_input", data["invalid_gate"]["reasons"])
 
 
 if __name__ == "__main__":

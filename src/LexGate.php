@@ -18,6 +18,9 @@ final class LexGate
         'marketing_growth',
     ];
     private const SENSITIVE = '/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|otp|recovery[_ -]?code|session|credential)/i';
+    private const SCOPE_PATTERN = '/^(?:group|venture|project|institution):[a-z][a-z0-9-]{1,63}$/D';
+    private const ID_PATTERN = '/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,9}$/D';
+    private const REF_PATTERN = '#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D';
 
     public static function evaluate(array $input, int $now): array
     {
@@ -34,12 +37,12 @@ final class LexGate
         }
 
         $kind = self::enum($input['kind'] ?? null, self::KINDS, 'kind');
-        $gapId = self::id($input['gap_id'] ?? null, 'gap_id');
-        $scope = self::scope($input['scope'] ?? null);
+        $gapId = self::text($input['gap_id'] ?? null, 'gap_id', self::ID_PATTERN, 1, 140);
+        $scope = self::text($input['scope'] ?? null, 'scope', self::SCOPE_PATTERN, 3, 80);
         $question = self::question($input['question'] ?? null);
         $freshness = self::enum($input['freshness'] ?? null, self::FRESHNESS, 'freshness');
         $severity = self::enum($input['severity'] ?? null, self::SEVERITIES, 'severity');
-        $policyRef = self::ref($input['policy_ref'] ?? null, 'policy_ref');
+        $policyRef = self::text($input['policy_ref'] ?? null, 'policy_ref', self::REF_PATTERN, 8, 220, true);
         $evidenceRefs = self::refs($input['evidence_refs'] ?? null, 'evidence_refs', true);
         $observedAt = self::time($input['observed_at'] ?? null, 'observed_at');
         if ($observedAt > $now) {
@@ -168,12 +171,12 @@ final class LexGate
         $workType = self::enum($input['work_type'] ?? null, self::WORK_TYPES, 'work_type');
         $capabilities = self::ids($input['requested_capabilities'] ?? null, 'requested_capabilities', false);
         $roles = self::ids($input['required_roles'] ?? null, 'required_roles', false);
-        $groupId = self::id($input['group_id'] ?? null, 'group_id');
-        $ventureId = self::nullableId($input['venture_id'] ?? null, 'venture_id');
-        $projectId = self::nullableId($input['project_id'] ?? null, 'project_id');
+        $groupId = self::text($input['group_id'] ?? null, 'group_id', self::ID_PATTERN, 1, 140);
+        $ventureId = self::optionalText($input['venture_id'] ?? null, 'venture_id');
+        $projectId = self::optionalText($input['project_id'] ?? null, 'project_id');
         $repositoryRef = self::nullableRepository($input['repository_ref'] ?? null);
-        $authorityLevel = self::id($input['authority_level'] ?? null, 'authority_level');
-        $producerRef = self::ref($input['producer_ref'] ?? null, 'producer_ref');
+        $authorityLevel = self::text($input['authority_level'] ?? null, 'authority_level', self::ID_PATTERN, 1, 140);
+        $producerRef = self::text($input['producer_ref'] ?? null, 'producer_ref', self::REF_PATTERN, 8, 220, true);
 
         $idempotency = 'lex-gap:' . hash('sha256', implode("\n", [
             $scope,
@@ -232,31 +235,11 @@ final class LexGate
         }
     }
 
-    private static function scope(mixed $value): string
+    private static function optionalText(mixed $value, string $label): ?string
     {
-        return self::token(
-            $value,
-            'scope',
-            '/^(?:group|venture|project|institution):[a-z][a-z0-9-]{1,63}$/D',
-            3,
-            80,
-        );
-    }
-
-    private static function id(mixed $value, string $label): string
-    {
-        return self::token(
-            $value,
-            $label,
-            '/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,9}$/D',
-            1,
-            140,
-        );
-    }
-
-    private static function nullableId(mixed $value, string $label): ?string
-    {
-        return $value === null ? null : self::id($value, $label);
+        return $value === null
+            ? null
+            : self::text($value, $label, self::ID_PATTERN, 1, 140);
     }
 
     private static function question(mixed $value): string
@@ -301,30 +284,14 @@ final class LexGate
         $unique = [];
         foreach ($value as $item) {
             $normalized = $kind === 'id'
-                ? self::id($item, $label)
-                : self::ref($item, $label);
+                ? self::text($item, $label, self::ID_PATTERN, 1, 140)
+                : self::text($item, $label, self::REF_PATTERN, 8, 220, true);
             $unique[$normalized] = true;
         }
 
         $items = array_keys($unique);
         sort($items, SORT_STRING);
         return $items;
-    }
-
-    private static function ref(mixed $value, string $label): string
-    {
-        $ref = self::token(
-            $value,
-            $label,
-            '#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D',
-            8,
-            220,
-        );
-        if (str_contains($ref, '..')) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
-
-        return $ref;
     }
 
     private static function nullableRepository(mixed $value): ?string
@@ -342,22 +309,22 @@ final class LexGate
         return $value;
     }
 
-    private static function token(
+    private static function text(
         mixed $value,
         string $label,
         string $pattern,
         int $minLength,
         int $maxLength,
+        bool $rejectTraversal = false,
     ): string {
-        if (!is_string($value)) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
+        $valid = is_string($value)
+            && strlen($value) >= $minLength
+            && strlen($value) <= $maxLength
+            && preg_match($pattern, $value) === 1
+            && preg_match(self::SENSITIVE, $value) !== 1
+            && (!$rejectTraversal || !str_contains($value, '..'));
 
-        $length = strlen($value);
-        if ($length < $minLength
-            || $length > $maxLength
-            || preg_match($pattern, $value) !== 1
-            || preg_match(self::SENSITIVE, $value) === 1) {
+        if (!$valid) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
 
@@ -366,20 +333,16 @@ final class LexGate
 
     private static function time(mixed $value, string $label): int
     {
-        if (!is_int($value) || $value < 1) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
-
-        return $value;
+        return is_int($value) && $value > 0
+            ? $value
+            : throw new InvalidArgumentException($label . ' invalid.');
     }
 
     private static function enum(mixed $value, array $allowed, string $label): string
     {
-        if (!is_string($value) || !in_array($value, $allowed, true)) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
-
-        return $value;
+        return is_string($value) && in_array($value, $allowed, true)
+            ? $value
+            : throw new InvalidArgumentException($label . ' invalid.');
     }
 
 }

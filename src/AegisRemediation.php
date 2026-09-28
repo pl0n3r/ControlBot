@@ -262,83 +262,118 @@ final class AegisRemediation
 
     private static function fields(array $row, array $expected, string $label): void
     {
-        $actual = array_keys($row);
-        sort($actual, SORT_STRING);
-        sort($expected, SORT_STRING);
-        if ($actual !== $expected) {
+        if (array_is_list($row)) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+
+        $keys = array_keys($row);
+        if (array_diff($expected, $keys) !== [] || array_diff($keys, $expected) !== []) {
             throw new InvalidArgumentException($label . ' fields invalid.');
         }
     }
 
     private static function scope(mixed $value): string
     {
-        if (!is_string($value)
-            || preg_match('/^(?:venture|project|institution):[a-z][a-z0-9-]{0,63}$/D', $value) !== 1
-            || preg_match(self::SENSITIVE, $value) === 1) {
-            throw new InvalidArgumentException('scope invalid.');
-        }
-        return $value;
+        return self::validatedText(
+            $value,
+            'scope',
+            '/^(?:venture|project|institution):[a-z][a-z0-9-]{0,63}$/D',
+            80,
+        );
     }
 
     private static function id(mixed $value, string $label): string
     {
-        if (!is_string($value)
-            || strlen($value) > 120
-            || preg_match('/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D', $value) !== 1
-            || preg_match(self::SENSITIVE, $value) === 1) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
-        return $value;
+        return self::validatedText(
+            $value,
+            $label,
+            '/^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+){0,7}$/D',
+            120,
+        );
     }
 
     private static function policyRef(mixed $value): string
     {
-        if (!is_string($value)
-            || preg_match('#^controlbot:policy/[a-z][a-z0-9._/-]{1,119}$#D', $value) !== 1) {
-            throw new InvalidArgumentException('policy_ref invalid.');
+        return self::validatedText(
+            $value,
+            'policy_ref',
+            '#^controlbot:policy/[a-z][a-z0-9._/-]{1,119}$#D',
+            180,
+        );
+    }
+
+    private static function validatedText(
+        mixed $value,
+        string $label,
+        string $pattern,
+        int $maxLength
+    ): string {
+        $invalid = !is_string($value)
+            || $value === ''
+            || strlen($value) > $maxLength
+            || preg_match($pattern, $value) !== 1
+            || preg_match(self::SENSITIVE, $value) === 1;
+
+        if ($invalid) {
+            throw new InvalidArgumentException($label . ' invalid.');
         }
         return $value;
     }
 
     private static function refs(mixed $value): array
     {
-        if (!is_array($value) || !array_is_list($value) || count($value) > 50) {
-            throw new InvalidArgumentException('evidence_refs invalid.');
-        }
+        return self::normalizedSet(
+            $value,
+            50,
+            'evidence_refs',
+            static fn(mixed $item): string => self::evidenceRef($item),
+        );
+    }
 
-        $out = [];
-        foreach ($value as $ref) {
-            if (!is_string($ref)
-                || strlen($ref) < 8
-                || strlen($ref) > 180
-                || str_contains($ref, '@')
-                || str_contains($ref, '..')
-                || preg_match(self::SENSITIVE, $ref) === 1
-                || preg_match('#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D', $ref) !== 1) {
-                throw new InvalidArgumentException('evidence_ref invalid.');
-            }
-            $out[$ref] = true;
-        }
+    private static function evidenceRef(mixed $value): string
+    {
+        $invalid = !is_string($value)
+            || strlen($value) < 8
+            || strlen($value) > 180
+            || str_contains($value, '@')
+            || str_contains($value, '..')
+            || preg_match(self::SENSITIVE, $value) === 1
+            || preg_match('#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D', $value) !== 1;
 
-        $refs = array_keys($out);
-        sort($refs, SORT_STRING);
-        return $refs;
+        if ($invalid) {
+            throw new InvalidArgumentException('evidence_ref invalid.');
+        }
+        return $value;
     }
 
     private static function enums(mixed $value, array $allowed, string $label): array
     {
-        if (!is_array($value) || !array_is_list($value) || count($value) > count($allowed)) {
+        return self::normalizedSet(
+            $value,
+            count($allowed),
+            $label,
+            static fn(mixed $item): string => self::enum($item, $allowed, $label),
+        );
+    }
+
+    private static function normalizedSet(
+        mixed $value,
+        int $limit,
+        string $label,
+        callable $normalize
+    ): array {
+        if (!is_array($value) || !array_is_list($value) || count($value) > $limit) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
 
-        $out = [];
+        $seen = [];
         foreach ($value as $item) {
-            $item = self::enum($item, $allowed, $label);
-            $out[$item] = true;
+            $seen[$normalize($item)] = true;
         }
-        $items = array_keys($out);
-        sort($items, SORT_STRING);
-        return $items;
+
+        $normalized = array_keys($seen);
+        sort($normalized, SORT_STRING);
+        return $normalized;
     }
 
     private static function enum(mixed $value, array $allowed, string $label): string

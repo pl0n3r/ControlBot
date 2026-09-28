@@ -52,6 +52,30 @@ class DecisionRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["history"][0]["category"], "factory-release")
         self.assertEqual(payload["history"][0]["actions"], ["comment", "close-issue"])
 
+    def test_venture_owner_required_materializes_existing_decision_flow(self):
+        d=scenario("venture-materialize"); self.assertEqual(d["result"]["status"],"owner_decision_required"); self.assertTrue(d["result"]["owner_decision"]["created"]); self.assertEqual(d["created_issues"],1); self.assertEqual(d["result"]["owner_decision"]["issue"],d["materialized"][0]["number"]); self.assertIn("factory-human-gate",d["materialized"][0]["labels"]); self.assertTrue(any("labels=factory-human-gate" in r[1] for r in d["seen"]))
+
+    def test_materialized_venture_gate_is_visible_in_inbox(self):
+        d=scenario("venture-materialize"); self.assertIn("Venture access escalation",d["page"]["body"]); self.assertIn("factory-human-gate",d["materialized"][0]["body"]); self.assertEqual(d["materialized"][0]["state"],"open")
+
+    def test_venture_gate_materialization_is_idempotent(self):
+        d=scenario("venture-replay"); self.assertEqual(d["created_issues"],1); self.assertEqual(d["first"]["owner_decision"]["issue"],d["second"]["owner_decision"]["issue"]); self.assertTrue(d["first"]["owner_decision"]["created"]); self.assertFalse(d["second"]["owner_decision"]["created"])
+
+    def test_untrusted_issue_cannot_capture_venture_idempotency(self):
+        d=scenario("venture-untrusted-recovery"); self.assertEqual(d["created_issues"],1); self.assertNotEqual(d["result"]["owner_decision"]["issue"],199); self.assertTrue(d["result"]["owner_decision"]["created"])
+
+    def test_response_loss_recovers_from_durable_pending_without_repost(self):
+        d=scenario("venture-response-lost"); self.assertTrue(d["first_failed"]); self.assertEqual(d["created_issues"],1); self.assertFalse(d["second"]["owner_decision"]["created"]); self.assertEqual(d["second"]["owner_decision"]["issue"],d["issues"][0]["number"])
+
+    def test_client_cannot_supply_writer_or_repository_authority(self):
+        d=scenario("venture-client-authority"); self.assertTrue(d["extra_blocked"] and d["repo_blocked"]); self.assertEqual(d["created_issues"],0); self.assertNotIn("fixture-client-value",json.dumps(d))
+
+    def test_missing_authorized_writer_fails_closed(self):
+        d=scenario("venture-no-writer"); self.assertTrue(d["blocked"]); self.assertEqual(d["created_issues"],0); self.assertEqual(d["seen"],[])
+
+    def test_owner_approval_does_not_reexecute_original_lifecycle_command(self):
+        d=scenario("venture-approve"); self.assertEqual((d["approval"]["category"],d["approval"]["option"]),("product-direction","A")); self.assertEqual(d["created_issues"],1); self.assertEqual(d["issue_state"],"closed"); self.assertEqual(len([r for r in d["seen"] if r[0]=="POST" and r[1].endswith("/issues")]),1)
+
     def test_repository_allowlist_is_server_side(self):
         result = raw("untrusted-repo")
         self.assertNotEqual(result.returncode, 0)

@@ -56,7 +56,7 @@ final class LexGate
             'policy_ref' => $policyRef,
             'evidence_refs' => $evidenceRefs,
             'observed_at' => $observedAt,
-            'ready_hint' => $freshness === 'fresh',
+            'ready_hint' => $freshness === 'fresh' && $kind !== 'material_uncertainty',
             'authority_effect' => 'none',
             'auto_execute' => false,
         ];

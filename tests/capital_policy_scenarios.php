@@ -6,37 +6,10 @@ require __DIR__ . '/../src/VentureIdentity.php';
 require __DIR__ . '/../src/DecisionRights.php';
 require __DIR__ . '/../src/CapitalPolicy.php';
 
-use ControlBot\Budget\BudgetGuard;
 use ControlBot\Business\CapitalPolicy;
-use ControlBot\Business\DecisionRights;
 
 const NOW = 2000;
 const POLICY = 'controlbot:policy/business-os-v1';
-
-function budgetGuardResult(bool $blocked = false): array
-{
-    $guard = new BudgetGuard();
-    $summary = $guard->summarize([
-        'provider' => 'github_actions',
-        'account_scope' => 'pl0n3r',
-        'resource' => 'private_minutes',
-        'included' => 100,
-        'used' => $blocked ? 100 : 10,
-        'billable_used' => 0,
-        'reset_at' => '2026-10-01',
-        'budget_limit' => 0,
-        'budget_mode' => $blocked ? 'hard_stop' : 'alert_only',
-        'capacity' => 'available',
-        'observed_at' => 1900,
-        'source' => 'github_api',
-    ], []);
-
-    return $guard->workPolicy($summary, [
-        'critical' => false,
-        'requires_private_runner' => true,
-        'pr_open' => false,
-    ]);
-}
 
 function identity(string $id = 'identity-finance'): array
 {
@@ -51,37 +24,63 @@ function identity(string $id = 'identity-finance'): array
     ];
 }
 
-function rightsResult(
+function budgetGuardInput(bool $blocked = false): array
+{
+    return [
+        'account' => [
+            'provider' => 'github_actions',
+            'account_scope' => 'pl0n3r',
+            'resource' => 'private_minutes',
+            'included' => 100,
+            'used' => $blocked ? 100 : 10,
+            'billable_used' => 0,
+            'reset_at' => '2026-10-01',
+            'budget_limit' => 0,
+            'budget_mode' => $blocked ? 'hard_stop' : 'alert_only',
+            'capacity' => 'available',
+            'observed_at' => 1900,
+            'source' => 'github_api',
+        ],
+        'projects' => [],
+        'work' => [
+            'critical' => false,
+            'requires_private_runner' => true,
+            'pr_open' => false,
+        ],
+    ];
+}
+
+function decisionRightsInput(
     string $scope = 'venture:condor',
     string $capability = 'capital.propose',
     string $authority = 'L2_VENTURE_ADMIN',
     float $budgetLimit = 20_000_000.0,
 ): array {
-    $context = [
-        'identity' => identity(),
-        'scope' => $scope,
-        'active_policy_refs' => [POLICY],
+    return [
+        'context' => [
+            'identity' => identity(),
+            'scope' => $scope,
+            'active_policy_refs' => [POLICY],
+        ],
+        'grant' => [
+            'version' => 1,
+            'grant_id' => 'grant-finance',
+            'identity_id' => 'identity-finance',
+            'role' => $authority === 'L4_OWNER' ? 'owner' : 'venture_admin',
+            'capability' => $capability,
+            'scope' => $scope,
+            'authority_level' => $authority,
+            'policy_ref' => POLICY,
+            'budget_limit' => $budgetLimit,
+            'granted_at' => 1800,
+            'expires_at' => 3000,
+        ],
+        'action' => [
+            'capability' => $capability,
+            'required_authority_level' => $authority,
+            'budget_amount' => 5_000_000.0,
+        ],
     ];
-    $grant = [
-        'version' => 1,
-        'grant_id' => 'grant-finance',
-        'identity_id' => 'identity-finance',
-        'role' => $authority === 'L4_OWNER' ? 'owner' : 'venture_admin',
-        'capability' => $capability,
-        'scope' => $scope,
-        'authority_level' => $authority,
-        'policy_ref' => POLICY,
-        'budget_limit' => $budgetLimit,
-        'granted_at' => 1800,
-        'expires_at' => 3000,
-    ];
-    $action = [
-        'capability' => $capability,
-        'required_authority_level' => $authority,
-        'budget_amount' => 5_000_000.0,
-    ];
-
-    return DecisionRights::evaluate($context, $grant, $action, NOW);
 }
 
 function baseCapital(): array
@@ -126,51 +125,26 @@ function baseCapital(): array
                 'provenance_ref' => 'controlbot:finance/source-invoice-rollup',
             ]],
         ],
-        'budget_guard' => budgetGuardResult(),
-        'decision_rights' => rightsResult(),
+        'budget_guard_input' => budgetGuardInput(),
+        'decision_rights_input' => decisionRightsInput(),
     ];
 }
 
 $name = $argv[1] ?? '';
 
 if ($name === 'base') {
-    $out = CapitalPolicy::evaluate(baseCapital());
+    $out = CapitalPolicy::evaluate(baseCapital(), NOW);
 } elseif ($name === 'restrictions') {
     $budgetBlocked = baseCapital();
-    $budgetBlocked['budget_guard'] = budgetGuardResult(true);
+    $budgetBlocked['budget_guard_input'] = budgetGuardInput(true);
 
     $rightsDenied = baseCapital();
-    $rightsDenied['decision_rights'] = DecisionRights::evaluate(
-        [
-            'identity' => identity(),
-            'scope' => 'venture:condor',
-            'active_policy_refs' => [POLICY],
-        ],
-        [
-            'version' => 1,
-            'grant_id' => 'grant-finance',
-            'identity_id' => 'identity-finance',
-            'role' => 'venture_admin',
-            'capability' => 'capital.propose',
-            'scope' => 'venture:condor',
-            'authority_level' => 'L2_VENTURE_ADMIN',
-            'policy_ref' => POLICY,
-            'budget_limit' => 20_000_000.0,
-            'granted_at' => 1800,
-            'expires_at' => 3000,
-        ],
-        [
-            'capability' => 'capital.delete',
-            'required_authority_level' => 'L2_VENTURE_ADMIN',
-            'budget_amount' => 5_000_000.0,
-        ],
-        NOW,
-    );
+    $rightsDenied['decision_rights_input']['action']['capability'] = 'capital.delete';
 
     $out = [
-        'baseline' => CapitalPolicy::evaluate(baseCapital()),
-        'budget_guard' => CapitalPolicy::evaluate($budgetBlocked),
-        'decision_rights' => CapitalPolicy::evaluate($rightsDenied),
+        'baseline' => CapitalPolicy::evaluate(baseCapital(), NOW),
+        'budget_guard' => CapitalPolicy::evaluate($budgetBlocked, NOW),
+        'decision_rights' => CapitalPolicy::evaluate($rightsDenied, NOW),
     ];
 } elseif ($name === 'owner-gates') {
     $over = baseCapital();
@@ -181,7 +155,7 @@ if ($name === 'base') {
 
     $l4 = baseCapital();
     $l4['proposal']['required_authority_level'] = 'L4_OWNER';
-    $l4['decision_rights'] = rightsResult(
+    $l4['decision_rights_input'] = decisionRightsInput(
         scope: 'venture:condor',
         capability: 'capital.propose',
         authority: 'L4_OWNER',
@@ -196,10 +170,10 @@ if ($name === 'base') {
     $reserve['proposal']['amount_minor'] = 5_000_000;
 
     $out = [
-        'over_limit' => CapitalPolicy::evaluate($over),
-        'l4' => CapitalPolicy::evaluate($l4),
-        'irreversible' => CapitalPolicy::evaluate($irreversible),
-        'reserve_floor' => CapitalPolicy::evaluate($reserve),
+        'over_limit' => CapitalPolicy::evaluate($over, NOW),
+        'l4' => CapitalPolicy::evaluate($l4, NOW),
+        'irreversible' => CapitalPolicy::evaluate($irreversible, NOW),
+        'reserve_floor' => CapitalPolicy::evaluate($reserve, NOW),
     ];
 } elseif ($name === 'shared-costs') {
     $input = baseCapital();
@@ -211,12 +185,12 @@ if ($name === 'base') {
         'rule_ref' => null,
         'provenance_ref' => null,
     ];
-    $out = CapitalPolicy::evaluate($input);
+    $out = CapitalPolicy::evaluate($input, NOW);
 } elseif ($name === 'no-payments') {
     $secret = 'bank-token-super-secret';
     $invalid = baseCapital();
     $invalid['bank_token'] = $secret;
-    $evaluated = CapitalPolicy::evaluate($invalid);
+    $evaluated = CapitalPolicy::evaluate($invalid, NOW);
 
     try {
         CapitalPolicy::executePayment(['bank_token' => $secret]);
@@ -231,8 +205,8 @@ if ($name === 'base') {
         'leaked' => str_contains(json_encode($evaluated, JSON_THROW_ON_ERROR), $secret),
     ];
 } elseif ($name === 'deterministic') {
-    $first = CapitalPolicy::evaluate(baseCapital());
-    $second = CapitalPolicy::evaluate(baseCapital());
+    $first = CapitalPolicy::evaluate(baseCapital(), NOW);
+    $second = CapitalPolicy::evaluate(baseCapital(), NOW);
 
     $unknown = baseCapital();
     $unknown['budget']['state'] = 'unknown';
@@ -240,12 +214,16 @@ if ($name === 'base') {
     $mismatch = baseCapital();
     $mismatch['reserve']['currency'] = 'USD';
 
+    $invalidGate = baseCapital();
+    $invalidGate['decision_rights_input']['action']['token'] = 'client-secret';
+
     $out = [
         'first' => $first,
         'second' => $second,
         'same' => $first === $second,
-        'unknown' => CapitalPolicy::evaluate($unknown),
-        'mismatch' => CapitalPolicy::evaluate($mismatch),
+        'unknown' => CapitalPolicy::evaluate($unknown, NOW),
+        'mismatch' => CapitalPolicy::evaluate($mismatch, NOW),
+        'invalid_gate' => CapitalPolicy::evaluate($invalidGate, NOW),
     ];
 } else {
     fwrite(STDERR, "scenario inválido\n");

@@ -19,12 +19,12 @@ final class CapitalPolicy
     private const FINANCIAL_STATES = ['known', 'unknown'];
     private const DECISIONS = ['allow', 'deny', 'owner_decision_required'];
 
-    public static function evaluate(array $input): array
+    public static function evaluate(array $input, int $now): array
     {
         try {
             self::fields($input, [
                 'version', 'scope', 'currency', 'budget', 'reserve', 'proposal',
-                'budget_guard', 'decision_rights',
+                'budget_guard_input', 'decision_rights_input',
             ], 'capital');
 
             if (($input['version'] ?? null) !== 1) {
@@ -35,9 +35,12 @@ final class CapitalPolicy
             $currency = self::currency($input['currency'] ?? null);
             $budget = self::budget($input['budget'] ?? null, $scope, $currency);
             $reserve = self::reserve($input['reserve'] ?? null, $scope, $currency);
+            if ($now < 1) {
+                throw new InvalidArgumentException('now invalid.');
+            }
             $proposal = self::proposal($input['proposal'] ?? null, $scope, $currency);
-            $budgetGuard = self::budgetGuard($input['budget_guard'] ?? null);
-            $rights = self::decisionRights($input['decision_rights'] ?? null);
+            $budgetGuard = self::evaluateBudgetGuard($input['budget_guard_input'] ?? null);
+            $rights = self::evaluateDecisionRights($input['decision_rights_input'] ?? null, $now);
         } catch (InvalidArgumentException) {
             return self::failed('deny', ['invalid_input']);
         }
@@ -332,10 +335,48 @@ final class CapitalPolicy
         return $out;
     }
 
-    private static function budgetGuard(mixed $value): array
+    private static function evaluateBudgetGuard(mixed $value): array
     {
         if (!is_array($value) || array_is_list($value)) {
-            throw new InvalidArgumentException('budget_guard invalid.');
+            throw new InvalidArgumentException('budget_guard_input invalid.');
+        }
+        self::fields($value, ['account', 'projects', 'work'], 'budget_guard_input');
+        if (!is_array($value['account'] ?? null)
+            || !is_array($value['projects'] ?? null)
+            || !is_array($value['work'] ?? null)) {
+            throw new InvalidArgumentException('budget_guard_input invalid.');
+        }
+
+        $guard = new BudgetGuard();
+        $summary = $guard->summarize($value['account'], $value['projects']);
+        $result = $guard->workPolicy($summary, $value['work']);
+        return self::budgetGuardResult($result);
+    }
+
+    private static function evaluateDecisionRights(mixed $value, int $now): array
+    {
+        if (!is_array($value) || array_is_list($value)) {
+            throw new InvalidArgumentException('decision_rights_input invalid.');
+        }
+        self::fields($value, ['context', 'grant', 'action'], 'decision_rights_input');
+        if (!is_array($value['context'] ?? null)
+            || !is_array($value['grant'] ?? null)
+            || !is_array($value['action'] ?? null)) {
+            throw new InvalidArgumentException('decision_rights_input invalid.');
+        }
+
+        return self::decisionRightsResult(DecisionRights::evaluate(
+            $value['context'],
+            $value['grant'],
+            $value['action'],
+            $now,
+        ));
+    }
+
+    private static function budgetGuardResult(mixed $value): array
+    {
+        if (!is_array($value) || array_is_list($value)) {
+            throw new InvalidArgumentException('budget_guard result invalid.');
         }
         self::fields($value, [
             'auto_executable', 'pause_noncritical', 'preserve_pr_fail_closed', 'reason',
@@ -354,10 +395,10 @@ final class CapitalPolicy
         ];
     }
 
-    private static function decisionRights(mixed $value): array
+    private static function decisionRightsResult(mixed $value): array
     {
         if (!is_array($value) || array_is_list($value)) {
-            throw new InvalidArgumentException('decision_rights invalid.');
+            throw new InvalidArgumentException('decision_rights result invalid.');
         }
         self::fields($value, ['decision', 'reasons'], 'decision_rights');
         $decision = self::enum($value['decision'] ?? null, self::DECISIONS, 'decision_rights.decision');

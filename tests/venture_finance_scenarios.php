@@ -100,7 +100,7 @@ if ($name === 'base') {
         'negative_money' => ['cash_out' => -1],
         'bad_currency' => ['currency' => 'ZZZ'],
         'bad_period' => ['period' => '2026-13'],
-        'extra' => ['customer_list' => ['alice@example.com']],
+        'extra' => ['customer_list' => ['personal-record']],
     ] as $key => $replace) {
         try {
             VentureFinancialSnapshot::normalize(baseSnapshot($replace));

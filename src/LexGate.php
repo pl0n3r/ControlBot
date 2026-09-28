@@ -154,10 +154,6 @@ final class LexGate
             ],
             'recommendation' => 'B',
             'safe_default' => 'B',
-            'policy_ref' => $policyRef,
-            'evidence_refs' => $evidenceRefs,
-            'authority_effect' => 'none',
-            'auto_execute' => false,
         ];
     }
 

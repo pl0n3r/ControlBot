@@ -67,9 +67,15 @@ class LexGateTests(unittest.TestCase):
         self.assertFalse(data["auto_execute"])
         self.assertEqual(data["authority_effect"], "none")
         self.assertFalse(data["ready_hint"])
-        self.assertEqual(gate["authority_effect"], "none")
-        self.assertFalse(gate["auto_execute"])
         self.assertEqual(gate["safe_default"], "B")
+        self.assertEqual(
+            set(gate),
+            {
+                "category", "context", "title_simple", "summary_simple",
+                "why_recommended", "blocks", "options", "recommendation",
+                "safe_default",
+            },
+        )
 
     def test_equivalent_work_items_are_idempotent(self):
         data = scenario("idempotency")

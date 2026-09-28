@@ -88,6 +88,9 @@ final class LexCore
         if ($reviewedAt < $observedAt) {
             throw new InvalidArgumentException('reviewed_at before observed_at.');
         }
+        if ($observedAt > $now || $reviewedAt > $now) {
+            throw new InvalidArgumentException('legal obligation timestamps in the future.');
+        }
         if ($expiresAt !== null && $expiresAt < $reviewedAt) {
             throw new InvalidArgumentException('expires_at before reviewed_at.');
         }

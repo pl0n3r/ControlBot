@@ -9,6 +9,7 @@ LEX Core es el dominio read-only de Legal & Compliance dentro de AEGIS. Normaliz
 Cada obligación termina exactamente en uno de cuatro estados: `compliant`, `gap`, `unknown` o `not_applicable`.
 
 `unknown` es fail-closed. Si la evidencia se declara `stale` o `unknown`, o si una obligación ya expiró al tiempo de evaluación, el estado efectivo pasa a `unknown` aunque el productor haya reportado `compliant`.
+`observed_at` y `reviewed_at` no pueden estar en el futuro respecto del instante de evaluación; esos payloads se rechazan en vez de tratarlos como evidencia disponible.
 
 Un `compliant` reportado exige al menos una referencia de evidencia. `not_applicable` exige una justificación explícita. Estas reglas impiden convertir ausencia de evidencia en cumplimiento.
 

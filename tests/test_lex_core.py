@@ -57,6 +57,8 @@ class LexCoreTests(unittest.TestCase):
         self.assertIn("invalid", data["sensitive"])
         self.assertIn("requires evidence", data["compliant_without_evidence"])
         self.assertIn("requires justification", data["not_applicable_without_justification"])
+        self.assertIn("timestamps in the future", data["future_observed"])
+        self.assertIn("timestamps in the future", data["future_reviewed"])
 
     def test_legal_registry_is_deterministic(self):
         data = scenario("deterministic")

@@ -93,11 +93,21 @@ if ($name === 'states') {
         'evidence_refs' => [],
     ])]);
 
+    $futureObserved = registry([obligation('ob-future-observed', [
+        'observed_at' => 1300,
+        'reviewed_at' => 1300,
+    ])]);
+    $futureReviewed = registry([obligation('ob-future-reviewed', [
+        'reviewed_at' => 1300,
+    ])]);
+
     $out = [
         'extra' => rejected(fn() => LexCore::registry($extra, $now)),
         'sensitive' => rejected(fn() => LexCore::registry($sensitive, $now)),
         'compliant_without_evidence' => rejected(fn() => LexCore::registry($noEvidence, $now)),
         'not_applicable_without_justification' => rejected(fn() => LexCore::registry($noJustification, $now)),
+        'future_observed' => rejected(fn() => LexCore::registry($futureObserved, $now)),
+        'future_reviewed' => rejected(fn() => LexCore::registry($futureReviewed, $now)),
     ];
 } elseif ($name === 'deterministic') {
     $first = registry([

@@ -19,9 +19,12 @@ final class FinanceRuntime
         'finance_analysis', 'compliance_review',
     ];
     private const PRIORITIES = ['critical', 'high', 'medium'];
-    private const AUTHORITY = [
-        'L0_AI_AUTONOMOUS', 'L1_OPERATOR', 'L2_VENTURE_ADMIN',
-        'L3_GROUP_INSTITUTION', 'L4_OWNER',
+    private const AUTHORITY_TO_FACTORY = [
+        'L0_AI_AUTONOMOUS' => 'autonomous',
+        'L1_OPERATOR' => 'operational',
+        'L2_VENTURE_ADMIN' => 'venture_admin',
+        'L3_GROUP_INSTITUTION' => 'group_institution',
+        'L4_OWNER' => 'owner',
     ];
 
     public static function read(array $input, int $now): array
@@ -311,7 +314,11 @@ final class FinanceRuntime
         $originMode = self::oneOf($work['origin_mode'] ?? null, ['directed', 'automatic'], 'origin_mode');
         $type = self::oneOf($work['work_type'] ?? null, self::WORK_TYPES, 'work_type');
         $priority = self::oneOf($work['priority_class'] ?? null, self::PRIORITIES, 'priority_class');
-        $authority = self::oneOf($work['authority_level'] ?? null, self::AUTHORITY, 'authority_level');
+        $controlAuthority = self::oneOf(
+            $work['authority_level'] ?? null,
+            array_keys(self::AUTHORITY_TO_FACTORY),
+            'authority_level',
+        );
 
         return [
             'work_id' => self::refText($work['work_id'] ?? null, 'work_id', 128),
@@ -322,7 +329,7 @@ final class FinanceRuntime
             'work_type' => $type,
             'requested_capabilities' => self::list($work['requested_capabilities'] ?? null, 'requested_capabilities', true),
             'required_roles' => self::list($work['required_roles'] ?? null, 'required_roles', true),
-            'authority_level' => $authority,
+            'authority_level' => self::AUTHORITY_TO_FACTORY[$controlAuthority],
             'priority_class' => $priority,
             'depends_on' => self::list($work['depends_on'] ?? null, 'depends_on', false),
             'claims' => self::list($work['claims'] ?? null, 'claims', false),

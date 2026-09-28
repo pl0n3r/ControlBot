@@ -16,7 +16,7 @@ use ControlBot\Production\ProductionOperation;
 use ControlBot\Production\SecretReference;
 use ControlBot\Production\SecretsBroker;
 
-const NOW = 1_800_000_000;
+const NOW = 1_799_997_000;
 const SECRET = 'fixture-hostinger-secret-839201';
 
 function secretRef(string $capability): SecretReference

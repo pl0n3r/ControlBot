@@ -28,7 +28,6 @@ class LexCoreTests(unittest.TestCase):
             "unknown": 1,
             "not_applicable": 1,
         })
-        self.assertFalse(data["summary"]["safe_to_claim_compliant"])
 
     def test_stale_or_unknown_evidence_never_becomes_compliant(self):
         data = scenario("freshness")

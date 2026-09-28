@@ -39,7 +39,7 @@ El esquema es cerrado. IDs, scopes y refs tienen límites de longitud y rechazan
 
 ## Resumen
 
-`summary.counts` agrega los cuatro estados efectivos. `safe_to_claim_compliant` solo puede ser verdadero si existe al menos una obligación, no hay `gap` ni `unknown` y ninguna obligación exige revisión humana. Este valor resume evidencia registrada; no es una opinión jurídica ni una garantía de cumplimiento.
+`summary.counts` agrega los cuatro estados efectivos y `summary.human_review_required` cuenta obligaciones que exigen criterio humano. El core no produce un score, aprobación o conclusión legal agregada.
 
 ## Fuera de alcance
 

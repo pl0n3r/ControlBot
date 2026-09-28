@@ -146,10 +146,6 @@ final class LexCore
         return [
             'counts' => $counts,
             'human_review_required' => $humanReviewRequired,
-            'safe_to_claim_compliant' => $obligations !== []
-                && $counts['unknown'] === 0
-                && $counts['gap'] === 0
-                && $humanReviewRequired === 0,
         ];
     }
 

@@ -171,11 +171,13 @@ final class LexJurisdiction
 
     private static function fields(array $row, array $expected, string $label): void
     {
-        $actual = array_keys($row);
-        sort($actual, SORT_STRING);
-        sort($expected, SORT_STRING);
-        if ($actual !== $expected) {
+        if (array_is_list($row) || count($row) !== count($expected)) {
             throw new InvalidArgumentException($label . ' fields invalid.');
+        }
+        foreach ($expected as $field) {
+            if (!array_key_exists($field, $row)) {
+                throw new InvalidArgumentException($label . ' fields invalid.');
+            }
         }
     }
 
@@ -235,40 +237,53 @@ final class LexJurisdiction
 
     private static function ids(mixed $value, string $label, bool $allowEmpty): array
     {
-        if (!is_array($value) || !array_is_list($value) || count($value) > 50
-            || (!$allowEmpty && $value === [])) {
-            throw new InvalidArgumentException($label . ' invalid.');
-        }
-        $out = [];
-        foreach ($value as $id) {
-            $out[self::id($id, $label)] = true;
-        }
-        $ids = array_keys($out);
-        sort($ids, SORT_STRING);
-        return $ids;
+        return self::normalizedList(
+            $value,
+            $label,
+            $allowEmpty,
+            static fn(mixed $item): string => self::id($item, $label),
+        );
     }
 
     private static function refs(mixed $value, string $label, bool $allowEmpty): array
     {
+        return self::normalizedList(
+            $value,
+            $label,
+            $allowEmpty,
+            static fn(mixed $item): string => self::ref($item, $label),
+        );
+    }
+
+    private static function normalizedList(
+        mixed $value,
+        string $label,
+        bool $allowEmpty,
+        callable $normalize,
+    ): array {
         if (!is_array($value) || !array_is_list($value) || count($value) > 50
             || (!$allowEmpty && $value === [])) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
-        $out = [];
-        foreach ($value as $ref) {
-            $out[self::ref($ref, $label)] = true;
+        $unique = [];
+        foreach ($value as $item) {
+            $unique[$normalize($item)] = true;
         }
-        $refs = array_keys($out);
-        sort($refs, SORT_STRING);
-        return $refs;
+        $items = array_keys($unique);
+        sort($items, SORT_STRING);
+        return $items;
     }
 
     private static function ref(mixed $value, string $label): string
     {
-        if (!is_string($value) || strlen($value) < 8 || strlen($value) > 220
-            || str_contains($value, '@') || str_contains($value, '..')
+        $invalid = !is_string($value)
+            || strlen($value) < 8
+            || strlen($value) > 220
+            || str_contains($value, '@')
+            || str_contains($value, '..')
             || preg_match(self::SENSITIVE, $value) === 1
-            || preg_match('#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D', $value) !== 1) {
+            || preg_match('#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D', $value) !== 1;
+        if ($invalid) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
         return $value;

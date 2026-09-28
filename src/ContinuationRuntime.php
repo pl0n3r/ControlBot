@@ -110,7 +110,7 @@ final class ContinuationRuntime
 
         $action = $pending['action']->safeRecord();
         $token = $pending['token'];
-        $this->assertCurrentScope($action, $token->safeRecord(), $current, $now);
+        $this->assertCurrentScope($action, $token, $current, $now);
 
         $policy = CapabilityPolicy::classify($action['capability']);
         if ($policy['decision'] !== 'owner_required' || $policy['requires_owner_approval'] !== true) {
@@ -167,7 +167,7 @@ final class ContinuationRuntime
 
         $action = $pending['action']->safeRecord();
         $token = $pending['token'];
-        $this->assertCurrentScope($action, $token->safeRecord(), $current, $now);
+        $this->assertCurrentScope($action, $token, $current, $now);
         $closed = $token->close($closedAt, false)->safeRecord();
 
         $result = [
@@ -195,8 +195,13 @@ final class ContinuationRuntime
         }
     }
 
-    private function assertCurrentScope(array $action, array $token, array $current, int $now): void
-    {
+    private function assertCurrentScope(
+        array $action,
+        ContinuationToken $token,
+        array $current,
+        int $now,
+    ): void {
+        $tokenRecord = $token->safeRecord();
         $expected = [
             'capability', 'project', 'environment', 'resource', 'operation', 'issue',
             'run_id', 'source_sha', 'plan_digest', 'risk_digest',
@@ -214,7 +219,7 @@ final class ContinuationRuntime
             }
         }
         foreach (['issue', 'run_id'] as $field) {
-            if (!is_string($current[$field]) || $current[$field] !== $token[$field]) {
+            if (!is_string($current[$field]) || $current[$field] !== $tokenRecord[$field]) {
                 throw new RuntimeException('Autorización invalidada por drift: ' . $field);
             }
         }

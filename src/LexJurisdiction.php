@@ -39,6 +39,12 @@ final class LexJurisdiction
             throw new InvalidArgumentException('jurisdiction pack expires_at invalid.');
         }
 
+        $jurisdiction = self::jurisdiction($input['jurisdiction'] ?? null);
+        $kind = self::enum($input['kind'] ?? null, self::KINDS, 'jurisdiction kind');
+        if (!str_starts_with($jurisdiction, $kind . ':')) {
+            throw new InvalidArgumentException('jurisdiction kind mismatch.');
+        }
+
         $sources = self::sources($input['sources'] ?? null, $now);
         $sourceIds = array_column($sources, 'source_id');
         $controls = self::controls($input['controls'] ?? null, $sourceIds);
@@ -64,8 +70,8 @@ final class LexJurisdiction
         return [
             'schema_version' => 1,
             'pack_id' => self::id($input['pack_id'] ?? null, 'pack_id'),
-            'jurisdiction' => self::jurisdiction($input['jurisdiction'] ?? null),
-            'kind' => self::enum($input['kind'] ?? null, self::KINDS, 'jurisdiction kind'),
+            'jurisdiction' => $jurisdiction,
+            'kind' => $kind,
             'pack_version' => self::semver($input['pack_version'] ?? null),
             'state' => $state,
             'freshness' => $freshness,
@@ -212,8 +218,7 @@ final class LexJurisdiction
     private static function text(mixed $value, string $label, int $max): string
     {
         if (!is_string($value) || $value === '' || strlen($value) > $max
-            || str_contains($value, "\n") || str_contains($value, "\r")
-            || preg_match(self::SENSITIVE, $value) === 1) {
+            || str_contains($value, "\n") || str_contains($value, "\r")) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
         return $value;

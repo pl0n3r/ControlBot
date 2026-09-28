@@ -19,13 +19,13 @@ function lexGateInput(array $overrides = []): array
         'evidence_refs' => ['controlbot:lex/evidence-transfer-review'],
         'observed_at' => 1200,
         'work_type' => 'compliance_review',
-        'requested_capabilities' => ['legal-review'],
-        'required_roles' => ['legal-privacidad'],
+        'requested_capabilities' => ['legal_review'],
+        'required_roles' => ['legal_privacidad'],
         'group_id' => 'pl0n3r',
         'venture_id' => 'condor',
-        'project_id' => 'condor-colombia',
+        'project_id' => 'condor_colombia',
         'repository_ref' => 'pl0n3r/Condor',
-        'authority_level' => 'L4_OWNER',
+        'authority_level' => 'l4_owner',
         'producer_ref' => 'controlbot:lex/engine',
     ], $overrides);
 }
@@ -42,9 +42,9 @@ if ($name === 'gate') {
         'question' => 'Actualizar el aviso de privacidad para reflejar la transferencia documentada.',
         'severity' => 'medium',
         'work_type' => 'compliance_review',
-        'requested_capabilities' => ['privacy-documentation'],
-        'required_roles' => ['legal-privacidad', 'contenido'],
-        'authority_level' => 'L1_OPERATOR',
+        'requested_capabilities' => ['privacy_documentation'],
+        'required_roles' => ['legal_privacidad', 'contenido'],
+        'authority_level' => 'l1_operator',
     ]), $now);
 } elseif ($name === 'stale') {
     $stale = LexGate::evaluate(lexGateInput([

@@ -126,9 +126,19 @@ if ($name === 'compliance') {
     $ref['compliance'][0]['evidence_refs'] = ['controlbot:aegis/api-token-value'];
     $payload = baseEvidence();
     $payload['incidents'][0]['payload'] = ['secret' => 'raw'];
+    $scope = baseEvidence();
+    $scope['scope'] = 'venture:token-abc123';
+    $scope['compliance'][0]['scope'] = 'venture:token-abc123';
+    $scope['compliance'][1]['scope'] = 'venture:token-abc123';
+    $scope['backup_evidence']['scope'] = 'venture:token-abc123';
+    $scope['restore_evidence']['scope'] = 'venture:token-abc123';
+    $affected = baseEvidence();
+    $affected['incidents'][0]['affected_scopes'] = ['venture:condor', 'project:secret-cache'];
     $out = [
         'ref_rejected' => rejected(fn() => AegisEvidence::normalize($ref)),
         'payload_rejected' => rejected(fn() => AegisEvidence::normalize($payload)),
+        'scope_rejected' => rejected(fn() => AegisEvidence::normalize($scope)),
+        'affected_scope_rejected' => rejected(fn() => AegisEvidence::normalize($affected)),
     ];
 } elseif ($name === 'deterministic') {
     $input = baseEvidence();

@@ -64,6 +64,8 @@ class AegisEvidenceTests(unittest.TestCase):
         data = scenario("sensitive")
         self.assertIn("invalid", data["ref_rejected"])
         self.assertIn("fields invalid", data["payload_rejected"])
+        self.assertIn("scope invalid", data["scope_rejected"])
+        self.assertIn("scope invalid", data["affected_scope_rejected"])
 
     def test_evidence_normalization_is_deterministic(self):
         data = scenario("deterministic")

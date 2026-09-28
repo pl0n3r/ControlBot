@@ -175,7 +175,8 @@ final class AegisEvidence
     private static function scope(mixed $value): string
     {
         if (!is_string($value)
-            || preg_match('/^(?:venture|project|institution):[a-z][a-z0-9-]{0,63}$/D', $value) !== 1) {
+            || preg_match('/^(?:venture|project|institution):[a-z][a-z0-9-]{0,63}$/D', $value) !== 1
+            || preg_match(self::SENSITIVE, $value) === 1) {
             throw new InvalidArgumentException('scope invalid.');
         }
         return $value;

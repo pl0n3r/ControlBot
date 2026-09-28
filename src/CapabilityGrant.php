@@ -210,7 +210,7 @@ final class CapabilityGrant
 
     private static function timestamp(string $value): int
     {
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $value);
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $value, new \DateTimeZone('UTC'));
         $errors = DateTimeImmutable::getLastErrors();
         if ($date === false || (is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
             throw new InvalidArgumentException('Timestamp inválido.');

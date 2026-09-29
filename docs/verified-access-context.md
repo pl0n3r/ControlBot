@@ -9,7 +9,9 @@
 ```text
 query mínima: identity_id + scope + capability
         ↓
-VentureAccessSource (inyectada por composition root)
+DecisionRuntime (composition root / sesión / allowlist)
+        ↓
+VentureAccessSource privada inyectada por #218
         ↓
 VentureAccessSourceContract::resolved()
         ↓
@@ -18,12 +20,13 @@ VerifiedAccessContext
 DecisionRights::evaluate()
 ```
 
-La UI, requests y agentes solo pueden aportar la query mínima. La implementación de `VentureAccessSource` pertenece al TCB server-side; #218 ya instaló esa dependencia en el composition root. No existe una factory pública que acepte el envelope completo de acceso.
+La UI, requests y agentes solo pueden aportar la query mínima a la frontera server-side. `VerifiedAccessContext` no acepta `VentureAccessSource`: exige un `DecisionRuntime` final, que conserva la fuente como dependencia privada instalada por el composition root de #218. Un source arbitrario implementado por un caller no satisface la API de emisión.
 
 ## Propiedades
 
 - el constructor de `VerifiedAccessContext` es privado;
-- source + query se revalidan con el contrato canónico de #218;
+- `DecisionRuntime` autentica la sesión, aplica allowlist y resuelve la query mínima con su source privado;
+- el resultado se revalida con el contrato canónico de #218;
 - identity, grant, scope, policy activa, expiración y material sensible fallan cerrado en ese contrato;
 - clone y serialización no reproducen provenance;
 - la emisión no muta lifecycle, grants ni audit;

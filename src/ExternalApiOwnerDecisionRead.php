@@ -53,17 +53,13 @@ final class ExternalApiOwnerDecisionRead
 
     private static function assertAuthorization(array $authorization,string $expectedScope): void
     {
-        $expected=[
-            'decision'=>'allow',
-            'operation_id'=>'owner_decision.read',
-            'capability'=>'owner.decision.read',
-            'mutation'=>false,
-            'scope'=>$expectedScope,
-        ];
-        foreach($expected as $field=>$value){
-            if(!array_key_exists($field,$authorization)||$authorization[$field]!==$value)
-                throw new InvalidArgumentException('Owner decision read not authorized.');
-        }
+        $operation=ExternalApiContract::operation('GET','/api/v1/owner-decisions/{decision_id}');
+        $valid=($authorization['decision']??null)==='allow'
+            &&($authorization['operation_id']??null)===$operation['operation_id']
+            &&($authorization['capability']??null)===$operation['auth_scope']
+            &&($authorization['mutation']??null)===$operation['mutation']
+            &&($authorization['scope']??null)===$expectedScope;
+        if(!$valid) throw new InvalidArgumentException('Owner decision read not authorized.');
     }
 
     private static function options(mixed $raw): array
@@ -84,8 +80,9 @@ final class ExternalApiOwnerDecisionRead
 
     private static function slug(mixed $value,string $label): string
     {
-        if(!is_string($value)||preg_match('/^[a-z][a-z0-9-]{1,63}$/D',$value)!==1)
-            throw new InvalidArgumentException($label.' invalid.');
+        $valid=is_string($value)&&strlen($value)>=2&&strlen($value)<=64
+            &&preg_match('/^[a-z][a-z0-9-]*$/D',$value)===1;
+        if(!$valid) throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
 
@@ -102,23 +99,27 @@ final class ExternalApiOwnerDecisionRead
     private static function nullableTimestamp(mixed $value,string $label): ?int
     {
         if($value===null) return null;
-        if(!is_int($value)||$value<1) throw new InvalidArgumentException($label.' invalid.');
+        self::must(is_int($value)&&$value>0,$label.' invalid.');
         return $value;
     }
 
     private static function oneOf(mixed $value,array $allowed,string $label): string
     {
-        if(!is_string($value)||!in_array($value,$allowed,true))
-            throw new InvalidArgumentException($label.' invalid.');
+        self::must(is_string($value)&&array_search($value,$allowed,true)!==false,$label.' invalid.');
         return $value;
     }
 
     private static function fields(mixed $row,array $expected,string $label): array
     {
-        if(!is_array($row)||array_is_list($row))
-            throw new InvalidArgumentException($label.' invalid.');
-        $actual=array_keys($row);sort($actual,SORT_STRING);sort($expected,SORT_STRING);
-        if($actual!==$expected) throw new InvalidArgumentException($label.' fields invalid.');
+        self::must(is_array($row)&&!array_is_list($row),$label.' invalid.');
+        $actual=array_fill_keys(array_keys($row),true);
+        $wanted=array_fill_keys($expected,true);
+        self::must(count($actual)===count($wanted)&&$actual==$wanted,$label.' fields invalid.');
         return $row;
+    }
+
+    private static function must(bool $condition,string $message): void
+    {
+        if(!$condition) throw new InvalidArgumentException($message);
     }
 }

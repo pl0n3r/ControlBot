@@ -30,6 +30,11 @@ if($scenario==='compatibility'){
         'valid'=>PromptEvaluation::compare(setrow(),$current,$candidate),
         'task'=>rejected(fn()=>PromptEvaluation::compare(setrow(['task_class'=>'other']),$current,$candidate)),
         'set'=>rejected(fn()=>PromptEvaluation::compare(setrow(['version'=>2]),$current,$candidate)),
+        'older_candidate'=>rejected(fn()=>PromptEvaluation::compare(
+            setrow(),
+            resultrow(2,['acceptance_rate'=>0.80,'rework_rate'=>0.20]),
+            resultrow(1,['acceptance_rate'=>0.95,'rework_rate'=>0.10])
+        )),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='metrics'){

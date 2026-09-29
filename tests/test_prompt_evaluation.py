@@ -18,6 +18,7 @@ class PromptEvaluationTests(unittest.TestCase):
         self.assertEqual(data["valid"]["decision"], "candidate_better")
         self.assertTrue(data["task"])
         self.assertTrue(data["set"])
+        self.assertTrue(data["older_candidate"])
 
     def test_metrics_must_be_compatible_finite_and_well_sampled(self):
         data = scenario("metrics")

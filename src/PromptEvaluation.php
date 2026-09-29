@@ -115,7 +115,7 @@ final class PromptEvaluation
                 throw new InvalidArgumentException('Evaluation metrics incompatible.');
         }
         if($current['template_id']!==$candidate['template_id']
-            ||$candidate['prompt_version']===$current['prompt_version']) {
+            ||$candidate['prompt_version']<=$current['prompt_version']) {
             throw new InvalidArgumentException('Prompt versions incompatible.');
         }
     }

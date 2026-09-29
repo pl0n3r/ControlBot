@@ -5,9 +5,8 @@ require_once __DIR__.'/../src/ExternalApiContract.php';
 require_once __DIR__.'/../src/ExternalApiReadProjection.php';
 
 use ControlBot\ExternalApi\ExternalApiReadProjection;
-use InvalidArgumentException;
 
-function bad(callable $fn): bool { try{$fn();return false;}catch(InvalidArgumentException){return true;} }
+function bad(callable $fn): bool { try{$fn();return false;}catch(\InvalidArgumentException){return true;} }
 function meta(array $overrides=[]): array {
     return array_replace([
         'request_id'=>str_repeat('a',32),
@@ -74,6 +73,8 @@ if($case==='cockpit'){
             venture(['venture_ref'=>'controlbot:venture/api_key.value']),
         ])),
         'extra_entry'=>bad(fn()=>ExternalApiReadProjection::ownerInbox(meta(),[entry(['internal_model_id'=>'x'])])),
+        'scalar_venture'=>bad(fn()=>ExternalApiReadProjection::cockpit(meta(),['not-an-object'])),
+        'scalar_entry'=>bad(fn()=>ExternalApiReadProjection::ownerInbox(meta(),['not-an-object'])),
     ];
 }elseif($case==='pure'){
     $reflection=new ReflectionClass(ExternalApiReadProjection::class);

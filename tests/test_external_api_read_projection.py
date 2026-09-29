@@ -12,6 +12,8 @@ def scenario(name):
     )
     if run.returncode != 0:
         raise AssertionError(run.stderr.strip() or f"scenario {name} failed with {run.returncode}")
+    if run.stderr.strip():
+        raise AssertionError(f"scenario {name} wrote to stderr: {run.stderr.strip()}")
     return json.loads(run.stdout)
 
 class ExternalApiReadProjectionTests(unittest.TestCase):

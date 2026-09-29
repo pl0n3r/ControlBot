@@ -54,7 +54,11 @@ final class ExternalApiReadProjection
             throw new InvalidArgumentException('ventures invalid.');
         $out=[];
         foreach($rows as $row){
-            self::fields($row,['venture_ref','business_state','technical_state','pending_decisions','critical_events'],'CockpitVentureSummary');
+            $row=self::fields(
+                $row,
+                ['venture_ref','business_state','technical_state','pending_decisions','critical_events'],
+                'CockpitVentureSummary'
+            );
             $out[]=[
                 'venture_ref'=>self::controlbotRef($row['venture_ref'],'venture_ref'),
                 'business_state'=>self::enumValue($row['business_state'],self::STATES,'business_state'),
@@ -72,7 +76,11 @@ final class ExternalApiReadProjection
             throw new InvalidArgumentException('entries invalid.');
         $out=[];
         foreach($rows as $row){
-            self::fields($row,['entry_id','kind','venture_ref','title','summary','decision_id','deadline_at'],'OwnerInboxEntry');
+            $row=self::fields(
+                $row,
+                ['entry_id','kind','venture_ref','title','summary','decision_id','deadline_at'],
+                'OwnerInboxEntry'
+            );
             $out[]=[
                 'entry_id'=>self::slug($row['entry_id'],'entry_id'),
                 'kind'=>self::enumValue($row['kind'],self::KINDS,'kind'),
@@ -129,10 +137,11 @@ final class ExternalApiReadProjection
         return $value;
     }
 
-    private static function fields(mixed $row,array $expected,string $label): void
+    private static function fields(mixed $row,array $expected,string $label): array
     {
         if(!is_array($row)||array_is_list($row)
             ||array_fill_keys(array_keys($row),true)!=array_fill_keys($expected,true))
             throw new InvalidArgumentException($label.' fields invalid.');
+        return $row;
     }
 }

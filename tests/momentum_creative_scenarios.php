@@ -27,7 +27,10 @@ function variant(string $key='A',string $status='draft'): array {
         'asset_ref'=>'asset:dddddddddddddddddddddddddddddddd','hypothesis_ref'=>null,
         'metric_ref'=>'metric:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','provenance_refs'=>[],'status'=>$status];
 }
-function blocked(callable $fn): bool { try{$fn();return false;}catch(Throwable){return true;} }
+function blocked(callable $fn): bool {
+    try { $fn(); return false; }
+    catch (InvalidArgumentException) { return true; }
+}
 
 $case=$argv[1]??'';
 if($case==='scope'){

@@ -31,7 +31,7 @@ class OwnerInboxTests(unittest.TestCase):
     def test_text_and_refs_are_safe_and_evidence_is_deterministic(self):
         d=scenario("safe")
         self.assertEqual(d["sorted"]["evidence_refs"],["controlbot:evidence/aa","controlbot:evidence/zz"])
-        self.assertTrue(d["duplicate"] and d["html"] and d["secret"])
+        self.assertTrue(d["duplicate"] and d["html"] and d["secret"] and d["mail"] and d["number"])
 
     def test_collection_deduplicates_and_orders_without_hidden_score(self):
         d=scenario("collection")

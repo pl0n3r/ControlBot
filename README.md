@@ -1,49 +1,150 @@
 # ControlBot
 
-Centro de control web **privado** de la fábrica de software de pl0n3r. Es una herramienta separada de Condor, GrindFlow y BRVTAL, y consume la gobernanza de `pl0n3r/factory@v1`.
+> Centro de control web **privado** de la fábrica de software asistida por IA.
 
-## Estado actual
+**Rol en la fábrica:** control plane privado · **Fase:** construcción · **Roadmap:** [épico canónico #1](https://github.com/pl0n3r/ControlBot/issues/1)
 
-- Fase: **construcción**.
-- Versión actual: **0.1.18** (candidato #49: Hostinger Executor tipado, grant-gated y sin transporte real).
-- Stack objetivo: PHP 8.5 + MariaDB.
-- Hosting objetivo: Hostinger, junto a Condor pero con app, base y deploy independientes.
-- Deploy y observer: instalados en modo **fail-closed**; no actúan sin variables/configuración explícita.
-- AutoFactory: puente externo estable. ControlBot lo integra cuando una función lo necesite, pero no se modifica como parte del trabajo actual.
+ControlBot mantiene el modelo operativo de proyectos, agentes, trabajo, decisiones, producción e incidentes. Factory aporta gobernanza; GitHub conserva la fuente de verdad del ciclo de código; FactoryRunner ejecuta trabajo autorizado y AutoFactory sigue como herramienta local/manual separada.
 
-## Orden de implementación
+## Operational Cockpit
 
-1. #2 — adopción del kit Factory v1.
-2. #3 — aprobaciones con un clic.
-3. #4 — centro de decisiones.
-4. Dashboard básico con la dirección visual de #18.
-5. Resto de Issues por prioridad y dependencias.
+<!-- factory:status:start -->
+| Señal | Estado |
+| --- | --- |
+| main SHA | UNKNOWN |
+| versión | UNKNOWN |
+| CI | UNKNOWN |
+| release | UNKNOWN |
+| health | UNKNOWN |
+| smoke/observer | UNKNOWN |
+| quality/security | UNKNOWN |
+| Issue activo | UNKNOWN |
+| PR activo | UNKNOWN |
+| último release | UNKNOWN |
+<!-- factory:status:end -->
 
-## Módulos previstos
+### Progress + Readiness
 
-- Dashboard de producción, trabajo, seguridad y costos.
-- Agentes y estado de latido.
-- Chat y despacho.
-- Decisiones del dueño.
-- Nuevo proyecto.
-- Cuentas y perfiles.
-- Bitácora.
+<!-- factory:progress-readiness:start -->
+| Señal | Estado |
+| --- | --- |
+| Target | UNKNOWN |
+| Progress | UNKNOWN |
+| Readiness | UNKNOWN |
+| Evidence freshness | UNKNOWN |
+| Critical blockers | UNKNOWN |
+| Trend | UNKNOWN |
 
-Especificación completa: #1. Puente del navegador: `pl0n3r/AutoFactory#1`.
+| Dimensión | Progress | Readiness |
+| --- | --- | --- |
+| UNKNOWN | UNKNOWN | UNKNOWN |
+<!-- factory:progress-readiness:end -->
 
-## Desarrollo
+> Estos bloques son derivados. `UNKNOWN`/`PENDING` significa que falta evidencia canónica; nunca se promueve a `GREEN` o `DEGRADED` sin evidencia.
 
-Todo agente debe leer primero `pl0n3r/factory/PLAN-AGENTES.md` y luego `AGENTES.md`. Desde #3 en adelante, cada Issue se reserva con `/tomar`, se trabaja en `trabajo/issue-N` y se valida con Factory v1.
+## Work Queue
+
+- **NOW:** [trabajo reservado/en curso](https://github.com/pl0n3r/ControlBot/issues?q=is%3Aissue+is%3Aopen+label%3A%22estado%3A+reservado%22).
+- **NEXT:** [Issues críticos disponibles](https://github.com/pl0n3r/ControlBot/issues?q=is%3Aissue+is%3Aopen+label%3A%22prioridad%3A+cr%C3%ADtica%22+label%3A%22estado%3A+disponible%22).
+- **LATER:** [épico y planificación canónica #1](https://github.com/pl0n3r/ControlBot/issues/1).
+- **BLOCKED:** [bloqueos vigentes](https://github.com/pl0n3r/ControlBot/issues?q=is%3Aissue+is%3Aopen+label%3A%22estado%3A+bloqueado%22).
+
+Esta vista resume la cola; no reemplaza el épico, los Issues, las decisiones ni el historial de releases.
+
+## Qué hace el producto
+
+ControlBot es el sistema operativo privado de la fábrica. Centraliza:
+
+- dashboard de producción, trabajo, seguridad y costos;
+- proyectos, agentes, sesiones y capacidad;
+- despacho y seguimiento de trabajo;
+- decisiones del dueño e inbox de puertas humanas;
+- observabilidad, incidentes y bitácora;
+- integraciones gobernadas con GitHub, FactoryRunner y el puente de navegador.
+
+El acceso es solo del dueño. Las capacidades sensibles permanecen detrás de autenticación fuerte, policy y trazabilidad.
+
+## Arquitectura en 60 segundos
+
+```mermaid
+flowchart LR
+    O["Dueño"] --> C["ControlBot · control plane"]
+    C --> F["Factory · governance/kit"]
+    C --> R["FactoryRunner · execution plane"]
+    C --> G["GitHub · source of truth"]
+    C --> A["AutoFactory · herramienta local/manual"]
+    C --> P["Productos: Condor / GrindFlow / BRVTAL"]
+```
+
+ControlBot decide y coordina dentro de su autoridad; no reemplaza los contratos de Factory, no ejecuta trabajo arbitrario por shell y no fusiona datos ni código con los productos.
+
+## Stack e infraestructura
+
+**Stack declarado:** PHP 8.5 + MariaDB + GitHub Actions + Hostinger shared hosting.
+
+- app, base de datos y deploy propios;
+- sin procesos Node permanentes ni WebSockets en hosting compartido;
+- tareas periódicas por cron cuando correspondan;
+- tokens y secretos solo server-side;
+- deploy y observación permanecen fail-closed hasta contar con configuración explícita.
+
+## Ciclo de entrega
+
+Issue → `/tomar` → rama canónica → implementación → PR → Factory CI/aceptación/revisión → merge → release/deploy cuando aplique → smoke/observer → evidencia.
+
+Un merge no equivale a go-live ni a producción validada. Las acciones de infraestructura respetan backup, rollback, trazabilidad y puertas humanas vigentes.
+
+## Calidad y seguridad
+
+- Factory v1 gobierna CI, coordinación, aceptación, roles, etiquetas, release, política y privacidad.
+- Estado desconocido falla cerrado; no se inventan señales operativas.
+- Acceso del dueño con autenticación fuerte, CSRF, rate limiting y sesiones cortas.
+- Tokens de GitHub/Sentry y credenciales viven fuera del repositorio.
+- La API del puente acepta llaves por perfil emparejadas y revocables.
+- Login, captcha y verificaciones de cuentas web los realiza manualmente el dueño.
+- Toda acción relevante deja bitácora y las escrituras de infraestructura siguen `decisiones.yml`.
+
+## Roadmap y fuentes de verdad
+
+- **Visión y roadmap:** [Issue #1](https://github.com/pl0n3r/ControlBot/issues/1)
+- **Contrato local:** [`AGENTES.md`](AGENTES.md)
+- **Decisiones del dueño:** [`decisiones.yml`](decisiones.yml)
+- **Tratamientos y fase:** [`datos.yml`](datos.yml)
+- **Trabajo ejecutable:** [GitHub Issues](https://github.com/pl0n3r/ControlBot/issues)
+- **Cambios revisados:** [Pull Requests](https://github.com/pl0n3r/ControlBot/pulls)
+- **Contratos profundos:** [`docs/`](docs/)
+- **Gobernanza común:** [`pl0n3r/factory@v1`](https://github.com/pl0n3r/factory/tree/v1)
+
+El README enlaza estas fuentes; no las sustituye ni crea un roadmap paralelo.
+
+## Desarrollo local
+
+El repositorio usa regresiones Python que ejercitan contratos y escenarios PHP. La validación reproducible principal es:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
+
+Los escenarios PHP requieren PHP 8.5, la misma versión fijada por CI.
+
+## Mapa de la fábrica
+
+- **Factory:** governance/kit y contratos compartidos.
+- **ControlBot:** control plane privado de orquestación, decisiones, observabilidad y UX del dueño.
+- **FactoryRunner:** execution plane autónomo que materializa órdenes autorizadas.
+- **AutoFactory:** herramienta local/manual y puente externo estable; no es el scheduler de ControlBot.
+- **Condor / GrindFlow / BRVTAL:** productos independientes con sus propios datos, runtime y deploy.
+
+La elegibilidad en la cola automática no altera estas responsabilidades.
 
 ## Inbox de decisiones
 
-El inbox descubre puertas humanas abiertas y confiables en los repos configurados, recorre Issues abiertos con paginación acotada y falla cerrado si no puede completar la lectura. En `factory-release` conserva el SHA exacto de `main`, estado de checks y evidencia disponible. El seguimiento de release correlaciona la corrida por workflow, SHA y momento del dispatch; estados ausentes permanecen pendientes en vez de inventarse.
-
+El inbox descubre puertas humanas abiertas y confiables en los repos configurados, recorre Issues con paginación acotada y falla cerrado si no puede completar la lectura. Para `factory-release`, conserva SHA exacto de `main`, checks y evidencia antes de permitir una acción.
 
 ## Runtime privado de decisiones
 
-El runtime de #39 vive en `src/DecisionRuntime.php`: carga el inbox real desde GitHub con allowlist configurada en servidor, inyecta CSRF en las acciones, delega aprobaciones al endpoint seguro existente y conserva en la sesión server-side la correlación del release. No crea `public/`, no habilita deploy y no expone una cabina pública. El seguimiento devuelve evidencia terminal cuando existe una única corrida compatible y bloquea correlaciones ambiguas sin atribuir una ejecución arbitraria.
+El runtime resuelve las acciones del dueño desde contexto server-side, inyecta CSRF, conserva correlación de release y delega mutaciones solo a adapters gobernados. No convierte el dashboard en una cabina pública ni amplía la autoridad del agente.
 
-## Historial de decisiones
+## Historial y bitácora
 
-El corte #43 reutiliza la bitácora append-only existente para exponer un historial privado consolidado por decisión, con filtros server-side por repositorio y categoría. La salida omite actor y campos no allowlisted, solo conserva evidencia HTTPS de GitHub y falla cerrado ante filtros o entradas inválidas. El inbox mantiene prioridad para decisiones que bloquean trabajo y, dentro de esa clase, ordena por antigüedad.
+ControlBot reutiliza una bitácora append-only para exponer historial privado por decisión y filtros server-side. La salida minimiza datos, conserva evidencia HTTPS allowlisted y mantiene prioridad para puertas que bloquean producción o trabajo.

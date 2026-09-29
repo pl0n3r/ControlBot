@@ -1,0 +1,8 @@
+{
+  "name": "ControlBot",
+  "tagline": "Centro de control web privado de la fábrica de software asistida por IA.",
+  "role": "Control plane privado: orquestación, decisiones, observabilidad y UX del dueño.",
+  "phase": "construction",
+  "roadmap": "https://github.com/pl0n3r/ControlBot/issues/1",
+  "stack": "PHP 8.5 + MariaDB + GitHub Actions + Hostinger shared hosting"
+}

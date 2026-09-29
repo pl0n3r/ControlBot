@@ -46,6 +46,9 @@ if($case==='minimal'){
         $extra[$field]=bad(fn()=>ExternalApiPushNotification::payload(raw([$field=>'secret'])));
     $out=[
         'payload'=>$payload,
+        'allowed_word_entity'=>ExternalApiPushNotification::payload(raw([
+            'entity_ref'=>'controlbot:incident/title-email-reference',
+        ])),
         'extra'=>$extra,
         'sensitive_entity'=>bad(fn()=>ExternalApiPushNotification::payload(raw(['entity_ref'=>'controlbot:incident/password.value']))),
         'external_entity'=>bad(fn()=>ExternalApiPushNotification::payload(raw(['entity_ref'=>'https://example.test/detail']))),
@@ -84,6 +87,9 @@ if($case==='minimal'){
             'previous_dedupe_key'=>$same,'previous_delivered_at'=>1450,
         ])),
         'rate_limited'=>ExternalApiPushNotification::deliveryPolicy(raw(),context(['rate_delivered_count'=>3])),
+        'dedupe_exact_window'=>ExternalApiPushNotification::deliveryPolicy(raw(),context([
+            'previous_dedupe_key'=>$same,'previous_delivered_at'=>1200,
+        ])),
         'dedupe_window_elapsed'=>ExternalApiPushNotification::deliveryPolicy(raw(),context([
             'previous_dedupe_key'=>$same,'previous_delivered_at'=>1100,
         ])),

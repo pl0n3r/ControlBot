@@ -23,9 +23,15 @@ class ExternalApiPushNotificationTests(unittest.TestCase):
         payload=d["payload"]
         self.assertTrue(payload["requires_authenticated_detail"])
         self.assertEqual(payload["localization_key"],"push.critical_incident")
+        for forbidden in ("title","body","amount","email","device_token","provider_credential"):
+            self.assertNotIn(forbidden,payload)
         serialized=json.dumps(payload,sort_keys=True).lower()
-        for forbidden in ("title","body","amount","email","device_token","provider_credential","http://","https://"):
+        for forbidden in ("http://","https://"):
             self.assertNotIn(forbidden,serialized)
+
+    def test_payload_allows_non_sensitive_words_inside_entity_ref_values(self):
+        payload=scenario("minimal")["allowed_word_entity"]
+        self.assertEqual(payload["entity_ref"],"controlbot:incident/title-email-reference")
 
     def test_detail_operation_is_existing_public_get_and_requires_authenticated_fetch(self):
         d=scenario("detail")
@@ -53,6 +59,12 @@ class ExternalApiPushNotificationTests(unittest.TestCase):
         self.assertEqual(d["rate_limited"]["reasons"],["rate_limited"])
         self.assertEqual(d["dedupe_window_elapsed"]["decision"],"deliver")
         self.assertEqual(d["rate_window_elapsed"]["decision"],"deliver")
+
+    def test_dedupe_exact_window_boundary_is_not_duplicate(self):
+        row=scenario("policy")["dedupe_exact_window"]
+        self.assertEqual(row["decision"],"deliver")
+        self.assertFalse(row["duplicate"])
+        self.assertNotIn("duplicate",row["reasons"])
 
     def test_payload_rejects_device_tokens_credentials_external_urls_and_extra_fields(self):
         d=scenario("minimal")

@@ -18,7 +18,7 @@ class RecoveryWorkOriginTests(unittest.TestCase):
 
     def test_authority_priority_type_capabilities_roles_and_policy_are_explicit_inputs(self):
         item=scenario("explicit")
-        self.assertEqual(item["authority_level"],"owner-reviewed")
+        self.assertEqual(item["authority_level"],"owner_reviewed")
         self.assertEqual(item["priority_class"],"critical")
         self.assertEqual(item["work_type"],"operations")
         self.assertEqual(item["requested_capabilities"],["incident.repair"])

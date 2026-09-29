@@ -1,0 +1,72 @@
+<?php
+declare(strict_types=1);
+
+require __DIR__.'/../src/SchedulerCore.php';
+
+use ControlBot\Scheduler\SchedulerCore;
+
+function work(string $id,string $project='project-a',array $deps=[],array $claims=[]): array {
+    return [
+        'work_item'=>[
+            'version'=>1,'work_item_id'=>$id,'project_id'=>$project,'source_ref'=>'pl0n3r/ControlBot#214',
+            'type'=>'feature','priority'=>'high','state'=>'queued','dependency_ids'=>array_keys($deps),
+            'required_capabilities'=>['php'],'generation'=>1,'attempt'=>1,'reservation_id'=>null,'assigned_session_id'=>null,
+        ],
+        'dependency_states'=>$deps,'claims'=>$claims,
+    ];
+}
+function presence(int $idle=3,string $state='idle_capacity'): array {
+    return [
+        'version'=>1,'policy_ref'=>'factory-dispatcher-v2','observed_at'=>1000,
+        'presence_state'=>'multi','capacity_state'=>$state,'healthy_sessions'=>3,'idle_capacity'=>$idle,
+        'sessions'=>[],'accounts'=>[],
+    ];
+}
+function constraints(array $claims=[],array $projects=[]): array {
+    return ['active_claims'=>$claims,'project_concurrency'=>$projects];
+}
+function known(int $limit=4,int $active=0): array { return ['state'=>'known','limit'=>$limit,'active'=>$active]; }
+function unknown(): array { return ['state'=>'unknown','limit'=>null,'active'=>null]; }
+
+$case=$argv[1]??'';
+if($case==='idle_bound'){
+    $rows=[work('work-a'),work('work-b'),work('work-c')];
+    $ctx=constraints([],['project-a'=>known(5,0)]);
+    $small=SchedulerCore::dispatchableCapacity(presence(2),$rows,$ctx);
+    $large=SchedulerCore::dispatchableCapacity(presence(50),$rows,$ctx);
+    echo json_encode(compact('small','large'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($case==='dependencies'){
+    $rows=[work('work-a','project-a',['dep-a'=>'open']),work('work-b','project-a',[])];
+    $out=SchedulerCore::dispatchableCapacity(presence(3),$rows,constraints([],['project-a'=>known(3,0)]));
+    echo json_encode($out,JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($case==='claims'){
+    $rows=[work('work-a','project-a',[],['src/shared.php']),work('work-b','project-a',[],['src/free.php'])];
+    $reserved=[['claim'=>'src/shared.php','owner_work_item_id'=>'work-existing']];
+    $active=SchedulerCore::dispatchableCapacity(presence(3),$rows,constraints($reserved,['project-a'=>known(3,0)]));
+    $peerRows=[work('work-a','project-a',[],['src/shared.php']),work('work-b','project-a',[],['src/shared.php'])];
+    $peer=SchedulerCore::dispatchableCapacity(presence(3),$peerRows,constraints([],['project-a'=>known(3,0)]));
+    echo json_encode(compact('active','peer'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($case==='concurrency'){
+    $rows=[work('work-a'),work('work-b'),work('work-c')];
+    $out=SchedulerCore::dispatchableCapacity(presence(5),$rows,constraints([],['project-a'=>known(2,1)]));
+    echo json_encode($out,JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($case==='unknown'){
+    $dep=SchedulerCore::dispatchableCapacity(
+        presence(4),[work('work-a','project-a',['dep-a'=>'unknown'])],constraints([],['project-a'=>known()])
+    );
+    $policy=SchedulerCore::dispatchableCapacity(
+        presence(4),[work('work-a')],constraints([],['project-a'=>unknown()])
+    );
+    echo json_encode(compact('dep','policy'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($case==='contract'){
+    $out=SchedulerCore::dispatchableCapacity(
+        presence(2),[work('work-b'),work('work-a')],constraints([],['project-a'=>known(2,0)])
+    );
+    echo json_encode($out,JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+fwrite(STDERR,"Unknown scheduler scenario\n"); exit(2);

@@ -93,6 +93,83 @@ final class SchedulerCore
         ];
     }
 
+    public static function dispatchableCapacity(array $presenceRaw,array $workRows,array $constraints): array
+    {
+        $presence=self::presenceCapacity($presenceRaw);
+        if(!array_is_list($workRows)||count($workRows)>64) throw new InvalidArgumentException('Dispatch work rows invalid.');
+        self::fields($constraints,['active_claims','project_concurrency'],'DispatchConstraints');
+        $activeClaims=self::activeClaims($constraints['active_claims']);
+
+        $work=[]; $projects=[];
+        foreach($workRows as $raw){
+            self::fields($raw,['work_item','dependency_states','claims'],'DispatchWork');
+            if(!is_array($raw['work_item'])) throw new InvalidArgumentException('Dispatch WorkItem invalid.');
+            $item=self::workItem($raw['work_item']);
+            if(isset($work[$item['work_item_id']])) throw new InvalidArgumentException('Dispatch WorkItem duplicated.');
+            $deps=self::dependencyStates($raw['dependency_states'],$item['dependency_ids']);
+            $claims=self::resourceClaims($raw['claims']);
+            $projects[$item['project_id']]=true;
+            $work[$item['work_item_id']]=['item'=>$item,'deps'=>$deps,'claims'=>$claims,'reasons'=>[]];
+        }
+        $concurrency=self::projectConcurrency($constraints['project_concurrency'],array_keys($projects));
+
+        foreach($work as $id=>&$row){
+            $item=$row['item']; $reasons=[];
+            if(!in_array($item['state'],['queued','eligible'],true)) $reasons[]='workitem_not_dispatchable';
+            foreach($row['deps'] as $state){
+                if($state==='open') $reasons[]='pending_dependencies';
+                elseif($state==='unknown') $reasons[]='critical_constraint_unknown';
+            }
+            foreach($row['claims'] as $claim){
+                if(isset($activeClaims[$claim]) && $activeClaims[$claim]!==$id) $reasons[]='claim_conflict';
+                elseif(isset($activeClaims[$claim])) $reasons[]='claim_already_owned';
+            }
+            $project=$concurrency[$item['project_id']];
+            if($project['state']==='unknown') $reasons[]='critical_constraint_unknown';
+            elseif($project['active'] >= $project['limit']) $reasons[]='project_concurrency_exhausted';
+            $row['reasons']=array_values(array_unique($reasons)); sort($row['reasons']);
+        }
+        unset($row);
+
+        $eligible=array_filter($work,static fn(array $row):bool=>$row['reasons']===[]);
+        $readyCount=count($eligible);
+        $claimBound=self::claimLaneBound($eligible);
+        $projectCounts=[];
+        foreach($eligible as $row){
+            $project=$row['item']['project_id'];
+            $projectCounts[$project]=($projectCounts[$project]??0)+1;
+        }
+        $concurrencyBound=0;
+        foreach($projectCounts as $project=>$count){
+            $rule=$concurrency[$project];
+            $remaining=max(0,$rule['limit']-$rule['active']);
+            $concurrencyBound+=min($count,$remaining);
+        }
+
+        $idle=$presence['idle_capacity'];
+        $dispatchable=min($idle,$readyCount,$claimBound,$concurrencyBound);
+        $reasons=[];
+        if($idle===0) $reasons[]='authoritative_capacity_unavailable';
+        if($readyCount<count($work)) $reasons[]='work_constraints';
+        if($claimBound<$readyCount) $reasons[]='claim_contention';
+        if($concurrencyBound<$readyCount) $reasons[]='project_concurrency';
+        foreach($work as $row) if(in_array('critical_constraint_unknown',$row['reasons'],true)) {$reasons[]='critical_constraint_unknown';break;}
+        $reasons=array_values(array_unique($reasons)); sort($reasons);
+
+        $views=[];
+        foreach($work as $id=>$row){
+            $views[]=['work_item_id'=>$id,'eligible'=>$row['reasons']===[],'reasons'=>$row['reasons']];
+        }
+        usort($views,static fn(array $a,array $b):int=>$a['work_item_id']<=>$b['work_item_id']);
+
+        return [
+            'version'=>1,'policy_ref'=>'factory-dispatcher-v2',
+            'authoritative_idle_capacity'=>$idle,'dispatchable_capacity'=>$dispatchable,
+            'ready_work_items'=>$readyCount,'claim_lanes'=>$claimBound,'concurrency_slots'=>$concurrencyBound,
+            'reasons'=>$reasons,'work_items'=>$views,
+        ];
+    }
+
     public static function candidate(array $workRaw,array $context): array
     {
         $work=self::workItem($workRaw);
@@ -139,12 +216,120 @@ final class SchedulerCore
     private static function capacity(mixed $raw): array
     {
         self::fields($raw,['account_id','eligible','free_capacity','session_ids'],'Capacity');
-        if(!is_bool($raw['eligible'])||!is_int($raw['free_capacity'])||$raw['free_capacity']<0||$raw['free_capacity']>32
+        if(!is_bool($raw['eligible'])||!is_int($raw['free_capacity'])||$raw['free_capacity']<0
             || $raw['eligible']!==($raw['free_capacity']>0)) throw new InvalidArgumentException('Capacity invalid.');
         return [
             'account_id'=>self::ref($raw['account_id'],'account_id'),'eligible'=>$raw['eligible'],
             'free_capacity'=>$raw['free_capacity'],'session_ids'=>self::unique($raw['session_ids'],'capacity.session_ids','ref'),
         ];
+    }
+
+    private static function presenceCapacity(array $raw): array
+    {
+        self::fields($raw,[
+            'version','policy_ref','observed_at','presence_state','capacity_state',
+            'healthy_sessions','idle_capacity','sessions','accounts',
+        ],'PresenceSnapshot');
+        if($raw['version']!==1||$raw['policy_ref']!=='factory-dispatcher-v2'
+            ||!is_int($raw['idle_capacity'])||$raw['idle_capacity']<0
+            ||!in_array($raw['capacity_state'],['idle_capacity','saturated','degraded','unknown'],true)
+            ||!is_array($raw['sessions'])||!array_is_list($raw['sessions'])
+            ||!is_array($raw['accounts'])||!array_is_list($raw['accounts'])) {
+            throw new InvalidArgumentException('Presence capacity invalid.');
+        }
+        if(($raw['capacity_state']==='idle_capacity')!==($raw['idle_capacity']>0))
+            throw new InvalidArgumentException('Presence capacity state mismatch.');
+        return ['idle_capacity'=>$raw['idle_capacity']];
+    }
+
+    private static function activeClaims(mixed $rows): array
+    {
+        if(!is_array($rows)||!array_is_list($rows)||count($rows)>128) throw new InvalidArgumentException('active_claims invalid.');
+        $out=[];
+        foreach($rows as $row){
+            self::fields($row,['claim','owner_work_item_id'],'ActiveClaim');
+            $claim=self::resourceClaim($row['claim']);
+            $owner=self::id($row['owner_work_item_id'],'owner_work_item_id');
+            if(isset($out[$claim])) throw new InvalidArgumentException('Active claim duplicated.');
+            $out[$claim]=$owner;
+        }
+        return $out;
+    }
+
+    private static function projectConcurrency(mixed $raw,array $projectIds): array
+    {
+        if(!is_array($raw)||($raw!==[]&&array_is_list($raw))) throw new InvalidArgumentException('project_concurrency invalid.');
+        sort($projectIds); $keys=array_keys($raw); sort($keys);
+        if($keys!==$projectIds) throw new InvalidArgumentException('project_concurrency mismatch.');
+        $out=[];
+        foreach($projectIds as $project){
+            $row=$raw[$project]??null;
+            self::fields($row,['state','limit','active'],'ProjectConcurrency');
+            if(!is_string($row['state'])||!in_array($row['state'],['known','unknown'],true))
+                throw new InvalidArgumentException('Project concurrency state invalid.');
+            if($row['state']==='unknown'){
+                if($row['limit']!==null||$row['active']!==null) throw new InvalidArgumentException('Unknown concurrency must not assert limits.');
+                $out[$project]=['state'=>'unknown','limit'=>0,'active'=>0];
+                continue;
+            }
+            if(!is_int($row['limit'])||$row['limit']<0||!is_int($row['active'])||$row['active']<0||$row['active']>$row['limit'])
+                throw new InvalidArgumentException('Project concurrency invalid.');
+            $out[$project]=['state'=>'known','limit'=>$row['limit'],'active'=>$row['active']];
+        }
+        return $out;
+    }
+
+    private static function resourceClaims(mixed $values): array
+    {
+        if(!is_array($values)||!array_is_list($values)||count($values)>64) throw new InvalidArgumentException('claims invalid.');
+        $out=[];
+        foreach($values as $value){
+            $claim=self::resourceClaim($value);
+            if(in_array($claim,$out,true)) throw new InvalidArgumentException('claim duplicated.');
+            $out[]=$claim;
+        }
+        sort($out); return $out;
+    }
+
+    private static function resourceClaim(mixed $value): string
+    {
+        if(!is_string($value)||strlen($value)<1||strlen($value)>200||str_starts_with($value,'/')
+            ||preg_match('/^[A-Za-z0-9._\/-]+$/D',$value)!==1
+            ||preg_match('/(?:^|\/)\.\.(?:\/|$)/',$value)===1
+            ||preg_match('/(?:^|\/)(?:\.env|secrets?|tokens?|credentials?)(?:\.|\/|$)/i',$value)===1)
+            throw new InvalidArgumentException('claim invalid.');
+        return $value;
+    }
+
+    private static function claimLaneBound(array $eligible): int
+    {
+        if($eligible===[]) return 0;
+        $parent=[]; $claimOwner=[];
+        foreach($eligible as $id=>$row){
+            $parent[$id]=$id;
+            foreach($row['claims'] as $claim){
+                if(isset($claimOwner[$claim])) self::union($parent,$id,$claimOwner[$claim]);
+                else $claimOwner[$claim]=$id;
+            }
+        }
+        $roots=[];
+        foreach(array_keys($parent) as $id) $roots[self::root($parent,$id)]=true;
+        return count($roots);
+    }
+
+    private static function union(array &$parent,string $a,string $b): void
+    {
+        $ra=self::root($parent,$a); $rb=self::root($parent,$b);
+        if($ra!==$rb) $parent[$rb]=$ra;
+    }
+
+    private static function root(array &$parent,string $id): string
+    {
+        while($parent[$id]!==$id){
+            $parent[$id]=$parent[$parent[$id]];
+            $id=$parent[$id];
+        }
+        return $id;
     }
 
     private static function unique(mixed $values,string $label,string $kind): array

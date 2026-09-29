@@ -13,6 +13,7 @@ final class ExternalApiReadProjection
 
     public static function cockpit(array $meta,array $ventures): array
     {
+        self::readOperation('/api/v1/cockpit','cockpit.read');
         return [
             'meta'=>self::meta($meta),
             'data'=>['ventures'=>self::ventures($ventures)],
@@ -21,6 +22,7 @@ final class ExternalApiReadProjection
 
     public static function ownerInbox(array $meta,array $entries): array
     {
+        self::readOperation('/api/v1/owner-inbox','owner_inbox.read');
         return [
             'meta'=>self::meta($meta),
             'data'=>['entries'=>self::entries($entries)],
@@ -30,30 +32,20 @@ final class ExternalApiReadProjection
     private static function meta(array $raw): array
     {
         self::fields($raw,['request_id','correlation_id','generated_at','freshness'],'ResponseMetaInput');
-        $freshness=self::freshness($raw['freshness']);
-        return [
+        return ExternalApiContract::responseMeta([
             'version'=>1,
-            'request_id'=>self::hexId($raw['request_id'],'request_id'),
-            'correlation_id'=>self::hexId($raw['correlation_id'],'correlation_id'),
-            'generated_at'=>self::positiveInt($raw['generated_at'],'generated_at'),
-            'freshness'=>$freshness,
-        ];
+            'request_id'=>$raw['request_id'],
+            'correlation_id'=>$raw['correlation_id'],
+            'generated_at'=>$raw['generated_at'],
+            'freshness'=>$raw['freshness'],
+        ]);
     }
 
-    private static function freshness(mixed $raw): array
+    private static function readOperation(string $path,string $expectedId): void
     {
-        self::fields($raw,['state','observed_at','source_ref'],'Freshness');
-        $state=self::enumValue($raw['state'],self::STATES,'freshness.state');
-        if($state==='unknown'){
-            if($raw['observed_at']!==null||$raw['source_ref']!==null)
-                throw new InvalidArgumentException('unknown freshness provenance invalid.');
-            return ['state'=>'unknown','observed_at'=>null,'source_ref'=>null];
-        }
-        return [
-            'state'=>$state,
-            'observed_at'=>self::positiveInt($raw['observed_at'],'observed_at'),
-            'source_ref'=>self::controlbotRef($raw['source_ref'],'source_ref'),
-        ];
+        $operation=ExternalApiContract::operation('GET',$path);
+        if(($operation['operation_id']??null)!==$expectedId||($operation['mutation']??true)!==false)
+            throw new InvalidArgumentException('Public read operation invalid.');
     }
 
     private static function ventures(array $rows): array
@@ -104,16 +96,11 @@ final class ExternalApiReadProjection
 
     private static function text(mixed $value,string $label,int $max): string
     {
-        if(!is_string($value)||$value===''||strlen($value)>$max||preg_match(self::SENSITIVE,$value)===1)
+        $clean=is_string($value)?trim($value):'';
+        $count=preg_match_all('/./us',$clean,$characters);
+        if($clean===''||$count===false||$count>$max||preg_match('/[\x00-\x1f\x7f]/',$clean)===1)
             throw new InvalidArgumentException($label.' invalid.');
-        return $value;
-    }
-
-    private static function hexId(mixed $value,string $label): string
-    {
-        if(!is_string($value)||preg_match('/^[a-f0-9]{32}$/D',$value)!==1)
-            throw new InvalidArgumentException($label.' invalid.');
-        return $value;
+        return $clean;
     }
 
     private static function slug(mixed $value,string $label): string

@@ -13,7 +13,7 @@ final class ExecutiveCockpit
     private const HEALTH=['healthy','degraded','critical','unknown'];
     private const CLASSES=['fyi','watch','decision','critical'];
     private const SENSITIVE='/(?:-----BEGIN [^-]*PRIVATE KEY-----|\bBearer\s+\S+|(?:password|passwd|secret|token|api[_ -]?key|private[_ -]?key)\s*[:=]\s*\S+)/i';
-    private const DIRECT_PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?[0-9][0-9(). -]{7,}[0-9])/i';
+    private const DIRECT_PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?(?=(?:[0-9(). -]*[0-9]){10})[0-9][0-9(). -]{7,}[0-9])/i';
 
     public static function build(array $rows): array
     {

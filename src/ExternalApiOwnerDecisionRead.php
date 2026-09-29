@@ -8,7 +8,6 @@ use InvalidArgumentException;
 
 final class ExternalApiOwnerDecisionRead
 {
-    private const STATES=['pending','resolved','expired','blocked'];
     private const SENSITIVE='/(?:\b(?:password|passwd|secret|token|cookie|authorization|bearer|credential|otp|dsn)\b|private[_ -]?key|public[_ -]?key|api[_ -]?key|user[_ -]?id|customer[_ -]?id)/i';
     private const DIRECT_PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+\d{1,3}(?:[ .()\-]?\d){7,14}|\(\d{2,3}\)[ .\-]?\d{3,4}[ .\-]?\d{4}|\b\d{3}[ .\-]\d{3}[ .\-]\d{4}\b)/i';
 
@@ -26,8 +25,8 @@ final class ExternalApiOwnerDecisionRead
         );
         self::assertAuthorization($authorization,$expectedScope);
         $requestedDecisionId=self::slug($requestedDecisionId,'decision_id');
-        self::fields($meta,['request_id','correlation_id','generated_at','freshness'],'ResponseMetaInput');
-        $detail=self::fields(
+        self::exactObject($meta,['request_id','correlation_id','generated_at','freshness'],'ResponseMetaInput');
+        $detail=self::exactObject(
             $detail,
             ['decision_id','category','title','question','options','state','deadline_at'],
             'OwnerDecisionData'
@@ -45,8 +44,8 @@ final class ExternalApiOwnerDecisionRead
                 'title'=>self::text($detail['title'],'title',160),
                 'question'=>self::text($detail['question'],'question',1000),
                 'options'=>self::options($detail['options']),
-                'state'=>self::oneOf($detail['state'],self::STATES,'state'),
-                'deadline_at'=>self::nullableTimestamp($detail['deadline_at'],'deadline_at'),
+                'state'=>self::state($detail['state']),
+                'deadline_at'=>self::deadline($detail['deadline_at']),
             ],
         ];
     }
@@ -68,7 +67,7 @@ final class ExternalApiOwnerDecisionRead
             throw new InvalidArgumentException('options invalid.');
         $out=[];$seen=[];
         foreach($raw as $row){
-            $row=self::fields($row,['key','label'],'DecisionOption');
+            $row=self::exactObject($row,['key','label'],'DecisionOption');
             $key=$row['key'];
             if(!is_string($key)||preg_match('/^[A-D]$/D',$key)!==1||isset($seen[$key]))
                 throw new InvalidArgumentException('option key invalid.');
@@ -96,26 +95,28 @@ final class ExternalApiOwnerDecisionRead
         return $clean;
     }
 
-    private static function nullableTimestamp(mixed $value,string $label): ?int
+    private static function state(mixed $value): string
+    {
+        if(!is_string($value)) throw new InvalidArgumentException('state invalid.');
+        return match($value){
+            'pending','resolved','expired','blocked'=>$value,
+            default=>throw new InvalidArgumentException('state invalid.'),
+        };
+    }
+
+    private static function deadline(mixed $value): ?int
     {
         if($value===null) return null;
-        if(!is_int($value)||$value<=0) throw new InvalidArgumentException($label.' invalid.');
-        return $value;
+        if(is_int($value)&&$value>0) return $value;
+        throw new InvalidArgumentException('deadline_at invalid.');
     }
 
-    private static function oneOf(mixed $value,array $allowed,string $label): string
+    private static function exactObject(mixed $value,array $keys,string $label): array
     {
-        if(!is_string($value)||array_search($value,$allowed,true)===false)
+        if(!is_array($value)||array_is_list($value)||count($value)!==count($keys))
             throw new InvalidArgumentException($label.' invalid.');
+        foreach($keys as $key)
+            if(!array_key_exists($key,$value)) throw new InvalidArgumentException($label.' fields invalid.');
         return $value;
-    }
-
-    private static function fields(mixed $row,array $expected,string $label): array
-    {
-        if(!is_array($row)||array_is_list($row)) throw new InvalidArgumentException($label.' invalid.');
-        $keys=array_keys($row);
-        if(count($keys)!==count($expected)||array_diff($keys,$expected)!==[]||array_diff($expected,$keys)!==[])
-            throw new InvalidArgumentException($label.' fields invalid.');
-        return $row;
     }
 }

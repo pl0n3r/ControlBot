@@ -5,8 +5,7 @@ require __DIR__ . '/../src/InfrastructureProvider.php';
 require __DIR__ . '/../src/RecoveryProfile.php';
 
 use ControlBot\Infrastructure\RecoveryProfile;
-
-$name = $argv[1] ?? '';
+use InvalidArgumentException;
 
 function profile(array $overrides = []): array
 {
@@ -14,16 +13,8 @@ function profile(array $overrides = []): array
         'version' => 1,
         'project_ref' => 'controlbot:project/project-controlbot',
         'manifest_ref' => 'controlbot:recovery-manifest/project-controlbot-v1',
-        'targets' => [
-            'rpo_minutes' => 15,
-            'rto_minutes' => 60,
-        ],
-        'retention' => [
-            'hourly' => 24,
-            'daily' => 7,
-            'weekly' => 8,
-            'monthly' => 12,
-        ],
+        'targets' => ['rpo_minutes' => 15, 'rto_minutes' => 60],
+        'retention' => ['hourly' => 24, 'daily' => 7, 'weekly' => 8, 'monthly' => 12],
         'sources' => [
             'database' => 'required',
             'media' => 'not_applicable',
@@ -55,84 +46,55 @@ function rejected(callable $fn): array
     }
 }
 
-if ($name === 'valid') {
-    $normalized = RecoveryProfile::normalize(profile());
-    $out = [
-        'profile' => $normalized,
-        'effective_status' => RecoveryProfile::effectiveStatus($normalized),
-    ];
-} elseif ($name === 'explicit-not-applicable') {
-    $out = RecoveryProfile::normalize(profile([
-        'sources' => [
-            'database' => 'not_applicable',
-            'media' => 'required',
-            'repository' => 'required',
-            'configuration' => 'not_applicable',
-        ],
-    ]));
-} elseif ($name === 'unknown-source-state') {
-    $out = rejected(static fn() => RecoveryProfile::normalize(profile([
-        'sources' => ['database' => 'optional'],
-    ])));
-} elseif ($name === 'all-not-applicable') {
-    $out = rejected(static fn() => RecoveryProfile::normalize(profile([
-        'sources' => [
-            'database' => 'not_applicable',
-            'media' => 'not_applicable',
-            'repository' => 'not_applicable',
-            'configuration' => 'not_applicable',
-        ],
-    ])));
-} elseif ($name === 'bad-strategy') {
-    $out = rejected(static fn() => RecoveryProfile::normalize(profile([
-        'strategy' => ['copies_required' => 2],
-    ])));
-} elseif ($name === 'bad-rpo') {
-    $out = rejected(static fn() => RecoveryProfile::normalize(profile([
-        'targets' => ['rpo_minutes' => 0],
-    ])));
-} elseif ($name === 'empty-retention') {
-    $out = rejected(static fn() => RecoveryProfile::normalize(profile([
-        'retention' => ['hourly' => 0, 'daily' => 0, 'weekly' => 0, 'monthly' => 0],
-    ])));
-} elseif ($name === 'unknown-field') {
-    $out = rejected(static fn() => RecoveryProfile::normalize([
-        ...profile(),
-        'provider' => 'vendor-one',
-    ]));
-} elseif ($name === 'sensitive-manifest-ref') {
-    $out = rejected(static fn() => RecoveryProfile::normalize(profile([
-        'manifest_ref' => 'controlbot:recovery-manifest/token-secret-value',
-    ])));
-} elseif ($name === 'encryption-disabled') {
-    $out = rejected(static fn() => RecoveryProfile::normalize(profile([
-        'encryption_required' => false,
-    ])));
-} elseif ($name === 'stale') {
-    $candidate = profile(['freshness' => 'stale']);
-    $out = ['effective_status' => RecoveryProfile::effectiveStatus($candidate)];
-} elseif ($name === 'unknown') {
-    $candidate = profile([
-        'freshness' => 'unknown',
-        'source_ref' => null,
-        'observed_at' => null,
-    ]);
-    $out = ['effective_status' => RecoveryProfile::effectiveStatus($candidate)];
-} elseif ($name === 'unknown-with-provenance') {
-    $out = rejected(static fn() => RecoveryProfile::normalize(profile([
-        'freshness' => 'unknown',
-    ])));
-} elseif ($name === 'stale-without-provenance') {
-    $out = rejected(static fn() => RecoveryProfile::normalize(profile([
-        'freshness' => 'stale',
-        'source_ref' => null,
-        'observed_at' => null,
-    ])));
-} elseif ($name === 'missing-profile') {
-    $out = ['effective_status' => RecoveryProfile::effectiveStatus(null)];
-} else {
-    fwrite(STDERR, "scenario invalid\n");
-    exit(2);
-}
+$case = $argv[1] ?? '';
+$out = match ($case) {
+    'valid' => [
+        'profile' => RecoveryProfile::normalize(profile()),
+        'effective_status' => RecoveryProfile::effectiveStatus(profile()),
+    ],
+    'explicit-not-applicable' => RecoveryProfile::normalize(profile(['sources' => [
+        'database' => 'not_applicable', 'media' => 'required',
+        'repository' => 'required', 'configuration' => 'not_applicable',
+    ]])),
+    'unknown-source-state' => rejected(fn() => RecoveryProfile::normalize(
+        profile(['sources' => ['database' => 'optional']])
+    )),
+    'all-not-applicable' => rejected(fn() => RecoveryProfile::normalize(profile(['sources' => [
+        'database' => 'not_applicable', 'media' => 'not_applicable',
+        'repository' => 'not_applicable', 'configuration' => 'not_applicable',
+    ]]))),
+    'bad-strategy' => rejected(fn() => RecoveryProfile::normalize(
+        profile(['strategy' => ['copies_required' => 2]])
+    )),
+    'bad-rpo' => rejected(fn() => RecoveryProfile::normalize(
+        profile(['targets' => ['rpo_minutes' => 0]])
+    )),
+    'empty-retention' => rejected(fn() => RecoveryProfile::normalize(profile(['retention' => [
+        'hourly' => 0, 'daily' => 0, 'weekly' => 0, 'monthly' => 0,
+    ]]))),
+    'unknown-field' => rejected(fn() => RecoveryProfile::normalize([
+        ...profile(), 'provider' => 'vendor-one',
+    ])),
+    'sensitive-manifest-ref' => rejected(fn() => RecoveryProfile::normalize(
+        profile(['manifest_ref' => 'controlbot:recovery-manifest/token-secret-value'])
+    )),
+    'encryption-disabled' => rejected(fn() => RecoveryProfile::normalize(
+        profile(['encryption_required' => false])
+    )),
+    'stale' => ['effective_status' => RecoveryProfile::effectiveStatus(
+        profile(['freshness' => 'stale'])
+    )],
+    'unknown' => ['effective_status' => RecoveryProfile::effectiveStatus(profile([
+        'freshness' => 'unknown', 'source_ref' => null, 'observed_at' => null,
+    ]))],
+    'unknown-with-provenance' => rejected(fn() => RecoveryProfile::normalize(
+        profile(['freshness' => 'unknown'])
+    )),
+    'stale-without-provenance' => rejected(fn() => RecoveryProfile::normalize(profile([
+        'freshness' => 'stale', 'source_ref' => null, 'observed_at' => null,
+    ]))),
+    'missing-profile' => ['effective_status' => RecoveryProfile::effectiveStatus(null)],
+    default => throw new InvalidArgumentException('scenario invalid'),
+};
 
 echo json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

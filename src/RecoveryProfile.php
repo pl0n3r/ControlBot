@@ -9,7 +9,7 @@ final class RecoveryProfile
 {
     private const FRESHNESS = ['fresh', 'stale', 'unknown'];
     private const APPLICABILITY = ['required', 'not_applicable'];
-    private const SOURCE_KEYS = ['database', 'media', 'repository', 'configuration'];
+    private const SOURCES = ['database', 'media', 'repository', 'configuration'];
 
     public static function normalize(array $raw): array
     {
@@ -18,27 +18,21 @@ final class RecoveryProfile
             'sources', 'strategy', 'encryption_required',
             'restore_drill_cadence_hours', 'source_ref', 'observed_at', 'freshness',
         ], 'RecoveryProfile');
-
         if (($raw['version'] ?? null) !== 1) {
             throw new InvalidArgumentException('RecoveryProfile version invalid.');
         }
 
         $freshness = InfrastructureProvider::normalizeEnum(
-            $raw['freshness'],
-            self::FRESHNESS,
-            'recovery.freshness',
+            $raw['freshness'], self::FRESHNESS, 'recovery.freshness'
         );
-        $sourceRef = self::nullableReference($raw['source_ref'], 'recovery.source_ref');
+        $sourceRef = self::nullableRef($raw['source_ref'], 'recovery.source_ref');
         $observedAt = self::nullableTimestamp($raw['observed_at'], 'recovery.observed_at');
-
-        if ($freshness === 'unknown') {
-            if ($sourceRef !== null || $observedAt !== null) {
-                throw new InvalidArgumentException('RecoveryProfile unknown must not imply provenance.');
-            }
-        } elseif ($sourceRef === null || $observedAt === null) {
+        if ($freshness === 'unknown' && ($sourceRef !== null || $observedAt !== null)) {
+            throw new InvalidArgumentException('RecoveryProfile unknown must not imply provenance.');
+        }
+        if ($freshness !== 'unknown' && ($sourceRef === null || $observedAt === null)) {
             throw new InvalidArgumentException('RecoveryProfile provenance required.');
         }
-
         if (($raw['encryption_required'] ?? null) !== true) {
             throw new InvalidArgumentException('RecoveryProfile encryption must be required.');
         }
@@ -46,24 +40,18 @@ final class RecoveryProfile
         return [
             'version' => 1,
             'project_ref' => self::prefixedRef(
-                $raw['project_ref'],
-                'recovery.project_ref',
-                'controlbot:project/',
+                $raw['project_ref'], 'recovery.project_ref', 'controlbot:project/'
             ),
             'manifest_ref' => self::prefixedRef(
-                $raw['manifest_ref'],
-                'recovery.manifest_ref',
-                'controlbot:recovery-manifest/',
+                $raw['manifest_ref'], 'recovery.manifest_ref', 'controlbot:recovery-manifest/'
             ),
             'targets' => self::targets($raw['targets']),
             'retention' => self::retention($raw['retention']),
             'sources' => self::sources($raw['sources']),
             'strategy' => self::strategy($raw['strategy']),
             'encryption_required' => true,
-            'restore_drill_cadence_hours' => self::boundedPositiveInt(
-                $raw['restore_drill_cadence_hours'],
-                8760,
-                'recovery.restore_drill_cadence_hours',
+            'restore_drill_cadence_hours' => self::positiveInt(
+                $raw['restore_drill_cadence_hours'], 8760, 'recovery.restore_drill_cadence_hours'
             ),
             'source_ref' => $sourceRef,
             'observed_at' => $observedAt,
@@ -76,110 +64,75 @@ final class RecoveryProfile
         if ($raw === null) {
             return 'unknown';
         }
-
-        $profile = self::normalize($raw);
-        return $profile['freshness'] === 'fresh' ? 'configured' : 'unknown';
+        return self::normalize($raw)['freshness'] === 'fresh' ? 'configured' : 'unknown';
     }
 
     private static function targets(mixed $raw): array
     {
-        InfrastructureProvider::assertFields(
-            $raw,
-            ['rpo_minutes', 'rto_minutes'],
-            'RecoveryTargets',
-        );
-
+        InfrastructureProvider::assertFields($raw, ['rpo_minutes', 'rto_minutes'], 'RecoveryTargets');
         return [
-            'rpo_minutes' => self::boundedPositiveInt(
-                $raw['rpo_minutes'],
-                525600,
-                'recovery.targets.rpo_minutes',
+            'rpo_minutes' => self::positiveInt(
+                $raw['rpo_minutes'], 525600, 'recovery.targets.rpo_minutes'
             ),
-            'rto_minutes' => self::boundedPositiveInt(
-                $raw['rto_minutes'],
-                525600,
-                'recovery.targets.rto_minutes',
+            'rto_minutes' => self::positiveInt(
+                $raw['rto_minutes'], 525600, 'recovery.targets.rto_minutes'
             ),
         ];
     }
 
     private static function retention(mixed $raw): array
     {
-        InfrastructureProvider::assertFields(
-            $raw,
-            ['hourly', 'daily', 'weekly', 'monthly'],
-            'RecoveryRetention',
-        );
-
+        $keys = ['hourly', 'daily', 'weekly', 'monthly'];
+        InfrastructureProvider::assertFields($raw, $keys, 'RecoveryRetention');
         $result = [];
-        foreach (['hourly', 'daily', 'weekly', 'monthly'] as $key) {
+        foreach ($keys as $key) {
             $value = $raw[$key] ?? null;
             if (!is_int($value) || $value < 0 || $value > 10000) {
-                throw new InvalidArgumentException('recovery.retention.' . $key . ' invalid.');
+                throw new InvalidArgumentException("recovery.retention.$key invalid.");
             }
             $result[$key] = $value;
         }
-
         if (array_sum($result) < 1) {
             throw new InvalidArgumentException('RecoveryRetention requires at least one retained copy.');
         }
-
         return $result;
     }
 
     private static function sources(mixed $raw): array
     {
-        InfrastructureProvider::assertFields($raw, self::SOURCE_KEYS, 'RecoverySources');
-
+        InfrastructureProvider::assertFields($raw, self::SOURCES, 'RecoverySources');
         $result = [];
-        $required = 0;
-        foreach (self::SOURCE_KEYS as $key) {
-            $value = InfrastructureProvider::normalizeEnum(
-                $raw[$key],
-                self::APPLICABILITY,
-                'recovery.sources.' . $key,
+        foreach (self::SOURCES as $key) {
+            $result[$key] = InfrastructureProvider::normalizeEnum(
+                $raw[$key], self::APPLICABILITY, "recovery.sources.$key"
             );
-            $result[$key] = $value;
-            if ($value === 'required') {
-                $required++;
-            }
         }
-
-        if ($required < 1) {
+        if (!in_array('required', $result, true)) {
             throw new InvalidArgumentException('RecoverySources requires at least one required source.');
         }
-
         return $result;
     }
 
     private static function strategy(mixed $raw): array
     {
-        InfrastructureProvider::assertFields($raw, [
-            'copies_required', 'media_types_required', 'offsite_required',
-            'immutable_required', 'undetected_restore_failures_target',
-        ], 'RecoveryStrategy');
-
-        if (($raw['copies_required'] ?? null) !== 3
-            || ($raw['media_types_required'] ?? null) !== 2
-            || ($raw['offsite_required'] ?? null) !== true
-            || ($raw['immutable_required'] ?? null) !== true
-            || ($raw['undetected_restore_failures_target'] ?? null) !== 0) {
-            throw new InvalidArgumentException('RecoveryStrategy must express 3-2-1-1-0.');
-        }
-
-        return [
+        $expected = [
             'copies_required' => 3,
             'media_types_required' => 2,
             'offsite_required' => true,
             'immutable_required' => true,
             'undetected_restore_failures_target' => 0,
         ];
+        InfrastructureProvider::assertFields($raw, array_keys($expected), 'RecoveryStrategy');
+        if ($raw !== $expected) {
+            throw new InvalidArgumentException('RecoveryStrategy must express 3-2-1-1-0.');
+        }
+        return $expected;
     }
 
-    private static function boundedPositiveInt(mixed $value, int $max, string $label): int
+    private static function positiveInt(mixed $value, int $max, string $label): int
     {
         if (!is_int($value) || $value < 1 || $value > $max) {
-            throw new InvalidArgumentException($label . ' invalid.');
+            throw new InvalidArgumentException("$label invalid.");
         }
         return $value;
     }
@@ -188,12 +141,12 @@ final class RecoveryProfile
     {
         $ref = InfrastructureProvider::normalizeControlRef($value, $label);
         if (!str_starts_with($ref, $prefix) || strlen($ref) <= strlen($prefix)) {
-            throw new InvalidArgumentException($label . ' invalid.');
+            throw new InvalidArgumentException("$label invalid.");
         }
         return $ref;
     }
 
-    private static function nullableReference(mixed $value, string $label): ?string
+    private static function nullableRef(mixed $value, string $label): ?string
     {
         return $value === null ? null : InfrastructureProvider::normalizeReference($value, $label);
     }

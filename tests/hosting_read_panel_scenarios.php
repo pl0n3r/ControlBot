@@ -57,6 +57,14 @@ if($case==='connected'){
     $a=panel()->read(profile('alpha','prod'),grant('alpha','prod'),ctx(),1790713800);
     $b=panel()->read(profile('beta','stage'),grant('beta','stage'),ctx(),1790713800);
     $out=['rows'=>HostingReadPanel::aggregate([$b,$a]),'cross_denied'=>bad(fn()=>panel()->read(profile('beta','stage'),grant('alpha','prod'),ctx(),1790713800))];
+}elseif($case==='invalid_aggregate'){
+    $partial=panel(['disk'=>'unknown'])->read(profile(),grant(),ctx(),1790713800);
+    $forged=$partial;$forged['health']='healthy';
+    $badProject=$partial;$badProject['project']='../../beta';
+    $out=[
+        'forged_health'=>bad(fn()=>HostingReadPanel::aggregate([$forged])),
+        'invalid_project'=>bad(fn()=>HostingReadPanel::aggregate([$badProject])),
+    ];
 }elseif($case==='source'){
     $out=['panel'=>file_get_contents(__DIR__.'/../src/HostingReadPanel.php')];
 }else{fwrite(STDERR,"unknown scenario\n");exit(2);}

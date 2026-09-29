@@ -19,6 +19,7 @@ class HostingReadPanelTests(unittest.TestCase):
 
     def test_partial_provider_data_remains_unknown_per_field(self):
         d=scenario("partial"); self.assertEqual((d["disk"],d["cron"]),("unknown","unknown")); self.assertNotEqual(d["health"],"healthy")
+        invalid=scenario("invalid_aggregate"); self.assertTrue(all(invalid.values()))
 
     def test_panel_exposes_no_mutating_or_shell_actions(self):
         s=scenario("source")["panel"].lower()

@@ -48,9 +48,7 @@ final class HostingReadPanel
             $signals[$key]=self::choice($raw[$key],self::SIGNALS,$key);
         $source=self::plain($raw['source'],'source');
 
-        $health='healthy';
-        if($site==='offline'||in_array('critical',$signals,true)) $health='critical';
-        elseif($site!=='online'||$fresh!=='fresh'||array_diff($signals,['ok'])!==[]) $health='degraded';
+        $health=self::derivedHealth($site,$fresh,$signals);
 
         $snapshot=[
             'project'=>$safe['project'],'environment'=>$safe['environment'],'profile_id'=>$safe['profile_id'],
@@ -73,6 +71,21 @@ final class HostingReadPanel
                 'project','environment','profile_id','observed_at','connection_status','site_status','disk',
                 'databases','cron','ssl','deploy_status','recent_errors','health','source','freshness'
             ],'snapshot');
+            self::slug($row['project'],'project');
+            self::slug($row['environment'],'environment');
+            self::uuid($row['profile_id'],'profile_id');
+            self::choice($row['connection_status'],['connected','degraded'],'connection_status');
+            $site=self::choice($row['site_status'],self::SITES,'site_status');
+            $fresh=self::choice($row['freshness'],self::FRESHNESS,'freshness');
+            $signals=[];
+            foreach(['disk','databases','cron','ssl','deploy_status','recent_errors'] as $signal)
+                $signals[$signal]=self::choice($row[$signal],self::SIGNALS,$signal);
+            if(!is_int($row['observed_at'])||$row['observed_at']<1)
+                throw new InvalidArgumentException('observed_at inválido.');
+            self::plain($row['source'],'source');
+            self::choice($row['health'],['healthy','degraded','critical'],'health');
+            if($row['health']!==self::derivedHealth($site,$fresh,$signals))
+                throw new InvalidArgumentException('health inconsistente con snapshot.');
             $key=$row['project'].'|'.$row['environment'];
             if(isset($out[$key])) throw new InvalidArgumentException('Scope Hostinger duplicado.');
             self::secretFree($row);$out[$key]=$row;
@@ -80,6 +93,24 @@ final class HostingReadPanel
         ksort($out,SORT_STRING);return array_values($out);
     }
 
+    private static function derivedHealth(string $site,string $fresh,array $signals): string
+    {
+        if($site==='offline'||in_array('critical',$signals,true)) return 'critical';
+        if($site!=='online'||$fresh!=='fresh'||array_diff($signals,['ok'])!==[]) return 'degraded';
+        return 'healthy';
+    }
+    private static function slug(mixed $value,string $label): string
+    {
+        if(!is_string($value)||preg_match('/^[a-z][a-z0-9_.-]{0,63}$/D',$value)!==1)
+            throw new InvalidArgumentException($label.' inválido.');
+        return $value;
+    }
+    private static function uuid(mixed $value,string $label): string
+    {
+        if(!is_string($value)||preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iD',$value)!==1)
+            throw new InvalidArgumentException($label.' inválido.');
+        return $value;
+    }
     private static function fields(array $row,array $expected,string $label): void
     {
         $keys=array_keys($row);sort($keys);sort($expected);

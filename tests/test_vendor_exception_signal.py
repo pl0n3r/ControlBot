@@ -23,10 +23,12 @@ class VendorExceptionSignalTests(unittest.TestCase):
 
     def test_critical_unknown_or_stale_never_becomes_healthy_incident_or_outage(self):
         d=scenario("unknown")
-        self.assertEqual(d["types"],["critical_unknown","missing_exit_plan","missing_export_capability"])
-        signal=d["signals"][0]
-        self.assertEqual(signal["freshness"],"unknown")
-        self.assertEqual(signal["health"],"unknown")
+        self.assertEqual(d["unknown_types"],["critical_unknown"])
+        self.assertEqual(d["stale_types"],["critical_unknown"])
+        self.assertEqual(d["unknown"][0]["freshness"],"unknown")
+        self.assertEqual(d["stale"][0]["freshness"],"stale")
+        self.assertEqual(d["unknown"][0]["health"],"unknown")
+        self.assertEqual(d["stale"][0]["health"],"unknown")
         payload=json.dumps(d).lower()
         for forbidden in ("healthy","incident","outage"):
             self.assertNotIn(forbidden,payload)

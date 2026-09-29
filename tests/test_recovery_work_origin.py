@@ -27,7 +27,7 @@ class RecoveryWorkOriginTests(unittest.TestCase):
 
     def test_only_present_canonical_classes_from_nonhealthy_factory_health_can_origin_work(self):
         self.assertEqual(scenario("unknown")["project_id"],"controlbot")
-        for case in ("healthy","class-absent","unknown-class","expanded-health","sensitive-health"):
+        for case in ("healthy","class-absent","unknown-class","expanded-health","incoherent-drill","sensitive-health"):
             with self.subTest(case=case):
                 self.assertTrue(scenario(case)["blocked"])
 

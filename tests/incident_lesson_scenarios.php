@@ -13,14 +13,14 @@ function finding(string $ref,string $class,string $relation,string $summary,stri
     return ['finding_ref'=>'finding:'.$ref,'classification'=>$class,'evidence_ref'=>'evidence:'.$ref,
         'evidence_state'=>$evidence,'evidence_relation'=>$relation,'summary'=>$summary,'owner_action_required'=>$owner];
 }
-function postmortem(bool $uncertain=false,bool $reverse=false): array {
+function postmortem(bool $uncertain=false,bool $reverse=false,string $uncertainState='incomplete'): array {
     $rows=[
         finding(A,'root_cause','necessary_cause','Private Actions capacity was exhausted for the incident period.'),
         finding(B,'independent_bug','independent_defect','Coordination caller lacked checks write permission.'),
         finding(C,'contributing_factor','contributor','Hourly coordination fan out increased pressure during recovery.'),
         finding(D,'preventive_change','preventive_only','Production observer cadence moved from one hour to six hours.'),
         $uncertain
-            ? finding(E,'unknown','unresolved','Billing hard stop mechanism remains unverified.','incomplete',true)
+            ? finding(E,'unknown','unresolved','Billing hard stop mechanism remains unverified.',$uncertainState,true)
             : finding(E,'contributing_factor','contributor','Recovery queue was serialized after the canary.'),
     ];
     if($reverse) $rows=array_reverse($rows);
@@ -41,7 +41,13 @@ $out=match($case){
         $email=postmortem();$email['findings'][0]['summary']='Contact owner@example.com for details.';
         return ['token'=>rejected(fn()=>IncidentLesson::candidate($token)),'email'=>rejected(fn()=>IncidentLesson::candidate($email))];
     })(),
-    'uncertain'=>IncidentLesson::candidate(postmortem(true)),
+    'uncertain'=>(function():array{
+        return [
+            'incomplete'=>IncidentLesson::candidate(postmortem(true,false,'incomplete')),
+            'contradictory'=>IncidentLesson::candidate(postmortem(true,false,'contradictory')),
+            'unknown'=>IncidentLesson::candidate(postmortem(true,false,'unknown')),
+        ];
+    })(),
     'independent'=>IncidentLesson::candidate(postmortem()),
     'incident78'=>IncidentLesson::candidate(postmortem(true)),
     default=>throw new InvalidArgumentException('Unknown scenario.'),

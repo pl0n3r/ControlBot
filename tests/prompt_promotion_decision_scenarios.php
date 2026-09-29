@@ -46,7 +46,7 @@ function evaluation(string $decision='candidate_better',array $replace=[]): arra
     ];
     return array_replace(PromptEvaluation::compare($set,$current,$candidate),$replace);
 }
-function decide(array $rows=null,array $eval=null): array {
+function decide(?array $rows=null,?array $eval=null): array {
     return PromptPromotionDecision::decide($rows??history(),'support-agent',2,$eval??evaluation());
 }
 

@@ -7,7 +7,6 @@ foreach([
 ] as $file) require __DIR__.'/../src/'.$file.'.php';
 
 use ControlBot\Business\ProductDiscoveryAssessment;
-use InvalidArgumentException;
 
 const H='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const H2='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -90,7 +89,7 @@ function runAssessment(
     );
 }
 function bad(callable $fn): bool {
-    try{$fn();return false;}catch(InvalidArgumentException){return true;}
+    try{$fn();return false;}catch(\InvalidArgumentException){return true;}
 }
 
 $case=$argv[1]??'';

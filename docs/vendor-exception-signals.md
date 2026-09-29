@@ -15,7 +15,7 @@ Esta proyección convierte condiciones materiales ya normalizadas por `VendorReg
 - `missing_exit_plan`
 - `missing_export_capability`
 
-Las fechas `renewal_at` y `expiry_at` solo generan señal cuando existen y caen antes del final de la ventana explícita `now + horizon_seconds`. Fechas vencidas también permanecen visibles porque siguen siendo materialmente pendientes hasta que la fuente autoritativa cambie el estado.
+Las fechas `renewal_at` y `expiry_at` solo generan señal cuando existen y caen estrictamente antes del final de la ventana explícita `now + horizon_seconds`; el límite final es exclusivo. Fechas vencidas también permanecen visibles porque siguen siendo materialmente pendientes hasta que la fuente autoritativa cambie el estado.
 
 ## Materialidad
 

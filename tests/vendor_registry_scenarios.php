@@ -53,13 +53,15 @@ if($case==='privacy'){
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='states'){
-    $stale=vendor(); $stale['freshness']['state']='stale'; $stale['health']='degraded';
-    $unknown=vendor(); $unknown['freshness']=['state'=>'unknown','observed_at'=>null,'source_ref'=>null]; $unknown['health']='unknown';
+    $stale=vendor(); $stale['freshness']['state']='stale'; $stale['health']='degraded'; $stale['sla_state']='degraded';
+    $unknown=vendor(); $unknown['freshness']=['state'=>'unknown','observed_at'=>null,'source_ref'=>null]; $unknown['health']='unknown'; $unknown['sla_state']='unknown';
     $falseHealthy=$unknown; $falseHealthy['health']='healthy';
+    $falseSla=$unknown; $falseSla['sla_state']='healthy';
     $badDates=vendor(); $badDates['renewal_at']=1950000000;
     echo json_encode([
         'stale'=>VendorRegistry::normalize($stale),'unknown'=>VendorRegistry::normalize($unknown),
         'false_healthy_rejected'=>blocked(fn()=>VendorRegistry::normalize($falseHealthy)),
+        'false_sla_rejected'=>blocked(fn()=>VendorRegistry::normalize($falseSla)),
         'bad_dates_rejected'=>blocked(fn()=>VendorRegistry::normalize($badDates)),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }

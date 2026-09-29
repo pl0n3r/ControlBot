@@ -33,17 +33,23 @@ class MomentumCampaignTests(unittest.TestCase):
         self.assertTrue(data["human_slug_rejected"])
         self.assertTrue(data["phone_like_rejected"])
         self.assertTrue(data["wrong_namespace_rejected"])
+        self.assertTrue(data["namespaced_name_rejected"])
+        self.assertTrue(data["namespaced_phone_rejected"])
         self.assertTrue(data["secret_rejected"])
 
     def test_state_schedule_channels_and_variants_are_closed_and_deterministic(self):
         data=scenario("closed")
         row=data["canonical"]
-        self.assertEqual(row["creative_variant_refs"],["creative:a","creative:b"])
+        self.assertEqual(row["creative_variant_refs"],[
+            "creative:88888888888888888888888888888888",
+            "creative:99999999999999999999999999999999",
+        ])
         self.assertEqual(row["channels"],["email","paid_social","web"])
         self.assertTrue(data["duplicate_rejected"])
         self.assertTrue(data["extra_rejected"])
         self.assertTrue(data["schedule_rejected"])
         self.assertTrue(data["active_without_start_rejected"])
+        self.assertTrue(data["completed_without_start_rejected"])
 
     def test_contract_has_no_execution_spend_or_parallel_scheduler(self):
         data=scenario("pure")

@@ -60,6 +60,9 @@ if($case==='clock'){
         'bad_generation'=>rejected(fn()=>RuntimeCapacitySignal::normalize(array_replace($base,['generation'=>0]))),
         'bad_attempt'=>rejected(fn()=>RuntimeCapacitySignal::normalize(array_replace($base,['attempt'=>0]))),
         'over_occupied'=>rejected(fn()=>RuntimeCapacitySignal::normalize(array_replace($base,['total_capacity'=>1,'occupied_capacity'=>2]))),
+        'assigned_without_ref'=>rejected(fn()=>RuntimeCapacitySignal::normalize(array_replace($base,['state'=>'assigned','assignment_ref'=>null]))),
+        'idle_with_ref'=>rejected(fn()=>RuntimeCapacitySignal::normalize(array_replace($base,['state'=>'idle','assignment_ref'=>'work-215']))),
+        'degraded_preserves_assignment'=>RuntimeCapacitySignal::normalize(array_replace($base,['state'=>'rate_limited','assignment_ref'=>'work-215'])),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='extra'){

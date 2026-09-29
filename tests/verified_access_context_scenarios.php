@@ -92,9 +92,11 @@ if($case==='structural'){
         'array_is_context'=>$raw instanceof VerifiedAccessContext,
         'object_is_context'=>(object)$raw instanceof VerifiedAccessContext,
         'malicious_source_cannot_mint'=>blocked(
-            fn()=>VerifiedAccessContext::fromDecisionRuntime(
-                $malicious,$session,'pl0n3r/factory',query(),NOW
-            )
+            function() use($malicious,&$session): void {
+                VerifiedAccessContext::fromDecisionRuntime(
+                    $malicious,$session,'pl0n3r/factory',query(),NOW
+                );
+            }
         ),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }

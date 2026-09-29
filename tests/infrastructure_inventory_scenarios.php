@@ -180,6 +180,47 @@ if ($name === 'multi-provider') {
     $out = blocked(static fn() => InfrastructureResource::normalize(
         resource('token-secret', 'storage')
     ));
+} elseif ($name === 'github-reference-guard') {
+    $sensitiveUrls = [
+        'https://github.com/acme/password-repo',
+        'https://github.com/acme/passwd-repo',
+        'https://github.com/acme/secret-repo',
+        'https://github.com/acme/token-repo',
+        'https://github.com/acme/api-key-repo',
+        'https://github.com/acme/private-key-repo',
+        'https://github.com/acme/dsn:credential',
+        'https://github.com/acme/bearer credential',
+    ];
+    $providerSensitive = array_replace(
+        provider('provider-primary', 'hosting', 'vendor-one', []),
+        ['source_ref' => 'https://github.com/acme/token-secret-value'],
+    );
+    $resourceSensitive = resource(
+        'storage-media', 'storage',
+        ['source_ref' => 'https://github.com/acme/private-key-backup'],
+    );
+    $out = [
+        'valid' => InfrastructureProvider::normalizeReference(
+            'https://github.com/pl0n3r/ControlBot/issues/258', 'reference'
+        ),
+        'sensitive_urls' => array_map(
+            static fn(string $url): bool => blocked(
+                static fn() => InfrastructureProvider::normalizeReference($url, 'reference')
+            )['blocked'],
+            $sensitiveUrls,
+        ),
+        'provider_sensitive' => blocked(
+            static fn() => InfrastructureProvider::normalizeProvider($providerSensitive)
+        )['blocked'],
+        'resource_sensitive' => blocked(
+            static fn() => InfrastructureResource::normalize($resourceSensitive)
+        )['blocked'],
+        'controlbot_sensitive' => blocked(
+            static fn() => InfrastructureProvider::normalizeReference(
+                'controlbot:secret-token', 'reference'
+            )
+        )['blocked'],
+    ];
 } elseif ($name === 'bad-release-sha') {
     $out = blocked(static fn() => InfrastructureResource::normalize(
         resource('service-web', 'service', [

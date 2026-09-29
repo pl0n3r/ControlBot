@@ -54,7 +54,7 @@ case 'idempotency':
           ]),vendor())];
     break;
 case 'limited':
-    $stale=vendor(); $stale['freshness']['state']='stale';
+    $stale=vendor(['health'=>'degraded','sla_state'=>'degraded']); $stale['freshness']['state']='stale';
     $unknown=vendor([
         'freshness'=>['state'=>'unknown','observed_at'=>null,'source_ref'=>null],
         'health'=>'unknown','sla_state'=>'unknown',

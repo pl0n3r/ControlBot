@@ -11,6 +11,7 @@ class ExternalApiRequestGateTests(unittest.TestCase):
         d=scenario("read")
         self.assertEqual(d["valid"]["decision"],"allow")
         self.assertEqual(d["valid"]["capability"],"owner.cockpit.read")
+        self.assertEqual(d["valid"]["identity_id"],"identity-owner")
         self.assertFalse(d["valid"]["mutation"])
         self.assertIsNone(d["valid"]["step_up_ref"])
         self.assertTrue(d["revoked_device"])

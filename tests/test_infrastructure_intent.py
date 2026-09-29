@@ -58,11 +58,11 @@ class InfrastructureIntentTests(unittest.TestCase):
         self.assertEqual(
             work["required_roles"],
             [
-                "architecture",
-                "infrastructure",
+                "arquitectura",
+                "infraestructura",
+                "ingenieria-software",
                 "qa",
-                "security",
-                "software_engineering",
+                "seguridad",
                 "sre",
             ],
         )
@@ -171,6 +171,48 @@ class InfrastructureIntentTests(unittest.TestCase):
         self.assertIn(
             "financial_evidence_unknown",
             data["cost_unknown"]["reasons"],
+        )
+
+
+    def test_owner_decision_materializes_approval_gate_without_runner(self):
+        data = scenario("gates")
+        for key in ("high", "authority", "over_budget"):
+            row = data[key]
+            self.assertEqual(row["status"], "owner_decision_required")
+            self.assertIsNone(row["runner_request"])
+            approval = row["work_item"]["approval_ref"]
+            self.assertTrue(approval.startswith("controlbot:approval/infra-"))
+            self.assertIn(f'"approval_ref":"{approval}"', row["owner_decision_gate"])
+
+    def test_planned_work_does_not_invent_approval_ref(self):
+        work = scenario("safe")["work_item"]
+        self.assertNotIn("approval_ref", work)
+
+    def test_factory_roles_use_catalog_slugs(self):
+        self.assertEqual(
+            scenario("safe")["work_item"]["required_roles"],
+            ["arquitectura", "infraestructura", "ingenieria-software", "qa", "seguridad", "sre"],
+        )
+
+    def test_hard_deny_dominates_owner_escalation(self):
+        row = scenario("gates")["deny_owner"]
+        self.assertEqual(row["status"], "denied")
+        self.assertIn("authority_scope_mismatch", row["reasons"])
+        self.assertIsNone(row["work_item"])
+        self.assertIsNone(row["runner_request"])
+        self.assertIsNone(row["owner_decision_gate"])
+
+    def test_predispatch_request_has_no_runner_identity(self):
+        request = scenario("safe")["runner_request"]
+        self.assertNotIn("runner_id", request)
+        self.assertNotIn("order_id", request)
+        self.assertNotIn("attempt_id", request)
+
+    def test_slice_stays_under_size_budget(self):
+        source = ROOT / "src" / "InfrastructureIntent.php"
+        self.assertLessEqual(
+            len(source.read_text(encoding="utf-8").splitlines()),
+            400,
         )
 
 

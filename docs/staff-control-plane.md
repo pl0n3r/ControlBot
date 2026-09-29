@@ -1,17 +1,19 @@
-# Staff Control Plane v1 — lectura
+# Staff Control Plane v1
 
-El boundary read-only consume únicamente una proyección `/ops/staff` project-scoped que declara `population=staff_only`. Un proveedor que mezcle clientes finales, use un scope distinto o no pueda demostrar esa frontera falla cerrado.
-
-`StaffControlPlane::summary()` normaliza conteos agregados y freshness sin PII. `StaffControlPlane::search()` procesa email solo durante la llamada, devuelve `masked_email`, ordena por `staff_id` y fija `directory_persisted=false`; no escribe DB, cache ni archivos.
-
-Este slice no ejecuta invitaciones, suspensiones, cambios de rol ni recuperaciones. Esas mutaciones requieren el boundary privilegiado posterior con authority y passkey verificadas.
-
-Privacidad: `datos.yml` declara identidad y contacto staff como tratamientos on-demand con retención `request_lifetime_only`, sin proveedor externo. D-063 se atesta para construcción porque este slice no está live y los fixtures no usan datos reales.
+El boundary de lectura consume únicamente una proyección `/ops/staff` project-scoped con `population=staff_only`. Una fuente que mezcle clientes finales, use otro scope o no pueda demostrar esa frontera falla cerrado. Search procesa email solo durante la llamada, devuelve `masked_email` y fija `directory_persisted=false`.
 
 ## Acciones privilegiadas
 
-Las mutaciones usan un `StaffActionIntent` project-scoped y un `StaffProductGateway` server-side. ControlBot no conoce credenciales de servicio, passwords, activation tokens ni recovery codes del producto.
+`StaffControlPlane::actionIntent()` no ejecuta el producto. Construye un intent tipado únicamente desde un `VerifiedAccessContext` y un `VerifiedExternalSessionContext` nominales. Exige identidad humana activa, role Owner, capability `staff.manage`, authority `L4_OWNER`, scope exacto `project:<project_id>` y step-up vigente con método `passkey`.
 
-Cada acción exige identidad humana con autoridad `L4_OWNER`, capability `staff.manage`, scope `project:<id>` y un `VerifiedExternalSessionContext` ligado a la misma identidad con step-up `passkey` todavía vigente. Los roles de invite/change-role se validan contra el allowlist devuelto por el producto.
+Las acciones permitidas son `staff.invite`, `staff.suspend`, `staff.reactivate`, `staff.role.change` y `staff.password_recovery.send`. Invite y role change requieren un rol presente en el allowlist suministrado por el producto. El target es una referencia opaca; ControlBot no recibe email de invitación, password, activation/reset token ni recovery code en este boundary.
 
-La idempotency key se deriva de `project_id + intent_id`. Antes de mutar se consulta el status; un outcome `unknown` se reconcilia por lookup y nunca provoca una segunda mutación automática. Cada intento escribe auditoría minimizada de ControlBot y exige `product_audit_ref` para resultados no `not_found`.
+Cada intent deriva una `idempotency_key` estable de su identidad, proyecto, target, acción y rol. Reejecutar el mismo intent conserva la misma clave.
+
+## Resultado y reconciliación
+
+`recordOutcome()` acepta únicamente `applied|denied|unknown`, exige la misma idempotency key y emite auditoría minimizada con refs separadas de ControlBot y del producto. Un resultado `unknown` fija `retry_allowed=false` y `reconciliation_required=true`.
+
+`reconcile()` solo acepta un outcome previo unknown ligado al mismo intent y un status lookup `applied|denied|not_found`. Solo `not_found` habilita retry. La reconciliación no vuelve a ejecutar la mutación.
+
+No hay DB directa, adapter HTTP real, credenciales de servicio, acciones masivas cross-project, UI ni ejecución autónoma por agentes.

@@ -6,6 +6,8 @@ namespace ControlBot\Staff;
 use ControlBot\Approvals\AppendOnlyAuditLog;
 use ControlBot\Business\VerifiedAccessContext;
 use ControlBot\ExternalApi\VerifiedExternalSessionContext;
+use ControlBot\Business\VerifiedAccessContext;
+use ControlBot\ExternalApi\VerifiedExternalSessionContext;
 use InvalidArgumentException;
 
 interface StaffProductGateway
@@ -21,6 +23,9 @@ final class StaffControlPlane
     private const STATUSES=['active','suspended'];
     private const MFA=['unknown','required','satisfied'];
     private const FRESHNESS=['fresh','stale','unknown'];
+    private const ACTIONS=['staff.invite','staff.suspend','staff.reactivate','staff.role.change','staff.password_recovery.send'];
+    private const OUTCOMES=['applied','denied','unknown'];
+    private const RECONCILED=['applied','denied','not_found'];
     private const ACTIONS=['staff.invite','staff.suspend','staff.reactivate','staff.role.change','staff.password_recovery.send'];
     private const OUTCOMES=['not_found','applied','denied','unknown'];
     private const SENSITIVE='/(?:password|passwd|secret|token|credential|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn)/i';
@@ -191,6 +196,180 @@ final class StaffControlPlane
         if(!is_string($value)||preg_match('/^'.preg_quote($namespace,'/').':[a-f0-9]{32}$/D',$value)!==1)
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
+    }
+
+
+    public static function actionIntent(
+        array $raw,
+        VerifiedAccessContext $access,
+        VerifiedExternalSessionContext $session,
+        array $allowedRoles,
+        int $now
+    ): array {
+        self::fields($raw,[
+            'version','intent_id','project_id','staff_id_or_invitee_ref',
+            'action','requested_role','requested_at',
+        ],'StaffActionIntent');
+        if(($raw['version']??null)!==1||$now<1||($raw['requested_at']??null)!==$now)
+            throw new InvalidArgumentException('Staff action version/time invalid.');
+
+        $project=self::id($raw['project_id'],'project_id');
+        $scope='project:'.$project;
+        $accessSummary=$access->safeSummary();
+        $identity=$access->decisionContext()['identity']??null;
+        $grant=$access->grant();
+        $sessionSummary=$session->safeSummary();
+        $step=$session->stepUp();
+        if(!is_array($identity)
+            ||($identity['kind']??null)!=='human'
+            ||($identity['state']??null)!=='active'
+            ||($grant['role']??null)!=='owner'
+            ||($accessSummary['capability']??null)!=='staff.manage'
+            ||($accessSummary['authority_level']??null)!=='L4_OWNER'
+            ||($accessSummary['scope']??null)!==$scope
+            ||($sessionSummary['identity_id']??null)!==($accessSummary['identity_id']??null)
+            ||($sessionSummary['scope']??null)!==$scope
+            ||($sessionSummary['freshness']??null)!=='fresh'
+            ||!is_array($step)
+            ||($step['method']??null)!=='passkey'
+            ||($step['verified_at']??0)>$now
+            ||($step['expires_at']??0)<=$now)
+            throw new InvalidArgumentException('Staff action authority invalid.');
+
+        $action=self::one($raw['action'],self::ACTIONS,'action');
+        $role=self::nullableSlug($raw['requested_role'],'requested_role');
+        $roles=self::roles($allowedRoles);
+        if(in_array($action,['staff.invite','staff.role.change'],true)){
+            if($role===null||!in_array($role,$roles,true))
+                throw new InvalidArgumentException('requested_role not allowed.');
+        }elseif($role!==null){
+            throw new InvalidArgumentException('requested_role not applicable.');
+        }
+
+        $targetNamespace=$action==='staff.invite'?'invitee':'staff';
+        $target=self::opaque($raw['staff_id_or_invitee_ref'],$targetNamespace);
+        $intentId=self::opaque($raw['intent_id'],'staffintent');
+        $key=self::idempotency($intentId,$project,$target,$action,$role);
+        $result=[
+            'version'=>1,'intent_id'=>$intentId,'project_id'=>$project,
+            'staff_id_or_invitee_ref'=>$target,'action'=>$action,'requested_role'=>$role,
+            'requested_by'=>$accessSummary['identity_id'],'grant_id'=>$accessSummary['grant_id'],
+            'policy_refs'=>$accessSummary['policy_refs'],'session_ref'=>$sessionSummary['session_ref'],
+            'step_up_ref'=>$sessionSummary['step_up_ref'],'idempotency_key'=>$key,
+            'requested_at'=>$now,'execution'=>false,
+        ];
+        self::safe($result);
+        return $result;
+    }
+
+    public static function recordOutcome(array $raw,array $intent): array
+    {
+        $intent=self::intent($intent);
+        self::fields($raw,['version','idempotency_key','state','product_audit_ref','evidence_ref','observed_at'],'StaffActionOutcome');
+        if(($raw['version']??null)!==1||($raw['idempotency_key']??null)!==$intent['idempotency_key'])
+            throw new InvalidArgumentException('Staff outcome binding invalid.');
+        $state=self::one($raw['state'],self::OUTCOMES,'outcome.state');
+        $audit=self::audit(
+            $intent,$state,self::opaque($raw['product_audit_ref'],'productaudit'),
+            self::opaque($raw['evidence_ref'],'evidence'),self::time($raw['observed_at'],'observed_at')
+        );
+        return [
+            'version'=>1,'intent_id'=>$intent['intent_id'],'idempotency_key'=>$intent['idempotency_key'],
+            'state'=>$state,'retry_allowed'=>false,'reconciliation_required'=>$state==='unknown',
+            'audit'=>$audit,
+        ];
+    }
+
+    public static function reconcile(array $raw,array $unknownOutcome,array $intent): array
+    {
+        $intent=self::intent($intent);
+        if(($unknownOutcome['version']??null)!==1
+            ||($unknownOutcome['state']??null)!=='unknown'
+            ||($unknownOutcome['idempotency_key']??null)!==$intent['idempotency_key']
+            ||($unknownOutcome['retry_allowed']??null)!==false
+            ||($unknownOutcome['reconciliation_required']??null)!==true)
+            throw new InvalidArgumentException('Staff unknown outcome invalid.');
+
+        self::fields($raw,['version','idempotency_key','state','product_audit_ref','evidence_ref','observed_at'],'StaffActionReconciliation');
+        if(($raw['version']??null)!==1||($raw['idempotency_key']??null)!==$intent['idempotency_key'])
+            throw new InvalidArgumentException('Staff reconciliation binding invalid.');
+        $state=self::one($raw['state'],self::RECONCILED,'reconciliation.state');
+        $audit=self::audit(
+            $intent,'reconciled_'.$state,self::opaque($raw['product_audit_ref'],'productaudit'),
+            self::opaque($raw['evidence_ref'],'evidence'),self::time($raw['observed_at'],'observed_at')
+        );
+        return [
+            'version'=>1,'intent_id'=>$intent['intent_id'],'idempotency_key'=>$intent['idempotency_key'],
+            'state'=>$state,'retry_allowed'=>$state==='not_found','reconciliation_required'=>false,
+            'audit'=>$audit,
+        ];
+    }
+
+    private static function intent(array $raw): array
+    {
+        self::fields($raw,[
+            'version','intent_id','project_id','staff_id_or_invitee_ref','action','requested_role',
+            'requested_by','grant_id','policy_refs','session_ref','step_up_ref','idempotency_key',
+            'requested_at','execution',
+        ],'NormalizedStaffActionIntent');
+        if(($raw['version']??null)!==1||($raw['execution']??null)!==false)
+            throw new InvalidArgumentException('Normalized staff intent invalid.');
+        $action=self::one($raw['action'],self::ACTIONS,'action');
+        $project=self::id($raw['project_id'],'project_id');
+        $role=self::nullableSlug($raw['requested_role'],'requested_role');
+        $targetNamespace=$action==='staff.invite'?'invitee':'staff';
+        $target=self::opaque($raw['staff_id_or_invitee_ref'],$targetNamespace);
+        $intentId=self::opaque($raw['intent_id'],'staffintent');
+        $expected=self::idempotency($intentId,$project,$target,$action,$role);
+        if(($raw['idempotency_key']??null)!==$expected)
+            throw new InvalidArgumentException('Staff intent idempotency invalid.');
+        return $raw;
+    }
+
+    private static function audit(array $intent,string $result,string $productAudit,string $evidence,int $observedAt): array
+    {
+        $row=[
+            'controlbot_audit_ref'=>'staffaudit:'.hash('sha256',$intent['intent_id'].'|'.$intent['idempotency_key'].'|'.$result.'|'.$productAudit),
+            'product_audit_ref'=>$productAudit,'intent_id'=>$intent['intent_id'],'project_id'=>$intent['project_id'],
+            'action'=>$intent['action'],'requested_by'=>$intent['requested_by'],'idempotency_key'=>$intent['idempotency_key'],
+            'result'=>$result,'evidence_ref'=>$evidence,'observed_at'=>$observedAt,
+        ];
+        self::safe($row);
+        return $row;
+    }
+
+    private static function idempotency(string $intentId,string $project,string $target,string $action,?string $role): string
+    {
+        return 'staff-action:'.hash('sha256',implode('|',[$intentId,$project,$target,$action,$role??'-']));
+    }
+
+    private static function roles(mixed $values): array
+    {
+        if(!is_array($values)||!array_is_list($values)||$values===[]||count($values)>32)
+            throw new InvalidArgumentException('allowed roles invalid.');
+        $out=[];
+        foreach($values as $value){$value=self::slug($value,'allowed_role');$out[$value]=true;}
+        $roles=array_keys($out);sort($roles,SORT_STRING);return $roles;
+    }
+
+    private static function nullableSlug(mixed $value,string $label): ?string
+    {
+        return $value===null?null:self::slug($value,$label);
+    }
+
+    private static function opaque(mixed $value,string $namespace): string
+    {
+        $size=$namespace==='staffaudit'?64:32;
+        if(!is_string($value)||preg_match('/^'.preg_quote($namespace,'/').':[a-f0-9]{'.$size.'}$/D',$value)!==1)
+            throw new InvalidArgumentException($namespace.' ref invalid.');
+        return $value;
+    }
+
+    private static function safe(mixed $value): void
+    {
+        if(is_array($value)){foreach($value as $item)self::safe($item);return;}
+        if(is_string($value)&&(str_contains($value,'@')||preg_match(self::SENSITIVE,$value)===1))
+            throw new InvalidArgumentException('Staff action contains sensitive material.');
     }
 
     private static function maskEmail(mixed $value): string

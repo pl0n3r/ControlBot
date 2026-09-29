@@ -35,4 +35,31 @@ class StaffControlPlaneTests(unittest.TestCase):
         self.assertEqual(data["d063_attestation"],{"nothing_live":True,"no_real_customer_data":True})
         for name in ("politica-tratamiento.md","aviso-privacidad.md","registro-tratamientos.md","retencion.md"):
             text=(ROOT/"docs"/"privacidad"/name).read_text(); self.assertIn("staff_directory_identity",text); self.assertIn("staff_directory_contact",text)
+    def test_invitation_requires_passkey_and_product_keeps_activation_secret(self):
+        d=scenario("invite"); i=d["intent"]
+        self.assertEqual((i["action"],i["requested_role"]),("staff.invite","admin"))
+        self.assertFalse(i["execution"]); self.assertTrue(d["role_reject"]); self.assertTrue(d["secret_reject"])
+        self.assertTrue(i["idempotency_key"].startswith("staff-action:"))
+
+    def test_mutations_are_typed_scoped_and_idempotent(self):
+        d=scenario("mutations")
+        for action,row in d.items():
+            self.assertEqual(row["typed"]["action"],action); self.assertEqual(row["typed"]["project_id"],"controlbot")
+            self.assertTrue(row["stable"]); self.assertFalse(row["typed"]["execution"])
+
+    def test_ambiguous_mutation_reconciles_before_retry(self):
+        d=scenario("ambiguous")
+        self.assertEqual(d["unknown"]["state"],"unknown"); self.assertFalse(d["unknown"]["retry_allowed"]); self.assertTrue(d["unknown"]["reconciliation_required"])
+        self.assertEqual(d["applied"]["state"],"applied"); self.assertFalse(d["applied"]["retry_allowed"])
+        self.assertEqual(d["not_found"]["state"],"not_found"); self.assertTrue(d["not_found"]["retry_allowed"])
+
+    def test_agents_cannot_invoke_owner_staff_actions(self):
+        self.assertTrue(all(scenario("authority").values()))
+
+    def test_dual_audit_is_secret_free_and_minimized(self):
+        d=scenario("audit"); a=d["result"]["audit"]; s=d["serialized"].lower()
+        self.assertIn("controlbot_audit_ref",a); self.assertIn("product_audit_ref",a)
+        self.assertNotIn("staff_id_or_invitee_ref",a)
+        for value in ("password","activation_token","recovery_code","credential","@"): self.assertNotIn(value,s)
+
 if __name__=="__main__": unittest.main()

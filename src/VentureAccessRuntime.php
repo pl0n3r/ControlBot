@@ -11,14 +11,6 @@ final class VentureAccessRuntime
     private const CONTEXT_FIELDS = ['identity','scope','active_policy_refs','grant','budget_guard','production_authority'];
     private const RESTRICTION_DECISIONS = ['allow','deny','owner_decision_required'];
 
-    public static function verifiedContext(
-        VentureAccessSource $source,
-        array $query,
-        int $now,
-    ): VerifiedAccessContext {
-        return VerifiedAccessContext::fromServerSource($source, $query, $now);
-    }
-
     public static function execute(array $state, array $request, array $trusted, int $now): array
     {
         self::fields($request,self::REQUEST_FIELDS,'LifecycleRequest');

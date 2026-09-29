@@ -22,7 +22,6 @@ use ControlBot\ExternalApi\ExternalApiSessionSource;
 use ControlBot\ExternalApi\VerifiedExternalSessionContext;
 use ControlBot\Security\OwnerSessionService;
 use ControlBot\Security\TokenVault;
-use InvalidArgumentException;
 
 const E_NOW=12000;
 const E_SCOPE='venture:alpha';
@@ -118,7 +117,16 @@ function emobile(array $overrides=[]): array {
         'source_ref'=>'controlbot:decision/alpha','sensitivity'=>'confidential',
     ],$overrides);
 }
-function bad(callable $fn): bool{try{$fn();return false;}catch(InvalidArgumentException){return true;}}
+function bad(callable $fn): bool{try{$fn();return false;}catch(\InvalidArgumentException){return true;}}
+function guardedOrigin(array $mobile,VerifiedAccessContext $ctx,VerifiedExternalSessionContext $auth): array {
+    $policy=ExternalApiMobileState::mutationPolicy(
+        $mobile,true,E_NOW,'owner_decision.decide',true,true,true,[]
+    );
+    if($policy['freshness_gate']!=='pass') return ['policy'=>$policy,'origin'=>null];
+    return ['policy'=>$policy,'origin'=>ExternalApiDirectedWorkOrigin::process(
+        $ctx,$auth,emutation('approve'),E_SCOPE,E_DECISION,eintent(),eids(),E_NOW
+    )];
+}
 
 $case=$argv[1]??'';
 if($case==='flow'){
@@ -137,25 +145,20 @@ if($case==='flow'){
 }elseif($case==='reject'){
     $out=eprocess('reject');
 }elseif($case==='invalid_state'){
-    $stale=ExternalApiMobileState::mutationPolicy(
-        emobile(['observed_at'=>E_NOW-500,'received_at'=>E_NOW-400]),true,E_NOW,
-        'owner_decision.decide',true,true,true,[]
-    );
-    $unknown=ExternalApiMobileState::mutationPolicy(
-        emobile(['observed_at'=>null,'received_at'=>null,'source_ref'=>null]),true,E_NOW,
-        'owner_decision.decide',true,true,true,[]
-    );
-    $ctx=ectx();
+    $ctx=ectx();$auth=eauth($ctx);
     $out=[
-        'stale'=>$stale,'unknown'=>$unknown,
+        'stale'=>guardedOrigin(
+            emobile(['observed_at'=>E_NOW-500,'received_at'=>E_NOW-400]),$ctx,$auth
+        ),
+        'unknown'=>guardedOrigin(
+            emobile(['observed_at'=>null,'received_at'=>null,'source_ref'=>null]),$ctx,$auth
+        ),
         'no_step'=>bad(fn()=>ExternalApiDirectedWorkOrigin::process(
             $ctx,eauth($ctx,false),emutation('approve'),E_SCOPE,E_DECISION,eintent(),eids(),E_NOW
         )),
         'revoked'=>bad(fn()=>ExternalApiDirectedWorkOrigin::process(
             $ctx,eauth($ctx,true,true),emutation('approve'),E_SCOPE,E_DECISION,eintent(),eids(),E_NOW
         )),
-        'work_origin_called_for_stale'=>false,
-        'work_origin_called_for_unknown'=>false,
     ];
 }elseif($case==='result_push'){
     $out=epush('decision_result','owner_decision.read','2');

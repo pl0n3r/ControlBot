@@ -39,6 +39,8 @@ class SchedulerTests(unittest.TestCase):
         self.assertTrue(data["policy"])
         self.assertTrue(data["idle"])
         self.assertTrue(data["shape"])
+        self.assertTrue(data["saturated_positive"])
+        self.assertTrue(data["idle_zero"])
 
     def test_scheduler_does_not_recompute_presence_capacity_from_accounts_or_plan(self):
         self.assertTrue(scenario("mixed_capacity")["account_noise_same"])

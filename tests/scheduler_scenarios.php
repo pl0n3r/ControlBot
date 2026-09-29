@@ -50,10 +50,14 @@ if($case==='mixed_capacity'){
     $badPolicy=$degradedPresence; $badPolicy['policy_ref']='other-policy';
     $badIdle=$degradedPresence; $badIdle['idle_capacity']=-1;
     $badShape=$degradedPresence; unset($badShape['accounts']);
+    $saturatedPositive=presence(1,'saturated');
+    $idleZero=presence(0,'idle_capacity');
     $invalid=[
         'policy'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($badPolicy,$rows,$ctx)),
         'idle'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($badIdle,$rows,$ctx)),
         'shape'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($badShape,$rows,$ctx)),
+        'saturated_positive'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($saturatedPositive,$rows,$ctx)),
+        'idle_zero'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($idleZero,$rows,$ctx)),
     ];
     echo json_encode([
         'degraded'=>$degraded,

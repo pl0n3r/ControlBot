@@ -17,6 +17,17 @@ def scenario(name):
         raise AssertionError(result.stderr.strip() or f"{name} failed")
     return json.loads(result.stdout)
 
+def index_scenario(name):
+    result = subprocess.run(
+        ["php", str(ROOT / "tests" / "global_search_index_scenarios.php"), name],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode or result.stderr.strip():
+        raise AssertionError(result.stderr.strip() or f"index {name} failed")
+    return json.loads(result.stdout)
+
 class GlobalSearchTests(unittest.TestCase):
     def test_issue_number_query_returns_canonical_incident(self):
         data = scenario("number")
@@ -62,6 +73,21 @@ class GlobalSearchTests(unittest.TestCase):
         self.assertTrue(result["canonical_url"].endswith("/issues/122"))
         self.assertTrue(data["network_rejected"])
         self.assertTrue(data["dot_rejected"])
+
+    def test_fixture_queries_meet_local_index_latency_budget(self):
+        data = index_scenario("performance")
+        self.assertLess(data["p95"], 2000)
+        self.assertEqual(data["hits"], [])
+
+    def test_incremental_reindex_preserves_identity_without_duplicates(self):
+        renamed = index_scenario("rename")
+        self.assertEqual(renamed["count"], 1)
+        self.assertEqual(renamed["entity"]["document"]["repo"], "pl0n3r/factory")
+        reindexed = index_scenario("reindex")
+        self.assertTrue(reindexed["fingerprint"])
+        self.assertTrue(reindexed["retry"])
+        self.assertTrue(reindexed["exists"])
+        self.assertEqual(reindexed["factory"], 1)
 
 
 if __name__ == "__main__":

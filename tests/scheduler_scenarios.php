@@ -27,8 +27,47 @@ function constraints(array $claims=[],array $projects=[]): array {
 }
 function known(int $limit=4,int $active=0): array { return ['state'=>'known','limit'=>$limit,'active'=>$active]; }
 function unknown(): array { return ['state'=>'unknown','limit'=>null,'active'=>null]; }
+function rejected(callable $fn): bool { try{$fn();return false;}catch(Throwable){return true;} }
 
 $case=$argv[1]??'';
+if($case==='mixed_capacity'){
+    $rows=[work('work-a'),work('work-b')];
+    $ctx=constraints([],['project-a'=>known(3,0)]);
+    $degradedPresence=presence(2,'degraded');
+    $unknownPresence=presence(1,'unknown');
+    $zeroPresence=presence(0,'degraded');
+    $degraded=SchedulerCore::dispatchableCapacity($degradedPresence,$rows,$ctx);
+    $unknownCapacity=SchedulerCore::dispatchableCapacity($unknownPresence,$rows,$ctx);
+    $zero=SchedulerCore::dispatchableCapacity($zeroPresence,$rows,$ctx);
+
+    $accountNoiseA=$degradedPresence;
+    $accountNoiseA['accounts']=[['provider_id'=>'chatgpt-web','plan'=>'declared-large','free_capacity'=>999]];
+    $accountNoiseB=$degradedPresence;
+    $accountNoiseB['accounts']=[['provider_id'=>'claude-web','plan'=>'declared-small','free_capacity'=>0]];
+    $fromA=SchedulerCore::dispatchableCapacity($accountNoiseA,$rows,$ctx);
+    $fromB=SchedulerCore::dispatchableCapacity($accountNoiseB,$rows,$ctx);
+
+    $badPolicy=$degradedPresence; $badPolicy['policy_ref']='other-policy';
+    $badIdle=$degradedPresence; $badIdle['idle_capacity']=-1;
+    $badShape=$degradedPresence; unset($badShape['accounts']);
+    $saturatedPositive=presence(1,'saturated');
+    $idleZero=presence(0,'idle_capacity');
+    $invalid=[
+        'policy'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($badPolicy,$rows,$ctx)),
+        'idle'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($badIdle,$rows,$ctx)),
+        'shape'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($badShape,$rows,$ctx)),
+        'saturated_positive'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($saturatedPositive,$rows,$ctx)),
+        'idle_zero'=>rejected(fn()=>SchedulerCore::dispatchableCapacity($idleZero,$rows,$ctx)),
+    ];
+    echo json_encode([
+        'degraded'=>$degraded,
+        'unknown'=>$unknownCapacity,
+        'unknown_input_state'=>$unknownPresence['capacity_state'],
+        'zero'=>$zero,
+        'account_noise_same'=>$fromA===$fromB,
+        'invalid'=>$invalid,
+    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
 if($case==='idle_bound'){
     $rows=[work('work-a'),work('work-b'),work('work-c')];
     $ctx=constraints([],['project-a'=>known(5,0)]);

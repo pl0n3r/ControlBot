@@ -15,6 +15,40 @@ def scenario(name):
 
 
 class SchedulerTests(unittest.TestCase):
+    def test_degraded_presence_can_preserve_authoritative_idle_capacity(self):
+        data=scenario("mixed_capacity")["degraded"]
+        self.assertEqual(data["policy_ref"],"factory-dispatcher-v2")
+        self.assertEqual(data["authoritative_idle_capacity"],2)
+        self.assertEqual(data["dispatchable_capacity"],2)
+
+    def test_unknown_presence_can_preserve_authoritative_idle_capacity_without_reclassification(self):
+        data=scenario("mixed_capacity")
+        self.assertEqual(data["unknown_input_state"],"unknown")
+        self.assertEqual(data["unknown"]["authoritative_idle_capacity"],1)
+        self.assertEqual(data["unknown"]["dispatchable_capacity"],1)
+        self.assertEqual(data["unknown"]["policy_ref"],"factory-dispatcher-v2")
+
+    def test_zero_authoritative_idle_capacity_remains_non_dispatchable(self):
+        data=scenario("mixed_capacity")["zero"]
+        self.assertEqual(data["authoritative_idle_capacity"],0)
+        self.assertEqual(data["dispatchable_capacity"],0)
+        self.assertIn("authoritative_capacity_unavailable",data["reasons"])
+
+    def test_presence_capacity_contract_still_fails_closed_on_invalid_shape_policy_or_idle(self):
+        data=scenario("mixed_capacity")["invalid"]
+        self.assertTrue(data["policy"])
+        self.assertTrue(data["idle"])
+        self.assertTrue(data["shape"])
+        self.assertTrue(data["saturated_positive"])
+        self.assertTrue(data["idle_zero"])
+
+    def test_scheduler_does_not_recompute_presence_capacity_from_accounts_or_plan(self):
+        self.assertTrue(scenario("mixed_capacity")["account_noise_same"])
+        source=(ROOT/"src"/"SchedulerCore.php").read_text(encoding="utf-8")
+        self.assertNotIn("declared_capacity",source)
+        self.assertNotIn("provider_id",source)
+        self.assertNotIn("plan",source)
+
     def test_dispatchable_capacity_never_exceeds_authoritative_idle_capacity(self):
         data=scenario("idle_bound")
         self.assertEqual(data["small"]["authoritative_idle_capacity"],2)

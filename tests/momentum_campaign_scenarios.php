@@ -17,7 +17,7 @@ function campaign(string $venture='venture-condor'): array {
         'version'=>1,'campaign_id'=>'campaign-launch-1','venture_id'=>$venture,
         'brand_context_id'=>'brand-condor','objective'=>'acquisition',
         'audience_ref'=>'audience-wholesale-v1','offer_ref'=>'offer-condor-v1','cta_ref'=>'cta-demo-v1',
-        'channels'=>['web','email','paid_social'],'creative_variant_refs'=>['creative-b','creative-a'],
+        'channels'=>['web','owned_messaging','paid_social'],'creative_variant_refs'=>['creative-b','creative-a'],
         'budget_ref'=>'capital:budget-2026-q4','schedule'=>['start_at'=>1100,'end_at'=>2100],
         'experiment_refs'=>['experiment-copy-a-b'],'status'=>'planned',
         'evidence_refs'=>['evidence:brief-1'],'execution'=>false,
@@ -38,15 +38,15 @@ if($case==='neutral'){
     echo json_encode(['campaign'=>$row],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='privacy'){
-    $email=campaign(); $email['audience_ref']='owner@example.com';
+    $directPii=campaign(); $directPii['audience_ref']='John Doe';
     $secret=campaign(); $secret['budget_ref']='token:supersecret';
     echo json_encode([
-        'email_rejected'=>blocked(fn()=>MomentumCampaign::campaign($email,brand())),
+        'direct_pii_rejected'=>blocked(fn()=>MomentumCampaign::campaign($directPii,brand())),
         'secret_rejected'=>blocked(fn()=>MomentumCampaign::campaign($secret,brand())),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='closed'){
-    $duplicate=campaign(); $duplicate['channels']=['email','email'];
+    $duplicate=campaign(); $duplicate['channels']=['owned_messaging','owned_messaging'];
     $extra=campaign(); $extra['provider']='meta';
     $badSchedule=campaign(); $badSchedule['schedule']=['start_at'=>2000,'end_at'=>1000];
     $active=campaign(); $active['status']='active'; $active['schedule']=['start_at'=>null,'end_at'=>null];

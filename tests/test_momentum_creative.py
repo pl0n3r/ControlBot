@@ -18,9 +18,14 @@ class MomentumCreativeTests(unittest.TestCase):
         self.assertTrue(data["cross_venture"])
 
     def test_variant_is_provider_neutral_and_uses_opaque_refs(self):
-        row=scenario("neutral")
+        data=scenario("neutral")
+        row=data["full"]
         self.assertRegex(row["content_ref"],r"^content:[a-f0-9]{32}$")
         self.assertRegex(row["asset_ref"],r"^asset:[a-f0-9]{32}$")
+        self.assertIsNone(data["content_only"]["asset_ref"])
+        self.assertIsNone(data["content_only"]["hypothesis_ref"])
+        self.assertIsNone(data["asset_only"]["content_ref"])
+        self.assertIsNone(data["asset_only"]["metric_ref"])
         source=(ROOT/"src"/"MomentumCreative.php").read_text(encoding="utf-8").lower()
         for forbidden in ("facebook","instagram","tiktok","google_ads","mail_service_vendor"):
             self.assertNotIn(forbidden,source)
@@ -35,6 +40,7 @@ class MomentumCreativeTests(unittest.TestCase):
     def test_variant_set_is_deterministic_and_rejects_duplicates(self):
         data=scenario("set")
         self.assertEqual([row["variant_key"] for row in data["ordered"]],["A","B"])
+        self.assertEqual(data["empty"],[])
         self.assertTrue(data["duplicate_rejected"])
 
     def test_core_has_no_generation_publish_spend_or_scheduler(self):

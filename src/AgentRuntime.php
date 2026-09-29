@@ -13,6 +13,7 @@ final class AgentRuntime
         'reviewing', 'blocked', 'rate_limited', 'requires_login', 'paused', 'stopping', 'failed',
     ];
     private const ASSIGNMENT_STATES = ['assigned', 'running', 'waiting', 'review', 'blocked', 'done'];
+    private const OBSERVED_CAPACITY_STATES = ['healthy', 'saturated', 'rate_limited', 'requires_login', 'offline', 'unknown'];
 
     private static function fields(array $record, array $expected, string $label): void
     {
@@ -144,7 +145,7 @@ final class AgentRuntime
             'provider_id' => self::slug($record['provider_id'], 'provider_id'),
             'account_alias' => self::safeText($record['account_alias'], 'account_alias', 80),
             'plan' => self::safeText($record['plan'], 'plan', 80),
-            'capacity' => self::positiveInt($record['capacity'], 'capacity', 32),
+            'capacity' => self::positiveInt($record['capacity'], 'capacity'),
             'status' => $record['status'],
         ];
     }
@@ -245,6 +246,56 @@ final class AgentRuntime
     public static function capacitySnapshot(array $accountRecord, array $sessionRecords): array
     {
         $account = self::account($accountRecord);
+        $sessionIds = self::sessionIds($account, $sessionRecords);
+        if (count($sessionIds) > $account['capacity']) {
+            throw new InvalidArgumentException('Account capacity exceeded.');
+        }
+        $free = $account['status'] === 'active' ? $account['capacity'] - count($sessionIds) : 0;
+        return [
+            'account_id' => $account['account_id'],
+            'eligible' => $account['status'] === 'active' && $free > 0,
+            'free_capacity' => $free,
+            'session_ids' => $sessionIds,
+        ];
+    }
+
+    public static function observedCapacitySnapshot(
+        array $accountRecord,
+        array $sessionRecords,
+        array $observation,
+    ): array {
+        $account = self::account($accountRecord);
+        $sessionIds = self::sessionIds($account, $sessionRecords);
+        self::fields($observation, [
+            'version', 'state', 'total_capacity', 'occupied_capacity', 'observed_at',
+        ], 'ObservedCapacity');
+        if ($observation['version'] !== 1
+            || !is_string($observation['state'])
+            || !in_array($observation['state'], self::OBSERVED_CAPACITY_STATES, true)) {
+            throw new InvalidArgumentException('Observed capacity invalid.');
+        }
+        $total = self::nonNegativeInt($observation['total_capacity'], 'total_capacity');
+        $occupied = self::nonNegativeInt($observation['occupied_capacity'], 'occupied_capacity');
+        $observedAt = self::nonNegativeInt($observation['observed_at'], 'observed_at');
+
+        $operational = $account['status'] === 'active' && $observation['state'] === 'healthy';
+        $free = $operational ? max(0, $total - $occupied) : 0;
+
+        return [
+            'account_id' => $account['account_id'],
+            'declared_capacity' => $account['capacity'],
+            'observed_state' => $observation['state'],
+            'observed_total_capacity' => $total,
+            'observed_occupied_capacity' => $occupied,
+            'observed_at' => $observedAt,
+            'eligible' => $free > 0,
+            'free_capacity' => $free,
+            'session_ids' => $sessionIds,
+        ];
+    }
+
+    private static function sessionIds(array $account, array $sessionRecords): array
+    {
         if (!array_is_list($sessionRecords) || count($sessionRecords) > 64) {
             throw new InvalidArgumentException('sessions invalid.');
         }
@@ -262,18 +313,16 @@ final class AgentRuntime
             }
             $ids[] = $session['session_id'];
         }
-        if (count($ids) > $account['capacity']) {
-            throw new InvalidArgumentException('Account capacity exceeded.');
+        sort($ids);
+        return $ids;
+    }
+
+    private static function nonNegativeInt(mixed $value, string $label): int
+    {
+        if (!is_int($value) || $value < 0) {
+            throw new InvalidArgumentException($label . ' invalid.');
         }
-        $sessionIds = $ids;
-        sort($sessionIds);
-        $free = $account['status'] === 'active' ? $account['capacity'] - count($sessionIds) : 0;
-        return [
-            'account_id' => $account['account_id'],
-            'eligible' => $account['status'] === 'active' && $free > 0,
-            'free_capacity' => $free,
-            'session_ids' => $sessionIds,
-        ];
+        return $value;
     }
 
     public static function handoff(array $record): array

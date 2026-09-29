@@ -28,6 +28,49 @@ class AgentRuntimeTests(unittest.TestCase):
         self.assertTrue(data["overflow"])
         self.assertTrue(data["duplicate"])
 
+    def test_observed_sessions_are_not_rejected_by_declared_capacity(self):
+        data = scenario("observed_capacity")
+        row = data["over_declared"]
+        self.assertEqual(row["declared_capacity"], 1)
+        self.assertEqual(row["session_ids"], ["session_1", "session_2"])
+        self.assertEqual(row["free_capacity"], 1)
+        self.assertTrue(row["eligible"])
+
+    def test_declared_capacity_never_grants_operational_eligibility(self):
+        row = scenario("observed_capacity")["declared_only"]
+        self.assertEqual(row["declared_capacity"], 999)
+        self.assertEqual(row["observed_state"], "unknown")
+        self.assertEqual(row["free_capacity"], 0)
+        self.assertFalse(row["eligible"])
+
+    def test_observed_account_states_fail_closed_for_new_capacity(self):
+        data = scenario("observed_capacity")["states"]
+        for state in ("rate_limited", "requires_login", "offline", "unknown"):
+            self.assertEqual(data[state]["observed_state"], state)
+            self.assertEqual(data[state]["free_capacity"], 0)
+            self.assertFalse(data[state]["eligible"])
+
+    def test_operational_capacity_comes_from_observed_signal_not_provider_plan(self):
+        data = scenario("observed_capacity")
+        self.assertEqual(data["chatgpt"]["free_capacity"], 3)
+        self.assertEqual(data["claude"]["free_capacity"], 3)
+        self.assertNotEqual(data["chatgpt"]["declared_capacity"], data["claude"]["declared_capacity"])
+        self.assertEqual(data["large_declared"]["capacity"], 999)
+
+    def test_observed_capacity_contract_rejects_invalid_or_incoherent_input(self):
+        data = scenario("observed_capacity")
+        self.assertTrue(data["invalid_state"])
+        self.assertTrue(data["invalid_total"])
+
+    def test_legacy_capacity_snapshot_remains_compatible_during_migration(self):
+        data = scenario("observed_capacity")
+        self.assertEqual(
+            set(data["legacy"]),
+            {"account_id", "eligible", "free_capacity", "session_ids"},
+        )
+        self.assertEqual(data["legacy"]["free_capacity"], 1)
+        self.assertTrue(data["legacy_overflow_rejected"])
+
     def test_lost_heartbeat_marks_session_unhealthy_without_losing_assignment(self):
         data = scenario("heartbeat")
         self.assertEqual(data["fresh"]["health"], "healthy")

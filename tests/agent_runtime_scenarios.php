@@ -7,6 +7,9 @@ function rejected(callable $work): bool { try { $work(); return false; } catch (
 $provider = ['version'=>1,'provider_id'=>'chatgpt-web','adapter'=>'browser-bridge'];
 $account = ['version'=>1,'account_id'=>'account_main','provider_id'=>'chatgpt-web','account_alias'=>'Principal','plan'=>'plus','capacity'=>2,'status'=>'active'];
 $agent = ['version'=>1,'agent_id'=>'agent_runtime','role'=>'software-engineering','capabilities'=>['review-code','test-php']];
+function observedCapacity(string $state='healthy', int $total=3, int $occupied=1): array {
+    return ['version'=>1,'state'=>$state,'total_capacity'=>$total,'occupied_capacity'=>$occupied,'observed_at'=>1000];
+}
 function sessionRow(string $id, string $status='idle', ?int $heartbeat=1000, ?string $assignment=null): array {
     return ['version'=>1,'session_id'=>$id,'agent_id'=>'agent_runtime','account_id'=>'account_main','profile_alias'=>'Perfil principal','tab_id'=>'tab_'.$id,'status'=>$status,'assignment_id'=>$assignment,'last_heartbeat_at'=>$heartbeat,'mode'=>'web','repository'=>$assignment===null?null:'pl0n3r/ControlBot','issue_number'=>$assignment===null?null:116];
 }
@@ -21,6 +24,29 @@ if ($scenario === 'contract') {
 if ($scenario === 'capacity') {
     $s1=sessionRow('session_1'); $s2=sessionRow('session_2'); $s3=sessionRow('session_3');
     echo json_encode(['one'=>AgentRuntime::capacitySnapshot($account,[$s1]),'two'=>AgentRuntime::capacitySnapshot($account,[$s1,$s2]),'overflow'=>rejected(fn()=>AgentRuntime::capacitySnapshot($account,[$s1,$s2,$s3])),'duplicate'=>rejected(fn()=>AgentRuntime::capacitySnapshot($account,[$s1,$s1]))], JSON_THROW_ON_ERROR), PHP_EOL; exit;
+}
+if ($scenario === 'observed_capacity') {
+    $s1=sessionRow('session_1'); $s2=sessionRow('session_2');
+    $declaredOne=array_replace($account,['capacity'=>1]);
+    $declaredHigh=array_replace($account,['capacity'=>999]);
+    $sameSignal=observedCapacity('healthy',4,1);
+    $claude=array_replace($declaredHigh,['account_id'=>'account_other','provider_id'=>'claude-web','account_alias'=>'Secundaria']);
+    $states=[];
+    foreach(['rate_limited','requires_login','offline','unknown'] as $state){
+        $states[$state]=AgentRuntime::observedCapacitySnapshot($declaredHigh,[],observedCapacity($state,99,0));
+    }
+    echo json_encode([
+        'over_declared'=>AgentRuntime::observedCapacitySnapshot($declaredOne,[$s1,$s2],observedCapacity('healthy',3,2)),
+        'declared_only'=>AgentRuntime::observedCapacitySnapshot($declaredHigh,[],observedCapacity('unknown',99,0)),
+        'states'=>$states,
+        'chatgpt'=>AgentRuntime::observedCapacitySnapshot($declaredOne,[],$sameSignal),
+        'claude'=>AgentRuntime::observedCapacitySnapshot($claude,[],$sameSignal),
+        'large_declared'=>AgentRuntime::account($declaredHigh),
+        'invalid_state'=>rejected(fn()=>AgentRuntime::observedCapacitySnapshot($account,[],observedCapacity('invented'))),
+        'invalid_total'=>rejected(fn()=>AgentRuntime::observedCapacitySnapshot($account,[],['version'=>1,'state'=>'healthy','total_capacity'=>-1,'occupied_capacity'=>0,'observed_at'=>1000])),
+        'legacy'=>AgentRuntime::capacitySnapshot($account,[$s1]),
+        'legacy_overflow_rejected'=>rejected(fn()=>AgentRuntime::capacitySnapshot($declaredOne,[$s1,$s2])),
+    ], JSON_THROW_ON_ERROR), PHP_EOL; exit;
 }
 if ($scenario === 'heartbeat') {
     $assigned=sessionRow('session_1','working',1000,'work_116');

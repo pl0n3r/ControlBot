@@ -122,7 +122,6 @@ final class SchedulerCore
             }
             foreach($row['claims'] as $claim){
                 if(isset($activeClaims[$claim]) && $activeClaims[$claim]!==$id) $reasons[]='claim_conflict';
-                elseif(isset($activeClaims[$claim])) $reasons[]='claim_already_owned';
             }
             $project=$concurrency[$item['project_id']];
             if($project['state']==='unknown') $reasons[]='critical_constraint_unknown';

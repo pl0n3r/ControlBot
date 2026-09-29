@@ -8,8 +8,10 @@ ROOT=Path(__file__).resolve().parents[1]
 def scenario(name):
     run=subprocess.run(
         ["php",str(ROOT/"tests"/"vendor_owner_inbox_projection_scenarios.php"),name],
-        cwd=ROOT,check=True,text=True,capture_output=True,
+        cwd=ROOT,check=False,text=True,capture_output=True,
     )
+    if run.returncode != 0:
+        raise AssertionError(run.stderr.strip() or f"scenario {name} failed with {run.returncode}")
     return json.loads(run.stdout)
 
 class VendorOwnerInboxProjectionTests(unittest.TestCase):

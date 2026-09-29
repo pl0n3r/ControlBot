@@ -11,7 +11,7 @@ Entrada: el contrato normalizado de `Postmortem v1`. El adaptador conserva las c
 - `contributing_factor` → `contributing_factors`;
 - `preventive_change` → `preventive_rules`.
 
-Evidencia `incomplete|contradictory` permanece fuera de las colecciones de hechos soportados y obliga `owner_action_required=true`. Un bug independiente nunca se promociona a causa o regla preventiva.
+Evidencia `unknown|incomplete|contradictory` permanece fuera de las colecciones de hechos soportados y obliga `owner_action_required=true`. Un bug independiente nunca se promociona a causa o regla preventiva.
 
 ## Identidad e idempotencia
 

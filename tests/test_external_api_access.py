@@ -28,7 +28,9 @@ class ExternalApiAccessTests(unittest.TestCase):
         self.assertEqual(data["owner"]["capability"],"owner.cockpit.read")
         self.assertEqual(data["owner"]["scope"],"venture:alpha")
         self.assertEqual(data["lower"]["decision"],"deny")
-        self.assertIn("owner_authority_required",data["lower"]["reasons"])
+        self.assertIn("owner_identity_required",data["lower"]["reasons"])
+        self.assertEqual(data["agent"]["decision"],"deny")
+        self.assertIn("owner_identity_required",data["agent"]["reasons"])
 
     def test_mismatched_capability_scope_policy_or_identity_fails_closed(self):
         data=scenario("mismatch")

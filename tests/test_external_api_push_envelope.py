@@ -31,6 +31,7 @@ class ExternalApiPushEnvelopeTests(unittest.TestCase):
         self.assertEqual(d["legit_dsn_target"],"controlbot:incident/dsn-outage")
         self.assertTrue(d["token_hyphen_target"])
         self.assertTrue(d["token_dot_target"])
+        self.assertTrue(d["password_dot_target"])
         for key in (
             "bad_version","bad_notification_ref","bad_correlation_id","bad_venture_ref",
             "bad_occurred_type","bad_occurred_zero","bad_copy_key",

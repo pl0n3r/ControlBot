@@ -8,8 +8,8 @@ use ControlBot\Ui\CapacityUi;
 function session(string $id,string $fresh='healthy',string $state='idle'): array {
     return ['session_id'=>$id,'state'=>$state,'freshness'=>$fresh];
 }
-function account(string $id,string $state='healthy',int $free=1,int $idle=1): array {
-    return ['account_id'=>$id,'eligible'=>($free+$idle)>0,'free_capacity'=>$free,'idle_sessions'=>$idle,'observed_state'=>$state,'observed_at'=>1000];
+function account(string $id,string $state='healthy',int $free=1,int $idle=1,string $provider='chatgpt-web'): array {
+    return ['account_id'=>$id,'provider_id'=>$provider,'eligible'=>($free+$idle)>0,'free_capacity'=>$free,'idle_sessions'=>$idle,'observed_state'=>$state,'observed_at'=>1000];
 }
 function presence(array $sessions,array $accounts,int $healthy,int $idle,string $capacity='idle_capacity'): array {
     return ['version'=>1,'policy_ref'=>'factory-dispatcher-v2','observed_at'=>1000,'presence_state'=>$healthy===0?'unknown':($healthy===1?'solo':'multi'),
@@ -31,6 +31,13 @@ if($case==='metrics'){
         scheduler(3,1)
     );
     echo json_encode(['html'=>$html],JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($case==='mixed'){
+    $sessions=[session('s1','healthy','idle')];
+    $healthy=account('a1','healthy',1,1,'chatgpt-web');
+    $degraded=renderReady(presence($sessions,[$healthy,account('a2','rate_limited',0,0,'claude-web')],1,2,'degraded'),scheduler(2,1));
+    $unknown=renderReady(presence($sessions,[$healthy,account('a3','unknown',0,0,'claude-web')],1,2,'unknown'),scheduler(2,1));
+    echo json_encode(compact('degraded','unknown'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='degraded'){
     $html=renderReady(

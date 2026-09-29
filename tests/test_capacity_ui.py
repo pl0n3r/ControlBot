@@ -24,13 +24,17 @@ class CapacityUiTests(unittest.TestCase):
         self.assertIn(">3</strong>",html)
         self.assertIn(">2</strong>",html)
         self.assertIn(">1</strong>",html)
+        self.assertIn('data-provider="chatgpt-web"',html)
 
-    def test_unknown_stale_and_degraded_never_render_healthy(self):
-        html=scenario("degraded")["html"]
-        self.assertIn('data-capacity-state="degraded"',html)
-        self.assertIn('data-freshness="stale"',html)
-        self.assertIn('data-freshness="unknown"',html)
-        self.assertNotIn('data-metric="healthy-sessions"><span>Healthy sessions</span><strong>1',html)
+    def test_mixed_degraded_and_unknown_preserve_trusted_capacity_without_rendering_healthy(self):
+        data=scenario("mixed")
+        self.assertIn('data-capacity-state="degraded"',data["degraded"])
+        self.assertIn('data-capacity-state="unknown"',data["unknown"])
+        for html in data.values():
+            self.assertIn('data-metric="idle-capacity"><span>Idle capacity</span><strong>2',html)
+            self.assertIn('data-metric="dispatchable-capacity"><span>Dispatchable capacity</span><strong>1',html)
+            self.assertIn('data-provider="chatgpt-web"',html)
+            self.assertIn('data-provider="claude-web"',html)
 
     def test_rate_limit_and_login_are_visible_non_capacity_states(self):
         html=scenario("degraded")["html"]

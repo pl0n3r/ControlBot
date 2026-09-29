@@ -7,8 +7,8 @@ use ControlBot\Runtime\PresenceAdapter;
 use InvalidArgumentException;
 
 function rejected(callable $fn): bool { try{$fn();return false;}catch(InvalidArgumentException){return true;} }
-function account(int $capacity=2,string $status='active',string $alias='Owner'): array {
-    return ['version'=>1,'account_id'=>'account_main','provider_id'=>'chatgpt-web','account_alias'=>$alias,'plan'=>'plus','capacity'=>$capacity,'status'=>$status];
+function account(int $capacity=2,string $status='active',string $alias='Owner',string $provider='chatgpt-web'): array {
+    return ['version'=>1,'account_id'=>'account_main','provider_id'=>$provider,'account_alias'=>$alias,'plan'=>'plus','capacity'=>$capacity,'status'=>$status];
 }
 function session(string $id='session_1',string $status='working',?int $heartbeat=990,bool $assigned=true,int $issue=120,string $profile='Main'): array {
     return ['version'=>1,'session_id'=>$id,'agent_id'=>'agent-'.$id,'account_id'=>'account_main','profile_alias'=>$profile,'tab_id'=>'tab-'.$id,
@@ -62,6 +62,10 @@ if($case==='observed_capacity'){
     $unknown=snap([row('session_1','idle',990,false)],[account(99)],['account_main'=>capacity('unknown',9,0)]);
     $missing=snap([row('session_1','idle',990,false)],[account(99)],[]);
     echo json_encode(compact('observed','stale','unknown','missing'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($case==='provider_projection'){
+    $projected=snap([row()],[account(2,'active','Owner','claude-web')],['account_main'=>capacity('healthy',2,1)]);
+    echo json_encode($projected,JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='provider_degradation'){
     $rows=[row('session_1','working',990,true,120)];

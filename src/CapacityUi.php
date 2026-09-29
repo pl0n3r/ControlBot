@@ -48,16 +48,24 @@ final class CapacityUi
             .' · <strong>Presence:</strong> '.self::e($presence['presence_state'])
             .'</div>';
 
-        $accounts='';
-        foreach($presence['accounts'] as $account){
-            $accounts.='<li data-account-state="'.self::e($account['observed_state']).'">'
-                .'<strong>'.self::e($account['account_id']).'</strong>'
-                .' <span>'.self::e(self::stateLabel($account['observed_state'])).'</span>'
-                .' <span>idle '.$account['idle_sessions'].'</span>'
-                .' <span>free '.$account['free_capacity'].'</span>'
-                .'</li>';
+        $providers=[];
+        foreach($presence['accounts'] as $account) $providers[$account['provider_id']][]=$account;
+        ksort($providers,SORT_STRING);
+        $providerViews='';
+        foreach($providers as $providerId=>$accounts){
+            $rows='';
+            foreach($accounts as $account){
+                $rows.='<li data-account-state="'.self::e($account['observed_state']).'">'
+                    .'<strong>'.self::e($account['account_id']).'</strong>'
+                    .' <span>'.self::e(self::stateLabel($account['observed_state'])).'</span>'
+                    .' <span>idle '.$account['idle_sessions'].'</span>'
+                    .' <span>free '.$account['free_capacity'].'</span>'
+                    .'</li>';
+            }
+            $providerViews.='<article class="capacity-provider" data-provider="'.self::e($providerId).'">'
+                .'<h3>'.self::e($providerId).'</h3><ul>'.$rows.'</ul></article>';
         }
-        if($accounts==='') $accounts='<li class="capacity-empty-row">No accounts observed.</li>';
+        if($providerViews==='') $providerViews='<p class="capacity-empty-row">No accounts observed.</p>';
 
         $sessionRows='';
         foreach($presence['sessions'] as $session){
@@ -72,7 +80,7 @@ final class CapacityUi
         $html='<section class="capacity-view" data-state="ready"><h1>AI Capacity</h1>'
             .$status
             .'<div class="capacity-metrics">'.$cards.'</div>'
-            .'<div class="capacity-columns"><section><h2>Accounts</h2><ul>'.$accounts.'</ul></section>'
+            .'<div class="capacity-columns"><section class="capacity-providers"><h2>Providers / Accounts</h2>'.$providerViews.'</section>'
             .'<section><h2>Sessions</h2><ul>'.$sessionRows.'</ul></section></div>'
             .'</section>';
         return self::shell($html);
@@ -93,8 +101,6 @@ final class CapacityUi
             || !is_array($raw['sessions']) || !array_is_list($raw['sessions'])
             || !is_array($raw['accounts']) || !array_is_list($raw['accounts']))
             throw new InvalidArgumentException('Presence snapshot invalid.');
-        if(($raw['capacity_state']==='idle_capacity')!==($raw['idle_capacity']>0))
-            throw new InvalidArgumentException('Presence capacity state mismatch.');
         if($raw['healthy_sessions']>count($raw['sessions']))
             throw new InvalidArgumentException('Healthy sessions exceed open sessions.');
 
@@ -110,7 +116,7 @@ final class CapacityUi
 
         $accounts=[];
         foreach($raw['accounts'] as $row){
-            self::fields($row,['account_id','eligible','free_capacity','idle_sessions','observed_state','observed_at'],'PresenceAccount');
+            self::fields($row,['account_id','provider_id','eligible','free_capacity','idle_sessions','observed_state','observed_at'],'PresenceAccount');
             if(!is_bool($row['eligible']) || !is_int($row['free_capacity']) || $row['free_capacity']<0
                 || !is_int($row['idle_sessions']) || $row['idle_sessions']<0
                 || !is_int($row['observed_at']) || $row['observed_at']<0
@@ -118,6 +124,7 @@ final class CapacityUi
                 throw new InvalidArgumentException('Presence account invalid.');
             $accounts[]=[
                 'account_id'=>self::ref($row['account_id']),
+                'provider_id'=>self::ref($row['provider_id']),
                 'free_capacity'=>$row['free_capacity'],
                 'idle_sessions'=>$row['idle_sessions'],
                 'observed_state'=>$row['observed_state'],

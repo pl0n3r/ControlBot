@@ -66,6 +66,8 @@ if($case==='scope'){
     $crossSignal=signal();$crossSignal['venture_id']='venture-brvtal';
     echo json_encode([
         'pipeline'=>$canonical,
+        'pipeline_campaign_ref'=>$canonical['campaign_ref'],
+        'pipeline_creative_ref'=>$canonical['creative_ref'],
         'cross_forecast_rejected'=>blocked(fn()=>MomentumRevenue::forecast($crossForecast,pipeline())),
         'cross_signal_rejected'=>blocked(fn()=>MomentumRevenue::lifecycleSignal($crossSignal,pipeline())),
     ],JSON_THROW_ON_ERROR),PHP_EOL;exit;

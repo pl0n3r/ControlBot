@@ -18,6 +18,8 @@ class MomentumRevenueTests(unittest.TestCase):
     def test_revenue_pipeline_is_venture_scoped_and_cross_venture_fails_closed(self):
         data=scenario("scope")
         self.assertEqual(data["pipeline"]["venture_id"],"venture-condor")
+        self.assertRegex(data["pipeline_campaign_ref"],r"^campaign:[a-f0-9]{32}$")
+        self.assertRegex(data["pipeline_creative_ref"],r"^creative:[a-f0-9]{32}$")
         self.assertTrue(data["cross_forecast_rejected"])
         self.assertTrue(data["cross_signal_rejected"])
 

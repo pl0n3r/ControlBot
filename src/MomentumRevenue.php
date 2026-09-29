@@ -15,17 +15,17 @@ final class MomentumRevenue
 
     public static function pipeline(array $raw): array
     {
-        self::fields($raw,[
+        self::exactFields($raw,[
             'version','pipeline_id','venture_id','lead_ref','opportunity_ref','source_ref','campaign_ref',
             'creative_ref','owner_ref','stage','qualification','next_action_ref','observed_at','freshness',
             'customer_success_handoff_ref',
         ],'RevenuePipeline');
         if($raw['version']!==1) throw new InvalidArgumentException('RevenuePipeline version invalid.');
 
-        $stage=self::enumValue($raw['stage'],self::STAGES,'stage');
-        $qualification=self::enumValue($raw['qualification'],self::QUALIFICATIONS,'qualification');
-        $opportunity=self::nullableOpaque($raw['opportunity_ref'],'opportunity');
-        $handoff=self::nullableOpaque($raw['customer_success_handoff_ref'],'customer-success');
+        $stage=self::choice($raw['stage'],self::STAGES,'stage');
+        $qualification=self::choice($raw['qualification'],self::QUALIFICATIONS,'qualification');
+        $opportunity=self::nullableReference($raw['opportunity_ref'],'opportunity');
+        $handoff=self::nullableReference($raw['customer_success_handoff_ref'],'customer-success');
 
         if(in_array($stage,['qualified','opportunity','proposal','won','lost'],true) && $qualification!=='qualified')
             throw new InvalidArgumentException('RevenuePipeline qualified stage mismatch.');
@@ -40,21 +40,24 @@ final class MomentumRevenue
         if($stage!=='won' && $handoff!==null)
             throw new InvalidArgumentException('Customer Success handoff only applies after won.');
 
+        $campaign=self::nullableReference($raw['campaign_ref'],'campaign');
+        $creative=self::nullableReference($raw['creative_ref'],'creative');
+
         return [
             'version'=>1,
-            'pipeline_id'=>self::opaque($raw['pipeline_id'],'pipeline'),
+            'pipeline_id'=>self::reference($raw['pipeline_id'],'pipeline'),
             'venture_id'=>self::venture($raw['venture_id']),
-            'lead_ref'=>self::opaque($raw['lead_ref'],'lead'),
+            'lead_ref'=>self::reference($raw['lead_ref'],'lead'),
             'opportunity_ref'=>$opportunity,
-            'source_ref'=>self::opaque($raw['source_ref'],'source'),
+            'source_ref'=>self::reference($raw['source_ref'],'source'),
             'campaign_ref'=>$campaign,
             'creative_ref'=>$creative,
-            'owner_ref'=>self::opaque($raw['owner_ref'],'owner'),
+            'owner_ref'=>self::reference($raw['owner_ref'],'owner'),
             'stage'=>$stage,
             'qualification'=>$qualification,
-            'next_action_ref'=>self::nullableOpaque($raw['next_action_ref'],'action'),
-            'observed_at'=>self::nonNegativeInt($raw['observed_at'],'observed_at'),
-            'freshness'=>self::enumValue($raw['freshness'],self::FRESHNESS,'freshness'),
+            'next_action_ref'=>self::nullableReference($raw['next_action_ref'],'action'),
+            'observed_at'=>self::natural($raw['observed_at'],'observed_at'),
+            'freshness'=>self::choice($raw['freshness'],self::FRESHNESS,'freshness'),
             'customer_success_handoff_ref'=>$handoff,
         ];
     }
@@ -62,28 +65,28 @@ final class MomentumRevenue
     public static function forecast(array $raw,array $pipelineRaw): array
     {
         $pipeline=self::pipeline($pipelineRaw);
-        self::fields($raw,[
+        self::exactFields($raw,[
             'version','forecast_id','venture_id','opportunity_ref','amount_minor','currency','confidence',
             'source_ref','observed_at','freshness',
         ],'RevenueForecast');
         if($raw['version']!==1) throw new InvalidArgumentException('RevenueForecast version invalid.');
 
         $venture=self::venture($raw['venture_id']);
-        $opportunity=self::opaque($raw['opportunity_ref'],'opportunity');
+        $opportunity=self::reference($raw['opportunity_ref'],'opportunity');
         if($pipeline['opportunity_ref']===null || $venture!==$pipeline['venture_id'] || $opportunity!==$pipeline['opportunity_ref'])
             throw new InvalidArgumentException('RevenueForecast scope mismatch.');
 
         return [
             'version'=>1,
-            'forecast_id'=>self::opaque($raw['forecast_id'],'forecast'),
+            'forecast_id'=>self::reference($raw['forecast_id'],'forecast'),
             'venture_id'=>$venture,
             'opportunity_ref'=>$opportunity,
             'amount_minor'=>self::amount($raw['amount_minor'],'amount_minor'),
             'currency'=>self::currency($raw['currency']),
             'confidence'=>self::confidence($raw['confidence']),
-            'source_ref'=>self::opaque($raw['source_ref'],'source'),
-            'observed_at'=>self::nonNegativeInt($raw['observed_at'],'observed_at'),
-            'freshness'=>self::enumValue($raw['freshness'],self::FRESHNESS,'freshness'),
+            'source_ref'=>self::reference($raw['source_ref'],'source'),
+            'observed_at'=>self::natural($raw['observed_at'],'observed_at'),
+            'freshness'=>self::choice($raw['freshness'],self::FRESHNESS,'freshness'),
             'classification'=>'forecast',
             'demonstrated_revenue'=>false,
         ];
@@ -92,25 +95,25 @@ final class MomentumRevenue
     public static function attribution(array $raw,array $pipelineRaw): array
     {
         $pipeline=self::pipeline($pipelineRaw);
-        self::fields($raw,[
+        self::exactFields($raw,[
             'version','attribution_id','venture_id','opportunity_ref','campaign_ref','creative_ref','classification',
             'amount_minor','currency','source_ref','evidence_refs','observed_at','freshness',
         ],'RevenueAttribution');
         if($raw['version']!==1) throw new InvalidArgumentException('RevenueAttribution version invalid.');
 
         $venture=self::venture($raw['venture_id']);
-        $opportunity=self::opaque($raw['opportunity_ref'],'opportunity');
+        $opportunity=self::reference($raw['opportunity_ref'],'opportunity');
         if($pipeline['opportunity_ref']===null || $venture!==$pipeline['venture_id'] || $opportunity!==$pipeline['opportunity_ref'])
             throw new InvalidArgumentException('RevenueAttribution scope mismatch.');
 
-        $campaign=self::nullableOpaque($raw['campaign_ref'],'campaign');
-        $creative=self::nullableOpaque($raw['creative_ref'],'creative');
+        $campaign=self::nullableReference($raw['campaign_ref'],'campaign');
+        $creative=self::nullableReference($raw['creative_ref'],'creative');
         if($campaign!==$pipeline['campaign_ref'] || $creative!==$pipeline['creative_ref'])
             throw new InvalidArgumentException('RevenueAttribution campaign scope mismatch.');
 
-        $classification=self::enumValue($raw['classification'],self::ATTRIBUTION,'classification');
+        $classification=self::choice($raw['classification'],self::ATTRIBUTION,'classification');
         $amount=$raw['amount_minor']===null?null:self::amount($raw['amount_minor'],'amount_minor');
-        $evidence=self::opaqueList($raw['evidence_refs'],'evidence',32);
+        $evidence=self::references($raw['evidence_refs'],'evidence',32);
         if($classification==='unknown' && $amount!==null)
             throw new InvalidArgumentException('Unknown attribution cannot claim revenue amount.');
         if(in_array($classification,['observed','inferred'],true) && $amount===null)
@@ -122,18 +125,18 @@ final class MomentumRevenue
 
         return [
             'version'=>1,
-            'attribution_id'=>self::opaque($raw['attribution_id'],'attribution'),
+            'attribution_id'=>self::reference($raw['attribution_id'],'attribution'),
             'venture_id'=>$venture,
             'opportunity_ref'=>$opportunity,
-            'campaign_ref'=>self::nullableOpaque($raw['campaign_ref'],'campaign'),
-            'creative_ref'=>self::nullableOpaque($raw['creative_ref'],'creative'),
+            'campaign_ref'=>$campaign,
+            'creative_ref'=>$creative,
             'classification'=>$classification,
             'amount_minor'=>$amount,
             'currency'=>self::currency($raw['currency']),
-            'source_ref'=>self::opaque($raw['source_ref'],'source'),
+            'source_ref'=>self::reference($raw['source_ref'],'source'),
             'evidence_refs'=>$evidence,
-            'observed_at'=>self::nonNegativeInt($raw['observed_at'],'observed_at'),
-            'freshness'=>self::enumValue($raw['freshness'],self::FRESHNESS,'freshness'),
+            'observed_at'=>self::natural($raw['observed_at'],'observed_at'),
+            'freshness'=>self::choice($raw['freshness'],self::FRESHNESS,'freshness'),
             'demonstrated_amount_minor'=>$classification==='observed'?$amount:null,
         ];
     }
@@ -141,109 +144,111 @@ final class MomentumRevenue
     public static function lifecycleSignal(array $raw,array $pipelineRaw): array
     {
         $pipeline=self::pipeline($pipelineRaw);
-        self::fields($raw,[
+        self::exactFields($raw,[
             'version','signal_id','venture_id','opportunity_ref','kind','classification','source_ref','observed_at',
             'freshness','product_intelligence_ref','customer_success_ref',
         ],'RevenueLifecycleSignal');
         if($raw['version']!==1) throw new InvalidArgumentException('RevenueLifecycleSignal version invalid.');
 
         $venture=self::venture($raw['venture_id']);
-        $opportunity=self::opaque($raw['opportunity_ref'],'opportunity');
+        $opportunity=self::reference($raw['opportunity_ref'],'opportunity');
         if($pipeline['opportunity_ref']===null || $venture!==$pipeline['venture_id'] || $opportunity!==$pipeline['opportunity_ref'])
             throw new InvalidArgumentException('RevenueLifecycleSignal scope mismatch.');
 
         if($pipeline['stage']!=='won')
             throw new InvalidArgumentException('Lifecycle signal requires won pipeline.');
 
-        $productRef=self::nullableOpaque($raw['product_intelligence_ref'],'product-intelligence');
-        $successRef=self::nullableOpaque($raw['customer_success_ref'],'customer-success');
+        $productRef=self::nullableReference($raw['product_intelligence_ref'],'product-intelligence');
+        $successRef=self::nullableReference($raw['customer_success_ref'],'customer-success');
         if($productRef===null && $successRef===null)
             throw new InvalidArgumentException('Lifecycle signal requires a domain handoff reference.');
 
         return [
             'version'=>1,
-            'signal_id'=>self::opaque($raw['signal_id'],'signal'),
+            'signal_id'=>self::reference($raw['signal_id'],'signal'),
             'venture_id'=>$venture,
             'opportunity_ref'=>$opportunity,
-            'kind'=>self::enumValue($raw['kind'],self::SIGNAL_KINDS,'kind'),
-            'classification'=>self::enumValue($raw['classification'],self::ATTRIBUTION,'classification'),
-            'source_ref'=>self::opaque($raw['source_ref'],'source'),
-            'observed_at'=>self::nonNegativeInt($raw['observed_at'],'observed_at'),
-            'freshness'=>self::enumValue($raw['freshness'],self::FRESHNESS,'freshness'),
+            'kind'=>self::choice($raw['kind'],self::SIGNAL_KINDS,'kind'),
+            'classification'=>self::choice($raw['classification'],self::ATTRIBUTION,'classification'),
+            'source_ref'=>self::reference($raw['source_ref'],'source'),
+            'observed_at'=>self::natural($raw['observed_at'],'observed_at'),
+            'freshness'=>self::choice($raw['freshness'],self::FRESHNESS,'freshness'),
             'product_intelligence_ref'=>$productRef,
             'customer_success_ref'=>$successRef,
         ];
     }
 
-    private static function opaque(mixed $value,string $namespace): string
+    private static function reference(mixed $value,string $namespace): string
     {
-        if(!is_string($value)||preg_match('/^'.preg_quote($namespace,'/').':[a-f0-9]{32}$/D',$value)!==1)
-            throw new InvalidArgumentException($namespace.' ref invalid.');
-        return $value;
+        $pattern=sprintf('/^%s:[a-f0-9]{32}$/D',preg_quote($namespace,'/'));
+        if(is_string($value) && preg_match($pattern,$value)===1) return $value;
+        throw new InvalidArgumentException($namespace.' ref invalid.');
     }
 
-    private static function nullableOpaque(mixed $value,string $namespace): ?string
+    private static function nullableReference(mixed $value,string $namespace): ?string
     {
-        return $value===null?null:self::opaque($value,$namespace);
+        return $value===null ? null : self::reference($value,$namespace);
     }
 
-    private static function opaqueList(mixed $values,string $namespace,int $max): array
+    private static function references(mixed $values,string $namespace,int $max): array
     {
-        if(!is_array($values)||!array_is_list($values)||count($values)>$max)
+        if(!is_array($values) || !array_is_list($values) || count($values)>$max)
             throw new InvalidArgumentException($namespace.' refs invalid.');
-        $out=[];
-        foreach($values as $value){
-            $ref=self::opaque($value,$namespace);
-            if(isset($out[$ref])) throw new InvalidArgumentException($namespace.' ref duplicated.');
-            $out[$ref]=true;
-        }
-        $refs=array_keys($out);sort($refs,SORT_STRING);return $refs;
+        $refs=array_map(
+            static fn(mixed $value): string=>self::reference($value,$namespace),
+            $values,
+        );
+        if(count(array_unique($refs,SORT_STRING))!==count($refs))
+            throw new InvalidArgumentException($namespace.' ref duplicated.');
+        sort($refs,SORT_STRING);
+        return $refs;
     }
 
     private static function venture(mixed $value): string
     {
-        if(!is_string($value)||preg_match('/^[a-z][a-z0-9-]{1,63}$/D',$value)!==1)
-            throw new InvalidArgumentException('venture_id invalid.');
-        return $value;
+        if(is_string($value) && preg_match('/^[a-z][a-z0-9-]{1,63}$/D',$value)===1) return $value;
+        throw new InvalidArgumentException('venture_id invalid.');
     }
 
-    private static function enumValue(mixed $value,array $allowed,string $label): string
+    private static function choice(mixed $value,array $allowed,string $label): string
     {
-        if(!is_string($value)||!in_array($value,$allowed,true))
-            throw new InvalidArgumentException($label.' invalid.');
-        return $value;
+        if(is_string($value) && in_array($value,$allowed,true)) return $value;
+        throw new InvalidArgumentException($label.' invalid.');
     }
 
-    private static function nonNegativeInt(mixed $value,string $label): int
+    private static function natural(mixed $value,string $label): int
     {
-        if(!is_int($value)||$value<0) throw new InvalidArgumentException($label.' invalid.');
-        return $value;
+        if(is_int($value) && $value>=0) return $value;
+        throw new InvalidArgumentException($label.' invalid.');
     }
 
     private static function amount(mixed $value,string $label): int
     {
-        $amount=self::nonNegativeInt($value,$label);
-        if($amount>1_000_000_000_000_000) throw new InvalidArgumentException($label.' exceeds limit.');
-        return $amount;
+        $amount=self::natural($value,$label);
+        if($amount<=1_000_000_000_000_000) return $amount;
+        throw new InvalidArgumentException($label.' exceeds limit.');
     }
 
     private static function confidence(mixed $value): int
     {
-        if(!is_int($value)||$value<0||$value>100) throw new InvalidArgumentException('confidence invalid.');
-        return $value;
+        if(is_int($value) && $value>=0 && $value<=100) return $value;
+        throw new InvalidArgumentException('confidence invalid.');
     }
 
     private static function currency(mixed $value): string
     {
-        if(!is_string($value)||preg_match('/^[A-Z]{3}$/D',$value)!==1)
-            throw new InvalidArgumentException('currency invalid.');
-        return $value;
+        if(is_string($value) && preg_match('/^[A-Z]{3}$/D',$value)===1) return $value;
+        throw new InvalidArgumentException('currency invalid.');
     }
 
-    private static function fields(mixed $row,array $expected,string $label): void
+    private static function exactFields(mixed $row,array $expected,string $label): void
     {
-        if(!is_array($row)||array_is_list($row)) throw new InvalidArgumentException($label.' invalid.');
-        $actual=array_keys($row);sort($actual);sort($expected);
-        if($actual!==$expected) throw new InvalidArgumentException($label.' fields invalid.');
+        if(!is_array($row) || array_is_list($row))
+            throw new InvalidArgumentException($label.' invalid.');
+        $actual=array_keys($row);
+        if(count($actual)===count($expected)
+            && array_diff($actual,$expected)===[] && array_diff($expected,$actual)===[]) return;
+        throw new InvalidArgumentException($label.' fields invalid.');
     }
+
 }

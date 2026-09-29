@@ -63,12 +63,20 @@ if($case==='material'){
     ]);
     $out=['signals'=>project($vendor),'types'=>types(project($vendor))];
 }elseif($case==='unknown'){
-    $vendor=vx([
+    $unknown=vx([
         'criticality'=>'critical','health'=>'unknown','sla_state'=>'unknown',
         'freshness'=>['state'=>'unknown','observed_at'=>null,'source_ref'=>null],
         'renewal_at'=>null,'expiry_at'=>null,
     ]);
-    $out=['signals'=>project($vendor),'types'=>types(project($vendor))];
+    $stale=vx([
+        'criticality'=>'critical','health'=>'unknown','sla_state'=>'unknown',
+        'freshness'=>['state'=>'stale','observed_at'=>1500,'source_ref'=>'evidence:cccccccccccccccccccccccccccccccc'],
+        'renewal_at'=>null,'expiry_at'=>null,
+    ]);
+    $out=[
+        'unknown'=>project($unknown),'unknown_types'=>types(project($unknown)),
+        'stale'=>project($stale),'stale_types'=>types(project($stale)),
+    ];
 }elseif($case==='provenance'){
     $out=['signals'=>project(vx())];
 }elseif($case==='boundary'){

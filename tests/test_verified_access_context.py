@@ -18,10 +18,11 @@ class VerifiedAccessContextTests(unittest.TestCase):
     def test_structural_context_cannot_self_certify(self):
         data=scenario("structural")
         self.assertTrue(data["constructor_private"])
-        self.assertTrue(data["legacy_raw_factory_absent"])
+        self.assertTrue(data["raw_factory_absent"])
+        self.assertTrue(data["source_factory_absent"])
         self.assertFalse(data["array_is_context"])
         self.assertFalse(data["object_is_context"])
-        self.assertTrue(data["raw_as_source_blocked"])
+        self.assertTrue(data["malicious_source_cannot_mint"])
 
     def test_server_side_producer_preserves_canonical_access_semantics(self):
         data=scenario("server")

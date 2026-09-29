@@ -4,7 +4,7 @@
 
 ## Entrada y trust boundary
 
-El plan recibe una selección `factory-dispatcher-v2`, el `WorkItem` vigente, una `Session` y su `Agent`, además de IDs de reserva/asignación suministrados por el caller. Reutiliza `SchedulerCore::workItem()` y `AgentRuntime` para normalizar los contratos existentes; no define un segundo modelo de WorkItem, Session o Assignment.
+El plan recibe exclusivamente un `ValidatedSchedulerSelection` nominal emitido por `ValidatedSchedulerSelection::fromDecision()`, que internamente llama a `SchedulerSelection::validateDecision()` sobre request, decisión y candidatos vigentes. Un array con el mismo shape no constituye provenance y se rechaza. Después recibe el `WorkItem` vigente, una `Session` y su `Agent`, además de IDs de reserva/asignación suministrados por el caller. Reutiliza `SchedulerCore::workItem()` y `AgentRuntime` para normalizar los contratos existentes; no define un segundo modelo de WorkItem, Session o Assignment.
 
 Antes de producir salida vuelve a ligar la selección con el estado vigente: `key`, `source_ref`, `priority`, `generation`, `required_capabilities` y `account_id` deben corresponder al WorkItem/Session observados. Solo se acepta un WorkItem `queued|eligible` sin ownership previo y una Session `idle`, healthy, sin assignment y perteneciente a un Agent que cubra todas las capabilities requeridas.
 
@@ -32,6 +32,7 @@ El fingerprint del Agent forma parte de CAS porque un cambio de capabilities ent
 
 Se rechazan, entre otros:
 
+- selección estructural fabricada o no emitida por `ValidatedSchedulerSelection::fromDecision()`;
 - drift entre selección y WorkItem actual;
 - WorkItem ya reservado/asignado o en estado no asignable;
 - Session ocupada, stale/offline o de otra cuenta;

@@ -48,6 +48,8 @@ if($case==='closed'){
         'extra'=>$extra,
         'sensitive_target'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:decision/secret']))),
         'legit_dsn_target'=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:incident/dsn-outage']))['target_ref'],
+        'token_hyphen_target'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:decision/token-value']))),
+        'token_dot_target'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:decision/token.value']))),
         'bad_version'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['version'=>2]))),
         'bad_notification_ref'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['notification_ref'=>'notification:not-opaque']))),
         'bad_correlation_id'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['correlation_id'=>'not-opaque']))),

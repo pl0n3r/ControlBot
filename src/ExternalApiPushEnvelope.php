@@ -13,7 +13,10 @@ final class ExternalApiPushEnvelope
     ];
     private const COPY_KEYS=['attention_required','decision_required','result_available'];
     private const FRESHNESS=['current','stale','unknown'];
-    private const SENSITIVE='#(?:^|[:/])(?:password|passwd|secret|token|cookie|authorization|bearer|credential|private[_ -]?key|public[_ -]?key|api[_ -]?key|otp|dsn)(?:$|[:/])#i';
+    private const SENSITIVE_COMPONENTS =
+        '#(?:^|[:/])(?:password|passwd|secret|cookie|authorization|bearer|credential|'
+        .'private[_ -]?key|public[_ -]?key|api[_ -]?key|otp|dsn)(?:$|[:/])#i';
+    private const SENSITIVE_TOKEN = '#(?:^|[:/])token(?:$|[:/._-])#i';
 
     /** Normalize and validate the push envelope. */
     public static function envelope(array $raw): array
@@ -116,7 +119,7 @@ final class ExternalApiPushEnvelope
     {
         if(!is_string($value)||strlen($value)>180
             ||preg_match('#^controlbot:(owner-inbox|decision|incident)/[a-z][a-z0-9._/-]{1,139}$#D',$value)!==1
-            ||preg_match(self::SENSITIVE,$value)===1)
+            ||self::sensitiveRef($value))
             throw new InvalidArgumentException('target_ref invalid.');
         return $value;
     }
@@ -126,9 +129,16 @@ final class ExternalApiPushEnvelope
     {
         if(!is_string($value)||strlen($value)>180
             ||preg_match('#^controlbot:[a-z][a-z0-9._/-]{1,159}$#D',$value)!==1
-            ||preg_match(self::SENSITIVE,$value)===1)
+            ||self::sensitiveRef($value))
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
+    }
+
+    /** Detect secret-bearing reference components without blocking unrelated substrings. */
+    private static function sensitiveRef(string $value): bool
+    {
+        return preg_match(self::SENSITIVE_COMPONENTS,$value)===1
+            ||preg_match(self::SENSITIVE_TOKEN,$value)===1;
     }
 
     /** Validate one opaque hexadecimal reference. */

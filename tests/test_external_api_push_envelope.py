@@ -28,6 +28,7 @@ class ExternalApiPushEnvelopeTests(unittest.TestCase):
         d=scenario("minimal")
         self.assertTrue(all(d["extra"].values()))
         self.assertTrue(d["sensitive_target"])
+        self.assertTrue(d["sensitive_source"])
         self.assertEqual(d["legit_dsn_target"],"controlbot:incident/dsn-outage")
         self.assertTrue(d["token_hyphen_target"])
         self.assertTrue(d["token_dot_target"])

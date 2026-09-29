@@ -47,6 +47,7 @@ if($case==='closed'){
         'payload'=>ExternalApiPushEnvelope::envelope(pushRaw()),
         'extra'=>$extra,
         'sensitive_target'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:decision/password.value']))),
+        'sensitive_source'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['source_ref'=>'controlbot:owner-inbox/password.value']))),
         'legit_dsn_target'=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:incident/dsn-outage']))['target_ref'],
         'token_hyphen_target'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:decision/token-value']))),
         'token_dot_target'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:decision/token.value']))),

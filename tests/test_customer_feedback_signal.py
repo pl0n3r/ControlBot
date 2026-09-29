@@ -6,8 +6,10 @@ ROOT=Path(__file__).resolve().parents[1]
 def scenario(name):
     run=subprocess.run(
         ["php",str(ROOT/"tests"/"customer_feedback_signal_scenarios.php"),name],
-        cwd=ROOT,check=True,text=True,capture_output=True,
+        cwd=ROOT,text=True,capture_output=True,
     )
+    if run.returncode:
+        raise AssertionError(run.stderr.strip() or run.stdout.strip() or f"scenario {name} failed")
     return json.loads(run.stdout)
 class CustomerFeedbackSignalTests(unittest.TestCase):
     def test_feedback_is_venture_scoped_and_product_target_requires_explicit_product_ref(self):

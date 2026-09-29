@@ -71,10 +71,7 @@ final class MomentumRevenue
         ],'RevenueForecast');
         if($raw['version']!==1) throw new InvalidArgumentException('RevenueForecast version invalid.');
 
-        $venture=self::venture($raw['venture_id']);
-        $opportunity=self::reference($raw['opportunity_ref'],'opportunity');
-        if($pipeline['opportunity_ref']===null || $venture!==$pipeline['venture_id'] || $opportunity!==$pipeline['opportunity_ref'])
-            throw new InvalidArgumentException('RevenueForecast scope mismatch.');
+        [$venture,$opportunity]=self::pipelineScope($raw,$pipeline,'RevenueForecast');
 
         return [
             'version'=>1,
@@ -101,10 +98,7 @@ final class MomentumRevenue
         ],'RevenueAttribution');
         if($raw['version']!==1) throw new InvalidArgumentException('RevenueAttribution version invalid.');
 
-        $venture=self::venture($raw['venture_id']);
-        $opportunity=self::reference($raw['opportunity_ref'],'opportunity');
-        if($pipeline['opportunity_ref']===null || $venture!==$pipeline['venture_id'] || $opportunity!==$pipeline['opportunity_ref'])
-            throw new InvalidArgumentException('RevenueAttribution scope mismatch.');
+        [$venture,$opportunity]=self::pipelineScope($raw,$pipeline,'RevenueAttribution');
 
         $campaign=self::nullableReference($raw['campaign_ref'],'campaign');
         $creative=self::nullableReference($raw['creative_ref'],'creative');
@@ -150,10 +144,7 @@ final class MomentumRevenue
         ],'RevenueLifecycleSignal');
         if($raw['version']!==1) throw new InvalidArgumentException('RevenueLifecycleSignal version invalid.');
 
-        $venture=self::venture($raw['venture_id']);
-        $opportunity=self::reference($raw['opportunity_ref'],'opportunity');
-        if($pipeline['opportunity_ref']===null || $venture!==$pipeline['venture_id'] || $opportunity!==$pipeline['opportunity_ref'])
-            throw new InvalidArgumentException('RevenueLifecycleSignal scope mismatch.');
+        [$venture,$opportunity]=self::pipelineScope($raw,$pipeline,'RevenueLifecycleSignal');
 
         if($pipeline['stage']!=='won')
             throw new InvalidArgumentException('Lifecycle signal requires won pipeline.');
@@ -176,6 +167,16 @@ final class MomentumRevenue
             'product_intelligence_ref'=>$productRef,
             'customer_success_ref'=>$successRef,
         ];
+    }
+
+    private static function pipelineScope(array $raw,array $pipeline,string $label): array
+    {
+        $venture=self::venture($raw['venture_id']);
+        $opportunity=self::reference($raw['opportunity_ref'],'opportunity');
+        if($pipeline['opportunity_ref']!==null
+            && $venture===$pipeline['venture_id']
+            && $opportunity===$pipeline['opportunity_ref']) return [$venture,$opportunity];
+        throw new InvalidArgumentException($label.' scope mismatch.');
     }
 
     private static function reference(mixed $value,string $namespace): string

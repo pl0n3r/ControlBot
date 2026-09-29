@@ -30,11 +30,16 @@ class ObservabilityEventTests(unittest.TestCase):
 
     def test_payload_and_correlation_keys_are_bounded_allowlisted_and_secret_free(self):
         data=scenario("security")
-        for key in ("secret","email","bearer","nested","extra","wrong_type","secret_key","project_secret","uri_userinfo"):
+        for key in (
+            "secret","email","bearer","nested","extra","wrong_type","secret_key","project_secret",
+            "uri_userinfo","uri_userinfo_empty","uri_userinfo_no_scheme",
+        ):
             self.assertTrue(data[key],(key,data))
         self.assertEqual(data["keys"],["issue:78","project:controlbot"])
         self.assertEqual(data["numeric"]["correlation_keys"],["run:1234567890"])
         self.assertEqual(data["numeric"]["payload_allowlisted"]["sha"],"abcdef1234567890abcdef1234567890abcdef12")
+        self.assertEqual(data["date_version"]["payload_allowlisted"]["version"],"2026.09.29.1")
+        self.assertEqual(data["date_version"]["payload_allowlisted"]["schema"],"2026-09-29")
 
     def test_fingerprint_is_deterministic_and_materially_bound(self):
         data=scenario("fingerprint")

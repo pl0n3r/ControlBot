@@ -182,7 +182,7 @@ final class AgentReplayCore
     private static function evidenceRef(mixed $value): string
     {
         if(!is_string($value)||strlen($value)<3||strlen($value)>240||str_contains($value,'@')
-            ||preg_match(self::SENSITIVE,$value)===1||preg_match(self::EMAIL,$value)===1||preg_match(self::FORBIDDEN_TEXT,$value)===1)
+            ||preg_match(self::SENSITIVE,$value)===1||preg_match(self::EMAIL,$value)===1||preg_match(self::PHONE,$value)===1||preg_match(self::FORBIDDEN_TEXT,$value)===1)
             throw new InvalidArgumentException('evidence_ref invalid.');
         $github=preg_match('~^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9._/#-]+)?$~D',$value)===1;
         $internal=preg_match('/^(?:controlbot|factory|factoryrunner|production|external):[A-Za-z0-9][A-Za-z0-9._:\\/#-]{1,199}$/D',$value)===1;
@@ -198,7 +198,7 @@ final class AgentReplayCore
     private static function secretFree(mixed $value): void
     {
         if(is_array($value)){foreach($value as $item)self::secretFree($item);return;}
-        if(is_string($value)&&(preg_match(self::SENSITIVE,$value)===1||preg_match(self::EMAIL,$value)===1||preg_match(self::FORBIDDEN_TEXT,$value)===1))
+        if(is_string($value)&&(preg_match(self::SENSITIVE,$value)===1||preg_match(self::EMAIL,$value)===1||preg_match(self::PHONE,$value)===1||preg_match(self::FORBIDDEN_TEXT,$value)===1))
             throw new InvalidArgumentException('Replay output contains sensitive material.');
     }
 }

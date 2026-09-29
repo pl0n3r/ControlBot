@@ -25,7 +25,7 @@ if($case==='summary'){
   'customer_boundary'=>bad(fn()=>StaffControlPlane::summary(summary(['population'=>'all_accounts']),'controlbot'))],JSON_THROW_ON_ERROR),PHP_EOL;
 }elseif($case==='search'){
  $out=StaffControlPlane::search(search(),'controlbot');
- $quoted=records();$quoted[0]['email']='\"a@private-name\"@example.com';
+ $quoted=records();$quoted[0]['email']='"a@private-name"@example.com';
  $quotedOut=StaffControlPlane::search(search(['records'=>$quoted]),'controlbot');
  echo json_encode(['valid'=>$out,'raw_email_leaked'=>str_contains(json_encode($out,JSON_THROW_ON_ERROR),'ada@example.com'),
   'quoted_masked'=>$quotedOut['records'][0]['masked_email']],JSON_THROW_ON_ERROR),PHP_EOL;

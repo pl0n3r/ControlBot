@@ -21,6 +21,13 @@ class PresenceAdapterTests(unittest.TestCase):
         self.assertEqual(data["idle_capacity"], 3)
         self.assertEqual(data["accounts"][0]["observed_state"], "healthy")
 
+    def test_provider_id_is_projected_authoritatively_for_capacity_ui(self):
+        data = scenario("provider_projection")
+        self.assertEqual(data["accounts"][0]["provider_id"], "claude-web")
+        self.assertEqual(data["accounts"][0]["account_id"], "account_main")
+        source = (ROOT / "src" / "PresenceAdapter.php").read_text(encoding="utf-8")
+        self.assertIn("'provider_id'=>$account['provider_id']", source)
+
     def test_stale_or_unknown_never_adds_idle_capacity(self):
         data = scenario("observed_capacity")
         for key in ("stale", "unknown", "missing"):

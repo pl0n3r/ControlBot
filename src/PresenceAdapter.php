@@ -108,7 +108,8 @@ final class PresenceAdapter
             $idle=$usable?($idleByAccount[$id]??0):0;
             $trustedFree+=$free; $trustedIdle+=$idle;
             $accountViews[]=[
-                'account_id'=>$id,'eligible'=>($free+$idle)>0,'free_capacity'=>$free,'idle_sessions'=>$idle,
+                'account_id'=>$id,'provider_id'=>$account['provider_id'],
+                'eligible'=>($free+$idle)>0,'free_capacity'=>$free,'idle_sessions'=>$idle,
                 'observed_state'=>$state,'observed_at'=>$view['observed_at'],
             ];
         }

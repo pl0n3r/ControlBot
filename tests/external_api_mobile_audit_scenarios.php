@@ -48,6 +48,7 @@ function aauth(VerifiedAccessContext $ctx,bool $step=false,string $scope=A_SCOPE
 function ids(): array{return ['request_id'=>'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','correlation_id'=>'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'];}
 function refs(array $o=[]): array{return array_replace(['decision_ref'=>null,'approval_ref'=>null,'work_item_ref'=>null,'result_ref'=>null],$o);}
 function bad(callable $fn): bool{try{$fn();return false;}catch(InvalidArgumentException){return true;}}
+function badMessage(callable $fn): ?string{try{$fn();return null;}catch(InvalidArgumentException $e){return $e->getMessage();}}
 function auditEvent(VerifiedAccessContext $ctx,string $method,string $path,string $outcome,array $r=[],bool $step=false,string $scope=A_SCOPE): array {
     return ExternalApiMobileAudit::event($ctx,aauth($ctx,$step,$scope),$method,$path,$scope,ids(),A_NOW,$outcome,refs($r));
 }
@@ -61,8 +62,8 @@ if($case==='derived'){
     $alpha=actx('owner.cockpit.read');
     $low=actx('owner.cockpit.read','L2_VENTURE_ADMIN');
     $out=[
-        'horizontal'=>bad(fn()=>ExternalApiMobileAudit::event($alpha,aauth($alpha),'GET','/api/v1/cockpit','venture:beta',ids(),A_NOW,'read_served',refs())),
-        'vertical'=>bad(fn()=>auditEvent($low,'GET','/api/v1/cockpit','read_served')),
+        'horizontal'=>badMessage(fn()=>ExternalApiMobileAudit::event($alpha,aauth($alpha),'GET','/api/v1/cockpit','venture:beta',ids(),A_NOW,'read_served',refs())),
+        'vertical'=>badMessage(fn()=>auditEvent($low,'GET','/api/v1/cockpit','read_served')),
     ];
 }elseif($case==='refs'){
     $ctx=actx('owner.decision.write');
@@ -75,6 +76,8 @@ if($case==='derived'){
         'missing_decision'=>bad(fn()=>auditEvent($ctx,'POST','/api/v1/owner-decisions/{decision_id}/decision','mutation_accepted',[],true)),
         'missing_work'=>bad(fn()=>auditEvent($ctx,'POST','/api/v1/owner-decisions/{decision_id}/decision','factory_handoff',[],true)),
         'missing_result'=>bad(fn()=>auditEvent($ctx,'POST','/api/v1/owner-decisions/{decision_id}/decision','verification_failed',[],true)),
+        'read_with_work'=>bad(fn()=>auditEvent(actx('owner.cockpit.read'),'GET','/api/v1/cockpit','read_served',['work_item_ref'=>'controlbot:work/item-abc'])),
+        'handoff_with_result'=>bad(fn()=>auditEvent($ctx,'POST','/api/v1/owner-decisions/{decision_id}/decision','factory_handoff',['work_item_ref'=>'controlbot:work/item-abc','result_ref'=>'controlbot:result/abc'],true)),
     ];
 }elseif($case==='sensitive'){
     $extra=refs();$extra['ip_address']='127.0.0.1';

@@ -81,6 +81,24 @@ class InfrastructureInventoryTests(unittest.TestCase):
         )
         self.assertTrue(scenario("bad-release-sha")["blocked"])
 
+    def test_reference_validation_accepts_normal_github_urls_and_rejects_sensitive_urls(self):
+        data = scenario("github-reference-guard")
+        self.assertEqual(
+            data["valid"],
+            "https://github.com/pl0n3r/ControlBot/issues/258",
+        )
+        self.assertTrue(all(data["sensitive_urls"]))
+        self.assertTrue(data["controlbot_sensitive"])
+
+    def test_sensitive_reference_guard_lives_in_common_provider_boundary(self):
+        data = scenario("github-reference-guard")
+        self.assertTrue(data["provider_sensitive"])
+        self.assertTrue(data["resource_sensitive"])
+        resource_source = (
+            ROOT / "src" / "InfrastructureResource.php"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("SENSITIVE_PATTERN", resource_source)
+
     def test_invalid_duplicate_or_sensitive_inventory_fails_closed(self):
         for case in (
             "duplicate-resource",

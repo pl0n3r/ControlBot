@@ -5,7 +5,6 @@ require __DIR__ . '/../src/InfrastructureProvider.php';
 require __DIR__ . '/../src/RecoveryProfile.php';
 
 use ControlBot\Infrastructure\RecoveryProfile;
-use InvalidArgumentException;
 
 function profile(array $overrides = []): array
 {

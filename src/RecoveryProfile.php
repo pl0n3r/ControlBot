@@ -123,8 +123,10 @@ final class RecoveryProfile
             'undetected_restore_failures_target' => 0,
         ];
         InfrastructureProvider::assertFields($raw, array_keys($expected), 'RecoveryStrategy');
-        if ($raw !== $expected) {
-            throw new InvalidArgumentException('RecoveryStrategy must express 3-2-1-1-0.');
+        foreach ($expected as $key => $value) {
+            if (($raw[$key] ?? null) !== $value) {
+                throw new InvalidArgumentException('RecoveryStrategy must express 3-2-1-1-0.');
+            }
         }
         return $expected;
     }

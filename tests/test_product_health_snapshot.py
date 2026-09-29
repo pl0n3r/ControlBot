@@ -37,7 +37,8 @@ class ProductHealthSnapshotTests(unittest.TestCase):
         for reason in ("freshness_unknown","inferred","observed_fresh","stale","unknown"): self.assertIn(reason,out["reasons"])
 
     def test_snapshot_does_not_mix_customer_success_technical_finance_or_decisions(self):
-        payload=json.dumps(scenario("boundary")).lower()
+        d=scenario("boundary"); payload=json.dumps(d["good"]).lower()
+        for key in ("churn","support","revenue"): self.assertTrue(d[key],key)
         for forbidden in ("customer_success","churn","support","technical","finance","decision"): self.assertNotIn(forbidden,payload)
 
     def test_contract_has_no_workitem_persistence_provider_recommendation_scoring_or_ui(self):

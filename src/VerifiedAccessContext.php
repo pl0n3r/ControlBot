@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace ControlBot\Business;
 
+use ControlBot\Decisions\DecisionRuntime;
 use LogicException;
 
 final class VerifiedAccessContext
@@ -13,19 +14,19 @@ final class VerifiedAccessContext
     ) {
     }
 
-    public static function fromServerSource(
-        VentureAccessSource $source,
+    public static function fromDecisionRuntime(
+        DecisionRuntime $runtime,
+        array &$session,
+        string $repository,
         array $query,
         int $now,
     ): self {
-        $query = VentureAccessSourceContract::query($query);
-        $resolved = $source->resolve(
-            $query['identity_id'],
-            $query['scope'],
-            $query['capability'],
+        $canonical = $runtime->resolveVentureAccess(
+            $session,
+            $repository,
+            $query,
             $now,
         );
-        $canonical = VentureAccessSourceContract::resolved($resolved, $query, $now);
 
         return new self(
             [

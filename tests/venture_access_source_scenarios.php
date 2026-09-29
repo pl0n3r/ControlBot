@@ -30,8 +30,10 @@ final class FakeAccessSource implements VentureAccessSource {
     public function resolve(string $identityId,string $scope,string $capability,int $now): array {
         $this->calls++;
         if($this->mode==='missing') throw new RuntimeException('missing');
+        if($this->mode==='ambiguous') throw new RuntimeException('ambiguous');
         $row=$this->row;
         if($this->mode==='capability') $row['grant']['capability']='config.write';
+        if($this->mode==='scope') $row['scope']='venture:beta';
         if($this->mode==='policy') $row['active_policy_refs']=['controlbot:policy/other'];
         return $row;
     }
@@ -62,9 +64,16 @@ if($case==='request'){
     $a=blocked(fn()=> $rt->resolveVentureAccess($session,'pl0n3r/factory',query(),NOW));
     $source2=new FakeAccessSource(row(),'policy'); [$rt2,$session2,$path2]=runtime($source2);
     $b=blocked(fn()=> $rt2->resolveVentureAccess($session2,'pl0n3r/factory',query(),NOW));
-    [$rt3,$session3,$path3]=runtime(null);
+    $source3=new FakeAccessSource(row(),'scope'); [$rt3,$session3,$path3]=runtime($source3);
     $c=blocked(fn()=> $rt3->resolveVentureAccess($session3,'pl0n3r/factory',query(),NOW));
-    $out=['capability'=>$a,'policy'=>$b,'missing'=>$c]; @unlink($path2); @unlink($path3);
+    $source4=new FakeAccessSource(row(),'missing'); [$rt4,$session4,$path4]=runtime($source4);
+    $d=blocked(fn()=> $rt4->resolveVentureAccess($session4,'pl0n3r/factory',query(),NOW));
+    $source5=new FakeAccessSource(row(),'ambiguous'); [$rt5,$session5,$path5]=runtime($source5);
+    $e=blocked(fn()=> $rt5->resolveVentureAccess($session5,'pl0n3r/factory',query(),NOW));
+    [$rt6,$session6,$path6]=runtime(null);
+    $f=blocked(fn()=> $rt6->resolveVentureAccess($session6,'pl0n3r/factory',query(),NOW));
+    $out=['capability'=>$a,'policy'=>$b,'scope'=>$c,'missing'=>$d,'ambiguous'=>$e,'unconfigured'=>$f];
+    @unlink($path2); @unlink($path3); @unlink($path4); @unlink($path5); @unlink($path6);
 }elseif($case==='composition'){
     $source=new FakeAccessSource(row()); [$rt,$session,$path]=runtime($source);
     $request=query(); $resolved=$rt->resolveVentureAccess($session,'pl0n3r/factory',$request,NOW);

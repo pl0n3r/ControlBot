@@ -7,6 +7,12 @@ use InvalidArgumentException;
 
 interface VentureAccessSource
 {
+    /**
+     * Return exactly one canonical match.
+     *
+     * Implementations must throw when there are zero or multiple matches; they
+     * must never pick an arbitrary record.
+     */
     public function resolve(string $identityId, string $scope, string $capability, int $now): array;
 }
 

@@ -5,23 +5,18 @@ require __DIR__.'/../src/VendorWorkOrigin.php';
 use ControlBot\Vendors\VendorWorkOrigin;
 
 const VENTURE='venture-condor';
-function R(string $ns,string $char): string { return $ns.':'.str_repeat($char,32); }
+
 function vendor(array $override=[]): array {
-    $v=[
-        'version'=>1,'vendor_id'=>R('vendor','1'),'venture_id'=>VENTURE,'category'=>'saas',
-        'service_ref'=>R('service','2'),'owner_ref'=>R('identity','3'),'lifecycle'=>'active',
-        'cost'=>['venture_id'=>VENTURE,'amount'=>120000,'currency'=>'COP','billing_cadence'=>'monthly','capital_ref'=>R('capital','4')],
-        'contract_ref'=>R('contract','5'),'data_ref'=>R('data','6'),'subprocessor_refs'=>[R('subprocessor','7')],
-        'credentials_ref'=>R('credential','8'),'criticality'=>'critical','exit_plan_ref'=>R('exit','9'),
-        'export_ref'=>R('export','a'),'sla_state'=>'degraded',
-        'security_review'=>['venture_id'=>VENTURE,'state'=>'pending','aegis_review_ref'=>R('aegis','b')],
-        'legal_review'=>['venture_id'=>VENTURE,'state'=>'rejected','lex_review_ref'=>R('lex','c')],
-        'renewal_at'=>1800000000,'expiry_at'=>1900000000,'health'=>'degraded',
-        'freshness'=>['state'=>'fresh','observed_at'=>1700000000,'source_ref'=>R('evidence','d')],
-        'offboarding'=>['export_ref'=>R('export','e'),'revoke_ref'=>R('revoke','f'),'retention_ref'=>R('retention','1'),'continuity_ref'=>R('continuity','2'),'evidence_ref'=>R('evidence','3')],
-    ];
-    foreach($override as $k=>$value) $v[$k]=$value;
-    return $v;
+    $script=__DIR__.'/vendor_registry_scenarios.php';
+    $command=escapeshellarg(PHP_BINARY).' '.escapeshellarg($script).' scope';
+    $lines=[]; $status=0;
+    exec($command,$lines,$status);
+    if($status!==0 || $lines===[]) throw new RuntimeException('Canonical vendor fixture failed.');
+    $payload=json_decode(implode("\n",$lines),true,512,JSON_THROW_ON_ERROR);
+    $vendor=$payload['valid']??null;
+    if(!is_array($vendor)) throw new RuntimeException('Canonical vendor fixture invalid.');
+    foreach($override as $key=>$value) $vendor[$key]=$value;
+    return $vendor;
 }
 function intent(array $override=[]): array {
     return array_replace([

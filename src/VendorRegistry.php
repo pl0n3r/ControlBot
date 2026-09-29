@@ -31,8 +31,9 @@ final class VendorRegistry
             throw new InvalidArgumentException('Vendor dates invalid.');
 
         $health=self::enumValue($raw['health'],self::HEALTH,'health');
+        $sla=self::enumValue($raw['sla_state'],self::HEALTH,'sla_state');
         $fresh=self::freshness($raw['freshness']);
-        if($fresh['state']!=='fresh'&&$health==='healthy')
+        if($fresh['state']!=='fresh'&&($health==='healthy'||$sla==='healthy'))
             throw new InvalidArgumentException('Stale or unknown vendor cannot be healthy.');
 
         return [
@@ -51,7 +52,7 @@ final class VendorRegistry
             'criticality'=>self::enumValue($raw['criticality'],self::CRITICALITY,'criticality'),
             'exit_plan_ref'=>self::nullableOpaque($raw['exit_plan_ref'],'exit_plan_ref','exit'),
             'export_ref'=>self::nullableOpaque($raw['export_ref'],'export_ref','export'),
-            'sla_state'=>self::enumValue($raw['sla_state'],self::HEALTH,'sla_state'),
+            'sla_state'=>$sla,
             'security_review'=>self::review($raw['security_review'],$venture,'aegis_review_ref','aegis'),
             'legal_review'=>self::review($raw['legal_review'],$venture,'lex_review_ref','lex'),
             'renewal_at'=>$renewal,

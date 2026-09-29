@@ -48,7 +48,7 @@ final class ExternalApiDirectedWorkOrigin
         $approval='controlbot:approval/mobile/'.substr(hash('sha256',$decisionRef.'|'.$mutation['idempotency_key'].'|'.$identity),0,40);
         $mutationAudit=self::audit($access,$auth,$scope,$requestIds,$now,'mutation_accepted',$decisionRef,$approval,null);
         $work=self::workItem($intent,$summary,$decisionRef,$approval,$mutationAudit['audit_ref'],$mutation['idempotency_key'],$now);
-        $workRef='controlbot:work/'.substr(hash('sha256',self::canonical($work)),0,40);
+        $workRef='controlbot:work/'.substr(hash('sha256',$work['work_id'].'|'.$work['idempotency_key']),0,40);
         $handoff=self::audit($access,$auth,$scope,$requestIds,$now,'factory_handoff',$decisionRef,$approval,$workRef);
         return [
             'version'=>1,
@@ -157,11 +157,4 @@ final class ExternalApiDirectedWorkOrigin
         return $value;
     }
 
-    private static function canonical(array $value): string
-    {
-        ksort($value,SORT_STRING);
-        foreach($value as &$item) if(is_array($item)&&!array_is_list($item)) ksort($item,SORT_STRING);
-        unset($item);
-        return json_encode($value,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
-    }
 }

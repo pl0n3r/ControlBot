@@ -47,11 +47,11 @@ final class VendorOwnerInboxProjection
                 ||!is_string($selected['source_ref'])||$selected['source_ref']==='')
                 throw new InvalidArgumentException('Vendor signal provenance invalid.');
             $observed=$selected['observed_at'];
-            $source='controlbot:vendor-exception/source/'.hash('sha256',$selected['source_ref']);
-            $evidence[]='controlbot:vendor-exception/signal/'.hash('sha256',$selected['signal_ref']);
+            $source='controlbot:vendor-exception/source/'.self::digest($selected['source_ref']);
+            $evidence[]='controlbot:vendor-exception/signal/'.self::digest($selected['signal_ref']);
             foreach($selected['evidence_refs'] as $ref){
                 if(!is_string($ref)||$ref==='') throw new InvalidArgumentException('Vendor evidence invalid.');
-                $evidence[]='controlbot:evidence/vendor/'.hash('sha256',$ref);
+                $evidence[]='controlbot:evidence/vendor/'.self::digest($ref);
             }
             $evidence=array_values(array_unique($evidence));
             sort($evidence,SORT_STRING);
@@ -63,7 +63,7 @@ final class VendorOwnerInboxProjection
 
         return OwnerInbox::entry([
             'version'=>1,
-            'entry_ref'=>'controlbot:vendor-exception/inbox/'.hash('sha256',$selected['signal_ref']),
+            'entry_ref'=>'controlbot:vendor-exception/inbox/'.self::digest($selected['signal_ref']),
             'class'=>$entryRaw['class'],
             'scope'=>['kind'=>'venture','ref'=>'controlbot:venture/'.$venture],
             'title'=>$entryRaw['title'],
@@ -79,6 +79,15 @@ final class VendorOwnerInboxProjection
             'observed_at'=>$observed,
             'freshness'=>$freshness,
         ]);
+    }
+
+    private static function digest(string $value): string
+    {
+        $hex=hash('sha256',$value);
+        return implode('',array_map(
+            static fn(string $pair): string=>'h'.$pair,
+            str_split($hex,2)
+        ));
     }
 
     private static function fields(mixed $row,array $expected,string $label): void

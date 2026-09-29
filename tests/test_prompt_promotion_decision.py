@@ -24,6 +24,7 @@ class PromptPromotionDecisionTests(unittest.TestCase):
         self.assertTrue(data["version"])
         self.assertTrue(data["authority"])
         self.assertTrue(data["fingerprint"])
+        self.assertTrue(data["template"])
 
     def test_only_candidate_better_is_eligible_for_human_approval(self):
         data = scenario("decision")

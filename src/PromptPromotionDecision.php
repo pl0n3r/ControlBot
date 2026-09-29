@@ -40,9 +40,10 @@ final class PromptPromotionDecision
 
         $evaluation=self::evaluation($evaluation);
         if(
-            $evaluation['current_version']!==$current['version']
+            $evaluation['template_id']!==$current['template_id']
+            ||$evaluation['current_version']!==$current['version']
             ||$evaluation['candidate_version']!==$candidate['version']
-        ) throw new InvalidArgumentException('Evaluation prompt versions mismatch.');
+        ) throw new InvalidArgumentException('Evaluation prompt identity mismatch.');
 
         $decision='hold';
         $reasons=$evaluation['reasons'];
@@ -87,7 +88,7 @@ final class PromptPromotionDecision
     private static function evaluation(array $raw): array
     {
         $expected=[
-            'version','decision','current_version','candidate_version','evaluation_set_fingerprint',
+            'version','decision','template_id','current_version','candidate_version','evaluation_set_fingerprint',
             'reasons','authority','fingerprint'
         ];
         $actual=array_keys($raw); sort($actual,SORT_STRING); sort($expected,SORT_STRING);
@@ -114,6 +115,7 @@ final class PromptPromotionDecision
         $canonical=[
             'version'=>1,
             'decision'=>$raw['decision'],
+            'template_id'=>self::slug($raw['template_id'],'template_id'),
             'current_version'=>$raw['current_version'],
             'candidate_version'=>$raw['candidate_version'],
             'evaluation_set_fingerprint'=>$raw['evaluation_set_fingerprint'],
@@ -124,6 +126,13 @@ final class PromptPromotionDecision
         if(!is_string($raw['fingerprint'])||!hash_equals($fingerprint,$raw['fingerprint']))
             throw new InvalidArgumentException('Evaluation fingerprint invalid.');
         return $canonical+['fingerprint'=>$fingerprint];
+    }
+
+    private static function slug(mixed $value,string $label): string
+    {
+        if(!is_string($value)||preg_match('/^[a-z][a-z0-9._-]{1,63}$/D',$value)!==1)
+            throw new InvalidArgumentException($label.' invalid.');
+        return $value;
     }
 
     private static function fingerprint(array $value): string

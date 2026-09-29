@@ -92,6 +92,7 @@ final class PromptEvaluation
         $out=[
             'version'=>1,
             'decision'=>$decision,
+            'template_id'=>$current['template_id'],
             'current_version'=>$current['prompt_version'],
             'candidate_version'=>$candidate['prompt_version'],
             'evaluation_set_fingerprint'=>$set['fingerprint'],

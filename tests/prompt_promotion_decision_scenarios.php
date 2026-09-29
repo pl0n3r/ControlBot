@@ -25,19 +25,19 @@ function history(array $currentReplace=[],array $candidateReplace=[]): array {
         versionrow(2,'candidate',1,$candidateReplace),
     ];
 }
-function evaluation(string $decision='candidate_better',array $replace=[]): array {
+function evaluation(string $decision='candidate_better',array $replace=[],string $templateId='support-agent'): array {
     $set=[
         'evaluation_set_id'=>'support-v1','version'=>1,'task_class'=>'support',
         'sample_size'=>40,'metric_names'=>['acceptance_rate','rework_rate'],
     ];
     $current=[
-        'template_id'=>'support-agent','prompt_version'=>1,'task_class'=>'support',
+        'template_id'=>$templateId,'prompt_version'=>1,'task_class'=>'support',
         'evaluation_set_id'=>'support-v1','evaluation_set_version'=>1,'sample_size'=>40,
         'metrics'=>['acceptance_rate'=>0.80,'rework_rate'=>0.20],
         'safety_result'=>'pass','policy_result'=>'pass',
     ];
     $candidate=[
-        'template_id'=>'support-agent','prompt_version'=>2,'task_class'=>'support',
+        'template_id'=>$templateId,'prompt_version'=>2,'task_class'=>'support',
         'evaluation_set_id'=>'support-v1','evaluation_set_version'=>1,'sample_size'=>40,
         'metrics'=>$decision==='candidate_better'
             ? ['acceptance_rate'=>0.90,'rework_rate'=>0.10]
@@ -64,10 +64,12 @@ if($scenario==='binding'){
     $versionDrift=evaluation('candidate_better',['candidate_version'=>3]);
     $authority=evaluation('candidate_better',['authority'=>'human_approval_required']);
     $fingerprint=evaluation('candidate_better',['evaluation_set_fingerprint'=>str_repeat('a',64)]);
+    $otherTemplate=evaluation('candidate_better',[],'other-agent');
     echo json_encode([
         'version'=>rejected(fn()=>decide(null,$versionDrift)),
         'authority'=>rejected(fn()=>decide(null,$authority)),
         'fingerprint'=>rejected(fn()=>decide(null,$fingerprint)),
+        'template'=>rejected(fn()=>decide(null,$otherTemplate)),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($scenario==='decision'){

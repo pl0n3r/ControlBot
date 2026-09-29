@@ -10,7 +10,7 @@ final class MomentumCampaign
     private const CHANNELS=['organic_social','other','owned_messaging','paid_social','search_ads','web'];
     private const OBJECTIVES=['acquisition','activation','awareness','reactivation','retention','revenue','research'];
     private const STATUSES=['draft','planned','approved','active','paused','completed','cancelled'];
-    private const SENSITIVE='/(?:bearer\s+|password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn|(?:ghp_|gho_|github_pat_)|(?:sk|rk|pk)-)/i';
+    private const SENSITIVE='/(?:bearer\s+|password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn|(?:ghp_|gho_|github_pat_)[A-Za-z0-9_]{8,}|(?:^|[^A-Za-z0-9])(?:sk|rk|pk)-[A-Za-z0-9_-]{8,})/i';
 
     public static function brandContext(array $raw): array
     {

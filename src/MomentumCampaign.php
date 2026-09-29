@@ -45,7 +45,7 @@ final class MomentumCampaign
         if($venture!==$brand['venture_id'] || $brandId!==$brand['brand_context_id'])
             throw new InvalidArgumentException('Campaign brand context scope mismatch.');
 
-        $status=self::enum($raw['status'],self::STATUSES,'status');
+        $status=self::enumValue($raw['status'],self::STATUSES,'status');
         $schedule=self::schedule($raw['schedule']);
         if($status==='active' && $schedule['start_at']===null)
             throw new InvalidArgumentException('Active campaign requires start_at.');
@@ -57,7 +57,7 @@ final class MomentumCampaign
             'campaign_id'=>self::ref($raw['campaign_id'],'campaign_id'),
             'venture_id'=>$venture,
             'brand_context_id'=>$brandId,
-            'objective'=>self::enum($raw['objective'],self::OBJECTIVES,'objective'),
+            'objective'=>self::enumValue($raw['objective'],self::OBJECTIVES,'objective'),
             'audience_ref'=>self::ref($raw['audience_ref'],'audience_ref'),
             'offer_ref'=>self::ref($raw['offer_ref'],'offer_ref'),
             'cta_ref'=>self::ref($raw['cta_ref'],'cta_ref'),
@@ -102,7 +102,7 @@ final class MomentumCampaign
             throw new InvalidArgumentException($label.' invalid.');
         $out=[];
         foreach($values as $value){
-            $normalized=self::enum($value,$allowed,$label);
+            $normalized=self::enumValue($value,$allowed,$label);
             if(in_array($normalized,$out,true)) throw new InvalidArgumentException($label.' duplicated.');
             $out[]=$normalized;
         }
@@ -119,7 +119,7 @@ final class MomentumCampaign
         return $value;
     }
 
-    private static function enum(mixed $value,array $allowed,string $label): string
+    private static function enumValue(mixed $value,array $allowed,string $label): string
     {
         if(!is_string($value)||!in_array($value,$allowed,true))
             throw new InvalidArgumentException($label.' invalid.');

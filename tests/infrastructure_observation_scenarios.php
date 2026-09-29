@@ -224,6 +224,13 @@ if ($name === 'freshness') {
                 ]),
             ], [binding('commerce')])
         ),
+        'dangling_environment' => blocked(static fn() =>
+            InfrastructureImpact::build([
+                resource('service-web', 'service', [
+                    'environment_ref' => 'controlbot:environment/missing-prod',
+                ]),
+            ], [binding('commerce')])
+        ),
     ];
 } else {
     fwrite(STDERR, "scenario inválido\n");

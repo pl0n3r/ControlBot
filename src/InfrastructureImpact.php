@@ -13,11 +13,15 @@ final class InfrastructureImpact
         $bindings = self::bindings($bindings);
 
         $byRef = [];
+        $environments = [];
         foreach ($resources as $resource) {
             $byRef['controlbot:resource/' . $resource['resource_id']] = $resource;
+            if ($resource['kind'] === 'environment') {
+                $environments[$resource['source_ref']] = true;
+            }
         }
         foreach ($resources as $resource) {
-            self::validateResourceLinks($resource, $byRef);
+            self::validateResourceLinks($resource, $byRef, $environments);
         }
 
         $forward = [];
@@ -93,8 +97,11 @@ final class InfrastructureImpact
         return $graph['venture_resources'][$ventureRef] ?? [];
     }
 
-    private static function validateResourceLinks(array $resource, array $byRef): void
-    {
+    private static function validateResourceLinks(
+        array $resource,
+        array $byRef,
+        array $environments,
+    ): void {
         if ($resource['service_ref'] !== null) {
             $service = $byRef[$resource['service_ref']] ?? null;
             if (!is_array($service) || $service['kind'] !== 'service') {
@@ -103,6 +110,9 @@ final class InfrastructureImpact
         }
         if ($resource['parent_ref'] !== null && !isset($byRef[$resource['parent_ref']])) {
             throw new InvalidArgumentException('resource.parent_ref unresolved.');
+        }
+        if ($resource['environment_ref'] !== null && !isset($environments[$resource['environment_ref']])) {
+            throw new InvalidArgumentException('resource.environment_ref unresolved.');
         }
     }
 

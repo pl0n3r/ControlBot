@@ -51,7 +51,8 @@ function gctx(string $cap,string $level='L4_OWNER',string $scope=GATE_SCOPE): Ve
 function gd(array $o=[]): array { return array_replace(['version'=>1,'device_ref'=>'device:11111111111111111111111111111111','identity_id'=>'identity-owner','registered_at'=>6500,'state'=>'active','revoked_at'=>null,'revocation_reason'=>null],$o); }
 function gsession(array $o=[]): array { return array_replace(['version'=>1,'session_ref'=>'session:22222222222222222222222222222222','device_ref'=>'device:11111111111111111111111111111111','identity_id'=>'identity-owner','scope'=>GATE_SCOPE,'issued_at'=>6900,'expires_at'=>7500,'state'=>'active','revoked_at'=>null,'revocation_reason'=>null],$o); }
 function gu(array $o=[]): array { return array_replace(['version'=>1,'step_up_ref'=>'stepup:33333333333333333333333333333333','session_ref'=>'session:22222222222222222222222222222222','device_ref'=>'device:11111111111111111111111111111111','identity_id'=>'identity-owner','method'=>'passkey','verified_at'=>6950,'expires_at'=>7200,'state'=>'active','revoked_at'=>null,'revocation_reason'=>null],$o); }
-function bad(callable $fn): bool { try{$fn();return false;}catch(InvalidArgumentException|TypeError){return true;} }
+function bad(callable $fn): bool { try{$fn();return false;}catch(InvalidArgumentException){return true;} }
+function badType(callable $fn): bool { try{$fn();return false;}catch(TypeError){return true;} }
 function gate(VerifiedAccessContext $ctx,string $method,string $path,?array $up=null,array $device=[],array $session=[]): array {
     return ExternalApiRequestGate::authorize($ctx,$method,$path,GATE_SCOPE,$device?:gd(),$session?:gsession(),$up,GATE_NOW);
 }
@@ -83,7 +84,7 @@ if($case==='read'){
     $device=gd();$device['access_token']='forbidden';
     $step=gu();$step['policy_ref']='controlbot:policy/client';
     $out=[
-        'raw_context'=>bad(fn()=>ExternalApiRequestGate::authorize([], 'GET','/api/v1/cockpit',GATE_SCOPE,gd(),gsession(),null,GATE_NOW)),
+        'raw_context'=>badType(fn()=>ExternalApiRequestGate::authorize([], 'GET','/api/v1/cockpit',GATE_SCOPE,gd(),gsession(),null,GATE_NOW)),
         'session_auth_field'=>bad(fn()=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit',null,gd(),$session)),
         'device_secret'=>bad(fn()=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit',null,$device)),
         'step_auth_field'=>bad(fn()=>gate(gctx('owner.decision.write'),'POST','/api/v1/owner-decisions/{decision_id}/decision',$step)),

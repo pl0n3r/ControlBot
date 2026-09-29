@@ -50,6 +50,17 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(data["dispatchable_capacity"],1)
         self.assertIn("project_concurrency",data["reasons"])
 
+    def test_joint_claim_and_concurrency_bound_does_not_overestimate(self):
+        data=scenario("joint_bound")
+        self.assertEqual(data["authoritative_idle_capacity"],4)
+        self.assertEqual(data["ready_work_items"],4)
+        self.assertEqual(data["claim_lanes"],3)
+        self.assertEqual(data["concurrency_slots"],3)
+        self.assertEqual(data["joint_constraint_slots"],2)
+        self.assertEqual(data["dispatchable_capacity"],2)
+        self.assertIn("claim_contention",data["reasons"])
+        self.assertIn("project_concurrency",data["reasons"])
+
     def test_unknown_critical_constraint_fails_closed(self):
         data=scenario("unknown")
         for row in data.values():

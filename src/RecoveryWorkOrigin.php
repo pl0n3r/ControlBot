@@ -84,7 +84,7 @@ final class RecoveryWorkOrigin
 
     private static function freshness(mixed $raw): void
     {
-        if(!is_array($raw)||array_is_list($raw)||count($raw)>4)
+        if(!is_array($raw)||($raw!==[]&&array_is_list($raw))||count($raw)>4)
             throw new InvalidArgumentException('Recovery Health freshness invalid.');
         foreach($raw as $key=>$value)
             if(!is_string($key)||!is_int($value)||$value<0)

@@ -18,6 +18,9 @@ class DynamicCapacityE2ETests(unittest.TestCase):
     def test_join_increases_observed_capacity_without_plan_constant(self):
         data=scenario()
         self.assertEqual(data["declared_capacity"],1)
+        self.assertEqual(data["signals"]["joined"]["source"],"autofactory")
+        self.assertEqual(data["signals"]["joined"]["state"],"idle")
+        self.assertEqual(data["signals"]["joined"]["total_capacity"],4)
         self.assertEqual(data["joined"]["accounts"][0]["observed_state"],"healthy")
         self.assertEqual(data["joined"]["idle_capacity"],4)
         self.assertGreater(data["joined"]["idle_capacity"],data["declared_capacity"])
@@ -32,6 +35,8 @@ class DynamicCapacityE2ETests(unittest.TestCase):
 
     def test_rate_limit_or_stale_reduces_capacity_and_preserves_work(self):
         data=scenario()
+        self.assertEqual(data["signals"]["rate_limited"]["state"],"rate_limited")
+        self.assertEqual(data["signals"]["stale"]["state"],"stale")
         for key in ("rate_limited","stale"):
             snapshot=data[key]
             self.assertEqual(snapshot["idle_capacity"],0)
@@ -47,7 +52,15 @@ class DynamicCapacityE2ETests(unittest.TestCase):
         self.assertEqual(data["recovered"]["sessions"][0]["generation"],2)
         self.assertEqual(data["handoff"]["from_session_id"],"session-a")
         self.assertEqual(data["handoff"]["to_session_id"],"session-b")
-        self.assertEqual(data["current_owner_session_ids"],["session-b"])
+        self.assertTrue(data["readiness"]["previous"]["ready"])
+        self.assertEqual(data["readiness"]["previous"]["reservation_owner"],"session-a")
+        self.assertTrue(data["readiness"]["current"]["ready"])
+        self.assertEqual(data["readiness"]["current"]["generation"],2)
+        self.assertEqual(data["readiness"]["current"]["reservation_owner"],"session-b")
+        self.assertFalse(data["readiness"]["stale_owner"]["ready"])
+        self.assertIn("stale_reservation_generation",data["readiness"]["stale_owner"]["reasons"])
+        self.assertIn("stale_owner",data["readiness"]["stale_owner"]["reasons"])
+        self.assertTrue(data["readiness"]["duplicate_owners_rejected"])
 
     def test_stale_generation_recovery_is_rejected_and_current_recovery_recomputes(self):
         data=scenario()
@@ -57,6 +70,9 @@ class DynamicCapacityE2ETests(unittest.TestCase):
         self.assertIn("stale_generation",data["stale_current_guard"]["reasons"])
         self.assertTrue(data["current_recovery_guard"]["allowed"])
         self.assertTrue(data["current_recovery_guard"]["recompute"])
+        self.assertEqual(data["signals"]["current_stale"]["source"],"factoryrunner")
+        self.assertEqual(data["signals"]["recovered"]["source"],"factoryrunner")
+        self.assertEqual(data["signals"]["recovered"]["generation"],2)
         self.assertEqual(data["current_stale"]["idle_capacity"],0)
         self.assertEqual(data["recovered"]["idle_capacity"],3)
         self.assertEqual(data["dispatch"]["recovered"]["dispatchable_capacity"],1)

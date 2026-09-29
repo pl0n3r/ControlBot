@@ -35,6 +35,8 @@ if ($scenario === 'observed_capacity') {
     foreach(['rate_limited','requires_login','offline','unknown'] as $state){
         $states[$state]=AgentRuntime::observedCapacitySnapshot($declaredHigh,[],observedCapacity($state,99,0));
     }
+    $large=[]; for($i=1;$i<=128;$i++){$large[]=sessionRow('bulk_'.$i);}
+    $largeSnapshot=AgentRuntime::observedCapacitySnapshot($declaredHigh,$large,observedCapacity('healthy',160,128));
     echo json_encode([
         'over_declared'=>AgentRuntime::observedCapacitySnapshot($declaredOne,[$s1,$s2],observedCapacity('healthy',3,2)),
         'declared_only'=>AgentRuntime::observedCapacitySnapshot($declaredHigh,[],observedCapacity('unknown',99,0)),
@@ -45,6 +47,8 @@ if ($scenario === 'observed_capacity') {
         'invalid_state'=>rejected(fn()=>AgentRuntime::observedCapacitySnapshot($account,[],observedCapacity('invented'))),
         'invalid_total'=>rejected(fn()=>AgentRuntime::observedCapacitySnapshot($account,[],['version'=>1,'state'=>'healthy','total_capacity'=>-1,'occupied_capacity'=>0,'observed_at'=>1000])),
         'invalid_occupancy'=>rejected(fn()=>AgentRuntime::observedCapacitySnapshot($account,[],observedCapacity('healthy',2,3))),
+        'large_count'=>count($largeSnapshot['session_ids']),
+        'late_duplicate'=>rejected(fn()=>AgentRuntime::observedCapacitySnapshot($declaredHigh,[...$large,$large[127]],observedCapacity('healthy',160,129))),
         'legacy'=>AgentRuntime::capacitySnapshot($account,[$s1]),
         'legacy_overflow_rejected'=>rejected(fn()=>AgentRuntime::capacitySnapshot($declaredOne,[$s1,$s2])),
     ], JSON_THROW_ON_ERROR), PHP_EOL; exit;

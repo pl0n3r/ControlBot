@@ -56,6 +56,8 @@ class AgentRuntimeTests(unittest.TestCase):
         self.assertEqual(data["claude"]["free_capacity"], 3)
         self.assertNotEqual(data["chatgpt"]["declared_capacity"], data["claude"]["declared_capacity"])
         self.assertEqual(data["large_declared"]["capacity"], 999)
+        self.assertEqual(data["large_count"], 128)
+        self.assertTrue(data["late_duplicate"])
 
     def test_observed_capacity_contract_rejects_invalid_or_incoherent_input(self):
         data = scenario("observed_capacity")

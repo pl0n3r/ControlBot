@@ -99,7 +99,16 @@ case 'closed':
     );
     $collection=CustomerFeedbackSignal::collection([$good,$second]);
     $duplicatedCollection=rejected(fn()=>CustomerFeedbackSignal::collection([$good,$good]));
-    echo json_encode(compact('good','duplicate','unknown','collection','duplicatedCollection')); break;
+    $forged=$good; $forged['source_ref']='person@example.test';
+    $forgedSource=rejected(fn()=>CustomerFeedbackSignal::collection([$forged]));
+    $forged=$good; $forged['venture_id']='wrong-scope';
+    $forgedScope=rejected(fn()=>CustomerFeedbackSignal::collection([$forged]));
+    $forged=$good; $forged['freshness']='unknown';
+    $forgedUnknown=rejected(fn()=>CustomerFeedbackSignal::collection([$forged]));
+    echo json_encode(compact(
+        'good','duplicate','unknown','collection','duplicatedCollection',
+        'forgedSource','forgedScope','forgedUnknown'
+    )); break;
 
 case 'fail_closed':
     $stale=CustomerFeedbackSignal::fromSupport(input('4'),support('stale'),'venture-condor');

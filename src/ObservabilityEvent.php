@@ -66,7 +66,6 @@ final class ObservabilityEvent
             'freshness' => self::freshness($source, $occurred, $now, $ttlBySource),
         ];
     }
-
     private static function payload(string $source, mixed $raw): array
     {
         if (!is_array($raw) || ($raw !== [] && array_is_list($raw)) || count($raw) > 16) {
@@ -84,7 +83,6 @@ final class ObservabilityEvent
         ksort($out, SORT_STRING);
         return $out;
     }
-
     private static function payloadValue(string $key, mixed $value): string|int|bool|null
     {
         if (in_array($key, ['startup_failure', 'rollback'], true)) {
@@ -108,17 +106,9 @@ final class ObservabilityEvent
         if (!is_string($value)) {
             throw new InvalidArgumentException('Event payload string invalid.');
         }
-        $noNumericPii = [
-            'sha', 'deployment_ref', 'release_ref', 'session_id', 'agent_id', 'version', 'schema',
-        ];
-        return self::safeText(
-            $value,
-            'payload.' . $key,
-            160,
-            !in_array($key, $noNumericPii, true)
-        );
+        $noNumericPii = ['sha', 'deployment_ref', 'release_ref', 'session_id', 'agent_id', 'version', 'schema'];
+        return self::safeText($value, 'payload.' . $key, 160, !in_array($key, $noNumericPii, true));
     }
-
     private static function freshness(string $source, int $occurred, int $now, array $ttlBySource): string
     {
         $ttl = $ttlBySource[$source] ?? null;
@@ -130,7 +120,6 @@ final class ObservabilityEvent
         }
         return ($now - $occurred) <= $ttl ? 'fresh' : 'stale';
     }
-
     private static function correlationKeys(mixed $raw): array
     {
         if (!is_array($raw) || !array_is_list($raw) || count($raw) > 16) {

@@ -25,12 +25,14 @@ final class IncidentUi
             $rows=array_values(array_filter($postmortem['findings'],static fn(array $r):bool=>$r['classification']===$class));
             $findings.=self::section($label,$rows===[]?'<p class="unknown">Sin evidencia materializada.</p>':self::findingRows($rows));
         }
-        $recovery='Canario #'.self::e((string)$postmortem['recovery']['canary_issue']).' → cola serial '.self::e(implode(' → #',$postmortem['recovery']['serial_queue']));
+        $recovery='Canario #'.self::e((string)$postmortem['recovery']['canary_issue']).' → cola serial '.self::e('#'.implode(' → #',$postmortem['recovery']['serial_queue']));
         $timelineHtml='';
         foreach($timeline['events'] as $event){
             $timelineHtml.='<li><span>'.self::e((string)$event['timestamp']).' · '.self::e($event['kind']).'</span>'.self::evidence($event['evidence_ref']).'</li>';
         }
-        $lessonEvidence=''; foreach($lesson['evidence_refs'] as $ref) $lessonEvidence.=self::evidence($ref);\n        $lessonHtml='<h3>'.self::e($lesson['title']).'</h3><p>'.self::e($lesson['summary']).'</p>'\n            .'<p>Publication: <strong>'.self::e($lesson['publication_state']).'</strong></p>'\n            .'<p>Fingerprint <code>'.self::e($lesson['candidate_fingerprint']).'</code></p>'\n            .'<p>Dedupe <code>'.self::e($lesson['dedupe_marker']).'</code></p>'\n            .'<div class=\"lesson-evidence\" aria-label=\"Lesson evidence\">'.$lessonEvidence.'</div>';
+        $lessonEvidence=''; foreach($lesson['evidence_refs'] as $ref) $lessonEvidence.=self::evidence($ref);
+        $lessonHtml='<h3>'.self::e($lesson['title']).'</h3><p>'.self::e($lesson['summary']).'</p>'
+            .'<p>Publication: <strong>'.self::e($lesson['publication_state']).'</strong></p>'\n            .'<p>Fingerprint <code>'.self::e($lesson['candidate_fingerprint']).'</code></p>'\n            .'<p>Dedupe <code>'.self::e($lesson['dedupe_marker']).'</code></p>'\n            .'<div class=\"lesson-evidence\" aria-label=\"Lesson evidence\">'.$lessonEvidence.'</div>';
         return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ControlBot · Incidente</title><style>'.self::styles().'</style></head>'
             .'<body><main class="shell" aria-labelledby="incident-title"><header><p class="eyebrow">CONTROLBOT / INCIDENT</p><h1 id="incident-title">'. $incident .'</h1><p class="status">'.self::e($status).' · MTTR '.$duration.'</p><p class="owner">'.self::e($owner).'</p></header>'
             .'<section class="grid"><article class="panel"><h2>Severidad / impacto</h2><p class="unknown">SEVERITY UNKNOWN · IMPACT UNKNOWN · no materializados por el core actual.</p></article>'

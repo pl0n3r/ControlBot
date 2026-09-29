@@ -58,9 +58,12 @@ final class InfrastructureImpact
         ];
     }
 
-    public static function impactForResource(array $graph, string $resourceId): array
-    {
-        self::graph($graph);
+    public static function impactForResource(
+        array $resources,
+        array $bindings,
+        string $resourceId,
+    ): array {
+        $graph = self::build($resources, $bindings);
         $resourceId = InfrastructureProvider::normalizeId($resourceId, 'resource_id');
         $impact = $graph['resource_impact'][$resourceId] ?? null;
         if (!is_array($impact)) {
@@ -69,9 +72,12 @@ final class InfrastructureImpact
         return $impact;
     }
 
-    public static function resourcesForVenture(array $graph, string $ventureRef): array
-    {
-        self::graph($graph);
+    public static function resourcesForVenture(
+        array $resources,
+        array $bindings,
+        string $ventureRef,
+    ): array {
+        $graph = self::build($resources, $bindings);
         $ventureRef = InfrastructureProvider::normalizeControlRef($ventureRef, 'venture_ref');
         if (!str_starts_with($ventureRef, 'controlbot:venture/')) {
             throw new InvalidArgumentException('venture_ref invalid.');
@@ -121,17 +127,4 @@ final class InfrastructureImpact
         return $value;
     }
 
-    private static function graph(array $graph): void
-    {
-        InfrastructureProvider::assertFields(
-            $graph,
-            ['version', 'resource_impact', 'venture_resources'],
-            'InfrastructureImpactGraph',
-        );
-        if (($graph['version'] ?? null) !== 1
-            || !is_array($graph['resource_impact'])
-            || !is_array($graph['venture_resources'])) {
-            throw new InvalidArgumentException('InfrastructureImpactGraph invalid.');
-        }
-    }
 }

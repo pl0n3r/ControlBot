@@ -20,10 +20,10 @@ final class VendorExceptionSignal
         $horizonEnd=$now+$horizonSeconds;
         if($horizonEnd<$now) throw new InvalidArgumentException('horizon overflow.');
 
-        if($vendor['renewal_at']!==null && $vendor['renewal_at']<=$horizonEnd)
+        if($vendor['renewal_at']!==null && $vendor['renewal_at']<$horizonEnd)
             $signals[]=self::signal('renewal_due',$vendor,$vendor['renewal_at']);
 
-        if($vendor['expiry_at']!==null && $vendor['expiry_at']<=$horizonEnd)
+        if($vendor['expiry_at']!==null && $vendor['expiry_at']<$horizonEnd)
             $signals[]=self::signal('expiry_due',$vendor,$vendor['expiry_at']);
 
         if($vendor['health']==='degraded' || $vendor['sla_state']==='degraded')

@@ -29,6 +29,7 @@ class ExternalApiReadProjectionTests(unittest.TestCase):
         d=scenario("inbox")
         self.assertEqual(set(d["data"]),{"entries"})
         self.assertEqual(d["data"]["entries"][0]["kind"],"DECISION")
+        self.assertEqual(d["data"]["entries"][0]["title"],"Revisión de bearer token")
         self.assertEqual(d["data"]["entries"][1]["kind"],"WATCH")
         self.assertIsNone(d["data"]["entries"][1]["venture_ref"])
         self.assertIsNone(d["data"]["entries"][1]["decision_id"])

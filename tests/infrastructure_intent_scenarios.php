@@ -202,7 +202,11 @@ if ($name === 'safe') {
     ]);
     $out = [
         'high' => InfrastructureIntent::plan(
-            intent(['intent_id' => 'intent-high', 'blast_radius' => 'high']),
+            intent([
+                'intent_id' => 'intent-high',
+                'blast_radius' => 'high',
+                'approval_ref' => 'controlbot:approval/caller-supplied',
+            ]),
             authority(),
             null,
             NOW,
@@ -227,6 +231,12 @@ if ($name === 'safe') {
         ),
         'scope_mismatch' => InfrastructureIntent::plan(
             intent(['intent_id' => 'intent-scope']),
+            authority('allow', 'venture:other'),
+            null,
+            NOW,
+        ),
+        'deny_owner' => InfrastructureIntent::plan(
+            intent(['intent_id' => 'intent-deny-owner', 'blast_radius' => 'high']),
             authority('allow', 'venture:other'),
             null,
             NOW,

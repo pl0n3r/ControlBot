@@ -74,6 +74,7 @@ $case=$argv[1]??'';
 if($case==='read'){
     $out=[
         'valid'=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit'),
+        'with_step'=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit',gu()),
         'revoked_device'=>bad(fn()=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit',null,gd(['state'=>'revoked','revoked_at'=>6990,'revocation_reason'=>'owner_revoked']))),
     ];
 }elseif($case==='deny'){

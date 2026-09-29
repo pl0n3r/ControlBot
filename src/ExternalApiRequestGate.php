@@ -35,15 +35,17 @@ final class ExternalApiRequestGate
         $sessionRaw=$authentication->session();
         $session=ExternalApiSession::session($sessionRaw,$device,$identity,$expectedScope,$now);
         $base=ExternalApiAccess::authorize($context,$method,$pathTemplate,$expectedScope,$now);
+        $stepRaw=$authentication->stepUp();
+        $step=$stepRaw===null?null:ExternalApiSession::stepUp(
+            $stepRaw,$sessionRaw,$device,$identity,$expectedScope,$now
+        );
 
         $decision=$base['decision']??null;
-        if($decision==='deny'||$decision==='allow') return self::result($base,$session,null);
+        if($decision==='deny'||$decision==='allow') return self::result($base,$session,$step);
         if($decision!=='step_up_required')
             throw new InvalidArgumentException('authorization decision invalid.');
 
-        $stepRaw=$authentication->stepUp();
-        if($stepRaw===null) return self::result($base,$session,null);
-        $step=ExternalApiSession::stepUp($stepRaw,$sessionRaw,$device,$identity,$expectedScope,$now);
+        if($step===null) return self::result($base,$session,null);
         $base['decision']='allow';
         $base['reasons']=['authorized_with_step_up'];
         return self::result($base,$session,$step);

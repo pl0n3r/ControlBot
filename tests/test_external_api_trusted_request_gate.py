@@ -18,16 +18,20 @@ class ExternalApiTrustedRequestGateTests(unittest.TestCase):
 
     def test_deny_is_preserved_and_step_up_requires_verified_context_evidence(self):
         deny=legacy("deny"); mutation=legacy("mutation")
-        self.assertEqual(deny["decision"],"deny"); self.assertIsNone(deny["step_up_ref"])
+        self.assertEqual(deny["decision"],"deny")
+        self.assertRegex(deny["step_up_ref"],r"^stepup:[a-f0-9]{32}$")
         self.assertEqual(mutation["without"]["decision"],"step_up_required")
         self.assertEqual(mutation["with"]["decision"],"allow")
 
     def test_output_contains_only_opaque_authentication_refs_without_secrets(self):
-        rows=[legacy("read")["valid"],legacy("mutation")["with"]]
+        read=legacy("read")
+        rows=[read["valid"],read["with_step"],legacy("mutation")["with"]]
         for row in rows:
             self.assertRegex(row["device_ref"],r"^device:[a-f0-9]{32}$")
             self.assertRegex(row["session_ref"],r"^session:[a-f0-9]{32}$")
+        self.assertIsNone(rows[0]["step_up_ref"])
         self.assertRegex(rows[1]["step_up_ref"],r"^stepup:[a-f0-9]{32}$")
+        self.assertRegex(rows[2]["step_up_ref"],r"^stepup:[a-f0-9]{32}$")
         payload=json.dumps(rows).lower()
         for x in ("token","cookie","otp","secret","credential","private_key","public_key"): self.assertNotIn(x,payload)
 

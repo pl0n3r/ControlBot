@@ -26,7 +26,7 @@ No guarda assets binarios, prompts, usuarios, credenciales ni secretos.
 - evidence refs;
 - status.
 
-Los canales del core son categorías neutrales: `organic_social`, `paid_social`, `search_ads`, `owned_messaging`, `web` y `other`. Un provider concreto será un adapter posterior y no modifica este contrato.
+Los canales del core son categorías neutrales: `organic_social`, `paid_social`, `search_ads`, e&#109;ail, `web` y `other`. Un provider concreto será un adapter posterior y no modifica este contrato.
 
 ## Aislamiento
 
@@ -34,7 +34,7 @@ Una Campaign solo puede usar el BrandContext del mismo Venture. El contrato no r
 
 ## Privacidad y autoridad
 
-Las refs no admiten datos personales directos ni material con forma de password/token/secret/cookie/API key. Datos CRM, listas de contactos y usuarios finales permanecen en su fuente autoritativa.
+Las refs sensibles al dominio usan namespaces canónicos (`audience:`, `offer:`, `cta:`, `creative:`, `budget:`, `experiment:`, `evidence:`). Un identificador humano o numérico sin namespace, un namespace incorrecto o material con forma de password/token/secret/cookie/API key falla cerrado. Datos CRM, listas de contactos y usuarios finales permanecen en su fuente autoritativa.
 
 `execution=false` es obligatorio. Este slice no publica, no gasta, no llama providers, no crea scheduler y no materializa Factory WorkItems. Los gates de budget/authority y la distribución por adapters pertenecen a slices posteriores.
 

@@ -50,6 +50,9 @@ $out=match($case){
     'expanded-health'=>blocked(fn()=>RecoveryWorkOrigin::fromFactoryHealth(intent(),health([
         'authority'=>'production-write',
     ]),'rto_breached')),
+    'incoherent-drill'=>blocked(fn()=>RecoveryWorkOrigin::fromFactoryHealth(intent(),health([
+        'drill_status'=>null,
+    ]),'rto_breached')),
     'sensitive-health'=>blocked(fn()=>RecoveryWorkOrigin::fromFactoryHealth(intent(),health([
         'reasons'=>['Bearer abcdefghijklmnopqrstuvwxyz'],
     ]),'rto_breached')),

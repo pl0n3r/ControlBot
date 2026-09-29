@@ -124,6 +124,11 @@ final class ExternalApiSessionSourceContract
                 throw new InvalidArgumentException('step-up reference mismatch.');
         }
 
+        if($observed<$device['registered_at']
+            ||$observed<$session['issued_at']
+            ||($step!==null&&$observed<$step['verified_at']))
+            throw new InvalidArgumentException('observed_at predates authenticated evidence.');
+
         $sourceRef=$raw['source_ref'];
         if(!is_string($sourceRef)
             ||preg_match('#^controlbot:session-source/[a-z][a-z0-9._/-]{1,119}$#D',$sourceRef)!==1

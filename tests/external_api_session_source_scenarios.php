@@ -42,6 +42,9 @@ if($case==='source'){$src=new FSource(raw());$c=VerifiedExternalSessionContext::
 elseif($case==='mint'){$r=new ReflectionClass(VerifiedExternalSessionContext::class);$c=ctx();$m=array_map(fn($x)=>$x->getName(),array_filter($r->getMethods(ReflectionMethod::IS_PUBLIC),fn($x)=>$x->getDeclaringClass()->getName()===VerifiedExternalSessionContext::class));sort($m);$out=['constructor_private'=>$r->getConstructor()?->isPrivate(),'serialize_rejected'=>logic(fn()=>serialize($c)),'public_methods'=>$m];}
 elseif($case==='fail_closed'){$out=[
     'stale'=>bad(fn()=>ctx(['freshness'=>'stale'])),'unknown'=>bad(fn()=>ctx(['freshness'=>'unknown'])),'future'=>bad(fn()=>ctx(['observed_at'=>7001])),
+    'device_observation'=>bad(fn()=>ctx(['device'=>dev(['registered_at'=>6996]),'step_up'=>null,'observed_at'=>6995],null)),
+    'session_observation'=>bad(fn()=>ctx(['session'=>ses(['issued_at'=>6996]),'step_up'=>null,'observed_at'=>6995],null)),
+    'step_observation'=>bad(fn()=>ctx(['step_up'=>up(['verified_at'=>6996]),'observed_at'=>6995])),
     'identity'=>bad(fn()=>ctx(['session'=>ses(['identity_id'=>'identity-other'])])),'scope'=>bad(fn()=>ctx(['session'=>ses(['scope'=>'venture:beta'])])),
     'device'=>bad(fn()=>ctx(['device'=>dev(['state'=>'revoked','revoked_at'=>6990,'revocation_reason'=>'owner_revoked'])])),
     'session'=>bad(fn()=>ctx(['session'=>ses(['state'=>'revoked','revoked_at'=>6990,'revocation_reason'=>'owner_revoked'])])),

@@ -55,8 +55,10 @@ final class ExternalApiAccess
             return self::result('deny', $reasons, $operation, $scope);
         }
 
-        if (($summary['authority_level'] ?? null) !== self::OWNER_AUTHORITY) {
-            return self::result('deny', ['owner_authority_required'], $operation, $scope);
+        if (($context->decisionContext()['identity']['kind'] ?? null) !== 'human'
+            || ($context->grant()['role'] ?? null) !== 'owner'
+            || ($summary['authority_level'] ?? null) !== self::OWNER_AUTHORITY) {
+            return self::result('deny', ['owner_identity_required'], $operation, $scope);
         }
 
         if (($operation['mutation'] ?? false) === true) {

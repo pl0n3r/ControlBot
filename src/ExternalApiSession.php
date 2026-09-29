@@ -53,7 +53,7 @@ final class ExternalApiSession
 
         self::fields($raw,[
             'version','step_up_ref','session_ref','device_ref','identity_id',
-            'method','verified_at','expires_at',
+            'method','verified_at','expires_at','state','revoked_at','revocation_reason',
         ],'StepUpEvidence');
         if(($raw['version']??null)!==1) throw new InvalidArgumentException('StepUpEvidence version invalid.');
 
@@ -69,6 +69,12 @@ final class ExternalApiSession
             ||!hash_equals($device['device_ref'],self::opaque($raw['device_ref'],'device_ref','device')))
             throw new InvalidArgumentException('step-up binding mismatch.');
 
+        $state=self::oneOf($raw['state'],['active','revoked'],'step_up.state');
+        [$revokedAt,$reason]=self::revocation($state,$raw['revoked_at'],$raw['revocation_reason'],$verified);
+        if($revokedAt!==null && $revokedAt>$now)
+            throw new InvalidArgumentException('step-up revocation time invalid.');
+        if($state!=='active') throw new InvalidArgumentException('step-up revoked.');
+
         return [
             'version'=>1,
             'step_up_ref'=>self::opaque($raw['step_up_ref'],'step_up_ref','stepup'),
@@ -78,6 +84,9 @@ final class ExternalApiSession
             'method'=>self::oneOf($raw['method'],['passkey','mfa'],'method'),
             'verified_at'=>$verified,
             'expires_at'=>$expires,
+            'state'=>$state,
+            'revoked_at'=>$revokedAt,
+            'revocation_reason'=>$reason,
         ];
     }
 

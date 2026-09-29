@@ -57,21 +57,10 @@ if($case==='concurrency'){
     echo json_encode($out,JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='joint_bound'){
-    $rows=[
-        work('work-a','project-a',[],[]),
-        work('work-b','project-a',[],[]),
-        work('work-c','project-b',[],['shared/x']),
-        work('work-d','project-c',[],['shared/x']),
-    ];
-    $out=SchedulerCore::dispatchableCapacity(
-        presence(4),
-        $rows,
-        constraints([],[
-            'project-a'=>known(1,0),
-            'project-b'=>known(1,0),
-            'project-c'=>known(1,0),
-        ])
-    );
+    $rows=[work('work-a','project-a'),work('work-b','project-a'),
+        work('work-c','project-b',[],['shared/x']),work('work-d','project-c',[],['shared/x'])];
+    $projects=['project-a'=>known(1,0),'project-b'=>known(1,0),'project-c'=>known(1,0)];
+    $out=SchedulerCore::dispatchableCapacity(presence(4),$rows,constraints([],$projects));
     echo json_encode($out,JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='unknown'){

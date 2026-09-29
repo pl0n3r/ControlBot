@@ -39,7 +39,7 @@ final class IncidentLesson
             if(isset($seen[$findingRef])) throw new InvalidArgumentException('Finding duplicated.');
             $seen[$findingRef]=true;
             $class=self::choice($raw['classification'],self::CLASSES,'classification');
-            $state=self::choice($raw['evidence_state'],['supported','incomplete','contradictory'],'evidence_state');
+            $state=self::choice($raw['evidence_state'],['supported','incomplete','contradictory','unknown'],'evidence_state');
             $relation=self::choice($raw['evidence_relation'],array_keys(self::RELATIONS),'evidence_relation');
             if(!is_bool($raw['owner_action_required'])) throw new InvalidArgumentException('owner_action_required invalid.');
             if($state!=='supported'){

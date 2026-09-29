@@ -46,10 +46,12 @@ class VendorRegistryTests(unittest.TestCase):
         self.assertTrue(data["bad_dates_rejected"])
 
     def test_offboarding_is_a_requirements_contract_without_execution(self):
-        row=scenario("offboarding")
+        data=scenario("offboarding"); row=data["valid"]
         self.assertEqual(row["lifecycle"],"offboarding")
         for field in ("export_ref","revoke_ref","retention_ref","continuity_ref","evidence_ref"):
             self.assertRegex(row["offboarding"][field],r"^[a-z]+:[a-f0-9]{32}$")
+        self.assertTrue(data["empty_rejected"])
+        self.assertTrue(data["incomplete_rejected"])
 
     def test_core_has_no_procurement_payment_provider_persistence_or_queue(self):
         data=scenario("surface")

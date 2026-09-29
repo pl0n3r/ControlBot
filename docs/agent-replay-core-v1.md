@@ -20,7 +20,7 @@ Un handoff conserva `work_item_id`, mientras cada evento mantiene su propio `act
 
 ## Privacidad y seguridad
 
-`summary` y `evidence_ref` rechazan secretos obvios, email/teléfono evidentes, transcripts completos y referencias a chain-of-thought/internal reasoning. `evidence_ref` admite enlaces GitHub sin query sensible o referencias internas allowlisted. El módulo no almacena chats ni intenta reconstruir razonamiento privado.
+`summary` y `evidence_ref` rechazan secretos obvios, identificadores personales evidentes como email, transcripts completos y referencias a chain-of-thought/internal reasoning. `evidence_ref` admite enlaces GitHub sin query sensible o referencias internas allowlisted. El módulo no almacena chats ni intenta reconstruir razonamiento privado.
 
 ## Fuera de alcance
 

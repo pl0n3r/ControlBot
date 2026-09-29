@@ -13,6 +13,7 @@ class StaffControlPlaneTests(unittest.TestCase):
         d=scenario("search"); v=d["valid"]; self.assertFalse(v["directory_persisted"]); self.assertFalse(d["raw_email_leaked"])
         self.assertEqual(v["records"][0]["masked_email"],"a***@example.com")
         self.assertNotIn("email",v["records"][0])
+        self.assertNotIn("private-name",d["quoted_masked"]); self.assertTrue(d["quoted_masked"].endswith("@example.com"))
     def test_customer_records_or_ambiguous_staff_boundary_fail_closed(self):
         self.assertTrue(all(scenario("invalid").values()))
     def test_privacy_map_and_generated_docs_cover_staff_directory(self):

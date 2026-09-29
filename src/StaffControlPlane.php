@@ -59,7 +59,9 @@ final class StaffControlPlane
     private static function maskEmail(mixed $value): string
     {
         if(!is_string($value)||strlen($value)>254||filter_var($value,FILTER_VALIDATE_EMAIL)===false) throw new InvalidArgumentException('email invalid.');
-        [$local,$domain]=explode('@',$value,2);
+        $separator=strrpos($value,'@');
+        $local=substr($value,0,$separator);
+        $domain=substr($value,$separator+1);
         return substr($local,0,1).'***@'.strtolower($domain);
     }
     private static function id(mixed $v,string $l): string { if(!is_string($v)||preg_match('/^[a-z][a-z0-9-]{1,63}$/D',$v)!==1) throw new InvalidArgumentException($l.' invalid.'); return $v; }

@@ -36,7 +36,11 @@ if($case==='scope'){
         'cross_venture'=>blocked(fn()=>MomentumCreative::brief(brief('venture-brvtal'),brand()))],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 if($case==='neutral'){
-    echo json_encode(MomentumCreative::variant(variant(),brief(),brand()),JSON_THROW_ON_ERROR),PHP_EOL;exit;
+    $contentOnly=variant(); unset($contentOnly['asset_ref'],$contentOnly['hypothesis_ref'],$contentOnly['metric_ref']);
+    $assetOnly=variant('B'); unset($assetOnly['content_ref'],$assetOnly['hypothesis_ref'],$assetOnly['metric_ref']);
+    echo json_encode(['full'=>MomentumCreative::variant(variant(),brief(),brand()),
+        'content_only'=>MomentumCreative::variant($contentOnly,brief(),brand()),
+        'asset_only'=>MomentumCreative::variant($assetOnly,brief(),brand())],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 if($case==='lifecycle'){
     $approved=variant('A','approved');
@@ -51,6 +55,7 @@ if($case==='set'){
     $a=variant('A');$b=variant('B');
     $duplicate=[$a,$a];
     echo json_encode(['ordered'=>MomentumCreative::variantSet([$b,$a],brief(),brand()),
+        'empty'=>MomentumCreative::variantSet([],brief(),brand()),
         'duplicate_rejected'=>blocked(fn()=>MomentumCreative::variantSet($duplicate,brief(),brand()))],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 fwrite(STDERR,"Unknown MOMENTUM creative scenario\n");exit(2);

@@ -43,11 +43,13 @@ if($case==='dependencies'){
 }
 if($case==='claims'){
     $rows=[work('work-a','project-a',[],['src/shared.php']),work('work-b','project-a',[],['src/free.php'])];
-    $reserved=[['claim'=>'src/shared.php','owner_work_item_id'=>'work-existing']];
-    $active=SchedulerCore::dispatchableCapacity(presence(3),$rows,constraints($reserved,['project-a'=>known(3,0)]));
+    $foreign=[['claim'=>'src/shared.php','owner_work_item_id'=>'work-existing']];
+    $active=SchedulerCore::dispatchableCapacity(presence(3),$rows,constraints($foreign,['project-a'=>known(3,0)]));
+    $sameOwner=[['claim'=>'src/shared.php','owner_work_item_id'=>'work-a']];
+    $owned=SchedulerCore::dispatchableCapacity(presence(3),$rows,constraints($sameOwner,['project-a'=>known(3,0)]));
     $peerRows=[work('work-a','project-a',[],['src/shared.php']),work('work-b','project-a',[],['src/shared.php'])];
     $peer=SchedulerCore::dispatchableCapacity(presence(3),$peerRows,constraints([],['project-a'=>known(3,0)]));
-    echo json_encode(compact('active','peer'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+    echo json_encode(compact('active','owned','peer'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='concurrency'){
     $rows=[work('work-a'),work('work-b'),work('work-c')];

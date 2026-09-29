@@ -42,13 +42,16 @@ if($case==='scope'){
         'html'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['summary'=>'<b>secret</b>']))),
         'secret'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['source_ref'=>'controlbot:source/api-token-aa']))),
         'mail'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['summary'=>'Contact alice@example.com']))),
-        'number'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['impact'=>'Call +57 300 123 4567'])))];
+        'number'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['impact'=>'Call +57 300 123 4567']))),
+        'local_phone_title'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['title'=>'Call 555-1234']))),
+        'local_phone_summary'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['summary'=>'Call 555-1234']))),
+        'local_phone_impact'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['impact'=>'Call 555-1234'])))];
 }elseif($case==='collection'){
     $out=OwnerInbox::collection([
         oiEntry(['entry_ref'=>'controlbot:inbox/entry-fyi']),
-        oiEntry(['class'=>'decision','entry_ref'=>'controlbot:inbox/entry-d2','required_authority_level'=>'L4_OWNER','decision_ref'=>'controlbot:decision/d2','deadline_at'=>5000]),
+        oiEntry(['class'=>'decision','entry_ref'=>'controlbot:inbox/entry-d2','required_authority_level'=>'L4_OWNER','decision_ref'=>'controlbot:decision/d2','deadline_at'=>3000]),
         oiEntry(['class'=>'critical','entry_ref'=>'controlbot:inbox/entry-c1','required_authority_level'=>'L4_OWNER']),
-        oiEntry(['class'=>'decision','entry_ref'=>'controlbot:inbox/entry-d1','required_authority_level'=>'L4_OWNER','decision_ref'=>'controlbot:decision/d1','deadline_at'=>3000]),
+        oiEntry(['class'=>'decision','entry_ref'=>'controlbot:inbox/entry-d1','required_authority_level'=>'L4_OWNER','decision_ref'=>'controlbot:decision/d1','deadline_at'=>5000]),
         oiEntry(['class'=>'watch','entry_ref'=>'controlbot:inbox/entry-watch']),
     ]);
     $out['duplicate']=oiBlocked(fn()=>OwnerInbox::collection([oiEntry(),oiEntry()]));

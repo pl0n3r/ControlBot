@@ -11,7 +11,7 @@ final class OwnerInbox
     private const FRESHNESS=['current','stale','unknown'];
     private const AUTHORITY=['L0_AI_AUTONOMOUS','L1_OPERATOR','L2_VENTURE_ADMIN','L3_GROUP_INSTITUTION','L4_OWNER'];
     private const SENSITIVE='/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|dsn|user[_ -]?id|customer[_ -]?id)/i';
-    private const DIRECT_PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?[0-9][0-9(). -]{7,}[0-9])/i';
+    private const DIRECT_PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?[0-9][0-9(). -]{7,}[0-9]|\b[0-9]{3}[(). -]?[0-9]{4}\b)/i';
 
     public static function entry(array $raw): array
     {

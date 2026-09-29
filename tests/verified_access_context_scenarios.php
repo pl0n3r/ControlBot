@@ -5,7 +5,6 @@ require __DIR__.'/../src/VentureIdentity.php';
 require __DIR__.'/../src/VentureAccessSource.php';
 require __DIR__.'/../src/DecisionRights.php';
 require __DIR__.'/../src/VerifiedAccessContext.php';
-require __DIR__.'/../src/VentureAccessRuntime.php';
 
 use ControlBot\Business\DecisionRights;
 use ControlBot\Business\VerifiedAccessContext;
@@ -52,7 +51,7 @@ function blocked(callable $fn): bool {
 }
 function issued(array $row=null,string $cap='hostinger.read'): array {
     $source=new FixtureSource($row??snapshot());
-    $context=VentureAccessRuntime::verifiedContext($source,query($cap),NOW);
+    $context=VerifiedAccessContext::fromServerSource($source,query($cap),NOW);
     return [$context,$source];
 }
 

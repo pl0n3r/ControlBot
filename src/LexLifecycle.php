@@ -30,21 +30,28 @@ final class LexLifecycle
         $realData = self::boolean($input['real_data_requested'] ?? null, 'real_data_requested');
         $review = self::review($input['human_review'] ?? null);
 
-        $reviewApproved = $review['state'] === 'approved' && $review['evidence_refs'] !== [];
+        $reviewApplies = $review['scope'] === $scope;
+        $reviewApproved = $reviewApplies
+            && $review['state'] === 'approved'
+            && $review['evidence_refs'] !== [];
+        $reviewRejected = $reviewApplies && $review['state'] === 'rejected';
         $legallyCompatible = in_array($legalState, ['compliant', 'not_applicable'], true);
-        $constructionAllowed = $reversible && !$materialRisk && $review['state'] !== 'rejected';
+        $constructionAllowed = $reversible && !$materialRisk && !$reviewRejected;
 
-        $constructionStatus = $reviewApproved && $legallyCompatible
-            ? 'legally_reviewed'
-            : ($materialRisk || $review['state'] === 'rejected'
-                ? 'blocked_legal_risk'
-                : 'documented_not_legally_approved');
+        if ($materialRisk || $reviewRejected) {
+            $constructionStatus = 'blocked_legal_risk';
+        } elseif ($reviewApproved && $legallyCompatible) {
+            $constructionStatus = 'legally_reviewed';
+        } else {
+            $constructionStatus = 'documented_not_legally_approved';
+        }
 
         $reasons = [];
         if (!$legallyCompatible) $reasons[] = 'legal_state_' . $legalState;
         if (!$reviewApproved) $reasons[] = 'human_review_not_approved';
         if ($materialRisk) $reasons[] = 'material_legal_risk';
-        if ($review['state'] === 'rejected') $reasons[] = 'human_review_rejected';
+        if (!$reviewApplies) $reasons[] = 'human_review_scope_mismatch';
+        if ($reviewRejected) $reasons[] = 'human_review_rejected';
         sort($reasons, SORT_STRING);
 
         $livePass = $legallyCompatible && $reviewApproved && !$materialRisk;
@@ -76,13 +83,14 @@ final class LexLifecycle
         if (!is_array($value) || array_is_list($value)) {
             throw new InvalidArgumentException('human_review invalid.');
         }
-        self::fields($value, ['state', 'evidence_refs'], 'human_review');
+        self::fields($value, ['state', 'scope', 'evidence_refs'], 'human_review');
         $state = self::enum($value['state'] ?? null, self::REVIEWS, 'human_review state');
+        $scope = self::scope($value['scope'] ?? null);
         $refs = self::refs($value['evidence_refs'] ?? null);
         if ($state === 'approved' && $refs === []) {
             throw new InvalidArgumentException('approved review requires evidence.');
         }
-        return ['state' => $state, 'evidence_refs' => $refs];
+        return ['state' => $state, 'scope' => $scope, 'evidence_refs' => $refs];
     }
 
     private static function refs(mixed $value): array

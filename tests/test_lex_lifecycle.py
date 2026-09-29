@@ -35,6 +35,11 @@ class LexLifecycleTests(unittest.TestCase):
         self.assertFalse(data["pending"]["transition_allowed"])
         self.assertFalse(data["real_data"]["transition_allowed"])
         self.assertFalse(data["gap"]["transition_allowed"])
+        self.assertFalse(data["wrong_scope"]["transition_allowed"])
+        self.assertIn(
+            "human_review_scope_mismatch",
+            data["wrong_scope"]["live_legal_gate"]["reasons"],
+        )
         self.assertTrue(data["approved"]["transition_allowed"])
         self.assertEqual(data["approved"]["live_legal_gate"]["state"], "pass")
         self.assertEqual(
@@ -45,7 +50,11 @@ class LexLifecycleTests(unittest.TestCase):
 
     def test_material_legal_risk_blocks_affected_scope_without_expanding_authority(self):
         data = scenario("risk")
-        for candidate in (data["material"], data["rejected"]):
+        for candidate in (
+            data["material"],
+            data["material_approved"],
+            data["rejected"],
+        ):
             self.assertFalse(candidate["construction_work_allowed"])
             self.assertFalse(candidate["transition_allowed"])
             self.assertEqual(candidate["live_legal_gate"]["state"], "blocked")
@@ -53,6 +62,10 @@ class LexLifecycleTests(unittest.TestCase):
             self.assertFalse(candidate["auto_execute"])
         self.assertEqual(
             data["material"]["construction_legal_status"],
+            "blocked_legal_risk",
+        )
+        self.assertEqual(
+            data["material_approved"]["construction_legal_status"],
             "blocked_legal_risk",
         )
 

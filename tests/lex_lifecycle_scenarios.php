@@ -16,7 +16,11 @@ function input(array $overrides = []): array
         'material_risk' => false,
         'reversible_work' => true,
         'real_data_requested' => false,
-        'human_review' => ['state' => 'pending', 'evidence_refs' => []],
+        'human_review' => [
+            'state' => 'pending',
+            'scope' => 'venture:condor',
+            'evidence_refs' => [],
+        ],
     ], $overrides);
 }
 
@@ -41,6 +45,7 @@ if ($name === 'construction') {
             'legal_state' => 'gap',
             'human_review' => [
                 'state' => 'approved',
+                'scope' => 'venture:condor',
                 'evidence_refs' => ['controlbot:lex/evidence/legal-review'],
             ],
         ])),
@@ -49,12 +54,26 @@ if ($name === 'construction') {
             'legal_state' => 'compliant',
             'human_review' => [
                 'state' => 'approved',
+                'scope' => 'venture:condor',
                 'evidence_refs' => ['controlbot:lex/evidence/legal-review'],
             ],
         ])),
         'real_data' => LexLifecycle::project(input(['real_data_requested' => true])),
+        'wrong_scope' => LexLifecycle::project(input([
+            'stage' => 'live',
+            'legal_state' => 'compliant',
+            'human_review' => [
+                'state' => 'approved',
+                'scope' => 'venture:brvtal',
+                'evidence_refs' => ['controlbot:lex/evidence/legal-review'],
+            ],
+        ])),
         'approved_without_evidence_blocked' => blocked(input([
-            'human_review' => ['state' => 'approved', 'evidence_refs' => []],
+            'human_review' => [
+                'state' => 'approved',
+                'scope' => 'venture:condor',
+                'evidence_refs' => [],
+            ],
         ])),
     ];
 } elseif ($name === 'invalid-evidence') {
@@ -62,12 +81,14 @@ if ($name === 'construction') {
         'session' => blocked(input([
             'human_review' => [
                 'state' => 'approved',
+                'scope' => 'venture:condor',
                 'evidence_refs' => ['controlbot:lex/evidence/session-credential'],
             ],
         ])),
         'traversal' => blocked(input([
             'human_review' => [
                 'state' => 'approved',
+                'scope' => 'venture:condor',
                 'evidence_refs' => ['controlbot:lex/evidence/../approval'],
             ],
         ])),
@@ -75,9 +96,19 @@ if ($name === 'construction') {
 } elseif ($name === 'risk') {
     $out = [
         'material' => LexLifecycle::project(input(['material_risk' => true])),
+        'material_approved' => LexLifecycle::project(input([
+            'legal_state' => 'compliant',
+            'material_risk' => true,
+            'human_review' => [
+                'state' => 'approved',
+                'scope' => 'venture:condor',
+                'evidence_refs' => ['controlbot:lex/evidence/legal-review'],
+            ],
+        ])),
         'rejected' => LexLifecycle::project(input([
             'human_review' => [
                 'state' => 'rejected',
+                'scope' => 'venture:condor',
                 'evidence_refs' => ['controlbot:lex/evidence/legal-review'],
             ],
         ])),

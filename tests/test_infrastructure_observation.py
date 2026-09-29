@@ -53,7 +53,9 @@ class InfrastructureObservationTests(unittest.TestCase):
             "controlbot:capability/other-venture",
             data["graph"]["resource_impact"]["database-primary"]["capability_refs"],
         )
-        self.assertTrue(scenario("invalid")["duplicate_binding"])
+        invalid = scenario("invalid")
+        self.assertTrue(invalid["duplicate_binding"])
+        self.assertTrue(invalid["dangling_service"])
 
     def test_backup_and_restore_verification_remain_separate_signals(self):
         data = scenario("recovery-signals")

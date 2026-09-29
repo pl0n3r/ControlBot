@@ -12,6 +12,14 @@ final class InfrastructureImpact
         $resources = InfrastructureResource::normalizeInventory($resources);
         $bindings = self::bindings($bindings);
 
+        $byRef = [];
+        foreach ($resources as $resource) {
+            $byRef['controlbot:resource/' . $resource['resource_id']] = $resource;
+        }
+        foreach ($resources as $resource) {
+            self::validateResourceLinks($resource, $byRef);
+        }
+
         $forward = [];
         $reverse = [];
         foreach ($resources as $resource) {
@@ -83,6 +91,19 @@ final class InfrastructureImpact
             throw new InvalidArgumentException('venture_ref invalid.');
         }
         return $graph['venture_resources'][$ventureRef] ?? [];
+    }
+
+    private static function validateResourceLinks(array $resource, array $byRef): void
+    {
+        if ($resource['service_ref'] !== null) {
+            $service = $byRef[$resource['service_ref']] ?? null;
+            if (!is_array($service) || $service['kind'] !== 'service') {
+                throw new InvalidArgumentException('resource.service_ref unresolved.');
+            }
+        }
+        if ($resource['parent_ref'] !== null && !isset($byRef[$resource['parent_ref']])) {
+            throw new InvalidArgumentException('resource.parent_ref unresolved.');
+        }
     }
 
     private static function bindings(mixed $rows): array

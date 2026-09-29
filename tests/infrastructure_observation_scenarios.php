@@ -217,6 +217,13 @@ if ($name === 'freshness') {
         'duplicate_binding' => blocked(static fn() =>
             InfrastructureImpact::build($resources, [binding('commerce'), binding('commerce')])
         ),
+        'dangling_service' => blocked(static fn() =>
+            InfrastructureImpact::build([
+                resource('database-primary', 'database', [
+                    'service_ref' => 'controlbot:resource/service-missing',
+                ]),
+            ], [binding('commerce')])
+        ),
     ];
 } else {
     fwrite(STDERR, "scenario inválido\n");

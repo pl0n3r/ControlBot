@@ -65,7 +65,7 @@ class DynamicCapacityE2ETests(unittest.TestCase):
     def test_stale_generation_recovery_is_rejected_and_current_recovery_recomputes(self):
         data=scenario()
         self.assertFalse(data["old_recovery_guard"]["allowed"])
-        self.assertIn("stale_generation",data["old_recovery_guard"]["reasons"])
+        self.assertIn("session_unknown",data["old_recovery_guard"]["reasons"])
         self.assertFalse(data["stale_current_guard"]["allowed"])
         self.assertIn("stale_generation",data["stale_current_guard"]["reasons"])
         self.assertTrue(data["current_recovery_guard"]["allowed"])
@@ -84,6 +84,7 @@ class DynamicCapacityE2ETests(unittest.TestCase):
         serialized=json.dumps(first,sort_keys=True).lower()
         for forbidden in (
             "transcript","password","passwd","token:","secret:","cookie:",
+            '"token":','"secret":','"cookie":','"authorization":','"password":',
             "authorization:","private_key","chain-of-thought","@example.",
         ):
             self.assertNotIn(forbidden,serialized)

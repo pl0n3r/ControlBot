@@ -155,6 +155,8 @@ if($case==='valid'){
             'venture-alpha','product-alpha'
         )),
         'bad_ref'=>bad(fn()=>runAssessment('VALIDATED',['assessment_ref'=>'assessment:secret@example.com'])),
+        'sensitive_text'=>bad(fn()=>runAssessment('VALIDATED',['outcome_id'=>'outcome-secret'],[],['outcome_id'=>'outcome-secret'])),
+        'direct_pii_text'=>bad(fn()=>runAssessment('VALIDATED',['outcome_id'=>'outcome-1234567890'],[],['outcome_id'=>'outcome-1234567890'])),
         'numeric_opaque_ref'=>runAssessment('VALIDATED',['assessment_ref'=>'assessment:12345678901234567890123456789012'])['assessment_ref'],
     ];
 }elseif($case==='source'){

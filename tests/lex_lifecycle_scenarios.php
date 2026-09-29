@@ -57,6 +57,21 @@ if ($name === 'construction') {
             'human_review' => ['state' => 'approved', 'evidence_refs' => []],
         ])),
     ];
+} elseif ($name === 'invalid-evidence') {
+    $out = [
+        'session' => blocked(input([
+            'human_review' => [
+                'state' => 'approved',
+                'evidence_refs' => ['controlbot:lex/evidence/session-credential'],
+            ],
+        ])),
+        'traversal' => blocked(input([
+            'human_review' => [
+                'state' => 'approved',
+                'evidence_refs' => ['controlbot:lex/evidence/../approval'],
+            ],
+        ])),
+    ];
 } elseif ($name === 'risk') {
     $out = [
         'material' => LexLifecycle::project(input(['material_risk' => true])),

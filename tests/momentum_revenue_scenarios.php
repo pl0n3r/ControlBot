@@ -98,27 +98,33 @@ if($case==='forecast'){
     ],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 if($case==='attribution'){
-    $observed=MomentumRevenue::attribution(attribution('observed',12500000),pipeline());
-    $inferred=MomentumRevenue::attribution(attribution('inferred',9000000),pipeline());
-    $unknown=MomentumRevenue::attribution(attribution('unknown',null),pipeline());
+    $wonPipeline=pipeline('venture-condor','won');
+    $observed=MomentumRevenue::attribution(attribution('observed',12500000),$wonPipeline);
+    $inferred=MomentumRevenue::attribution(attribution('inferred',9000000),$wonPipeline);
+    $unknown=MomentumRevenue::attribution(attribution('unknown',null),$wonPipeline);
     $unknownClaim=attribution('unknown',1);
     $observedNoEvidence=attribution('observed',1);$observedNoEvidence['evidence_refs']=[];
+    $wrongCampaign=attribution('observed',1);$wrongCampaign['campaign_ref']='campaign:abababababababababababababababab';
     echo json_encode([
         'observed'=>$observed,'inferred'=>$inferred,'unknown'=>$unknown,
-        'unknown_claim_rejected'=>blocked(fn()=>MomentumRevenue::attribution($unknownClaim,pipeline())),
-        'observed_without_evidence_rejected'=>blocked(fn()=>MomentumRevenue::attribution($observedNoEvidence,pipeline())),
+        'unknown_claim_rejected'=>blocked(fn()=>MomentumRevenue::attribution($unknownClaim,$wonPipeline)),
+        'observed_without_evidence_rejected'=>blocked(fn()=>MomentumRevenue::attribution($observedNoEvidence,$wonPipeline)),
+        'pre_won_revenue_rejected'=>blocked(fn()=>MomentumRevenue::attribution(attribution('observed',1),pipeline())),
+        'campaign_mismatch_rejected'=>blocked(fn()=>MomentumRevenue::attribution($wrongCampaign,$wonPipeline)),
     ],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 if($case==='handoff'){
     $won=MomentumRevenue::pipeline(pipeline('venture-condor','won'));
     $premature=pipeline();$premature['customer_success_handoff_ref']='customer-success:99999999999999999999999999999999';
-    $retention=MomentumRevenue::lifecycleSignal(signal('renewal','observed'),pipeline());
-    $churn=MomentumRevenue::lifecycleSignal(signal('churn','inferred'),pipeline());
+    $wonPipeline=pipeline('venture-condor','won');
+    $retention=MomentumRevenue::lifecycleSignal(signal('renewal','observed'),$wonPipeline);
+    $churn=MomentumRevenue::lifecycleSignal(signal('churn','inferred'),$wonPipeline);
     $orphan=signal();$orphan['product_intelligence_ref']=null;$orphan['customer_success_ref']=null;
     echo json_encode([
         'won'=>$won,'retention'=>$retention,'churn'=>$churn,
         'premature_handoff_rejected'=>blocked(fn()=>MomentumRevenue::pipeline($premature)),
-        'orphan_signal_rejected'=>blocked(fn()=>MomentumRevenue::lifecycleSignal($orphan,pipeline())),
+        'orphan_signal_rejected'=>blocked(fn()=>MomentumRevenue::lifecycleSignal($orphan,$wonPipeline)),
+        'pre_won_signal_rejected'=>blocked(fn()=>MomentumRevenue::lifecycleSignal(signal('renewal','observed'),pipeline())),
     ],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 if($case==='pure'){

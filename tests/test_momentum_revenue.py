@@ -49,6 +49,8 @@ class MomentumRevenueTests(unittest.TestCase):
         self.assertIsNone(data["unknown"]["amount_minor"])
         self.assertTrue(data["unknown_claim_rejected"])
         self.assertTrue(data["observed_without_evidence_rejected"])
+        self.assertTrue(data["pre_won_revenue_rejected"])
+        self.assertTrue(data["campaign_mismatch_rejected"])
 
     def test_post_sale_handoff_and_retention_signals_preserve_domain_boundaries(self):
         data=scenario("handoff")
@@ -59,6 +61,7 @@ class MomentumRevenueTests(unittest.TestCase):
         self.assertRegex(data["retention"]["customer_success_ref"],r"^customer-success:[a-f0-9]{32}$")
         self.assertTrue(data["premature_handoff_rejected"])
         self.assertTrue(data["orphan_signal_rejected"])
+        self.assertTrue(data["pre_won_signal_rejected"])
 
     def test_core_has_no_provider_persistence_queue_spend_or_execution(self):
         data=scenario("pure")

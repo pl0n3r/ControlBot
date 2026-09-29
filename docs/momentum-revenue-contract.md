@@ -44,11 +44,11 @@ Classification is closed to:
 - `inferred`: amount may be represented but is never demonstrated revenue;
 - `unknown`: amount must be null.
 
-Only `observed` yields `demonstrated_amount_minor`. This prevents unknown or inferred values from silently entering demonstrated revenue totals.
+Only `observed` yields `demonstrated_amount_minor`. Any attribution that carries a revenue amount (`observed` or `inferred`) requires the pipeline to be `won`, and its campaign/creative refs must exactly match that pipeline. This prevents pre-conversion or cross-campaign values from silently entering revenue attribution.
 
 ## Renewal / upsell / churn signals
 
-Lifecycle signals are `renewal|upsell|churn` and separately classified `observed|inferred|unknown`. They must point to Product Intelligence and/or Customer Success through opaque references. A churn signal is therefore a signal with provenance, not a factual customer outcome by default.
+Lifecycle signals are `renewal|upsell|churn` and separately classified `observed|inferred|unknown`. They are post-sale signals and therefore require a `won` pipeline with its Customer Success handoff already established. They must point to Product Intelligence and/or Customer Success through opaque references. A churn signal is therefore a signal with provenance, not a factual customer outcome by default.
 
 ## Privacy and governance
 

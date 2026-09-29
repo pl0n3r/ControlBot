@@ -47,8 +47,8 @@ final class MomentumRevenue
             'lead_ref'=>self::opaque($raw['lead_ref'],'lead'),
             'opportunity_ref'=>$opportunity,
             'source_ref'=>self::opaque($raw['source_ref'],'source'),
-            'campaign_ref'=>self::nullableOpaque($raw['campaign_ref'],'campaign'),
-            'creative_ref'=>self::nullableOpaque($raw['creative_ref'],'creative'),
+            'campaign_ref'=>$campaign,
+            'creative_ref'=>$creative,
             'owner_ref'=>self::opaque($raw['owner_ref'],'owner'),
             'stage'=>$stage,
             'qualification'=>$qualification,
@@ -103,6 +103,11 @@ final class MomentumRevenue
         if($pipeline['opportunity_ref']===null || $venture!==$pipeline['venture_id'] || $opportunity!==$pipeline['opportunity_ref'])
             throw new InvalidArgumentException('RevenueAttribution scope mismatch.');
 
+        $campaign=self::nullableOpaque($raw['campaign_ref'],'campaign');
+        $creative=self::nullableOpaque($raw['creative_ref'],'creative');
+        if($campaign!==$pipeline['campaign_ref'] || $creative!==$pipeline['creative_ref'])
+            throw new InvalidArgumentException('RevenueAttribution campaign scope mismatch.');
+
         $classification=self::enumValue($raw['classification'],self::ATTRIBUTION,'classification');
         $amount=$raw['amount_minor']===null?null:self::amount($raw['amount_minor'],'amount_minor');
         $evidence=self::opaqueList($raw['evidence_refs'],'evidence',32);
@@ -110,6 +115,8 @@ final class MomentumRevenue
             throw new InvalidArgumentException('Unknown attribution cannot claim revenue amount.');
         if(in_array($classification,['observed','inferred'],true) && $amount===null)
             throw new InvalidArgumentException('Known attribution requires amount.');
+        if(in_array($classification,['observed','inferred'],true) && $pipeline['stage']!=='won')
+            throw new InvalidArgumentException('Known revenue attribution requires won pipeline.');
         if($classification==='observed' && $evidence===[])
             throw new InvalidArgumentException('Observed attribution requires evidence.');
 
@@ -144,6 +151,9 @@ final class MomentumRevenue
         $opportunity=self::opaque($raw['opportunity_ref'],'opportunity');
         if($pipeline['opportunity_ref']===null || $venture!==$pipeline['venture_id'] || $opportunity!==$pipeline['opportunity_ref'])
             throw new InvalidArgumentException('RevenueLifecycleSignal scope mismatch.');
+
+        if($pipeline['stage']!=='won')
+            throw new InvalidArgumentException('Lifecycle signal requires won pipeline.');
 
         $productRef=self::nullableOpaque($raw['product_intelligence_ref'],'product-intelligence');
         $successRef=self::nullableOpaque($raw['customer_success_ref'],'customer-success');

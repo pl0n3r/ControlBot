@@ -28,7 +28,9 @@ Step-up conserva una referencia opaca y evidencia temporal de `passkey|mfa`:
 - la sesión y el device deben estar activos;
 - `verified_at` no puede anteceder la sesión;
 - dura como máximo 300 segundos;
-- expirado o mismatched falla cerrado.
+- conserva estado `active|revoked` con timestamp/reason verificables;
+- una revocación propia invalida el step-up aunque la sesión y el device sigan activos;
+- expirado, revocado o mismatched falla cerrado.
 
 Step-up demuestra recencia de autenticación reforzada. No concede L4 ni ninguna capability.
 

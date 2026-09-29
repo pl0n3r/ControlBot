@@ -1,11 +1,9 @@
 # External API Push Envelope v1
 
 ## Objetivo
-
 Este contrato define el payload mínimo que una futura integración móvil puede entregar mediante push. El push **no es fuente de verdad** y no contiene el detalle de una decisión, incidente o excepción. Solo avisa que existe una entidad que debe resolverse después mediante la API autenticada.
 
 ## Tipos
-
 Los tipos v1 son cerrados:
 
 - `critical_incident`

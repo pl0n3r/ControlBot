@@ -20,6 +20,7 @@ class VendorExceptionSignalTests(unittest.TestCase):
             "missing_export_capability","renewal_due","security_review_rejected",
         ])
         self.assertEqual([x["type"] for x in d["signals"]],sorted(d["types"]))
+        self.assertEqual(d["at_boundary_types"],[])
 
     def test_critical_unknown_or_stale_never_becomes_healthy_incident_or_outage(self):
         d=scenario("unknown")

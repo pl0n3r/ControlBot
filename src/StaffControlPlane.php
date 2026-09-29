@@ -110,6 +110,8 @@ final class StaffControlPlane
             $reconciled=self::outcome($gateway->lookup($intent['project_id'],$intent['intent_id'],$intent['idempotency_key'],$now),$intent,true);
             if(in_array($reconciled['status'],['applied','denied'],true))
                 return self::finish($audit,$intent,$reconciled,$reconciled['status'],$now);
+            if($reconciled['status']==='not_found')
+                return self::finish($audit,$intent,$result,'not_found',$now);
             return self::finish($audit,$intent,$result,'unknown_outcome',$now);
         }
         return self::finish($audit,$intent,$result,$result['status'],$now);

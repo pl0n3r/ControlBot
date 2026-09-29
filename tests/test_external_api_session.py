@@ -17,6 +17,7 @@ class ExternalApiSessionTests(unittest.TestCase):
         d=scenario("binding")
         self.assertEqual(d["device"]["identity_id"],"owner-human")
         self.assertEqual(d["session"]["scope"],"venture:alpha")
+        self.assertEqual(d["session"]["identity_id"],"owner-human")
         self.assertEqual(d["session"]["device_ref"],d["device"]["device_ref"])
         self.assertTrue(d["wrong_identity"] and d["wrong_scope"] and d["wrong_device"])
 
@@ -30,7 +31,7 @@ class ExternalApiSessionTests(unittest.TestCase):
         d=scenario("stepup")
         self.assertEqual(d["valid"]["method"],"passkey")
         self.assertLessEqual(d["valid"]["expires_at"]-d["valid"]["verified_at"],300)
-        for key in ("too_long","expired","wrong_session","wrong_device","wrong_identity","revoked_device"):
+        for key in ("too_long","expired","wrong_session","wrong_device","wrong_identity","revoked_device","revoked_step_up"):
             self.assertTrue(d[key],key)
 
     def test_safe_inventory_rejects_tokens_cookies_otp_secrets_credentials_and_keys(self):

@@ -265,7 +265,7 @@ final class AgentRuntime
         array $observation,
     ): array {
         $account = self::account($accountRecord);
-        $sessionIds = self::sessionIds($account, $sessionRecords);
+        $sessionIds = self::sessionIds($account, $sessionRecords, null);
         self::fields($observation, [
             'version', 'state', 'total_capacity', 'occupied_capacity', 'observed_at',
         ], 'ObservedCapacity');
@@ -279,7 +279,8 @@ final class AgentRuntime
         $observedAt = self::nonNegativeInt($observation['observed_at'], 'observed_at');
 
         $operational = $account['status'] === 'active' && $observation['state'] === 'healthy';
-        $free = $operational ? max(0, $total - $occupied) : 0;
+        $effectiveOccupied = max($occupied, count($sessionIds));
+        $free = $operational ? max(0, $total - $effectiveOccupied) : 0;
 
         return [
             'account_id' => $account['account_id'],
@@ -287,6 +288,7 @@ final class AgentRuntime
             'observed_state' => $observation['state'],
             'observed_total_capacity' => $total,
             'observed_occupied_capacity' => $occupied,
+            'effective_occupied_capacity' => $effectiveOccupied,
             'observed_at' => $observedAt,
             'eligible' => $free > 0,
             'free_capacity' => $free,
@@ -294,9 +296,10 @@ final class AgentRuntime
         ];
     }
 
-    private static function sessionIds(array $account, array $sessionRecords): array
+    private static function sessionIds(array $account, array $sessionRecords, ?int $maxSessions = 64): array
     {
-        if (!array_is_list($sessionRecords) || count($sessionRecords) > 64) {
+        if (!array_is_list($sessionRecords)
+            || ($maxSessions !== null && count($sessionRecords) > $maxSessions)) {
             throw new InvalidArgumentException('sessions invalid.');
         }
         $ids = [];

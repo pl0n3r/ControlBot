@@ -10,7 +10,7 @@ Métricas soportadas:
 - `acceptance_rate`: mayor es mejor.
 - `rework_rate`, `review_findings_rate`, `handoff_rate`, `latency_ms`, `cost_units`: menor es mejor.
 
-La comparación es estricta y fail-closed. Solo produce `candidate_better` cuando el candidato mejora al menos una métrica, no empeora ninguna, tiene muestra suficiente y pasa safety + policy. Empate, evidencia insuficiente o trade-off mixto mantienen `keep_current`.
+La comparación es estricta y fail-closed. Solo produce `candidate_better` cuando el candidato mejora al menos una métrica, no empeora ninguna, tiene muestra suficiente y pasa safety + policy. Empate, evidencia insuficiente o trade-off mixto mantienen `keep_current`. La salida conserva `template_id` dentro del fingerprint para que la evidencia no pueda reutilizarse entre templates que compartan números de versión.
 
 ## Seguridad y autoridad
 

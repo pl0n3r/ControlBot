@@ -231,6 +231,12 @@ if ($name === 'safe') {
             null,
             NOW,
         ),
+        'deny_owner' => InfrastructureIntent::plan(
+            intent(['intent_id' => 'intent-deny-owner', 'blast_radius' => 'high']),
+            authority('allow', 'venture:other'),
+            null,
+            NOW,
+        ),
     ];
 } elseif ($name === 'runner') {
     $safe = InfrastructureIntent::plan(intent(), authority(), null, NOW);

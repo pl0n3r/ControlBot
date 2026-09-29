@@ -4,15 +4,15 @@
 
 ## Contract
 
-The assessment must match `experiment_ref`, `initiative_id`, `hypothesis_ref`, `primary_metric_ref`, `outcome_id`, and Venture/Product scope. Mismatches fail closed.
+The assessment must match `experiment_ref`, `initiative_id`, `hypothesis_ref`, `primary_metric_ref`, `outcome_id`, the exact predeclared `evaluation_window`, and Venture/Product scope. Mismatches fail closed.
 
 Classification is limited to `VALIDATED | INVALIDATED | INCONCLUSIVE`. The caller supplies an opaque `assessment_rule_ref` and one or more opaque, unique evidence refs.
 
-An outcome that is inconclusive, stale, unknown, or inferred can only yield `INCONCLUSIVE`. A measured, fresh, observed result may be classified explicitly under the declared rule; `higher|lower|equal` remain numerical comparisons only.
+Only a measured, fresh, observed outcome with confidence > 0 and a fresh/non-unknown Hypothesis may yield `VALIDATED` or `INVALIDATED`. Otherwise classification is restricted to `INCONCLUSIVE`; `higher|lower|equal` remain numerical comparisons only.
 
 The output preserves evaluation window, delta, comparison, confidence, nature, freshness, source and evidence refs. These are evidence, not causal claims.
 
-Schema and refs are closed, deterministic and checked for sensitive material.
+Schema and refs are closed and deterministic. Typed opaque refs such as `assessment:<32hex>` are accepted as identifiers even when their hex payload is all digits; free-form strings still pass sensitive/PII checks.
 
 ## Limits
 

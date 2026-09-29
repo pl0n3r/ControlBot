@@ -17,7 +17,11 @@ final class InfrastructureImpact
         foreach ($resources as $resource) {
             $byRef['controlbot:resource/' . $resource['resource_id']] = $resource;
             if ($resource['kind'] === 'environment') {
-                $environments[$resource['source_ref']] = true;
+                $sourceRef = $resource['source_ref'];
+                if (isset($environments[$sourceRef])) {
+                    throw new InvalidArgumentException('resource.environment_ref ambiguous.');
+                }
+                $environments[$sourceRef] = $resource;
             }
         }
         foreach ($resources as $resource) {
@@ -107,12 +111,49 @@ final class InfrastructureImpact
             if (!is_array($service) || $service['kind'] !== 'service') {
                 throw new InvalidArgumentException('resource.service_ref unresolved.');
             }
+            self::requireSameScope(
+                $resource,
+                $service,
+                ['project_ref', 'venture_ref', 'environment_ref'],
+                'resource.service_ref cross-scope.',
+            );
         }
-        if ($resource['parent_ref'] !== null && !isset($byRef[$resource['parent_ref']])) {
-            throw new InvalidArgumentException('resource.parent_ref unresolved.');
+        if ($resource['parent_ref'] !== null) {
+            $parent = $byRef[$resource['parent_ref']] ?? null;
+            if (!is_array($parent)) {
+                throw new InvalidArgumentException('resource.parent_ref unresolved.');
+            }
+            self::requireSameScope(
+                $resource,
+                $parent,
+                ['project_ref', 'venture_ref'],
+                'resource.parent_ref cross-scope.',
+            );
         }
-        if ($resource['environment_ref'] !== null && !isset($environments[$resource['environment_ref']])) {
-            throw new InvalidArgumentException('resource.environment_ref unresolved.');
+        if ($resource['environment_ref'] !== null) {
+            $environment = $environments[$resource['environment_ref']] ?? null;
+            if (!is_array($environment)) {
+                throw new InvalidArgumentException('resource.environment_ref unresolved.');
+            }
+            self::requireSameScope(
+                $resource,
+                $environment,
+                ['project_ref', 'venture_ref'],
+                'resource.environment_ref cross-scope.',
+            );
+        }
+    }
+
+    private static function requireSameScope(
+        array $resource,
+        array $target,
+        array $fields,
+        string $message,
+    ): void {
+        foreach ($fields as $field) {
+            if ($resource[$field] !== $target[$field]) {
+                throw new InvalidArgumentException($message);
+            }
         }
     }
 

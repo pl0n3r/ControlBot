@@ -18,7 +18,6 @@ final class AgentReplayCore
     private const SENSITIVE='/(?:bearer\\s+|password|passwd|token\\s*[:=?]|secret\\s*[:=]|cookie\\s*[:=]|authorization\\s*[:=]|private[_ -]?key|api[_ -]?key|dsn\\s*[:=]|(?:sk|rk|pk)-[A-Za-z0-9_-]{12,})/i';
     private const FORBIDDEN_TEXT='/(?:full\\s+transcript|\\btranscript\\b|full\\s+chat|chat\\s+history|chain[- ]of[- ]thought|reasoning\\s+trace|private\\s+scratchpad|internal\\s+reasoning)/i';
     private const EMAIL='/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/i';
-    private const PHONE='/(?:^|\\D)\\+?\\d[\\d .()\\-]{7,}\\d(?:\\D|$)/';
 
     public static function build(array $rows): array
     {
@@ -174,7 +173,7 @@ final class AgentReplayCore
         $value=trim($value);
         if($value===''||strlen($value)>$max||preg_match('/[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]/',$value)===1
             ||preg_match(self::SENSITIVE,$value)===1||preg_match(self::FORBIDDEN_TEXT,$value)===1
-            ||preg_match(self::EMAIL,$value)===1||preg_match(self::PHONE,$value)===1)
+            ||preg_match(self::EMAIL,$value)===1)
             throw new InvalidArgumentException($label.' contains sensitive or unsupported material.');
         return $value;
     }

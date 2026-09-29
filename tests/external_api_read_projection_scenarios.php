@@ -5,8 +5,9 @@ require_once __DIR__.'/../src/ExternalApiContract.php';
 require_once __DIR__.'/../src/ExternalApiReadProjection.php';
 
 use ControlBot\ExternalApi\ExternalApiReadProjection;
+use InvalidArgumentException;
 
-function bad(callable $fn): bool { try{$fn();return false;}catch(Throwable){return true;} }
+function bad(callable $fn): bool { try{$fn();return false;}catch(InvalidArgumentException){return true;} }
 function meta(array $overrides=[]): array {
     return array_replace([
         'request_id'=>str_repeat('a',32),

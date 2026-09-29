@@ -166,6 +166,12 @@ if ($name === 'multi-provider') {
     $out = blocked(static fn() => InfrastructureResource::normalize(
         resource('storage-media', 'storage', ['project_ref' => 'project-controlbot'])
     ));
+} elseif ($name === 'provider-secret-ref') {
+    $out = blocked(static fn() => InfrastructureProvider::normalizeProvider(
+        array_replace(provider('provider-primary', 'hosting', 'vendor-one', []), [
+            'adapter_ref' => 'controlbot:secret-token',
+        ])
+    ));
 } elseif ($name === 'secret-ref') {
     $out = blocked(static fn() => InfrastructureResource::normalize(
         resource('storage-media', 'storage', ['source_ref' => 'controlbot:token=supersecretvalue'])

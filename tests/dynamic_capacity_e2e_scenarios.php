@@ -180,7 +180,7 @@ function lifecycle(): array {
         ],
         'handoff'=>handoff(),
         'readiness'=>['previous'=>$previousReady,'current'=>$currentReady,'stale_owner'=>$staleOwner,'duplicate_owners_rejected'=>$duplicateOwners],
-        'old_recovery_guard'=>PresenceAdapter::replanGuard($snapshots['stale'],'session-a',2,'recover'),
+        'old_recovery_guard'=>PresenceAdapter::replanGuard($snapshots['recovered'],'session-a',1,'recover'),
         'stale_current_guard'=>PresenceAdapter::replanGuard($snapshots['current_stale'],'session-b',1,'recover'),
         'current_recovery_guard'=>PresenceAdapter::replanGuard($snapshots['recovered'],'session-b',2,'recover'),
     ];

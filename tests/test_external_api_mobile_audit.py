@@ -34,8 +34,8 @@ class ExternalApiMobileAuditTests(unittest.TestCase):
 
     def test_horizontal_and_vertical_authorization_fail_closed(self):
         d=scenario("authz")
-        self.assertTrue(d["horizontal"])
-        self.assertTrue(d["vertical"])
+        self.assertEqual(d["horizontal"],"verified authentication context mismatch.")
+        self.assertEqual(d["vertical"],"audit outcome requires authorized request.")
 
     def test_outcome_refs_are_required_without_executing_or_inventing_success(self):
         d=scenario("refs")
@@ -43,6 +43,8 @@ class ExternalApiMobileAuditTests(unittest.TestCase):
         self.assertEqual(d["handoff"]["work_item_ref"],"controlbot:work/item-abc")
         self.assertEqual(d["verified"]["result_ref"],"controlbot:result/abc")
         self.assertTrue(d["missing_decision"] and d["missing_work"] and d["missing_result"])
+        self.assertTrue(d["read_with_work"])
+        self.assertTrue(d["handoff_with_result"])
         self.assertEqual(d["accepted"]["operation_id"],"owner_decision.decide")
 
     def test_event_has_no_secrets_payload_ip_user_agent_fingerprint_or_extra_fields(self):

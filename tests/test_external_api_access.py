@@ -29,6 +29,8 @@ class ExternalApiAccessTests(unittest.TestCase):
         self.assertEqual(data["owner"]["scope"],"venture:alpha")
         self.assertEqual(data["lower"]["decision"],"deny")
         self.assertIn("owner_identity_required",data["lower"]["reasons"])
+        self.assertEqual(data["non_owner_role"]["decision"],"deny")
+        self.assertIn("owner_identity_required",data["non_owner_role"]["reasons"])
         self.assertEqual(data["agent"]["decision"],"deny")
         self.assertIn("owner_identity_required",data["agent"]["reasons"])
 

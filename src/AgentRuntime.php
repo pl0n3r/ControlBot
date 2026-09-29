@@ -306,6 +306,7 @@ final class AgentRuntime
             throw new InvalidArgumentException('sessions invalid.');
         }
         $ids = [];
+        $seen = [];
         foreach ($sessionRecords as $record) {
             if (!is_array($record)) {
                 throw new InvalidArgumentException('session invalid.');
@@ -314,10 +315,13 @@ final class AgentRuntime
             if ($session['account_id'] !== $account['account_id']) {
                 throw new InvalidArgumentException('Session belongs to another account.');
             }
-            if (in_array($session['session_id'], $ids, true)) {
+            $sessionId = $session['session_id'];
+            $setKey = 'id:' . $sessionId;
+            if (isset($seen[$setKey])) {
                 throw new InvalidArgumentException('Session duplicated.');
             }
-            $ids[] = $session['session_id'];
+            $seen[$setKey] = true;
+            $ids[] = $sessionId;
         }
         sort($ids);
         return $ids;

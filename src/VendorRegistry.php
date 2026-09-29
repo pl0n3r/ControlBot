@@ -33,8 +33,12 @@ final class VendorRegistry
         $health=self::enumValue($raw['health'],self::HEALTH,'health');
         $sla=self::enumValue($raw['sla_state'],self::HEALTH,'sla_state');
         $fresh=self::freshness($raw['freshness']);
+        $lifecycle=self::enumValue($raw['lifecycle'],self::LIFECYCLE,'lifecycle');
+        $offboarding=self::offboarding($raw['offboarding']);
         if($fresh['state']!=='fresh'&&($health==='healthy'||$sla==='healthy'))
             throw new InvalidArgumentException('Stale or unknown vendor cannot be healthy.');
+        if(in_array($lifecycle,['offboarding','exited'],true)&&in_array(null,$offboarding,true))
+            throw new InvalidArgumentException('Offboarding lifecycle requires complete references.');
 
         return [
             'version'=>1,
@@ -43,7 +47,7 @@ final class VendorRegistry
             'category'=>self::slug($raw['category'],'category'),
             'service_ref'=>self::opaque($raw['service_ref'],'service_ref','service'),
             'owner_ref'=>self::opaque($raw['owner_ref'],'owner_ref','identity'),
-            'lifecycle'=>self::enumValue($raw['lifecycle'],self::LIFECYCLE,'lifecycle'),
+            'lifecycle'=>$lifecycle,
             'cost'=>self::cost($raw['cost'],$venture),
             'contract_ref'=>self::nullableOpaque($raw['contract_ref'],'contract_ref','contract'),
             'data_ref'=>self::nullableOpaque($raw['data_ref'],'data_ref','data'),
@@ -59,7 +63,7 @@ final class VendorRegistry
             'expiry_at'=>$expiry,
             'health'=>$health,
             'freshness'=>$fresh,
-            'offboarding'=>self::offboarding($raw['offboarding']),
+            'offboarding'=>$offboarding,
         ];
     }
 

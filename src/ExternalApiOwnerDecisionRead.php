@@ -88,9 +88,9 @@ final class ExternalApiOwnerDecisionRead
 
     private static function text(mixed $value,string $label,int $max): string
     {
-        $clean=is_string($value)?trim($value):'';
-        $count=preg_match_all('/./us',$clean,$characters);
-        if($clean===''||$count===false||$count>$max||preg_match('/[<>\x00-\x1f\x7f]/u',$clean)===1
+        if(!is_string($value)) throw new InvalidArgumentException($label.' invalid.');
+        $clean=trim($value);
+        if($clean===''||mb_strlen($clean,'UTF-8')>$max||preg_match('/[<>\x00-\x1f\x7f]/u',$clean)===1
             ||preg_match(self::SENSITIVE,$clean)===1||preg_match(self::DIRECT_PII,$clean)===1)
             throw new InvalidArgumentException($label.' invalid.');
         return $clean;
@@ -99,27 +99,23 @@ final class ExternalApiOwnerDecisionRead
     private static function nullableTimestamp(mixed $value,string $label): ?int
     {
         if($value===null) return null;
-        self::must(is_int($value)&&$value>0,$label.' invalid.');
+        if(!is_int($value)||$value<=0) throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
 
     private static function oneOf(mixed $value,array $allowed,string $label): string
     {
-        self::must(is_string($value)&&array_search($value,$allowed,true)!==false,$label.' invalid.');
+        if(!is_string($value)||array_search($value,$allowed,true)===false)
+            throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
 
     private static function fields(mixed $row,array $expected,string $label): array
     {
-        self::must(is_array($row)&&!array_is_list($row),$label.' invalid.');
-        $actual=array_fill_keys(array_keys($row),true);
-        $wanted=array_fill_keys($expected,true);
-        self::must(count($actual)===count($wanted)&&$actual==$wanted,$label.' fields invalid.');
+        if(!is_array($row)||array_is_list($row)) throw new InvalidArgumentException($label.' invalid.');
+        $keys=array_keys($row);
+        if(count($keys)!==count($expected)||array_diff($keys,$expected)!==[]||array_diff($expected,$keys)!==[])
+            throw new InvalidArgumentException($label.' fields invalid.');
         return $row;
-    }
-
-    private static function must(bool $condition,string $message): void
-    {
-        if(!$condition) throw new InvalidArgumentException($message);
     }
 }

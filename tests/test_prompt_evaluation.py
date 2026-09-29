@@ -16,6 +16,7 @@ class PromptEvaluationTests(unittest.TestCase):
     def test_comparison_requires_same_task_class_and_evaluation_set(self):
         data = scenario("compatibility")
         self.assertEqual(data["valid"]["decision"], "candidate_better")
+        self.assertEqual(data["valid"]["template_id"], "support-agent")
         self.assertTrue(data["task"])
         self.assertTrue(data["set"])
         self.assertTrue(data["older_candidate"])

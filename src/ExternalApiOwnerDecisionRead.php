@@ -87,7 +87,8 @@ final class ExternalApiOwnerDecisionRead
 
     private static function text(mixed $value,string $label,int $max): string
     {
-        if(!is_string($value)) throw new InvalidArgumentException($label.' invalid.');
+        if(!is_string($value) || !mb_check_encoding($value,'UTF-8'))
+            throw new InvalidArgumentException($label.' invalid.');
         $clean=trim($value);
         if($clean===''||mb_strlen($clean,'UTF-8')>$max||preg_match('/[<>\x00-\x1f\x7f]/u',$clean)===1
             ||preg_match(self::SENSITIVE,$clean)===1||preg_match(self::DIRECT_PII,$clean)===1)

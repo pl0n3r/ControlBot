@@ -32,7 +32,7 @@ class ExternalApiOwnerDecisionReadTests(unittest.TestCase):
         for key in ("identity_id","authority_level","policy_ref","grant_id","session_ref","device_ref","step_up_ref","access_token","refresh_token","authorization"):
             self.assertNotIn(key,serialized)
         self.assertEqual(d["ordinary_copy"]["data"]["question"],"Review tokenization footprint with the Secretary on 2026-09-29 10:00")
-        self.assertTrue(all(d[k] for k in ("email_pii","phone_pii","secret","dsn")))
+        self.assertTrue(all(d[k] for k in ("email_pii","phone_pii","secret","dsn","invalid_utf8")))
 
     def test_contract_is_deterministic_and_external_io_free(self):
         d=scenario("pure")

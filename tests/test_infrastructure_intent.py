@@ -218,35 +218,14 @@ class InfrastructureIntentTests(unittest.TestCase):
         self.assertNotIn("attempt_id", request)
 
     def test_slice_stays_under_size_budget(self):
-        paths = [
-            "src/InfrastructureIntent.php",
-            "tests/infrastructure_intent_scenarios.php",
-            "tests/test_infrastructure_intent.py",
-            "docs/infrastructure-governance.md",
-        ]
-        base = "d1108445b1f2e4bbfbad1f93656c69ea051a8a1a"
-        probe = subprocess.run(
-            ["git", "cat-file", "-e", f"{base}^{{commit}}"],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-        )
-        self.assertEqual(
-            probe.returncode,
-            0,
-            "The #200 base commit must be available to measure the real PR delta.",
-        )
-        diff = subprocess.run(
-            ["git", "diff", "--numstat", base, "HEAD", "--", *paths],
-            cwd=ROOT,
-            check=True,
-            text=True,
-            capture_output=True,
-        )
-        changed = 0
-        for line in diff.stdout.splitlines():
-            additions, deletions, _ = line.split("\t", 2)
-            changed += int(additions) + int(deletions)
+        event_path = Path(__import__("os").environ.get("GITHUB_EVENT_PATH", ""))
+        if not event_path.is_file():
+            self.skipTest("PR diff budget is enforced from GitHub pull_request metadata.")
+        event = json.loads(event_path.read_text(encoding="utf-8"))
+        pull_request = event.get("pull_request")
+        if not isinstance(pull_request, dict):
+            self.skipTest("PR diff budget only applies to pull_request events.")
+        changed = int(pull_request["additions"]) + int(pull_request["deletions"])
         self.assertLessEqual(changed, 400)
 
 

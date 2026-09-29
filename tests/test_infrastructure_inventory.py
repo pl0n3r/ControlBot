@@ -87,6 +87,7 @@ class InfrastructureInventoryTests(unittest.TestCase):
             "duplicate-provider",
             "unknown-field",
             "invalid-ref",
+            "provider-secret-ref",
             "secret-ref",
             "secret-id",
         ):

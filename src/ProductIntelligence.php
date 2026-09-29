@@ -11,7 +11,7 @@ final class ProductIntelligence
     private const STATUSES=['measured','unknown','insufficient_data'];
     private const FRESHNESS=['fresh','stale','unknown'];
     private const NATURE=['observed','inferred'];
-    private const SENSITIVE='/(?:bearer\s+|password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn|email|e-mail|user[_ -]?id|customer[_ -]?id|member[_ -]?id|ip[_ -]?address|full[_ -]?name)/i';
+    private const SENSITIVE='/(?:bearer\s+|password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn|user[_ -]?id|customer[_ -]?id|member[_ -]?id)/i';
 
     public static function metric(array $raw,string $expectedVentureId,string $expectedProductId): array
     {

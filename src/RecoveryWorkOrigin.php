@@ -70,6 +70,8 @@ final class RecoveryWorkOrigin
         self::items($raw['reasons'],'reasons',false,false);
         self::freshness($raw['freshness']);
         self::nullableText($raw['backup_ref'],'backup_ref');
+        if(($raw['drill_status']===null)!==($raw['drill_observed']===null))
+            throw new InvalidArgumentException('Factory Recovery Health drill provenance invalid.');
         if($raw['drill_status']!==null) self::catalog($raw['drill_status'],['PASSED','BREACHED'],'drill_status');
         self::drillObserved($raw['drill_observed']);
         return [

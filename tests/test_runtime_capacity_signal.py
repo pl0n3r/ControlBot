@@ -42,8 +42,17 @@ class RuntimeCapacitySignalTests(unittest.TestCase):
         self.assertEqual(data["valid"]["heartbeat_at"], 995)
         self.assertEqual(data["valid"]["generation"], 4)
         self.assertEqual(data["valid"]["attempt"], 2)
-        for key in ("future_heartbeat", "bad_generation", "bad_attempt", "over_occupied"):
+        for key in (
+            "future_heartbeat",
+            "bad_generation",
+            "bad_attempt",
+            "over_occupied",
+            "assigned_without_ref",
+            "idle_with_ref",
+        ):
             self.assertTrue(data[key], (key, data))
+        self.assertEqual(data["degraded_preserves_assignment"]["state"], "rate_limited")
+        self.assertEqual(data["degraded_preserves_assignment"]["assignment_ref"], "work-215")
 
     def test_extra_fields_fail_closed(self):
         data = scenario("extra")

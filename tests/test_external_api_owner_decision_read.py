@@ -69,6 +69,7 @@ class ExternalApiOwnerDecisionReadTests(unittest.TestCase):
         self.assertTrue(d["email_pii"])
         self.assertTrue(d["phone_pii"])
         self.assertTrue(d["secret"])
+        self.assertTrue(d["dsn"])
 
     def test_contract_is_deterministic_and_external_io_free(self):
         d=scenario("pure")

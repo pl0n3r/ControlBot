@@ -10,7 +10,8 @@ final class OwnerInbox
     private const CLASSES=['fyi','watch','decision','critical'];
     private const FRESHNESS=['current','stale','unknown'];
     private const AUTHORITY=['L0_AI_AUTONOMOUS','L1_OPERATOR','L2_VENTURE_ADMIN','L3_GROUP_INSTITUTION','L4_OWNER'];
-    private const SENSITIVE='/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|dsn|email|phone|user[_ -]?id|customer[_ -]?id)/i';
+    private const SENSITIVE='/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|dsn|user[_ -]?id|customer[_ -]?id)/i';
+    private const DIRECT_PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?[0-9][0-9(). -]{7,}[0-9])/i';
 
     public static function entry(array $raw): array
     {
@@ -125,7 +126,7 @@ final class OwnerInbox
     {
         if(!is_string($value)||strlen($value)<3||strlen($value)>180||str_contains($value,'@')
             ||preg_match('/^controlbot:[a-z][a-z0-9._\/-]{1,159}$/D',$value)!==1
-            ||preg_match(self::SENSITIVE,$value)===1)
+            ||preg_match(self::SENSITIVE,$value)===1||preg_match(self::DIRECT_PII,$value)===1)
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
@@ -135,7 +136,7 @@ final class OwnerInbox
         if(!is_string($value)) throw new InvalidArgumentException($label.' invalid.');
         $value=trim($value);
         if($value===''||mb_strlen($value)>$max||preg_match('/[<>\x00-\x1f\x7f]/u',$value)===1
-            ||preg_match(self::SENSITIVE,$value)===1)
+            ||preg_match(self::SENSITIVE,$value)===1||preg_match(self::DIRECT_PII,$value)===1)
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }

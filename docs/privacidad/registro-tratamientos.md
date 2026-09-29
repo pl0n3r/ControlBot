@@ -53,3 +53,23 @@ Producto: `pl0n3r/ControlBot`
 - Consentimiento: `review_required`
 - Proveedores: ninguno_declarado
 - Retención: `review_required`
+
+## staff_directory_contact
+
+- Categoría: `contact`
+- Campos de software: `email`, `masked_email`
+- Finalidad: `staff_administration`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `request_lifetime_only`
+
+## staff_directory_identity
+
+- Categoría: `identification`
+- Campos de software: `staff_id`, `display_name`, `role`, `status`, `last_access_at`, `mfa_state`
+- Finalidad: `staff_administration`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `request_lifetime_only`

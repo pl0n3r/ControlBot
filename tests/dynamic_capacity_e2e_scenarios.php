@@ -141,6 +141,10 @@ function lifecycle(): array {
     $snapshots=[];
     foreach($signals as $key=>$signal) $snapshots[$key]=snapshotFromSignal($signal);
 
+    $previousReady=SchedulerCore::readiness(
+        readinessWork(1,'reservation-1','session-a'),
+        readinessContext($snapshots['working'],1,'reservation-1','session-a'),
+    );
     $currentReady=SchedulerCore::readiness(
         readinessWork(2,'reservation-2','session-b'),
         readinessContext($snapshots['recovered'],2,'reservation-2','session-b'),
@@ -175,7 +179,7 @@ function lifecycle(): array {
             'recovered'=>dispatch($snapshots['recovered'],2),
         ],
         'handoff'=>handoff(),
-        'readiness'=>['current'=>$currentReady,'stale_owner'=>$staleOwner,'duplicate_owners_rejected'=>$duplicateOwners],
+        'readiness'=>['previous'=>$previousReady,'current'=>$currentReady,'stale_owner'=>$staleOwner,'duplicate_owners_rejected'=>$duplicateOwners],
         'old_recovery_guard'=>PresenceAdapter::replanGuard($snapshots['stale'],'session-a',2,'recover'),
         'stale_current_guard'=>PresenceAdapter::replanGuard($snapshots['current_stale'],'session-b',1,'recover'),
         'current_recovery_guard'=>PresenceAdapter::replanGuard($snapshots['recovered'],'session-b',2,'recover'),

@@ -7,7 +7,7 @@ use InvalidArgumentException;
 
 final class ProductExperimentOutcome
 {
-    private const SENSITIVE='/(?:bearer\s+|password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn)/i';
+    private const SENSITIVE='/(?:bearer\\s+|password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn)/i';
 
     public static function outcome(
         array $raw,
@@ -16,25 +16,39 @@ final class ProductExperimentOutcome
         string $expectedVentureId,
         string $expectedProductId
     ): array {
-        self::fields($raw,[
+        $required=[
             'version','outcome_id','experiment_ref','venture_id','product_id',
             'evaluation_window','source_ref','evidence_ref',
-        ],'ExperimentOutcome');
+        ];
+        $keys=array_keys($raw);
+        sort($keys,SORT_STRING);
+        $requiredSorted=$required;
+        sort($requiredSorted,SORT_STRING);
+        if(array_is_list($raw) || $keys!==$requiredSorted)
+            throw new InvalidArgumentException('ExperimentOutcome fields invalid.');
         if($raw['version']!==1) throw new InvalidArgumentException('ExperimentOutcome version invalid.');
 
-        $venture=self::id($raw['venture_id'],'venture_id','venture-');
-        $product=self::id($raw['product_id'],'product_id','product-');
-        if($venture!==self::id($expectedVentureId,'expected_venture_id','venture-')
-            ||$product!==self::id($expectedProductId,'expected_product_id','product-'))
-            throw new InvalidArgumentException('Experiment outcome scope mismatch.');
+        if(!is_string($raw['venture_id'])
+            ||preg_match('/^venture-[a-z0-9][a-z0-9-]{1,79}$/D',$raw['venture_id'])!==1
+            ||!is_string($expectedVentureId)
+            ||preg_match('/^venture-[a-z0-9][a-z0-9-]{1,79}$/D',$expectedVentureId)!==1
+            ||$raw['venture_id']!==$expectedVentureId)
+            throw new InvalidArgumentException('Experiment outcome venture scope mismatch.');
 
-        $baseline=ProductIntelligence::metric($baselineRaw,$venture,$product);
-        $variant=ProductIntelligence::metric($variantRaw,$venture,$product);
-        self::compatible($baseline,$variant);
+        if(!is_string($raw['product_id'])
+            ||preg_match('/^product-[a-z0-9][a-z0-9-]{1,79}$/D',$raw['product_id'])!==1
+            ||!is_string($expectedProductId)
+            ||preg_match('/^product-[a-z0-9][a-z0-9-]{1,79}$/D',$expectedProductId)!==1
+            ||$raw['product_id']!==$expectedProductId)
+            throw new InvalidArgumentException('Experiment outcome product scope mismatch.');
 
-        $window=self::window($raw['evaluation_window']);
-        self::insideWindow($baseline['period'],$window,'baseline');
-        self::insideWindow($variant['period'],$window,'variant');
+        $baseline=ProductIntelligence::metric($baselineRaw,$raw['venture_id'],$raw['product_id']);
+        $variant=ProductIntelligence::metric($variantRaw,$raw['venture_id'],$raw['product_id']);
+        self::assertComparable($baseline,$variant);
+
+        $window=self::evaluationWindow($raw['evaluation_window']);
+        self::assertInsideWindow($baseline['period'],$window,'baseline');
+        self::assertInsideWindow($variant['period'],$window,'variant');
 
         $measured=$baseline['status']==='measured' && $variant['status']==='measured';
         $delta=null;
@@ -43,17 +57,19 @@ final class ProductExperimentOutcome
             $delta=$variant['value']-$baseline['value'];
             if(is_float($delta) && !is_finite($delta))
                 throw new InvalidArgumentException('Experiment delta invalid.');
-            if($delta>0) $comparison='higher';
-            elseif($delta<0) $comparison='lower';
-            else $comparison='equal';
+            $comparison=$delta>0?'higher':($delta<0?'lower':'equal');
         }
+
+        if(!is_string($raw['outcome_id'])
+            ||preg_match('/^outcome-[a-z0-9][a-z0-9-]{1,79}$/D',$raw['outcome_id'])!==1)
+            throw new InvalidArgumentException('outcome_id invalid.');
 
         return [
             'version'=>1,
-            'outcome_id'=>self::id($raw['outcome_id'],'outcome_id','outcome-'),
-            'experiment_ref'=>self::experimentRef($raw['experiment_ref']),
-            'venture_id'=>$venture,
-            'product_id'=>$product,
+            'outcome_id'=>$raw['outcome_id'],
+            'experiment_ref'=>self::opaqueExperiment($raw['experiment_ref']),
+            'venture_id'=>$raw['venture_id'],
+            'product_id'=>$raw['product_id'],
             'surface'=>$baseline['surface'],
             'category'=>$baseline['category'],
             'unit'=>$baseline['unit'],
@@ -64,95 +80,68 @@ final class ProductExperimentOutcome
             'delta'=>$delta,
             'comparison'=>$comparison,
             'nature'=>($baseline['nature']==='observed' && $variant['nature']==='observed')?'observed':'inferred',
-            'freshness'=>self::freshness($baseline,$variant),
+            'freshness'=>self::effectiveFreshness($baseline,$variant),
             'confidence'=>min($baseline['confidence'],$variant['confidence']),
-            'source_ref'=>self::aggregateRef($raw['source_ref'],'source_ref'),
-            'evidence_ref'=>self::evidenceRef($raw['evidence_ref']),
+            'source_ref'=>self::aggregateSource($raw['source_ref']),
+            'evidence_ref'=>self::productEvidence($raw['evidence_ref']),
         ];
     }
 
-    private static function compatible(array $baseline,array $variant): void
+    private static function assertComparable(array $baseline,array $variant): void
     {
-        foreach(['venture_id','product_id','surface','category','unit'] as $field){
-            if($baseline[$field]!==$variant[$field])
+        foreach(['venture_id','product_id','surface','category','unit'] as $dimension){
+            if($baseline[$dimension]!==$variant[$dimension])
                 throw new InvalidArgumentException('Baseline and variant are not comparable.');
         }
     }
 
-    private static function freshness(array $baseline,array $variant): string
+    private static function effectiveFreshness(array $baseline,array $variant): string
     {
-        if($baseline['status']==='unknown' || $variant['status']==='unknown'
-            ||$baseline['freshness']==='unknown' || $variant['freshness']==='unknown')
+        $states=[$baseline['freshness'],$variant['freshness']];
+        if($baseline['status']==='unknown' || $variant['status']==='unknown' || in_array('unknown',$states,true))
             return 'unknown';
-        if($baseline['freshness']==='stale' || $variant['freshness']==='stale')
-            return 'stale';
-        return 'fresh';
+        return in_array('stale',$states,true)?'stale':'fresh';
     }
 
-    private static function window(mixed $raw): array
+    private static function evaluationWindow(mixed $value): array
     {
-        self::fields($raw,['start_at','end_at'],'evaluation_window');
-        $start=self::nonNegativeInt($raw['start_at'],'evaluation_window.start_at');
-        $end=self::nonNegativeInt($raw['end_at'],'evaluation_window.end_at');
-        if($end<=$start) throw new InvalidArgumentException('evaluation_window invalid.');
-        return ['start_at'=>$start,'end_at'=>$end];
+        if(!is_array($value) || array_is_list($value) || count($value)!==2
+            ||!array_key_exists('start_at',$value) || !array_key_exists('end_at',$value)
+            ||!is_int($value['start_at']) || !is_int($value['end_at'])
+            ||$value['start_at']<0 || $value['end_at']<0 || $value['end_at']<=$value['start_at'])
+            throw new InvalidArgumentException('evaluation_window invalid.');
+
+        return ['start_at'=>$value['start_at'],'end_at'=>$value['end_at']];
     }
 
-    private static function insideWindow(array $period,array $window,string $label): void
+    private static function assertInsideWindow(array $period,array $window,string $label): void
     {
         if($period['start_at']<$window['start_at'] || $period['end_at']>$window['end_at'])
             throw new InvalidArgumentException($label.' metric outside evaluation window.');
     }
 
-    private static function experimentRef(mixed $value): string
+    private static function opaqueExperiment(mixed $value): string
     {
         if(!is_string($value)||preg_match('/^experiment:[a-f0-9]{32}$/D',$value)!==1)
             throw new InvalidArgumentException('experiment_ref invalid.');
         return $value;
     }
 
-    private static function aggregateRef(mixed $value,string $label): string
+    private static function aggregateSource(mixed $value): string
     {
-        $ref=self::ref($value,$label);
-        if(!str_starts_with($ref,'aggregate:'))
-            throw new InvalidArgumentException($label.' must be aggregate.');
-        return $ref;
-    }
-
-    private static function evidenceRef(mixed $value): string
-    {
-        $ref=self::ref($value,'evidence_ref');
-        if(!str_starts_with($ref,'evidence:product/'))
-            throw new InvalidArgumentException('evidence_ref invalid.');
-        return $ref;
-    }
-
-    private static function ref(mixed $value,string $label): string
-    {
-        if(!is_string($value)||strlen($value)<3||strlen($value)>180||str_contains($value,'@')
-            ||preg_match('/^[A-Za-z0-9][A-Za-z0-9._:\/#-]*$/D',$value)!==1
+        if(!is_string($value)||strlen($value)>180
+            ||preg_match('/^aggregate:[A-Za-z0-9][A-Za-z0-9._:\\/#-]+$/D',$value)!==1
             ||preg_match(self::SENSITIVE,$value)===1)
-            throw new InvalidArgumentException($label.' invalid.');
+            throw new InvalidArgumentException('source_ref invalid.');
         return $value;
     }
 
-    private static function id(mixed $value,string $label,string $prefix): string
+    private static function productEvidence(mixed $value): string
     {
-        if(!is_string($value)||preg_match('/^'.preg_quote($prefix,'/').'[a-z0-9][a-z0-9-]{1,79}$/D',$value)!==1)
-            throw new InvalidArgumentException($label.' invalid.');
+        if(!is_string($value)||strlen($value)>180
+            ||preg_match('/^evidence:product\\/[A-Za-z0-9][A-Za-z0-9._:\\/#-]+$/D',$value)!==1
+            ||preg_match(self::SENSITIVE,$value)===1)
+            throw new InvalidArgumentException('evidence_ref invalid.');
         return $value;
-    }
-
-    private static function nonNegativeInt(mixed $value,string $label): int
-    {
-        if(!is_int($value)||$value<0) throw new InvalidArgumentException($label.' invalid.');
-        return $value;
-    }
-
-    private static function fields(mixed $row,array $expected,string $label): void
-    {
-        if(!is_array($row)||array_is_list($row)) throw new InvalidArgumentException($label.' invalid.');
-        $keys=array_keys($row);sort($keys);sort($expected);
-        if($keys!==$expected) throw new InvalidArgumentException($label.' fields invalid.');
     }
 }

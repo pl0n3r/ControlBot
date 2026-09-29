@@ -34,10 +34,10 @@ Una Campaign solo puede usar el BrandContext del mismo Venture. El contrato no r
 
 ## Privacidad y autoridad
 
-Las refs sensibles al dominio usan namespaces canónicos (`audience:`, `offer:`, `cta:`, `creative:`, `budget:`, `experiment:`, `evidence:`). Un identificador humano o numérico sin namespace, un namespace incorrecto o material con forma de password/token/secret/cookie/API key falla cerrado. Datos CRM, listas de contactos y usuarios finales permanecen en su fuente autoritativa.
+Las refs sensibles al dominio usan namespaces canónicos (`audience:`, `offer:`, `cta:`, `creative:`, `budget:`, `experiment:`, `evidence:`) y un identificador opaco verificable de 32 caracteres hexadecimales minúsculos. Nombres, teléfonos, IDs semánticos, namespaces incorrectos y material con forma de password/token/secret/cookie/API key fallan cerrado. Datos CRM, listas de contactos y usuarios finales permanecen en su fuente autoritativa.
 
 `execution=false` es obligatorio. Este slice no publica, no gasta, no llama providers, no crea scheduler y no materializa Factory WorkItems. Los gates de budget/authority y la distribución por adapters pertenecen a slices posteriores.
 
 ## Determinismo
 
-Listas de canales, variants, experiments, evidence y constraints se normalizan de forma ordenada y sin duplicados. Campos desconocidos, schedules incoherentes, estados inválidos y mezclas cross-Venture fallan cerrado.
+Listas de canales, variants, experiments, evidence y constraints se normalizan de forma ordenada y sin duplicados. Campos desconocidos, schedules incoherentes, estados inválidos y mezclas cross-Venture fallan cerrado. Una campaña `completed` requiere tanto `start_at` como `end_at`.

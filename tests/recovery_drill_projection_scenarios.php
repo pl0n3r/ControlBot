@@ -92,6 +92,7 @@ $out=match($case){
     'sensitive-ref'=>rejected(function(){ $x=drill();$x['evidence_refs']=['controlbot:evidence/token-secret-value'];normalizeDrill($x); }),
     'extra-field'=>rejected(function(){ $x=drill();$x['payload']='backup-material';normalizeDrill($x); }),
     'target-mismatch'=>rejected(function(){ $x=drill();$x['observed']['rto_target_seconds']=999;normalizeDrill($x); }),
+    'bad-observed-at'=>rejected(function(){ $x=drill();$x['observed_at']=0;normalizeDrill($x); }),
     default=>throw new InvalidArgumentException('scenario invalid'),
 };
 echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;

@@ -48,10 +48,16 @@ if($scenario==='request'){
     $valid=candidate();
     $wrong=$valid;$wrong['policy_ref']='local-ranking';
     $extra=$valid;$extra['authority']='admin';
+    $badKey=$valid;$badKey['key']='Work-A';
+    $badCapability=$valid;$badCapability['required_capabilities']=['review:admin'];
+    $secretAccount=$valid;$secretAccount['account_id']='ghp_123456789012345678901234567890';
     echo json_encode([
         'valid'=>SchedulerSelection::request([$valid]),
         'wrong_policy'=>rejected(fn()=>SchedulerSelection::request([$wrong])),
         'extra'=>rejected(fn()=>SchedulerSelection::request([$extra])),
+        'bad_key'=>rejected(fn()=>SchedulerSelection::request([$badKey])),
+        'bad_capability'=>rejected(fn()=>SchedulerSelection::request([$badCapability])),
+        'secret_account'=>rejected(fn()=>SchedulerSelection::request([$secretAccount])),
         'duplicate'=>rejected(fn()=>SchedulerSelection::request([$valid,$valid])),
     ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
 }

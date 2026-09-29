@@ -76,7 +76,7 @@ final class SchedulerSelection
         return [
             'version'=>1,'policy_ref'=>self::POLICY,'key'=>self::id($raw['key'],'key'),'source_ref'=>self::workRef($raw['source_ref']),
             'priority'=>self::enum($raw['priority'],self::PRIORITIES,'priority'),'generation'=>self::positiveInt($raw['generation'],'generation'),
-            'required_capabilities'=>self::unique($raw['required_capabilities'],'required_capabilities','slug'),'account_id'=>self::id($raw['account_id'],'account_id'),
+            'required_capabilities'=>self::unique($raw['required_capabilities'],'required_capabilities','slug'),'account_id'=>self::ref($raw['account_id'],'account_id'),
             'readiness'=>['ready'=>$ready,'reasons'=>$reasons,'open_dependencies'=>$open,'unknown_dependencies'=>$unknown],
         ];
     }

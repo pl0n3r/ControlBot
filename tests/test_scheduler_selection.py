@@ -24,6 +24,9 @@ class SchedulerSelectionTests(unittest.TestCase):
         self.assertEqual(len(data["valid"]["fingerprint"]), 64)
         self.assertTrue(data["wrong_policy"])
         self.assertTrue(data["extra"])
+        self.assertTrue(data["bad_key"])
+        self.assertTrue(data["bad_capability"])
+        self.assertTrue(data["secret_account"])
         self.assertTrue(data["duplicate"])
 
     def test_request_fingerprint_is_input_order_independent(self):

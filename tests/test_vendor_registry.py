@@ -42,6 +42,7 @@ class VendorRegistryTests(unittest.TestCase):
         self.assertEqual(data["stale"]["freshness"]["state"],"stale")
         self.assertEqual(data["unknown"]["health"],"unknown")
         self.assertTrue(data["false_healthy_rejected"])
+        self.assertTrue(data["false_sla_rejected"])
         self.assertTrue(data["bad_dates_rejected"])
 
     def test_offboarding_is_a_requirements_contract_without_execution(self):

@@ -48,8 +48,8 @@ final class MomentumCampaign
         $schedule=self::schedule($raw['schedule']);
         if($status==='active' && $schedule['start_at']===null)
             throw new InvalidArgumentException('Active campaign requires start_at.');
-        if($status==='completed' && $schedule['end_at']===null)
-            throw new InvalidArgumentException('Completed campaign requires end_at.');
+        if($status==='completed' && ($schedule['start_at']===null || $schedule['end_at']===null))
+            throw new InvalidArgumentException('Completed campaign requires start_at and end_at.');
 
         return [
             'version'=>1,
@@ -89,8 +89,9 @@ final class MomentumCampaign
     private static function opaqueRef(mixed $value,string $label,string $namespace): string
     {
         $ref=self::ref($value,$label);
-        if(!str_starts_with($ref,$namespace.':') || strlen($ref)<=strlen($namespace)+1)
-            throw new InvalidArgumentException($label.' namespace invalid.');
+        $pattern='/^'.preg_quote($namespace,'/').':[a-f0-9]{32}$/D';
+        if(preg_match($pattern,$ref)!==1)
+            throw new InvalidArgumentException($label.' opaque identifier invalid.');
         return $ref;
     }
 

@@ -38,6 +38,7 @@ if($case==='workflow'){
         'success'=>ExternalMonitorCore::assess(null,[workflow('private','success',1000)],null,1200,60),
         'failure'=>ExternalMonitorCore::assess(null,[workflow('private','failure',1100)],null,1200,60),
         'startup'=>ExternalMonitorCore::assess(null,[workflow('private','startup_failure',1100)],null,1200,60),
+        'startup_null_steps'=>ExternalMonitorCore::assess(null,[array_replace(workflow('private','startup_failure',1101),['steps_present'=>null])],null,1200,60),
         'invalid'=>rejected(fn()=>ExternalMonitorCore::workflow($bad)),
     ],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
@@ -51,8 +52,18 @@ if($case==='alert'){
     $secret=probe(['source_ref'=>'external:token=supersecret']);
     echo json_encode([
         'capacity'=>ExternalMonitorCore::assess(null,$rows,'exhausted',1200,60),
+        'capacity_without_workflow'=>ExternalMonitorCore::assess(null,[],'exhausted',1200,60),
+        'critical_capacity'=>ExternalMonitorCore::assess(null,[],'critical',1200,60),
         'outage'=>ExternalMonitorCore::assess(probe(['outcome'=>'timeout','http_status'=>null,'latency_ms'=>60000]),[],null,1010,60),
         'secret_rejected'=>rejected(fn()=>ExternalMonitorCore::probe($secret)),
     ],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($case==='determinism'){
+    $sha=str_repeat('e',40);
+    $a=workflow('private','success',1100,$sha);$a['source_ref']='github:actions/private/tie-a';
+    $b=workflow('private','startup_failure',1100,$sha);$b['source_ref']='github:actions/private/tie-b';
+    $first=ExternalMonitorCore::assess(null,[$a,$b],'exhausted',1200,60);
+    $second=ExternalMonitorCore::assess(null,[$b,$a],'exhausted',1200,60);
+    echo json_encode(['first'=>$first,'second'=>$second],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 fwrite(STDERR,"Unknown external monitor scenario\n");exit(2);

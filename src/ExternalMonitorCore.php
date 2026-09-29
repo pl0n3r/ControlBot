@@ -41,7 +41,7 @@ final class ExternalMonitorCore
         $steps=self::nullableBool($raw['steps_present'],'steps_present');
         if(in_array($conclusion,['success','failure'],true) && ($runner!==true || $steps!==true))
             throw new InvalidArgumentException('Completed workflow requires runner and steps.');
-        if($conclusion==='startup_failure' && ($runner!==false || $steps!==false))
+        if($conclusion==='startup_failure' && ($runner!==false || !in_array($steps,[false,null],true)))
             throw new InvalidArgumentException('startup_failure evidence invalid.');
         if($conclusion==='unknown' && ($runner!==null || $steps!==null))
             throw new InvalidArgumentException('Unknown workflow cannot assert runner or steps.');
@@ -68,7 +68,11 @@ final class ExternalMonitorCore
             if(isset($seen[$id])) throw new InvalidArgumentException('Workflow observation duplicated.');
             $seen[$id]=true;$workflows[]=$row;
         }
-        usort($workflows,static fn(array $a,array $b):int=>[$a['observed_at'],$a['visibility'],$a['sha']]<=>[$b['observed_at'],$b['visibility'],$b['sha']]);
+        usort($workflows,static fn(array $a,array $b):int=>
+            [$a['observed_at'],$a['visibility'],$a['sha'],$a['conclusion'],$a['source_ref']]
+            <=>
+            [$b['observed_at'],$b['visibility'],$b['sha'],$b['conclusion'],$b['source_ref']]
+        );
         if($budgetState!==null) self::choice($budgetState,self::BUDGET_STATES,'budget_state');
 
         [$application,$applicationReason]=self::applicationState($probe,$now,$probeTtl);
@@ -81,6 +85,7 @@ final class ExternalMonitorCore
             elseif($private['conclusion']==='failure') $reasons[]='private_workflow_step_failure';
         }
         if($public!==null && $public['conclusion']==='success') $reasons[]='public_runner_available';
+        if($budgetState==='critical') $reasons[]='owner_capacity_critical';
         if($capacity==='exhausted') $reasons[]='owner_capacity_exhausted';
         if($workflowState==='blocked' && $capacity==='exhausted' && self::earlierPrivateSuccess($workflows,$private)
             && $public!==null && $public['conclusion']==='success') $reasons[]='capacity_evidence_converges';
@@ -89,7 +94,7 @@ final class ExternalMonitorCore
 
         $refs=[];foreach([$probe,$private,$public] as $row) if(is_array($row)) $refs[]=$row['source_ref'];
         $refs=array_values(array_unique($refs));sort($refs,SORT_STRING);
-        $alert=self::alertIntent($application,$workflowState,$capacity,$refs);
+        $alert=self::alertIntent($application,$capacity,$budgetState,$refs);
         $out=[
             'version'=>1,'application_state'=>$application,'private_workflow_state'=>$workflowState,
             'owner_capacity_state'=>$capacity,'billing_mechanism_state'=>'unknown','reasons'=>$reasons,
@@ -130,11 +135,12 @@ final class ExternalMonitorCore
         return false;
     }
 
-    private static function alertIntent(string $application,string $workflow,string $capacity,array $refs): array
+    private static function alertIntent(string $application,string $capacity,?string $budgetState,array $refs): array
     {
         $required=false;$severity='info';$code='none';
         if($application==='down'){$required=true;$severity='critical';$code='application_down';}
-        elseif($workflow==='blocked' && $capacity==='exhausted'){$required=true;$severity='critical';$code='private_actions_capacity_exhausted';}
+        elseif($capacity==='exhausted'){$required=true;$severity='critical';$code='private_actions_capacity_exhausted';}
+        elseif($budgetState==='critical'){$required=true;$severity='critical';$code='private_actions_capacity_critical';}
         elseif($application==='degraded'){$required=true;$severity='warning';$code='application_degraded';}
         return ['required'=>$required,'severity'=>$severity,'code'=>$code,'external_channel_required'=>$required,'evidence_refs'=>$refs];
     }

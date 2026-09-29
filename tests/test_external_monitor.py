@@ -30,6 +30,10 @@ class ExternalMonitorCoreTests(unittest.TestCase):
         self.assertEqual(d["startup"]["private_workflow_state"],"blocked")
         self.assertIn("private_startup_failure_without_runner",d["startup"]["reasons"])
         self.assertNotIn("private_workflow_step_failure",d["startup"]["reasons"])
+        self.assertEqual(d["startup_null_steps"]["private_workflow_state"],"blocked")
+        self.assertIn("private_startup_failure_without_runner",d["startup_null_steps"]["reasons"])
+        self.assertNotIn("private_workflow_step_failure",d["startup_null_steps"]["reasons"])
+        self.assertIsNone(d["startup_null_steps"]["latest_private_workflow"]["steps_present"])
         self.assertTrue(d["invalid"])
 
     def test_incident_78_preserves_application_unknown_and_capacity_evidence(self):
@@ -43,13 +47,25 @@ class ExternalMonitorCoreTests(unittest.TestCase):
 
     def test_alert_intent_requires_external_channel_and_is_secret_free(self):
         d=scenario("alert")
-        for key in ("capacity","outage"):
+        for key in ("capacity","capacity_without_workflow","critical_capacity","outage"):
             alert=d[key]["alert_intent"]
             self.assertTrue(alert["required"])
             self.assertTrue(alert["external_channel_required"])
             self.assertEqual(alert["severity"],"critical")
+        self.assertEqual(d["capacity_without_workflow"]["alert_intent"]["code"],"private_actions_capacity_exhausted")
+        self.assertEqual(d["critical_capacity"]["owner_capacity_state"],"degraded")
+        self.assertEqual(d["critical_capacity"]["alert_intent"]["code"],"private_actions_capacity_critical")
+        self.assertIn("owner_capacity_critical",d["critical_capacity"]["reasons"])
         self.assertTrue(d["secret_rejected"])
         self.assertNotIn("secret",json.dumps(d["capacity"]).lower())
+
+    def test_equal_workflow_timestamps_are_ordered_deterministically(self):
+        d=scenario("determinism")
+        self.assertEqual(d["first"],d["second"])
+        self.assertEqual(
+            d["first"]["latest_private_workflow"]["source_ref"],
+            d["second"]["latest_private_workflow"]["source_ref"],
+        )
 
     def test_external_monitor_core_has_no_external_io(self):
         source=(ROOT/"src"/"ExternalMonitorCore.php").read_text(encoding="utf-8").lower()

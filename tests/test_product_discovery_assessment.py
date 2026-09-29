@@ -39,7 +39,7 @@ class ProductDiscoveryAssessmentTests(unittest.TestCase):
 
     def test_schema_refs_and_lists_are_closed_opaque_deterministic_and_secret_free(self):
         d=scenario("schema"); self.assertEqual(d["sorted"],sorted(d["sorted"]))
-        self.assertTrue(all(d[k] for k in ("duplicate","extra","bad_ref")))
+        self.assertTrue(all(d[k] for k in ("duplicate","extra","bad_ref","sensitive_text","direct_pii_text")))
         self.assertEqual(d["numeric_opaque_ref"],"assessment:"+"12345678901234567890123456789012")
         s=json.dumps(scenario("valid")).lower()
         for value in ("password","secret","authorization","bearer ","@"): self.assertNotIn(value,s)

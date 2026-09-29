@@ -81,6 +81,7 @@ $out=match($case){
     'valid'=>normalizeDrill(drill()),
     'cross-project'=>rejected(function(){ $x=drill();$x['project_ref']='controlbot:project/project-other';normalizeDrill($x); }),
     'producer-mismatch'=>rejected(fn()=>normalizeDrill(drill(),receipt('other'))),
+    'evidence-mismatch'=>rejected(function(){ $e=recoveryEvidence();$e['project_ref']='controlbot:project/project-other';RecoveryDrillProjection::normalize(drill(),profile(),$e,receipt()); }),
     'stale'=>(function(){ $x=drill();$x['freshness']='stale';return normalizeDrill($x); })(),
     'unknown'=>(function(){ $x=drill();$x['freshness']='unknown';return normalizeDrill($x); })(),
     'breached'=>(function(){ $x=drill();$x['reported_status']='BREACHED';$x['reasons']=['RTO_EXCEEDED'];$x['observed']['rto_seconds']=4000;return normalizeDrill($x); })(),

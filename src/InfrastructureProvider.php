@@ -14,6 +14,7 @@ final class InfrastructureProvider
         'network.read', 'cost.read',
     ];
     private const SCOPES = ['provider', 'project', 'environment', 'resource'];
+    private const SENSITIVE_PATTERN = '/(?i)(password|passwd|secret|token|api[_-]?key|private[_-]?key|dsn\\s*[:=]|bearer\\s+)/';
 
     public static function normalizeProvider(array $raw): array
     {
@@ -146,7 +147,9 @@ final class InfrastructureProvider
 
     private static function id(mixed $value, string $label): string
     {
-        if (!is_string($value) || preg_match('/^[a-z][a-z0-9-]{1,63}$/D', $value) !== 1) {
+        if (!is_string($value)
+            || preg_match(self::SENSITIVE_PATTERN, $value) === 1
+            || preg_match('/^[a-z][a-z0-9-]{1,63}$/D', $value) !== 1) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
         return $value;

@@ -1,14 +1,11 @@
 <?php
 declare(strict_types=1);
-
 foreach([
     'InfrastructureProvider','InfrastructureResource','InfrastructureObservation','RuntimeCapacitySignal',
     'VentureIdentity','VentureFinancialSnapshot','OwnerInbox','ProductIntelligence',
     'ProductHealthSnapshot','ExecutiveCockpit'
 ] as $file) require __DIR__.'/../src/'.$file.'.php';
-
 use ControlBot\Business\ExecutiveCockpit;
-
 function venture(string $id='venture-alpha'): array {
     $slug=str_replace('venture-','',$id);
     return ['version'=>1,'venture_id'=>$id,'group_id'=>'group-one','slug'=>$slug,'title'=>ucfirst($slug),'strategy_role'=>'core','state'=>'active','responsible_identity_id'=>'owner-alpha','project_refs'=>[]];
@@ -75,7 +72,6 @@ function row(array $overrides=[]): array {
     ],$overrides);
 }
 function bad(callable $fn): bool {try{$fn();return false;}catch(InvalidArgumentException){return true;}}
-
 $case=$argv[1]??'';
 if($case==='base') $out=ExecutiveCockpit::build([row()]);
 elseif($case==='stale') $out=ExecutiveCockpit::build([row([

@@ -13,7 +13,7 @@ use InvalidArgumentException;
 const NOW=1500;
 const SCOPE='venture:condor';
 
-function pack(string $id,string $jurisdiction): array {
+function jurisdictionPack(string $id,string $jurisdiction): array {
     $kind=str_starts_with($jurisdiction,'country:')?'country':(str_starts_with($jurisdiction,'region:')?'region':'supranational');
     return [
         'schema_version'=>1,'pack_id'=>$id,'jurisdiction'=>$jurisdiction,'kind'=>$kind,
@@ -50,7 +50,7 @@ function runtime(array $jurisdictions=['country:CO'],array $packs=[],?array $bef
     return [
         'version'=>1,'scope'=>SCOPE,
         'market'=>['market_id'=>$mode==='global'?'market-global':'market-co','mode'=>$mode,'jurisdictions'=>$jurisdictions,'source_ref'=>'controlbot:market/scope'],
-        'packs'=>$packs?:[pack('pack-co-v1','country:CO')],
+        'packs'=>$packs?:[jurisdictionPack('pack-co-v1','country:CO')],
         'registry_before'=>$before??registry('gap'),'gate'=>gate($gateKind),
         'registry_after'=>$after??registry('compliant',['controlbot:lex/evidence/privacy']),
         'watch'=>['version'=>1,'signals'=>[]],
@@ -68,10 +68,10 @@ if($name==='flow'){
     $out=[
         'runtime'=>LexRuntime::evaluate(runtime(
             ['country:CO','country:MX'],
-            [pack('pack-co-v1','country:CO'),pack('pack-mx-v1','country:MX')],
+            [jurisdictionPack('pack-co-v1','country:CO'),jurisdictionPack('pack-mx-v1','country:MX')],
             registry('unknown'),registry('unknown'),'global','material_uncertainty'
         ),NOW),
-        'empty_blocked'=>blocked(static fn():array=>LexRuntime::evaluate(runtime([], [pack('pack-co-v1','country:CO')],mode:'global'),NOW)),
+        'empty_blocked'=>blocked(static fn():array=>LexRuntime::evaluate(runtime([], [jurisdictionPack('pack-co-v1','country:CO')],mode:'global'),NOW)),
     ];
 }elseif($name==='insufficient'){
     $out=[

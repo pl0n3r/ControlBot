@@ -61,7 +61,10 @@ if($case==='material'){
         'legal_review'=>['venture_id'=>'venture-alpha','state'=>'rejected','lex_review_ref'=>'lex:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'],
         'exit_plan_ref'=>null,'export_ref'=>null,'criticality'=>'critical',
     ]);
-    $out=['signals'=>project($vendor),'types'=>types(project($vendor))];
+    $out=[
+        'signals'=>project($vendor),'types'=>types(project($vendor)),
+        'at_boundary_types'=>types(project(vx(['renewal_at'=>2100,'expiry_at'=>null]),1600,500)),
+    ];
 }elseif($case==='unknown'){
     $unknown=vx([
         'criticality'=>'critical','health'=>'unknown','sla_state'=>'unknown',
@@ -80,7 +83,13 @@ if($case==='material'){
 }elseif($case==='provenance'){
     $out=['signals'=>project(vx())];
 }elseif($case==='boundary'){
-    $signals=project(vx(['renewal_at'=>null,'expiry_at'=>null]));
+    $signals=project(vx([
+        'criticality'=>'critical','health'=>'degraded','sla_state'=>'unknown',
+        'security_review'=>['venture_id'=>'venture-alpha','state'=>'rejected','aegis_review_ref'=>'aegis:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+        'legal_review'=>['venture_id'=>'venture-alpha','state'=>'rejected','lex_review_ref'=>'lex:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'],
+        'renewal_at'=>null,'expiry_at'=>null,'exit_plan_ref'=>null,'export_ref'=>null,
+    ]),1600,2000);
+    if($signals===[]) throw new RuntimeException('boundary scenario must emit signals');
     $out=['signals'=>$signals,'payload'=>json_encode($signals,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES)];
 }elseif($case==='deterministic'){
     $a=project(vx([

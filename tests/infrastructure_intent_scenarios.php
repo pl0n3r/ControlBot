@@ -202,7 +202,11 @@ if ($name === 'safe') {
     ]);
     $out = [
         'high' => InfrastructureIntent::plan(
-            intent(['intent_id' => 'intent-high', 'blast_radius' => 'high']),
+            intent([
+                'intent_id' => 'intent-high',
+                'blast_radius' => 'high',
+                'approval_ref' => 'controlbot:approval/caller-supplied',
+            ]),
             authority(),
             null,
             NOW,

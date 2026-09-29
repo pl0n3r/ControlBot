@@ -4,7 +4,9 @@ require __DIR__.'/../src/ExternalApiPushEnvelope.php';
 
 use ControlBot\ExternalApi\ExternalApiPushEnvelope;
 
+/** Return true only when the callable fails closed with InvalidArgumentException. */
 function bad(callable $fn): bool { try{$fn();return false;}catch(InvalidArgumentException){return true;} }
+/** Build one valid baseline envelope with explicit overrides. */
 function pushRaw(array $o=[]): array { return array_replace([
     'version'=>1,
     'notification_ref'=>'notification:11111111111111111111111111111111',
@@ -44,7 +46,15 @@ if($case==='closed'){
     $out=[
         'payload'=>ExternalApiPushEnvelope::envelope(pushRaw()),
         'extra'=>$extra,
-        'sensitive_target'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:decision/secret-item']))),
+        'sensitive_target'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:decision/secret']))),
+        'legit_dsn_target'=>ExternalApiPushEnvelope::envelope(pushRaw(['target_ref'=>'controlbot:incident/dsn-outage']))['target_ref'],
+        'bad_version'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['version'=>2]))),
+        'bad_notification_ref'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['notification_ref'=>'notification:not-opaque']))),
+        'bad_correlation_id'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['correlation_id'=>'not-opaque']))),
+        'bad_venture_ref'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['venture_ref'=>'external:venture/alpha']))),
+        'bad_occurred_type'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['occurred_at'=>'1500']))),
+        'bad_occurred_zero'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['occurred_at'=>0]))),
+        'bad_copy_key'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['generic_copy_key'=>'custom_free_text']))),
     ];
 }elseif($case==='deep_link'){
     $out=[
@@ -60,6 +70,8 @@ if($case==='closed'){
         'unknown'=>ExternalApiPushEnvelope::envelope($unknown),
         'unknown_source'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['freshness'=>'unknown','occurred_at'=>null]))),
         'unknown_time'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['freshness'=>'unknown','source_ref'=>null]))),
+        'current_missing_source'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['source_ref'=>null]))),
+        'stale_missing_time'=>bad(fn()=>ExternalApiPushEnvelope::envelope(pushRaw(['freshness'=>'stale','occurred_at'=>null]))),
     ];
 }elseif($case==='delivery'){
     $raw=pushRaw();
@@ -69,6 +81,8 @@ if($case==='closed'){
         'preference_off'=>ExternalApiPushEnvelope::deliveryPolicy($raw,false,true,true),
         'policy_off'=>ExternalApiPushEnvelope::deliveryPolicy($raw,true,false,true),
         'severity_off'=>ExternalApiPushEnvelope::deliveryPolicy($raw,true,true,false),
+        'different_type'=>ExternalApiPushEnvelope::deliveryPolicy(pushRaw(['type'=>'decision_result']),true,true,true),
+        'different_target'=>ExternalApiPushEnvelope::deliveryPolicy(pushRaw(['target_ref'=>'controlbot:decision/decision-alpha']),true,true,true),
     ];
 }elseif($case==='pure'){
     $r=new ReflectionClass(ExternalApiPushEnvelope::class);

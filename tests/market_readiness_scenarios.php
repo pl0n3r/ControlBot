@@ -47,7 +47,7 @@ if($case==='complete'){
     $noEvidence=replaceGate(gates(),'product',['evidence_refs'=>[]]);
     $out=[
         'stale'=>MarketReadiness::forCountry(market(),'venture-condor','CO',$stale),
-        'unknown_ready'=>MarketReadiness::forCountry(market(),'venture-condor','CO',$unknown),
+        'unknown_ready_rejected'=>blocked(fn()=>MarketReadiness::forCountry(market(),'venture-condor','CO',$unknown)),
         'evidenceless_ready_rejected'=>blocked(fn()=>MarketReadiness::forCountry(market(),'venture-condor','CO',$noEvidence)),
     ];
 }elseif($case==='missing'){

@@ -68,6 +68,8 @@ final class MarketReadiness
         $observed=self::observedAt($raw['observed_at'],$freshness);
         if($freshness!=='unknown'&&$evidence===[])
             throw new InvalidArgumentException('Observed readiness gate requires evidence.');
+        if(in_array($status,['ready','not_applicable'],true)&&$evidence===[])
+            throw new InvalidArgumentException('Ready readiness gate requires evidence.');
         $effective=$freshness==='fresh'?$status:'unknown';
         return [
             'domain'=>$domain,

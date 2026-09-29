@@ -26,10 +26,7 @@ class MarketReadinessTests(unittest.TestCase):
         gate=next(g for g in d["stale"]["gates"] if g["domain"]=="lex")
         self.assertEqual(gate["status"],"ready")
         self.assertEqual(gate["effective_status"],"unknown")
-        self.assertEqual(d["unknown_ready"]["launch_state"],"unknown")
-        unknown_gate=next(g for g in d["unknown_ready"]["gates"] if g["domain"]=="privacy")
-        self.assertEqual(unknown_gate["effective_status"],"unknown")
-        self.assertEqual(unknown_gate["evidence_refs"],[])
+        self.assertTrue(d["unknown_ready_rejected"])
         self.assertTrue(d["evidenceless_ready_rejected"])
 
     def test_missing_domains_and_launch_state_are_explicit_without_score(self):

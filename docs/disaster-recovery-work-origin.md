@@ -1,6 +1,6 @@
 # Disaster Recovery Work Origin — ControlBot RECOVERY_WORKITEM
 
-Este slice de #182 convierte **Recovery Health ya derivado por Factory #331** en un WorkItem v1 de **Factory Queue #269**. ControlBot/AEGIS origina trabajo; Factory conserva readiness, deduplicación, prioridad operativa y despacho.
+Este slice de #182 convierte **Recovery Health ya derivado por Factory #331** en un WorkItem v1 de **Factory #269 / Factory Queue v1**. ControlBot/AEGIS origina trabajo; Factory conserva readiness, deduplicación, prioridad operativa y despacho.
 
 ## Frontera
 

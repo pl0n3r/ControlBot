@@ -10,6 +10,7 @@ use ControlBot\Runtime\AgentRuntime;
 use ControlBot\Scheduler\SchedulerAssignmentPlan;
 use ControlBot\Scheduler\SchedulerCore;
 use ControlBot\Scheduler\SchedulerSelection;
+use ControlBot\Scheduler\ValidatedSchedulerSelection;
 
 const NOW = 10_000;
 
@@ -37,7 +38,7 @@ function scheduler_context(array $replace=[]): array
     ],$replace);
 }
 
-function validated_selection(array $workOverride=[],array $contextOverride=[]): array
+function validated_selection(array $workOverride=[],array $contextOverride=[]): ValidatedSchedulerSelection
 {
     $candidate=SchedulerCore::candidate(work($workOverride),scheduler_context($contextOverride));
     $request=SchedulerSelection::request([$candidate]);
@@ -46,7 +47,7 @@ function validated_selection(array $workOverride=[],array $contextOverride=[]): 
         'selected_key'=>$candidate['key'],'selection_reason'=>'critical ready leaf selected by Factory dispatcher',
         'telemetry'=>['ready_not_selected'=>[],'excluded'=>[]],
     ];
-    return SchedulerSelection::validateDecision($request,$decision,[$candidate]);
+    return ValidatedSchedulerSelection::fromDecision($request,$decision,[$candidate]);
 }
 
 function session(array $replace=[]): array
@@ -65,7 +66,7 @@ function agent(array $replace=[]): array
     ],$replace);
 }
 
-function plan(array $selection=null,array $workRaw=null,array $sessionRaw=null,array $agentRaw=null,string $reservation='reservation-0001',string $assignment='assignment-0001'): array
+function plan(mixed $selection=null,array $workRaw=null,array $sessionRaw=null,array $agentRaw=null,string $reservation='reservation-0001',string $assignment='assignment-0001'): array
 {
     return SchedulerAssignmentPlan::plan(
         $selection??validated_selection(),$workRaw??work(),$sessionRaw??session(),$agentRaw??agent(),
@@ -75,19 +76,18 @@ function plan(array $selection=null,array $workRaw=null,array $sessionRaw=null,a
 
 $scenario=$argv[1]??'';
 if($scenario==='selection'){
-    $base=validated_selection();
-    $fields=['key','source_ref','generation','required_capabilities','account_id','priority'];
-    $rejected=[];
-    foreach($fields as $field){
-        $changed=$base;
-        $changed['selected'][$field]=match($field){
-            'key'=>'work-b','source_ref'=>'pl0n3r/ControlBot#351','generation'=>4,
-            'required_capabilities'=>['php'],'account_id'=>'account-other','priority'=>'high',
-        };
-        if($field==='key') $changed['selected_key']='work-b';
-        $rejected[$field]=rejected(fn()=>plan($changed));
-    }
-    echo json_encode(['valid'=>plan($base),'rejected'=>$rejected],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+    $rejected=[
+        'fabricated_array'=>rejected(fn()=>plan([])),
+        'key'=>rejected(fn()=>plan(validated_selection(['work_item_id'=>'work-b']),work())),
+        'source_ref'=>rejected(fn()=>plan(validated_selection(['source_ref'=>'pl0n3r/ControlBot#351']),work())),
+        'generation'=>rejected(fn()=>plan(validated_selection(['generation'=>4],['expected_generation'=>4]),work())),
+        'required_capabilities'=>rejected(fn()=>plan(validated_selection(['required_capabilities'=>['php']]),work())),
+        'priority'=>rejected(fn()=>plan(validated_selection(['priority'=>'high']),work())),
+        'account_id'=>rejected(fn()=>plan(validated_selection([],[
+            'capacity'=>['account_id'=>'account-other','eligible'=>true,'free_capacity'=>1,'session_ids'=>[]],
+        ]))),
+    ];
+    echo json_encode(['valid'=>plan(),'rejected'=>$rejected],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
 }
 if($scenario==='target'){
     echo json_encode([
@@ -100,14 +100,13 @@ if($scenario==='target'){
     ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
 }
 if($scenario==='binding'){
-    $result=plan();
-    echo json_encode($result,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+    echo json_encode(plan(),JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
 }
 if($scenario==='ownership'){
     $reserved=work(['state'=>'reserved','reservation_id'=>'reservation-old']);
     $assigned=work(['state'=>'assigned','reservation_id'=>'reservation-old','assigned_session_id'=>'session-old']);
     $occupied=session(['assignment_id'=>'assignment-old']);
-    $staleSelection=validated_selection();$staleSelection['selected']['generation']=2;
+    $staleSelection=validated_selection(['generation'=>2],['expected_generation'=>2]);
     echo json_encode([
         'reserved'=>rejected(fn()=>plan(null,$reserved)),
         'assigned'=>rejected(fn()=>plan(null,$assigned)),
@@ -120,8 +119,7 @@ if($scenario==='deterministic'){
     $workChanged=plan(null,work(['attempt'=>2]));
     $sessionChanged=plan(null,null,session(['last_heartbeat_at'=>NOW-11]));
     echo json_encode([
-        'same'=>$one===$two,
-        'fingerprint_same'=>$one['fingerprint']===$two['fingerprint'],
+        'same'=>$one===$two,'fingerprint_same'=>$one['fingerprint']===$two['fingerprint'],
         'work_cas_changed'=>$one['preconditions']['cas_sha256']!==$workChanged['preconditions']['cas_sha256'],
         'session_cas_changed'=>$one['preconditions']['cas_sha256']!==$sessionChanged['preconditions']['cas_sha256'],
     ],JSON_THROW_ON_ERROR),PHP_EOL;exit;

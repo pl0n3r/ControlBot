@@ -9,6 +9,7 @@ No es un controller, collector, cache ni fuente de verdad. Recibe snapshots ya n
 ## Reglas
 
 - El shape público sigue el OpenAPI v1; no se mantiene un segundo modelo paralelo.
+- Operation IDs y `ResponseMeta/Freshness` se validan mediante `ExternalApiContract`.
 - `request_id` y `correlation_id` son IDs hexadecimales de 32 caracteres.
 - `generated_at` y timestamps presentes son enteros positivos.
 - Freshness conserva exactamente `current | stale | unknown`.
@@ -18,7 +19,7 @@ No es un controller, collector, cache ni fuente de verdad. Recibe snapshots ya n
 - Cockpit expone solo venture ref, estados business/technical y contadores.
 - Owner Inbox expone solo la categoría, refs y copy mínimo definido por el contrato.
 - Los objetos rechazan campos extra para evitar fugas de modelos internos.
-- Claves o valores con señales de secretos/credenciales fallan cerrado.
+- Campos extra y referencias con señales de secretos/credenciales fallan cerrado; `title/summary` conservan copy legítimo definido por OpenAPI.
 
 ## Límites
 

@@ -43,6 +43,7 @@ final class MomentumCreative
     public static function variant(array $raw,array $briefRaw,array $brandRaw): array
     {
         $brief=self::brief($briefRaw,$brandRaw);
+        $raw += ['content_ref'=>null,'asset_ref'=>null,'hypothesis_ref'=>null,'metric_ref'=>null];
         self::fields($raw,[
             'version','variant_id','brief_id','venture_id','brand_context_id','variant_key','format',
             'content_ref','asset_ref','hypothesis_ref','metric_ref','provenance_refs','status',
@@ -79,7 +80,7 @@ final class MomentumCreative
     /** Normalize and deterministically order one variant set. */
     public static function variantSet(array $rows,array $briefRaw,array $brandRaw): array
     {
-        if(!array_is_list($rows)||$rows===[]||count($rows)>26)
+        if(!array_is_list($rows)||count($rows)>26)
             throw new InvalidArgumentException('CreativeVariant set invalid.');
         $out=[];$keys=[];$ids=[];
         foreach($rows as $raw){

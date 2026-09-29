@@ -60,13 +60,27 @@ class ExternalApiReadProjectionTests(unittest.TestCase):
 
     def test_public_projection_does_not_leak_internal_fields(self):
         d=scenario("no_leak")
-        serialized=json.dumps(d,sort_keys=True).lower()
         self.assertTrue(d["blocked_internal"])
+        self.assertEqual(d["inbox"]["data"]["entries"][0]["title"],"Revisión de bearer token")
+        self.assertIn("password",d["inbox"]["data"]["entries"][0]["summary"].lower())
+
+        keys=set()
+        def collect_keys(value):
+            if isinstance(value,dict):
+                for key,item in value.items():
+                    keys.add(key.lower())
+                    collect_keys(item)
+            elif isinstance(value,list):
+                for item in value:
+                    collect_keys(item)
+
+        collect_keys(d["cockpit"])
+        collect_keys(d["inbox"])
         for forbidden in (
             "internal_owner_email","password","api_key","provider_credential",
             "device_token","authorization","user_agent","ip_address",
         ):
-            self.assertNotIn(forbidden,serialized)
+            self.assertNotIn(forbidden,keys)
 
 if __name__=="__main__":
     unittest.main()

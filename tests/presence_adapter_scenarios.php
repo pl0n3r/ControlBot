@@ -60,7 +60,8 @@ if($case==='observed_capacity'){
     $observed=snap([row()],$declaredLow,$signal);
     $stale=snap([row('session_1','idle',990,false)],[account(99)],['account_main'=>capacity('healthy',9,1,800)]);
     $unknown=snap([row('session_1','idle',990,false)],[account(99)],['account_main'=>capacity('unknown',9,0)]);
-    echo json_encode(compact('observed','stale','unknown'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+    $missing=snap([row('session_1','idle',990,false)],[account(99)],[]);
+    echo json_encode(compact('observed','stale','unknown','missing'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='provider_degradation'){
     $rows=[row('session_1','working',990,true,120)];

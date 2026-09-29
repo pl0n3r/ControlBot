@@ -23,7 +23,7 @@ class PresenceAdapterTests(unittest.TestCase):
 
     def test_stale_or_unknown_never_adds_idle_capacity(self):
         data = scenario("observed_capacity")
-        for key in ("stale", "unknown"):
+        for key in ("stale", "unknown", "missing"):
             self.assertEqual(data[key]["capacity_state"], "unknown")
             self.assertEqual(data[key]["idle_capacity"], 0)
             self.assertEqual(data[key]["accounts"][0]["free_capacity"], 0)

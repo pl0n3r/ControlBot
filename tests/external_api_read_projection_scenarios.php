@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__.'/../src/ExternalApiContract.php';
 require_once __DIR__.'/../src/ExternalApiReadProjection.php';
 
 use ControlBot\ExternalApi\ExternalApiReadProjection;
@@ -30,8 +31,8 @@ function entry(array $overrides=[]): array {
         'entry_id'=>'decision-alpha',
         'kind'=>'DECISION',
         'venture_ref'=>'controlbot:venture/condor',
-        'title'=>'Aprobación pendiente',
-        'summary'=>'Existe una decisión que requiere revisión del owner.',
+        'title'=>'Revisión de bearer token',
+        'summary'=>'La política de password requiere revisión del owner.',
         'decision_id'=>'decision-alpha',
         'deadline_at'=>2500,
     ],$overrides);
@@ -68,7 +69,9 @@ if($case==='cockpit'){
         'bad_state'=>bad(fn()=>ExternalApiReadProjection::cockpit(meta(),[venture(['business_state'=>'healthy'])])),
         'bad_ref'=>bad(fn()=>ExternalApiReadProjection::cockpit(meta(),[venture(['venture_ref'=>'https://example.test'])])),
         'bad_time'=>bad(fn()=>ExternalApiReadProjection::cockpit(meta(['generated_at'=>0]),[])),
-        'sensitive_title'=>bad(fn()=>ExternalApiReadProjection::ownerInbox(meta(),[entry(['title'=>'Bearer token exposed'])])),
+        'sensitive_ref'=>bad(fn()=>ExternalApiReadProjection::cockpit(meta(),[
+            venture(['venture_ref'=>'controlbot:venture/api_key.value']),
+        ])),
         'extra_entry'=>bad(fn()=>ExternalApiReadProjection::ownerInbox(meta(),[entry(['internal_model_id'=>'x'])])),
     ];
 }elseif($case==='pure'){

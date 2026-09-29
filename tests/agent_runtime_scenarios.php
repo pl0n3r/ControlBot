@@ -44,6 +44,7 @@ if ($scenario === 'observed_capacity') {
         'large_declared'=>AgentRuntime::account($declaredHigh),
         'invalid_state'=>rejected(fn()=>AgentRuntime::observedCapacitySnapshot($account,[],observedCapacity('invented'))),
         'invalid_total'=>rejected(fn()=>AgentRuntime::observedCapacitySnapshot($account,[],['version'=>1,'state'=>'healthy','total_capacity'=>-1,'occupied_capacity'=>0,'observed_at'=>1000])),
+        'invalid_occupancy'=>rejected(fn()=>AgentRuntime::observedCapacitySnapshot($account,[],observedCapacity('healthy',2,3))),
         'legacy'=>AgentRuntime::capacitySnapshot($account,[$s1]),
         'legacy_overflow_rejected'=>rejected(fn()=>AgentRuntime::capacitySnapshot($declaredOne,[$s1,$s2])),
     ], JSON_THROW_ON_ERROR), PHP_EOL; exit;

@@ -61,6 +61,7 @@ class AgentRuntimeTests(unittest.TestCase):
         data = scenario("observed_capacity")
         self.assertTrue(data["invalid_state"])
         self.assertTrue(data["invalid_total"])
+        self.assertTrue(data["invalid_occupancy"])
 
     def test_legacy_capacity_snapshot_remains_compatible_during_migration(self):
         data = scenario("observed_capacity")

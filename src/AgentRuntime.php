@@ -277,6 +277,9 @@ final class AgentRuntime
         $total = self::nonNegativeInt($observation['total_capacity'], 'total_capacity');
         $occupied = self::nonNegativeInt($observation['occupied_capacity'], 'occupied_capacity');
         $observedAt = self::nonNegativeInt($observation['observed_at'], 'observed_at');
+        if ($occupied > $total) {
+            throw new InvalidArgumentException('Observed capacity occupancy invalid.');
+        }
 
         $operational = $account['status'] === 'active' && $observation['state'] === 'healthy';
         $effectiveOccupied = max($occupied, count($sessionIds));

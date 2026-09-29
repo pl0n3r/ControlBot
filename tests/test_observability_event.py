@@ -30,7 +30,7 @@ class ObservabilityEventTests(unittest.TestCase):
 
     def test_payload_and_correlation_keys_are_bounded_allowlisted_and_secret_free(self):
         data=scenario("security")
-        for key in ("secret","email","bearer","nested","extra","wrong_type","secret_key","project_secret"):
+        for key in ("secret","email","bearer","nested","extra","wrong_type","secret_key","project_secret","uri_userinfo"):
             self.assertTrue(data[key],(key,data))
         self.assertEqual(data["keys"],["issue:78","project:controlbot"])
         self.assertEqual(data["numeric"]["correlation_keys"],["run:1234567890"])

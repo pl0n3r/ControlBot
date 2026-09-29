@@ -82,13 +82,13 @@ function binding(
     ];
 }
 
-function blocked(callable $fn): bool
+function blocked(callable $fn, ?string $expectedReason = null): bool
 {
     try {
         $fn();
         return false;
-    } catch (InvalidArgumentException) {
-        return true;
+    } catch (InvalidArgumentException $error) {
+        return $expectedReason === null || $error->getMessage() === $expectedReason;
     }
 }
 
@@ -99,15 +99,19 @@ function scopedRelationBlocked(string $relation, string $field, string $value): 
         'source_ref' => 'controlbot:environment/controlbot-prod',
     ]);
     if ($relation === 'service') {
-        $resources = [
-            $environment,
-            resource('service-web', 'service', ['parent_ref' => null]),
-            resource('database-primary', 'database', [
-                $field => $value,
-                'service_ref' => 'controlbot:resource/service-web',
-                'parent_ref' => null,
-            ]),
-        ];
+        $resources = [$environment];
+        if ($field === 'environment_ref') {
+            $resources[] = resource('env-other', 'environment', [
+                'environment_ref' => null,
+                'source_ref' => $value,
+            ]);
+        }
+        $resources[] = resource('service-web', 'service', ['parent_ref' => null]);
+        $resources[] = resource('database-primary', 'database', [
+            $field => $value,
+            'service_ref' => 'controlbot:resource/service-web',
+            'parent_ref' => null,
+        ]);
     } elseif ($relation === 'environment') {
         $resources = [
             $environment,
@@ -129,7 +133,10 @@ function scopedRelationBlocked(string $relation, string $field, string $value): 
         throw new InvalidArgumentException('scope relation invalid.');
     }
 
-    return blocked(static fn() => InfrastructureImpact::build($resources, []));
+    return blocked(
+        static fn() => InfrastructureImpact::build($resources, []),
+        'resource.' . $relation . '_ref cross-scope.',
+    );
 }
 
 function ambiguousEnvironmentSourceBlocked(): bool

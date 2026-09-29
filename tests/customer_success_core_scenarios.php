@@ -38,7 +38,7 @@ function support(string $venture=VENTURE): array {
         'freshness'=>'fresh','observed_at'=>995,'escalation_ref'=>opaque('escalation','9'),
     ];
 }
-function blocked(callable $fn): bool { try{$fn();return false;}catch(Throwable){return true;} }
+function blocked(callable $fn): bool { try {$fn(); return false;} catch (InvalidArgumentException) {return true;} }
 
 $case=$argv[1]??'';
 if($case==='scope'){

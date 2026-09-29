@@ -121,6 +121,7 @@ final class InfrastructureProvider
             return self::normalizeControlRef($value, $label);
         }
         if (!is_string($value)
+            || preg_match(self::SENSITIVE_PATTERN, $value) === 1
             || preg_match('#^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/(?:issues|pull)/[1-9][0-9]*)?$#D', $value) !== 1) {
             throw new InvalidArgumentException($label . ' invalid.');
         }

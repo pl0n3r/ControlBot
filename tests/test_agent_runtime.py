@@ -12,6 +12,14 @@ def scenario(name: str) -> dict:
     )
     return json.loads(result.stdout)
 
+
+def pause_scenario(name: str) -> dict:
+    result = subprocess.run(
+        ["php", str(ROOT / "tests" / "pause_control_scenarios.php"), name],
+        cwd=ROOT, check=True, text=True, capture_output=True,
+    )
+    return json.loads(result.stdout)
+
 class AgentRuntimeTests(unittest.TestCase):
     def test_new_provider_or_account_does_not_change_scheduler_contract(self):
         data = scenario("contract")
@@ -108,6 +116,52 @@ class AgentRuntimeTests(unittest.TestCase):
         fields = {field for treatment in inventory["treatments"] for field in treatment["fields"]}
         self.assertTrue({"account_alias", "profile_alias", "agent_id", "status", "last_heartbeat_at"}.issubset(fields))
         self.assertTrue({"password", "session_token", "cookie", "token"}.isdisjoint(fields))
+
+
+    def test_pause_scopes_compose_global_project_account_session_deterministically(self):
+        data = pause_scenario("precedence")
+        self.assertEqual(data["forward"], data["reverse"])
+        self.assertEqual(data["forward"]["effective_scope"], "global")
+        self.assertEqual(data["without_global"]["effective_scope"], "project")
+
+    def test_pause_invalid_or_unknown_state_fails_closed_for_mutation(self):
+        data = pause_scenario("invalid")
+        self.assertTrue(data["invalid"])
+        self.assertTrue(data["foreign"])
+        self.assertTrue(data["unknown"]["blocked"])
+        self.assertFalse(data["unknown"]["mutation_allowed"])
+
+    def test_pause_preemptibility_never_stops_non_preemptible_without_safe_point(self):
+        data = pause_scenario("preemptibility")
+        self.assertTrue(data["non_preemptible_missing"])
+        self.assertTrue(data["safe_point_missing"])
+        self.assertEqual(data["non_preemptible"]["safe_point_at"], 105)
+        self.assertIsNone(data["immediate"]["safe_point_at"])
+
+    def test_pause_release_is_idempotent_and_never_expands_authority(self):
+        data = pause_scenario("release")
+        self.assertTrue(data["idempotent"])
+        self.assertTrue(data["same_keys"])
+        self.assertTrue(data["extra_rejected"])
+        self.assertFalse(data["effective"]["blocked"])
+        self.assertTrue(data["effective"]["mutation_allowed"])
+
+    def test_policy_freeze_requires_version_incident_and_evidence(self):
+        data = pause_scenario("policy")
+        self.assertEqual(data["valid"]["source"], "policy")
+        self.assertTrue(all(data["missing"].values()))
+
+    def test_pause_scopes_session_account_project_and_global(self):
+        data = pause_scenario("scopes")
+        self.assertEqual(set(data), {"session", "account", "project", "global"})
+        for scope, row in data.items():
+            self.assertTrue(row["blocked"])
+            self.assertEqual(row["effective_scope"], scope)
+
+    def test_pause_control_has_no_external_io_or_execution(self):
+        source = (ROOT / "src" / "PauseControl.php").read_text(encoding="utf-8")
+        for token in ("PDO", "curl_", "file_get_contents(", "fopen(", "exec(", "shell_exec(", "system(", "proc_open(", "passthru(", "FactoryRunner", "Scheduler"):
+            self.assertNotIn(token, source)
 
 if __name__ == "__main__":
     unittest.main()

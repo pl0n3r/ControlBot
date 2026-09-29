@@ -14,8 +14,10 @@ Por tanto, la misma excepción de proveedor puede proyectarse como `watch` o `de
 
 - Venture scope: `controlbot:venture/<venture_id>`.
 - Signal ref: se convierte en una referencia determinista bajo `controlbot:vendor-exception/`.
-- Source ref: se hashea bajo `controlbot:vendor-exception/source/`.
-- Evidence refs: se hashean bajo `controlbot:evidence/vendor/`.
+- Source ref: se deriva con un digest SHA-256 segmentado bajo `controlbot:vendor-exception/source/`.
+- Evidence refs: usan el mismo digest segmentado bajo `controlbot:evidence/vendor/`.
+
+El digest se segmenta con letras para que una secuencia hexadecimal no pueda parecer accidentalmente un teléfono ante los filtros PII de Owner Inbox. La transformación sigue siendo determinista y no revela el valor original.
 
 No se copian credentials, owner identity refs ni payloads de proveedor.
 

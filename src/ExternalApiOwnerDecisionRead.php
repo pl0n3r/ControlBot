@@ -9,8 +9,8 @@ use InvalidArgumentException;
 final class ExternalApiOwnerDecisionRead
 {
     private const STATES=['pending','resolved','expired','blocked'];
-    private const SENSITIVE='/(?:password|passwd|secret|token|cookie|authorization|bearer|credential|private[_ -]?key|public[_ -]?key|api[_ -]?key|otp|dsn|user[_ -]?id|customer[_ -]?id)/i';
-    private const DIRECT_PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?[0-9][0-9(). -]{7,}[0-9])/i';
+    private const SENSITIVE='/(?:\b(?:password|passwd|secret|token|cookie|authorization|bearer|credential|otp|dsn)\b|private[_ -]?key|public[_ -]?key|api[_ -]?key|user[_ -]?id|customer[_ -]?id)/i';
+    private const DIRECT_PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+\d{1,3}(?:[ .()\-]?\d){7,14}|\(\d{2,3}\)[ .\-]?\d{3,4}[ .\-]?\d{4}|\b\d{3}[ .\-]\d{3}[ .\-]\d{4}\b)/i';
 
     public static function detail(
         VerifiedAccessContext $access,

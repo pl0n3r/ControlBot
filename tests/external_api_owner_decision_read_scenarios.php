@@ -113,7 +113,12 @@ if($case==='authorized'){
     $unknown=ExternalApiOwnerDecisionRead::detail($ctx,dauth($ctx),D_SCOPE,'decision-alpha',dmeta('unknown'),ddetail(),D_NOW);
     $out=[
         'unknown'=>$unknown,
-        'pii'=>dbad(fn()=>ExternalApiOwnerDecisionRead::detail($ctx,dauth($ctx),D_SCOPE,'decision-alpha',dmeta(),ddetail(['title'=>'Contact owner@example.com']),D_NOW)),
+        'ordinary_copy'=>ExternalApiOwnerDecisionRead::detail(
+            $ctx,dauth($ctx),D_SCOPE,'decision-alpha',dmeta(),
+            ddetail(['question'=>'Review tokenization footprint with the Secretary on 2026-09-29 10:00']),D_NOW
+        ),
+        'email_pii'=>dbad(fn()=>ExternalApiOwnerDecisionRead::detail($ctx,dauth($ctx),D_SCOPE,'decision-alpha',dmeta(),ddetail(['title'=>'Contact owner@example.com']),D_NOW)),
+        'phone_pii'=>dbad(fn()=>ExternalApiOwnerDecisionRead::detail($ctx,dauth($ctx),D_SCOPE,'decision-alpha',dmeta(),ddetail(['title'=>'Call 300-123-4567']),D_NOW)),
         'secret'=>dbad(fn()=>ExternalApiOwnerDecisionRead::detail($ctx,dauth($ctx),D_SCOPE,'decision-alpha',dmeta(),ddetail(['question'=>'Share API token before launch?']),D_NOW)),
     ];
 }elseif($case==='pure'){

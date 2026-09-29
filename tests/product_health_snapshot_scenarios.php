@@ -22,8 +22,8 @@ function ph(array $metrics): array {
 
 $case=$argv[1]??'';
 if($case==='scope'){
-    $base=phMetric('metric-a','activation',0.4);
-    $second=phMetric('metric-b','adoption',0.5);
+    $base=phMetric('metric-aa','activation',0.4);
+    $second=phMetric('metric-bb','adoption',0.5);
     $out=[
         'good'=>ph([$base,$second]),
         'venture'=>phReject(fn()=>ph([$base,array_replace($second,['venture_id'=>'venture-other'])])),
@@ -38,7 +38,7 @@ if($case==='scope'){
             phMetric('metric-activation','activation',0.4,['source_ref'=>'aggregate:analytics/activation','evidence_ref'=>'evidence:product/activation']),
         ]),
         'duplicate'=>phReject(fn()=>ph([
-            phMetric('metric-a','activation',0.4),phMetric('metric-b','activation',0.5)
+            phMetric('metric-aa','activation',0.4),phMetric('metric-bb','activation',0.5)
         ])),
     ];
 }elseif($case==='reasons'){
@@ -56,7 +56,12 @@ if($case==='scope'){
         phMetric('metric-unknown','adoption',null),
     ]);
 }elseif($case==='boundary'){
-    $out=ph([phMetric('metric-activation','activation',0.4)]);
+    $out=[
+        'good'=>ph([phMetric('metric-activation','activation',0.4)]),
+        'churn'=>phReject(fn()=>ph([phMetric('metric-churn','churn_signal',0.4)])),
+        'support'=>phReject(fn()=>ph([phMetric('metric-support','support_rate',0.4)])),
+        'revenue'=>phReject(fn()=>ph([phMetric('metric-revenue','revenue_outcome',0.4,['source_ref'=>'aggregate:finance/product'])])),
+    ];
 }elseif($case==='pure'){
     $r=new ReflectionClass(ProductHealthSnapshot::class);
     $methods=array_values(array_map(static fn(ReflectionMethod $m):string=>$m->getName(),array_filter(

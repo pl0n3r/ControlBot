@@ -7,3 +7,11 @@ El boundary read-only consume únicamente una proyección `/ops/staff` project-s
 Este slice no ejecuta invitaciones, suspensiones, cambios de rol ni recuperaciones. Esas mutaciones requieren el boundary privilegiado posterior con authority y passkey verificadas.
 
 Privacidad: `datos.yml` declara identidad y contacto staff como tratamientos on-demand con retención `request_lifetime_only`, sin proveedor externo. D-063 se atesta para construcción porque este slice no está live y los fixtures no usan datos reales.
+
+## Acciones privilegiadas
+
+Las mutaciones usan un `StaffActionIntent` project-scoped y un `StaffProductGateway` server-side. ControlBot no conoce credenciales de servicio, passwords, activation tokens ni recovery codes del producto.
+
+Cada acción exige identidad humana con autoridad `L4_OWNER`, capability `staff.manage`, scope `project:<id>` y un `VerifiedExternalSessionContext` ligado a la misma identidad con step-up `passkey` todavía vigente. Los roles de invite/change-role se validan contra el allowlist devuelto por el producto.
+
+La idempotency key se deriva de `project_id + intent_id`. Antes de mutar se consulta el status; un outcome `unknown` se reconcilia por lookup y nunca provoca una segunda mutación automática. Cada intento escribe auditoría minimizada de ControlBot y exige `product_audit_ref` para resultados no `not_found`.

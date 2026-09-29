@@ -58,6 +58,30 @@
       "retention": "review_required",
       "consent": "review_required",
       "providers": []
+    },
+    {
+      "id": "staff_directory_contact",
+      "category": "contact",
+      "fields": ["email", "masked_email"],
+      "purpose": "staff_administration",
+      "basis": "review_required",
+      "retention": "request_lifetime_only",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "staff_directory_identity",
+      "category": "identification",
+      "fields": ["staff_id", "display_name", "role", "status", "last_access_at", "mfa_state"],
+      "purpose": "staff_administration",
+      "basis": "review_required",
+      "retention": "request_lifetime_only",
+      "consent": "review_required",
+      "providers": []
     }
-  ]
+  ],
+  "d063_attestation": {
+    "nothing_live": true,
+    "no_real_customer_data": true
+  }
 }

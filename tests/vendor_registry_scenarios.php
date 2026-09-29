@@ -67,7 +67,13 @@ if($case==='states'){
 }
 if($case==='offboarding'){
     $row=vendor(); $row['lifecycle']='offboarding';
-    echo json_encode(VendorRegistry::normalize($row),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+    $empty=$row; foreach($empty['offboarding'] as $key=>$_) $empty['offboarding'][$key]=null;
+    $incomplete=$row; $incomplete['offboarding']['continuity_ref']=null;
+    echo json_encode([
+        'valid'=>VendorRegistry::normalize($row),
+        'empty_rejected'=>blocked(fn()=>VendorRegistry::normalize($empty)),
+        'incomplete_rejected'=>blocked(fn()=>VendorRegistry::normalize($incomplete)),
+    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='surface'){
     $source=file_get_contents(__DIR__.'/../src/VendorRegistry.php');

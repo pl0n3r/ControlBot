@@ -40,7 +40,9 @@ if($case==='scope'){
     $out=['sorted'=>OwnerInbox::entry(oiEntry(['evidence_refs'=>['controlbot:evidence/zz','controlbot:evidence/aa']])),
         'duplicate'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['evidence_refs'=>['controlbot:evidence/aa','controlbot:evidence/aa']]))),
         'html'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['summary'=>'<b>secret</b>']))),
-        'secret'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['source_ref'=>'controlbot:source/api-token-aa'])))];
+        'secret'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['source_ref'=>'controlbot:source/api-token-aa']))),
+        'mail'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['summary'=>'Contact alice@example.com']))),
+        'number'=>oiBlocked(fn()=>OwnerInbox::entry(oiEntry(['impact'=>'Call +57 300 123 4567'])))];
 }elseif($case==='collection'){
     $out=OwnerInbox::collection([
         oiEntry(['entry_ref'=>'controlbot:inbox/entry-fyi']),

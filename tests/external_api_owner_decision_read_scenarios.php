@@ -174,6 +174,7 @@ if($case==='authorized'){
         'phone_pii'=>dbad(fn()=>dread(dmeta(),ddetail(['title'=>'Call 300-123-4567']))),
         'secret'=>dbad(fn()=>dread(dmeta(),ddetail(['question'=>'Share API token before launch?']))),
         'dsn'=>dbad(fn()=>dread(dmeta(),ddetail(['question'=>'Share DSN before launch?']))),
+        'invalid_utf8'=>dbad(fn()=>dread(dmeta(),ddetail(['question'=>"Invalid \xC3\x28 copy"]))),
     ];
 }elseif($case==='pure'){
     $first=dread();$second=dread();

@@ -16,11 +16,11 @@ final class InfrastructureIntent
     private const AUTHORITY = ['allow', 'deny', 'owner_decision_required', 'unknown'];
     private const PRIORITIES = ['critical', 'high', 'medium'];
     private const FACTORY_ROLES = [
-        'architecture',
-        'infrastructure',
+        'arquitectura',
+        'infraestructura',
+        'ingenieria-software',
         'qa',
-        'security',
-        'software_engineering',
+        'seguridad',
         'sre',
     ];
 
@@ -112,6 +112,9 @@ final class InfrastructureIntent
         $workItem = null;
         $runnerRequest = null;
         if ($status !== 'denied') {
+            if ($status === 'owner_decision_required' && $intent['approval_ref'] === null) {
+                $intent['approval_ref'] = 'controlbot:approval/infra-' . $intent['intent_id'];
+            }
             $workItem = self::factoryWorkItem($intent, $authority, $capital);
             if ($status === 'planned') {
                 $runnerRequest = self::runnerRequest([
@@ -152,7 +155,12 @@ final class InfrastructureIntent
             'work_item' => $workItem,
             'runner_request' => $runnerRequest,
             'owner_decision_gate' => $status === 'owner_decision_required'
-                ? self::ownerGate($intent['intent_id'], $intent['scope'], $owner)
+                ? self::ownerGate(
+                    $intent['intent_id'],
+                    $intent['scope'],
+                    $owner,
+                    $workItem['approval_ref'],
+                )
                 : null,
         ];
     }
@@ -370,7 +378,12 @@ final class InfrastructureIntent
         ];
     }
 
-    private static function ownerGate(string $id, string $scope, array $reasons): string
+    private static function ownerGate(
+        string $id,
+        string $scope,
+        array $reasons,
+        string $approvalRef,
+    ): string
     {
         $money = false;
         foreach ($reasons as $reason) {
@@ -410,12 +423,18 @@ final class InfrastructureIntent
             'summary_simple' => "Intent {$id} cannot be dispatched automatically.",
             'why_recommended' => 'The safe default preserves infrastructure until authority, impact and cost are explicitly accepted.',
             'blocks' => "Infrastructure intent {$id}.",
+            'approval_ref' => $approvalRef,
         ];
         return '<!-- factory-human-gate '
             . json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)
             . " -->\n<!-- controlbot-infrastructure-intent "
             . json_encode(
-                ['intent_id' => $id, 'scope' => $scope, 'reasons' => $reasons],
+                [
+                    'intent_id' => $id,
+                    'scope' => $scope,
+                    'reasons' => $reasons,
+                    'approval_ref' => $approvalRef,
+                ],
                 JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
             )
             . ' -->';

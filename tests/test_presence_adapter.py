@@ -15,6 +15,51 @@ def scenario(name: str) -> dict:
 
 
 class PresenceAdapterTests(unittest.TestCase):
+    def test_capacity_uses_observed_runtime_signal_not_declared_ceiling(self):
+        data = scenario("observed_capacity")["observed"]
+        self.assertEqual(data["accounts"][0]["free_capacity"], 3)
+        self.assertEqual(data["idle_capacity"], 3)
+        self.assertEqual(data["accounts"][0]["observed_state"], "healthy")
+
+    def test_stale_or_unknown_never_adds_idle_capacity(self):
+        data = scenario("observed_capacity")
+        for key in ("stale", "unknown"):
+            self.assertEqual(data[key]["capacity_state"], "unknown")
+            self.assertEqual(data[key]["idle_capacity"], 0)
+            self.assertEqual(data[key]["accounts"][0]["free_capacity"], 0)
+
+    def test_provider_degradation_zeroes_new_capacity_without_losing_assignment(self):
+        data = scenario("provider_degradation")
+        for state in ("rate_limited", "requires_login", "offline"):
+            self.assertEqual(data[state]["capacity_state"], "degraded")
+            self.assertEqual(data[state]["idle_capacity"], 0)
+            self.assertFalse(data[state]["accounts"][0]["eligible"])
+            self.assertEqual(data[state]["sessions"][0]["assignment_id"], "work-session_1")
+
+    def test_global_presence_states_remain_deterministic(self):
+        data = scenario("states")
+        self.assertEqual(data["solo"]["presence_state"], "solo")
+        self.assertEqual(data["multi"]["presence_state"], "multi")
+        self.assertEqual(data["idle"]["capacity_state"], "idle_capacity")
+        self.assertEqual(data["saturated"]["capacity_state"], "saturated")
+        self.assertEqual(data["degraded"]["capacity_state"], "degraded")
+        self.assertEqual(data["unknown"]["capacity_state"], "unknown")
+
+    def test_generation_and_safe_point_contract_remains_intact(self):
+        data = scenario("guard")
+        self.assertIn("stale_generation", data["stale"]["reasons"])
+        self.assertIn("non_preemptible_outside_safe_point", data["preemptBlocked"]["reasons"])
+        self.assertTrue(data["preemptSafe"]["allowed"])
+
+    def test_snapshot_is_single_authoritative_capacity_source(self):
+        data = scenario("authoritative")
+        self.assertEqual(data["small"]["idle_capacity"], data["large"]["idle_capacity"])
+        self.assertEqual(data["small"]["accounts"][0]["free_capacity"], data["large"]["accounts"][0]["free_capacity"])
+        source = (ROOT / "src" / "PresenceAdapter.php").read_text(encoding="utf-8")
+        self.assertIn("AgentRuntime::observedCapacitySnapshot", source)
+        self.assertNotIn("AgentRuntime::capacitySnapshot", source)
+        self.assertNotIn("$account['capacity']", source)
+
     def test_presence_contract_distinguishes_global_states_fail_closed(self):
         data = scenario("states")
         self.assertEqual(data["solo"]["presence_state"], "solo")

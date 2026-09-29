@@ -28,9 +28,18 @@ function row(string $id='session_1',string $status='working',?int $heartbeat=990
         'assignment'=>$assigned?assignment($id,$issue):null,'claims'=>['src/PresenceAdapter.php'],
         'generation'=>$generation,'attempt'=>1,'safe_point'=>$safe,'non_preemptible'=>$nonPreemptible];
 }
-function snap(array $rows,array $accounts=[null]): array {
+function capacity(string $state='healthy',int $total=2,int $occupied=1,int $observedAt=1000): array {
+    return ['version'=>1,'state'=>$state,'total_capacity'=>$total,'occupied_capacity'=>$occupied,'observed_at'=>$observedAt];
+}
+function snap(array $rows,array $accounts=[null],?array $observations=null): array {
     if($accounts===[null]) $accounts=[account(max(1,count($rows)+1))];
-    return PresenceAdapter::snapshot($accounts,$rows,1000);
+    if($observations===null){
+        $observations=[];
+        foreach($accounts as $accountRow){
+            $observations[$accountRow['account_id']]=capacity('healthy',max(1,count($rows)+1),count($rows));
+        }
+    }
+    return PresenceAdapter::snapshot($accounts,$rows,1000,90,300,$observations);
 }
 
 $case=$argv[1]??'';
@@ -38,11 +47,34 @@ if($case==='states'){
     $solo=snap([row()],[account(2)]);
     $multi=snap([row('session_1'),row('session_2','working',990,true,121)],[account(3)]);
     $idle=snap([row('session_1','idle',990,false)],[account(1)]);
-    $saturated=snap([row()],[account(1)]);
+    $saturated=snap([row()],[account(1)],['account_main'=>capacity('saturated',1,1)]);
     $degraded=snap([row('session_1','working',850)],[account(1)]);
     $unknown=snap([row('session_1','working',null)],[account(1)]);
-    $rateLimitedIdle=snap([row('session_1','idle',990,false)],[account(1,'rate_limited')]);
+    $rateLimitedIdle=snap([row('session_1','idle',990,false)],[account(1,'rate_limited')],['account_main'=>capacity('rate_limited',1,1)]);
     echo json_encode(compact('solo','multi','idle','saturated','degraded','unknown','rateLimitedIdle'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+
+if($case==='observed_capacity'){
+    $declaredLow=[account(1)];
+    $signal=['account_main'=>capacity('healthy',4,1)];
+    $observed=snap([row()],$declaredLow,$signal);
+    $stale=snap([row('session_1','idle',990,false)],[account(99)],['account_main'=>capacity('healthy',9,1,800)]);
+    $unknown=snap([row('session_1','idle',990,false)],[account(99)],['account_main'=>capacity('unknown',9,0)]);
+    echo json_encode(compact('observed','stale','unknown'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($case==='provider_degradation'){
+    $rows=[row('session_1','working',990,true,120)];
+    $states=[];
+    foreach(['rate_limited','requires_login','offline'] as $state){
+        $states[$state]=snap($rows,[account(99)],['account_main'=>capacity($state,9,1)]);
+    }
+    echo json_encode($states,JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($case==='authoritative'){
+    $rows=[row('session_1','idle',990,false)];
+    $small=snap($rows,[account(1)],['account_main'=>capacity('healthy',5,1)]);
+    $large=snap($rows,[account(999)],['account_main'=>capacity('healthy',5,1)]);
+    echo json_encode(compact('small','large'),JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='heartbeat'){
     $stale=snap([row('session_1','working',850)],[account(1)]);

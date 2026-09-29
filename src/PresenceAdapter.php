@@ -10,20 +10,30 @@ final class PresenceAdapter
     private const POLICY='factory-dispatcher-v2';
     private const OPERATIONS=['continue','recover','reassign','preempt'];
 
-    public static function snapshot(array $accountsRaw,array $rows,int $now,int $staleAfter=90,int $offlineAfter=300): array
-    {
+    public static function snapshot(
+        array $accountsRaw,
+        array $rows,
+        int $now,
+        int $staleAfter=90,
+        int $offlineAfter=300,
+        array $capacityObservations=[],
+    ): array {
         if(!array_is_list($accountsRaw)||$accountsRaw===[]||count($accountsRaw)>16||!array_is_list($rows)||count($rows)>64||$now<0)
             throw new InvalidArgumentException('Presence input invalid.');
 
-        $accounts=[]; $sessionsByAccount=[];
+        $accounts=[]; $sessionsByAccount=[]; $unsafeByAccount=[];
         foreach($accountsRaw as $raw){
             if(!is_array($raw)) throw new InvalidArgumentException('Account invalid.');
             $account=AgentRuntime::account($raw); $id=self::opaque($account['account_id'],'account_id');
             if(isset($accounts[$id])) throw new InvalidArgumentException('Account duplicated.');
-            $accounts[$id]=$account; $sessionsByAccount[$id]=[];
+            $accounts[$id]=$account; $sessionsByAccount[$id]=[]; $unsafeByAccount[$id]=$rows===[];
+        }
+        foreach($capacityObservations as $accountId=>$observation){
+            if(!is_string($accountId)||!isset($accounts[$accountId])||!is_array($observation))
+                throw new InvalidArgumentException('Capacity observation invalid.');
         }
 
-        $sessions=[]; $seen=[]; $unknown=$rows===[]; $degraded=false; $healthy=0; $idleByAccount=[];
+        $sessions=[]; $seen=[]; $presenceUnknown=$rows===[]; $capacityUnknown=$rows===[]; $degraded=false; $healthy=0; $idleByAccount=[];
         foreach($rows as $raw){
             self::fields($raw,['session','agent','assignment','claims','generation','attempt','safe_point','non_preemptible'],'PresenceRow');
             if(!is_array($raw['session'])||!is_array($raw['agent'])) throw new InvalidArgumentException('Presence row invalid.');
@@ -49,9 +59,14 @@ final class PresenceAdapter
             $health=AgentRuntime::sessionHealth($session,$now,$staleAfter,$offlineAfter);
             $heartbeat=$session['last_heartbeat_at'];
             $freshness=($heartbeat===null||$heartbeat>$now)?'unknown':$health['health'];
-            if($freshness==='unknown') $unknown=true;
-            elseif($freshness!=='healthy') $degraded=true;
-            else { $healthy++; if($session['status']==='idle') $idleByAccount[$aid]=($idleByAccount[$aid]??0)+1; }
+            if($freshness==='unknown'){
+                $presenceUnknown=true; $capacityUnknown=true; $unsafeByAccount[$aid]=true;
+            } elseif($freshness!=='healthy') {
+                $degraded=true; $unsafeByAccount[$aid]=true;
+            } else {
+                $healthy++;
+                if($session['status']==='idle') $idleByAccount[$aid]=($idleByAccount[$aid]??0)+1;
+            }
 
             if(!is_bool($raw['safe_point'])||!is_bool($raw['non_preemptible']))
                 throw new InvalidArgumentException('Preemption flags invalid.');
@@ -72,20 +87,36 @@ final class PresenceAdapter
 
         $accountViews=[]; $trustedFree=0; $trustedIdle=0;
         foreach($accounts as $id=>$account){
-            $view=AgentRuntime::capacitySnapshot($account,$sessionsByAccount[$id]);
-            $hasHealthy=false;
-            foreach($sessions as $row) if($row['account_id']===$id&&$row['freshness']==='healthy'){$hasHealthy=true;break;}
+            $observation=$capacityObservations[$id]??[
+                'version'=>1,'state'=>'unknown','total_capacity'=>0,'occupied_capacity'=>0,'observed_at'=>$now,
+            ];
+            $observedAt=$observation['observed_at']??null;
+            if(!is_int($observedAt)||$observedAt<0||$observedAt>$now)
+                throw new InvalidArgumentException('Capacity observation timestamp invalid.');
+            if($now-$observedAt>$staleAfter) $observation=array_replace($observation,['state'=>'unknown']);
+
+            $view=AgentRuntime::observedCapacitySnapshot($account,$sessionsByAccount[$id],$observation);
+            $state=$view['observed_state'];
+            if($state==='unknown') $capacityUnknown=true;
+            elseif(in_array($state,['rate_limited','requires_login','offline'],true)) $degraded=true;
             if($account['status']!=='active') $degraded=true;
-            $free=($account['status']==='active'&&$hasHealthy)?$view['free_capacity']:0;
-            $idle=$account['status']==='active'?($idleByAccount[$id]??0):0;
+
+            $usable=$account['status']==='active'
+                && !$unsafeByAccount[$id]
+                && in_array($state,['healthy','saturated'],true);
+            $free=$usable&&$view['eligible']?$view['free_capacity']:0;
+            $idle=$usable?($idleByAccount[$id]??0):0;
             $trustedFree+=$free; $trustedIdle+=$idle;
-            $accountViews[]=['account_id'=>$id,'eligible'=>($free+$idle)>0,'free_capacity'=>$free,'idle_sessions'=>$idle];
+            $accountViews[]=[
+                'account_id'=>$id,'eligible'=>($free+$idle)>0,'free_capacity'=>$free,'idle_sessions'=>$idle,
+                'observed_state'=>$state,'observed_at'=>$view['observed_at'],
+            ];
         }
 
         usort($sessions,static fn(array $a,array $b):int=>$a['session_id']<=>$b['session_id']);
         usort($accountViews,static fn(array $a,array $b):int=>$a['account_id']<=>$b['account_id']);
-        $presence=$unknown||$healthy===0?'unknown':($healthy===1?'solo':'multi');
-        $capacity=$unknown?'unknown':($degraded?'degraded':(($trustedIdle+$trustedFree)>0?'idle_capacity':'saturated'));
+        $presence=$presenceUnknown||$healthy===0?'unknown':($healthy===1?'solo':'multi');
+        $capacity=$capacityUnknown?'unknown':($degraded?'degraded':(($trustedIdle+$trustedFree)>0?'idle_capacity':'saturated'));
 
         return [
             'version'=>1,'policy_ref'=>self::POLICY,'observed_at'=>$now,

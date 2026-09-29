@@ -89,7 +89,12 @@ final class RecoveryDrillProjection
             || $raw['rto_target_seconds'] !== $profile['targets']['rto_minutes'] * 60) {
             throw new InvalidArgumentException('RecoveryDrillProjection targets mismatch.');
         }
-        return $raw;
+        return [
+            'rpo_seconds' => $raw['rpo_seconds'],
+            'rto_seconds' => $raw['rto_seconds'],
+            'rpo_target_seconds' => $raw['rpo_target_seconds'],
+            'rto_target_seconds' => $raw['rto_target_seconds'],
+        ];
     }
 
     private static function checks(mixed $raw): array

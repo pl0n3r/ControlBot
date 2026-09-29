@@ -148,6 +148,7 @@ final class ObservabilityEvent
         if ($value === '' || strlen($value) > $max
             || preg_match('/[\\x00-\\x1f\\x7f]/', $value) === 1
             || preg_match('/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/i', $value) === 1
+            || preg_match('#^[A-Za-z][A-Za-z0-9.-]*://[^/@:]+:[^/@]+@#D', $value) === 1
             || ($numericPii && preg_match('/(?:\\+?\\d[\\d .()\\-]{7,}\\d)/', $value) === 1)
             || preg_match('/(?:(?:password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn)\\s*[:=]\\s*\\S+|bearer\\s+\\S+|(?:ghp_|gho_|github_pat_)[A-Za-z0-9_]{20,}|(?:sk|rk|pk)-[A-Za-z0-9_-]{12,})/i', $value) === 1
             || preg_match('/\\b(?:SELECT\\b.+\\bFROM\\b|INSERT\\s+INTO\\b|UPDATE\\b.+\\bSET\\b|DELETE\\s+FROM\\b)/i', $value) === 1) {

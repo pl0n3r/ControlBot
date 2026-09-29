@@ -58,12 +58,9 @@ function dintent(array $extra=[]): array {
         'policy_ref'=>D_POLICY,'severity'=>'medium','budget_ref'=>null,
     ],$extra);
 }
-function dids(): array{return ['request_id'=>'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','correlation_id'=>'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'];}
-function dprocess(VerifiedAccessContext $ctx,array $mutation,?array $intent,?VerifiedExternalSessionContext $auth=null,string $scope=D_SCOPE): array {
-    return ExternalApiDirectedWorkOrigin::process(
-        $ctx,$auth??dauth($ctx),$mutation,$scope,'controlbot:decision/alpha',
-        $intent,dids(),D_NOW
-    );
+function dids(string $request='a',string $correlation='b'): array{return ['request_id'=>str_repeat($request,32),'correlation_id'=>str_repeat($correlation,32)];}
+function dprocess(VerifiedAccessContext $ctx,array $mutation,?array $intent,?VerifiedExternalSessionContext $auth=null,string $scope=D_SCOPE,?array $ids=null,int $now=D_NOW): array {
+    return ExternalApiDirectedWorkOrigin::process($ctx,$auth??dauth($ctx),$mutation,$scope,'controlbot:decision/alpha',$intent,$ids??dids(),$now);
 }
 function bad(callable $fn): bool{try{$fn();return false;}catch(InvalidArgumentException){return true;}}
 
@@ -92,6 +89,10 @@ if($case==='authorized'){
 }elseif($case==='approve'){
     $ctx=dctx();
     $out=dprocess($ctx,dmutation(),dintent());
+}elseif($case==='retry'){
+    $ctx=dctx();
+    $out=['first'=>dprocess($ctx,dmutation(),dintent(),null,D_SCOPE,dids('a','b'),D_NOW),
+        'second'=>dprocess($ctx,dmutation(),dintent(),null,D_SCOPE,dids('c','d'),D_NOW+1)];
 }elseif($case==='policy'){
     $ctx=dctx();
     $out=[

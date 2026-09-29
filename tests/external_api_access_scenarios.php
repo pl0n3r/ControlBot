@@ -107,6 +107,7 @@ if($case==='nominal'){
 }
 if($case==='owner_read'){
     $agent=snapshot('owner.cockpit.read'); $agent['identity']['kind']='agent';
+    $nonOwner=snapshot('owner.cockpit.read'); $nonOwner['grant']['role']='portfolio_admin';
     echo json_encode([
         'owner'=>ExternalApiAccess::authorize(
             issued('owner.cockpit.read'),'GET','/api/v1/cockpit',SCOPE,NOW
@@ -114,6 +115,7 @@ if($case==='owner_read'){
         'lower'=>ExternalApiAccess::authorize(
             issued('owner.cockpit.read','L3_GROUP_INSTITUTION'),'GET','/api/v1/cockpit',SCOPE,NOW
         ),
+        'non_owner_role'=>ExternalApiAccess::authorize(issued('owner.cockpit.read','L4_OWNER',SCOPE,$nonOwner),'GET','/api/v1/cockpit',SCOPE,NOW),
         'agent'=>ExternalApiAccess::authorize(
             issued('owner.cockpit.read','L4_OWNER',SCOPE,$agent),'GET','/api/v1/cockpit',SCOPE,NOW
         ),

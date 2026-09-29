@@ -1,15 +1,23 @@
 <?php
 declare(strict_types=1);
 
+require __DIR__.'/../src/Approvals.php';
+require __DIR__.'/../src/OwnerSession.php';
+require __DIR__.'/../src/GitHub.php';
+require __DIR__.'/../src/ApprovalEndpoint.php';
 require __DIR__.'/../src/VentureIdentity.php';
 require __DIR__.'/../src/VentureAccessSource.php';
 require __DIR__.'/../src/DecisionRights.php';
+require __DIR__.'/../src/DecisionRuntime.php';
 require __DIR__.'/../src/VerifiedAccessContext.php';
 
+use ControlBot\Approvals\AppendOnlyAuditLog;
 use ControlBot\Business\DecisionRights;
 use ControlBot\Business\VerifiedAccessContext;
-use ControlBot\Business\VentureAccessRuntime;
 use ControlBot\Business\VentureAccessSource;
+use ControlBot\Decisions\DecisionRuntime;
+use ControlBot\Security\OwnerSessionService;
+use ControlBot\Security\TokenVault;
 
 const NOW=5000;
 const SCOPE='venture:alpha';
@@ -23,6 +31,14 @@ final class FixtureSource implements VentureAccessSource
     {
         $this->calls[]=compact('identityId','scope','capability','now');
         return $this->row;
+    }
+}
+
+final class MaliciousSource implements VentureAccessSource
+{
+    public function resolve(string $identityId,string $scope,string $capability,int $now): array
+    {
+        return snapshot();
     }
 }
 
@@ -51,20 +67,35 @@ function blocked(callable $fn): bool {
 }
 function issued(array $row=null,string $cap='hostinger.read'): array {
     $source=new FixtureSource($row??snapshot());
-    $context=VerifiedAccessContext::fromServerSource($source,query($cap),NOW);
-    return [$context,$source];
+    $vault=new TokenVault(base64_encode(str_repeat('K',SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));
+    $sessions=new OwnerSessionService('pl0n3r',$vault);
+    $session=[]; $sessions->establishTrustedOAuthSession($session,'pl0n3r','fixture-server-value');
+    $auditPath=tempnam(sys_get_temp_dir(),'verified-access-');
+    $audit=new AppendOnlyAuditLog($auditPath);
+    try {
+        $runtime=DecisionRuntime::fromServer($sessions,$audit,['pl0n3r/factory'],$source);
+        $context=VerifiedAccessContext::fromDecisionRuntime(
+            $runtime,$session,'pl0n3r/factory',query($cap),NOW
+        );
+        return [$context,$source];
+    } finally { @unlink($auditPath); }
 }
 
 $case=$argv[1]??'';
 if($case==='structural'){
     $reflection=new ReflectionClass(VerifiedAccessContext::class);
-    $raw=snapshot();
+    $raw=snapshot(); $session=[]; $malicious=new MaliciousSource();
     echo json_encode([
         'constructor_private'=>$reflection->getConstructor()?->isPrivate()===true,
-        'legacy_raw_factory_absent'=>!method_exists(VerifiedAccessContext::class,'fromServerSnapshot'),
+        'raw_factory_absent'=>!method_exists(VerifiedAccessContext::class,'fromServerSnapshot'),
+        'source_factory_absent'=>!method_exists(VerifiedAccessContext::class,'fromServerSource'),
         'array_is_context'=>$raw instanceof VerifiedAccessContext,
         'object_is_context'=>(object)$raw instanceof VerifiedAccessContext,
-        'raw_as_source_blocked'=>blocked(fn()=>VerifiedAccessContext::fromServerSource($raw,query(),NOW)),
+        'malicious_source_cannot_mint'=>blocked(
+            fn()=>VerifiedAccessContext::fromDecisionRuntime(
+                $malicious,$session,'pl0n3r/factory',query(),NOW
+            )
+        ),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='server'){

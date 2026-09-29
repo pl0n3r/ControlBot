@@ -16,6 +16,8 @@ final class ProductHealthSnapshot
         foreach($metricsRaw as $raw){
             if(!is_array($raw)) throw new InvalidArgumentException('Product health metric invalid.');
             $metric=ProductIntelligence::metric($raw,$expectedVentureId,$expectedProductId);
+            if(in_array($metric['category'],['churn_signal','support_rate','revenue_outcome'],true))
+                throw new InvalidArgumentException('Product health category excluded.');
             $current=[
                 'venture_id'=>$metric['venture_id'],'product_id'=>$metric['product_id'],
                 'surface'=>$metric['surface'],'period'=>$metric['period'],

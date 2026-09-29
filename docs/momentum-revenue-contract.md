@@ -1,65 +1,22 @@
 # MOMENTUM Revenue/CRM Core v1
 
-## Purpose
+Pure, provider-neutral revenue/CRM contract for #126. ControlBot stores only opaque references; customer PII remains in authoritative CRM/product systems.
 
-This contract keeps acquisition, CRM and revenue operations scoped by Venture without turning ControlBot into a transactional CRM or copying customer PII. It extends MOMENTUM after Campaign and Creative core, while Customer Success (#185) owns post-sale adoption/support and Product Intelligence (#184) owns product outcomes/cohorts.
+## Domain
+`MomentumRevenue` exposes:
+- **pipeline**: Venture-scoped lead/qualification/opportunity state, owner alias, next action and freshness.
+- **forecast**: bounded amount, currency, confidence, source and freshness; always forecast, never demonstrated revenue.
+- **attribution**: `observed|inferred|unknown`; only observed yields demonstrated amount.
+- **lifecycle signal**: post-sale `renewal|upsell|churn` toward Product Intelligence #184 and/or Customer Success #185.
 
-## Domain boundary
+Refs use `namespace:<32 lowercase hex>`. Names, emails, phones, messages, IPs, tokens and provider credentials are out of contract.
 
-`MomentumRevenue` is pure and provider-neutral. It exposes four projections:
+## Rules
+Funnel: `lead → qualified → opportunity → proposal → won | lost`, plus terminal `disqualified`. Qualified+ stages require matching qualification; opportunity/proposal/won/lost require an opportunity ref. A `won` row requires a Customer Success handoff and non-won rows reject that handoff.
 
-- **pipeline**: lead/qualification/opportunity stage, owner alias, next-action reference and freshness;
-- **forecast**: amount, currency, confidence, source and freshness, always classified as forecast rather than demonstrated revenue;
-- **attribution**: observed/inferred/unknown revenue evidence, where only observed evidence yields a demonstrated amount;
-- **lifecycle signal**: renewal/upsell/churn signal with explicit references toward Product Intelligence and/or Customer Success.
+Forecast keeps confidence explicit and never upgrades to observed revenue. Attribution carrying an amount (`observed` or `inferred`) requires a `won` pipeline; campaign/creative refs must match the pipeline. `unknown` cannot claim amount and `observed` requires evidence.
 
-All entity references use `namespace:<32 lowercase hex>` identifiers. Human names, email addresses, phone numbers, messages, IPs, tokens and provider credentials are out of contract.
+Lifecycle signals are post-sale only: they require a `won` pipeline and at least one opaque handoff toward #184/#185. Churn remains a classified signal, not an automatic fact.
 
-## Funnel
-
-Closed stages:
-
-`lead → qualified → opportunity → proposal → won | lost`
-
-`disqualified` is an explicit terminal alternative. Qualified and later stages require `qualification=qualified`; `disqualified` requires `qualification=disqualified`. Opportunity/proposal/won/lost require an opaque opportunity reference.
-
-A `won` pipeline row must carry a `customer-success:<32hex>` handoff reference. Other stages may not carry that handoff. This keeps acquisition/CRM ownership in MOMENTUM and post-sale ownership in Customer Success.
-
-## Forecast
-
-A forecast is scoped to the Venture and opportunity of a pipeline row and records:
-
-- `amount_minor` as a bounded non-negative integer;
-- ISO-like three-letter uppercase currency code;
-- integer confidence from 0 to 100;
-- `source_ref`, `observed_at` and explicit `freshness=current|stale|unknown`.
-
-The normalized result adds `classification=forecast` and `demonstrated_revenue=false`. Confidence never upgrades a forecast into observed revenue.
-
-## Attribution
-
-Classification is closed to:
-
-- `observed`: amount required and at least one evidence reference required;
-- `inferred`: amount may be represented but is never demonstrated revenue;
-- `unknown`: amount must be null.
-
-Only `observed` yields `demonstrated_amount_minor`. Any attribution that carries a revenue amount (`observed` or `inferred`) requires the pipeline to be `won`, and its campaign/creative refs must exactly match that pipeline. This prevents pre-conversion or cross-campaign values from silently entering revenue attribution.
-
-## Renewal / upsell / churn signals
-
-Lifecycle signals are `renewal|upsell|churn` and separately classified `observed|inferred|unknown`. They are post-sale signals and therefore require a `won` pipeline with its Customer Success handoff already established. They must point to Product Intelligence and/or Customer Success through opaque references. A churn signal is therefore a signal with provenance, not a factual customer outcome by default.
-
-## Privacy and governance
-
-- No PII inline. CRM/customer identity remains behind opaque references in authoritative product/CRM systems.
-- No persistence, SQL, provider SDK, payment, email, paid-media execution, spend, scheduler or parallel queue.
-- No forecast ML or opaque scoring.
-- Operational work continues through Factory Queue #269 in later slices.
-- Database/migration concerns do not apply to this pure contract; no schema or runtime storage is changed.
-
-## Downstream contracts
-
-- Customer Success #185 receives explicit post-sale handoff references.
-- Product Intelligence #184 may consume lifecycle signal references with source/freshness/confidence semantics.
-- Campaign #228 and Creative #233 remain upstream attribution references and are not reimplemented here.
+## Boundaries
+No persistence/SQL, provider SDK, payment, email, paid-media execution, spend, scheduler, queue or WorkItem materialization. Campaign #228 and Creative #233 stay upstream; Customer Success owns post-sale operations; Product Intelligence owns outcomes/cohorts. Future executable work continues through Factory Queue #269.

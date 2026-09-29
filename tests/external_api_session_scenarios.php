@@ -28,7 +28,7 @@ if($case==='binding'){
     $out=[
         'device'=>ExternalApiSession::device(xd(),'owner-human'),
         'session'=>ExternalApiSession::session(xs(),xd(),'owner-human','venture:alpha',1600),
-        'wrong_identity'=>xr(fn()=>ExternalApiSession::session(xs(),xd(),'other-human','venture:alpha',1600)),
+        'wrong_identity'=>xr(fn()=>ExternalApiSession::session(xs(['identity_id'=>'other-human']),xd(),'owner-human','venture:alpha',1600)),
         'wrong_scope'=>xr(fn()=>ExternalApiSession::session(xs(),xd(),'owner-human','venture:beta',1600)),
         'wrong_device'=>xr(fn()=>ExternalApiSession::session(xs(['device_ref'=>'device:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']),xd(),'owner-human','venture:alpha',1600)),
     ];
@@ -51,6 +51,10 @@ if($case==='binding'){
         'wrong_device'=>xr(fn()=>ExternalApiSession::stepUp(xu(['device_ref'=>'device:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']),xs(),xd(),'owner-human','venture:alpha',1600)),
         'wrong_identity'=>xr(fn()=>ExternalApiSession::stepUp(xu(['identity_id'=>'other-human']),xs(),xd(),'owner-human','venture:alpha',1600)),
         'revoked_device'=>xr(fn()=>ExternalApiSession::stepUp(xu(),xs(),xd(['state'=>'revoked','revoked_at'=>1400,'revocation_reason'=>'device_lost']),'owner-human','venture:alpha',1600)),
+        'revoked_step_up'=>xr(fn()=>ExternalApiSession::stepUp(
+            xu(['state'=>'revoked','revoked_at'=>1550,'revocation_reason'=>'owner_revoked']),
+            xs(),xd(),'owner-human','venture:alpha',1600
+        )),
     ];
 }elseif($case==='inventory'){
     $devices=[xd(),xd(['device_ref'=>'device:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','state'=>'revoked','revoked_at'=>1450,'revocation_reason'=>'owner_revoked'])];

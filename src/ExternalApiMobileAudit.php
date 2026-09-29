@@ -8,31 +8,17 @@ use InvalidArgumentException;
 
 final class ExternalApiMobileAudit
 {
-    private const OUTCOMES=[
-        'read_served','mutation_accepted','mutation_rejected',
-        'factory_handoff','verification_succeeded','verification_failed',
-    ];
+    private const OUTCOMES=['read_served','mutation_accepted','mutation_rejected','factory_handoff','verification_succeeded','verification_failed'];
     private const SENSITIVE='/(?:password|passwd|secret|token|cookie|authorization|bearer|credential|private[_ -]?key|api[_ -]?key|otp|dsn|ip[_ -]?address|user[_ -]?agent|fingerprint)/i';
 
-    public static function event(
-        VerifiedAccessContext $access,
-        VerifiedExternalSessionContext $authentication,
-        string $method,
-        string $pathTemplate,
-        string $expectedScope,
-        array $requestIds,
-        int $occurredAt,
-        string $outcome,
-        array $refs,
-    ): array {
+    public static function event(VerifiedAccessContext $access,VerifiedExternalSessionContext $authentication,
+        string $method,string $pathTemplate,string $expectedScope,array $requestIds,int $occurredAt,string $outcome,array $refs): array {
         if($occurredAt<1) throw new InvalidArgumentException('occurred_at invalid.');
         self::fields($refs,['decision_ref','approval_ref','work_item_ref','result_ref'],'AuditRefs');
         $outcome=self::oneOf($outcome,self::OUTCOMES,'outcome');
         $ids=ExternalApiContract::requestIds($requestIds);
 
-        $authorization=ExternalApiRequestGate::authorize(
-            $access,$method,$pathTemplate,$expectedScope,$authentication,$occurredAt
-        );
+        $authorization=ExternalApiRequestGate::authorize($access,$method,$pathTemplate,$expectedScope,$authentication,$occurredAt);
         if(($authorization['decision']??null)!=='allow')
             throw new InvalidArgumentException('audit outcome requires authorized request.');
 
@@ -61,19 +47,11 @@ final class ExternalApiMobileAudit
             throw new InvalidArgumentException('verification outcome requires result_ref.');
 
         $allowedRefs=match($outcome){
-            'read_served'=>[],
-            'mutation_accepted','mutation_rejected'=>['decision_ref','approval_ref'],
+            'read_served'=>[],'mutation_accepted','mutation_rejected'=>['decision_ref','approval_ref'],
             'factory_handoff'=>['decision_ref','approval_ref','work_item_ref'],
-            'verification_succeeded','verification_failed'=>[
-                'decision_ref','approval_ref','work_item_ref','result_ref',
-            ],
+            'verification_succeeded','verification_failed'=>['decision_ref','approval_ref','work_item_ref','result_ref'],
         };
-        foreach([
-            'decision_ref'=>$decision,
-            'approval_ref'=>$approval,
-            'work_item_ref'=>$workItem,
-            'result_ref'=>$result,
-        ] as $refName=>$refValue){
+        foreach(['decision_ref'=>$decision,'approval_ref'=>$approval,'work_item_ref'=>$workItem,'result_ref'=>$result] as $refName=>$refValue){
             if($refValue!==null&&!in_array($refName,$allowedRefs,true))
                 throw new InvalidArgumentException('audit ref not allowed for outcome.');
         }
@@ -82,11 +60,8 @@ final class ExternalApiMobileAudit
         $grant=self::slug($accessSummary['grant_id']??null,'grant_id');
         $capability=self::capability($accessSummary['capability']??null);
         $scope=self::scope($accessSummary['scope']??null);
-        $authority=self::oneOf(
-            $accessSummary['authority_level']??null,
-            ['L0_AI_AUTONOMOUS','L1_OPERATOR','L2_VENTURE_ADMIN','L3_GROUP_INSTITUTION','L4_OWNER'],
-            'authority_level'
-        );
+        $authority=self::oneOf($accessSummary['authority_level']??null,
+            ['L0_AI_AUTONOMOUS','L1_OPERATOR','L2_VENTURE_ADMIN','L3_GROUP_INSTITUTION','L4_OWNER'],'authority_level');
         $policies=self::policyRefs($accessSummary['policy_refs']??null);
         $device=self::opaque($authSummary['device_ref']??null,'device_ref','device');
         $session=self::opaque($authSummary['session_ref']??null,'session_ref','session');

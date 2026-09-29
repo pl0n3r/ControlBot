@@ -21,7 +21,10 @@ final class ExternalApiOwnerDecisionRead
         array $detail,
         int $now,
     ): array {
-        self::authorize($access,$authentication,$expectedScope,$now);
+        $authorization=ExternalApiRequestGate::authorize(
+            $access,'GET','/api/v1/owner-decisions/{decision_id}',$expectedScope,$authentication,$now
+        );
+        self::assertAuthorization($authorization,$expectedScope);
         $requestedDecisionId=self::slug($requestedDecisionId,'decision_id');
         self::fields($meta,['request_id','correlation_id','generated_at','freshness'],'ResponseMetaInput');
         $detail=self::fields(
@@ -48,21 +51,19 @@ final class ExternalApiOwnerDecisionRead
         ];
     }
 
-    private static function authorize(
-        VerifiedAccessContext $access,
-        VerifiedExternalSessionContext $authentication,
-        string $expectedScope,
-        int $now,
-    ): void {
-        $result=ExternalApiRequestGate::authorize(
-            $access,'GET','/api/v1/owner-decisions/{decision_id}',$expectedScope,$authentication,$now
-        );
-        if(($result['decision']??null)!=='allow'
-            ||($result['operation_id']??null)!=='owner_decision.read'
-            ||($result['capability']??null)!=='owner.decision.read'
-            ||($result['mutation']??true)!==false
-            ||($result['scope']??null)!==$expectedScope)
-            throw new InvalidArgumentException('Owner decision read not authorized.');
+    private static function assertAuthorization(array $authorization,string $expectedScope): void
+    {
+        $expected=[
+            'decision'=>'allow',
+            'operation_id'=>'owner_decision.read',
+            'capability'=>'owner.decision.read',
+            'mutation'=>false,
+            'scope'=>$expectedScope,
+        ];
+        foreach($expected as $field=>$value){
+            if(!array_key_exists($field,$authorization)||$authorization[$field]!==$value)
+                throw new InvalidArgumentException('Owner decision read not authorized.');
+        }
     }
 
     private static function options(mixed $raw): array

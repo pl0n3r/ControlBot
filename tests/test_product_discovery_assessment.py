@@ -14,6 +14,7 @@ class ProductDiscoveryAssessmentTests(unittest.TestCase):
         self.assertEqual(v["hypothesis_ref"],"hypothesis:"+"b"*32)
         self.assertEqual(v["primary_metric_ref"],"metric:"+"d"*32)
         self.assertEqual(v["outcome_id"],"outcome-alpha")
+        self.assertTrue(d["window"])
 
     def test_classification_is_closed_and_requires_rule_and_evidence(self):
         d=scenario("classification")
@@ -25,6 +26,9 @@ class ProductDiscoveryAssessmentTests(unittest.TestCase):
         self.assertTrue(d["stale_reject"]); self.assertEqual(d["stale_ok"],"INCONCLUSIVE")
         self.assertTrue(d["inferred_reject"]); self.assertEqual(d["inferred_ok"],"INCONCLUSIVE")
         self.assertTrue(d["unknown_reject"]); self.assertEqual(d["unknown_ok"],"INCONCLUSIVE")
+        self.assertTrue(d["zero_confidence_reject"]); self.assertEqual(d["zero_confidence_ok"],"INCONCLUSIVE")
+        self.assertTrue(d["hypothesis_stale_reject"]); self.assertEqual(d["hypothesis_stale_ok"],"INCONCLUSIVE")
+        self.assertTrue(d["hypothesis_unknown_reject"]); self.assertEqual(d["hypothesis_unknown_ok"],"INCONCLUSIVE")
 
     def test_observed_measured_result_preserves_numbers_without_inferring_desirability_or_causality(self):
         d=scenario("numbers")
@@ -36,6 +40,7 @@ class ProductDiscoveryAssessmentTests(unittest.TestCase):
     def test_schema_refs_and_lists_are_closed_opaque_deterministic_and_secret_free(self):
         d=scenario("schema"); self.assertEqual(d["sorted"],sorted(d["sorted"]))
         self.assertTrue(all(d[k] for k in ("duplicate","extra","bad_ref")))
+        self.assertEqual(d["numeric_opaque_ref"],"assessment:"+"12345678901234567890123456789012")
         s=json.dumps(scenario("valid")).lower()
         for value in ("password","secret","authorization","bearer ","@"): self.assertNotIn(value,s)
 

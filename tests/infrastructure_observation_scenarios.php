@@ -231,6 +231,64 @@ if ($name === 'freshness') {
                 ]),
             ], [binding('commerce')])
         ),
+        'cross_venture_service' => blocked(static fn() =>
+            InfrastructureImpact::build([
+                resource('env-prod', 'environment', [
+                    'environment_ref' => null,
+                    'source_ref' => 'controlbot:environment/controlbot-prod',
+                ]),
+                resource('env-other', 'environment', [
+                    'project_ref' => 'controlbot:project/project-other',
+                    'venture_ref' => 'controlbot:venture/venture-other',
+                    'environment_ref' => null,
+                    'cost_ref' => 'controlbot:cost/project-other',
+                    'source_ref' => 'controlbot:environment/other-prod',
+                ]),
+                resource('service-other', 'service', [
+                    'project_ref' => 'controlbot:project/project-other',
+                    'venture_ref' => 'controlbot:venture/venture-other',
+                    'environment_ref' => 'controlbot:environment/other-prod',
+                    'parent_ref' => 'controlbot:resource/env-other',
+                    'cost_ref' => 'controlbot:cost/project-other',
+                ]),
+                resource('database-primary', 'database', [
+                    'service_ref' => 'controlbot:resource/service-other',
+                    'parent_ref' => 'controlbot:resource/env-prod',
+                ]),
+            ], [binding('commerce')])
+        ),
+        'cross_venture_environment' => blocked(static fn() =>
+            InfrastructureImpact::build([
+                resource('env-other', 'environment', [
+                    'project_ref' => 'controlbot:project/project-other',
+                    'venture_ref' => 'controlbot:venture/venture-other',
+                    'environment_ref' => null,
+                    'cost_ref' => 'controlbot:cost/project-other',
+                    'source_ref' => 'controlbot:environment/other-prod',
+                ]),
+                resource('storage-primary', 'storage', [
+                    'environment_ref' => 'controlbot:environment/other-prod',
+                ]),
+            ], [binding('commerce')])
+        ),
+        'cross_venture_parent' => blocked(static fn() =>
+            InfrastructureImpact::build([
+                resource('env-prod', 'environment', [
+                    'environment_ref' => null,
+                    'source_ref' => 'controlbot:environment/controlbot-prod',
+                ]),
+                resource('env-other', 'environment', [
+                    'project_ref' => 'controlbot:project/project-other',
+                    'venture_ref' => 'controlbot:venture/venture-other',
+                    'environment_ref' => null,
+                    'cost_ref' => 'controlbot:cost/project-other',
+                    'source_ref' => 'controlbot:environment/other-prod',
+                ]),
+                resource('storage-primary', 'storage', [
+                    'parent_ref' => 'controlbot:resource/env-other',
+                ]),
+            ], [binding('commerce')])
+        ),
     ];
 } else {
     fwrite(STDERR, "scenario inválido\n");

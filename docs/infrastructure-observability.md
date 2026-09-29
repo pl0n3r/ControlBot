@@ -32,7 +32,7 @@ Incident refs solo enlazan evidencia. No crean incidentes ni deciden severidad.
 
 `resource → service → environment → project → venture → capability`.
 
-No acepta un graph autocertificado por caller. Un capability solo se asocia cuando `project_ref` y `venture_ref` coinciden exactamente con el recurso. La vista inversa `venture → resources` usa únicamente `venture_ref` explícito; nunca cruza ventures por similitud de nombre, provider o account.
+No acepta un graph autocertificado por caller. Los enlaces `service_ref`, `environment_ref` y `parent_ref` deben conservar el mismo `project_ref` y `venture_ref`; `service_ref` además debe conservar `environment_ref`. Un capability solo se asocia cuando `project_ref` y `venture_ref` coinciden exactamente con el recurso. La vista inversa `venture → resources` usa únicamente `venture_ref` explícito; nunca cruza ventures por similitud de nombre, provider o account.
 
 El grafo describe **impacto potencial conocido por relaciones declaradas**. No fabrica customer impact ni blast radius cuando faltan relaciones.
 

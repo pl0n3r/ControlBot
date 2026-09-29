@@ -19,6 +19,7 @@ class RecoveryDrillProjectionTests(unittest.TestCase):
         self.assertEqual(data["backup_receipt_id"],"11111111-1111-4111-8111-111111111111")
         self.assertTrue(scenario("cross-project")["blocked"])
         self.assertTrue(scenario("producer-mismatch")["blocked"])
+        self.assertTrue(scenario("evidence-mismatch")["blocked"])
 
     def test_factory_status_metrics_and_reasons_are_preserved_without_recalculation(self):
         valid=scenario("valid")

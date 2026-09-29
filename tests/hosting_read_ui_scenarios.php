@@ -13,7 +13,7 @@ $row=[
 ];
 $case=$argv[1]??'';
 if($case==='render') $out=HostingReadUi::render([$row]);
-elseif($case==='stale') {$row['freshness']='stale';$out=['state'=>HostingReadUi::state($row),'view'=>HostingReadUi::render([$row])];}
+elseif($case==='stale') {$row['freshness']='stale';$row['health']='degraded';$out=['state'=>HostingReadUi::state($row),'view'=>HostingReadUi::render([$row])];}
 elseif($case==='source') $out=['source'=>file_get_contents(__DIR__.'/../src/HostingReadUi.php')];
 else{fwrite(STDERR,"unknown scenario\n");exit(2);}
 echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;

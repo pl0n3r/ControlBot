@@ -17,15 +17,19 @@ final class ExternalApiPushEnvelope
 
     public static function envelope(array $raw): array
     {
-        self::fields($raw,[
+        $expected=[
             'version','notification_ref','type','target_ref','venture_ref',
             'occurred_at','source_ref','freshness','generic_copy_key','correlation_id',
-        ],'PushEnvelope');
+        ];
+        $allowed=array_fill_keys($expected,true);
+        if(array_is_list($raw)||count($raw)!==count($expected)
+            ||array_diff_key($raw,$allowed)!==[]||array_diff_key($allowed,$raw)!==[])
+            throw new InvalidArgumentException('PushEnvelope fields invalid.');
         if(($raw['version']??null)!==1) throw new InvalidArgumentException('PushEnvelope version invalid.');
 
-        $type=self::oneOf($raw['type'],self::TYPES,'type');
+        $type=self::enumValue($raw['type'],self::TYPES,'type');
         $target=self::targetRef($raw['target_ref']);
-        $freshness=self::oneOf($raw['freshness'],self::FRESHNESS,'freshness');
+        $freshness=self::enumValue($raw['freshness'],self::FRESHNESS,'freshness');
 
         $occurred=$raw['occurred_at'];
         $source=$raw['source_ref'];
@@ -33,7 +37,8 @@ final class ExternalApiPushEnvelope
             if($occurred!==null||$source!==null)
                 throw new InvalidArgumentException('Unknown push freshness cannot invent provenance.');
         }else{
-            $occurred=self::timestamp($occurred,'occurred_at');
+            if(!is_int($occurred)||$occurred<1)
+                throw new InvalidArgumentException('occurred_at invalid.');
             $source=self::controlbotRef($source,'source_ref');
         }
 
@@ -52,7 +57,7 @@ final class ExternalApiPushEnvelope
             'occurred_at'=>$occurred,
             'source_ref'=>$source,
             'freshness'=>$freshness,
-            'generic_copy_key'=>self::oneOf($raw['generic_copy_key'],self::COPY_KEYS,'generic_copy_key'),
+            'generic_copy_key'=>self::enumValue($raw['generic_copy_key'],self::COPY_KEYS,'generic_copy_key'),
             'correlation_id'=>self::opaque($raw['correlation_id'],'correlation_id',null),
             'collapse_key'=>self::collapseKey($type,$target),
         ];
@@ -130,23 +135,10 @@ final class ExternalApiPushEnvelope
         return $value;
     }
 
-    private static function timestamp(mixed $value,string $label): int
+    private static function enumValue(mixed $value,array $allowed,string $label): string
     {
-        if(!is_int($value)||$value<1) throw new InvalidArgumentException($label.' invalid.');
-        return $value;
-    }
-
-    private static function oneOf(mixed $value,array $allowed,string $label): string
-    {
-        if(!is_string($value)||!in_array($value,$allowed,true))
+        if(!is_string($value)||array_search($value,$allowed,true)===false)
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
-    }
-
-    private static function fields(mixed $row,array $expected,string $label): void
-    {
-        if(!is_array($row)||array_is_list($row)) throw new InvalidArgumentException($label.' invalid.');
-        $actual=array_keys($row);sort($actual,SORT_STRING);sort($expected,SORT_STRING);
-        if($actual!==$expected) throw new InvalidArgumentException($label.' fields invalid.');
     }
 }

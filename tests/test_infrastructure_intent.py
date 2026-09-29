@@ -181,8 +181,17 @@ class InfrastructureIntentTests(unittest.TestCase):
             self.assertEqual(row["status"], "owner_decision_required")
             self.assertIsNone(row["runner_request"])
             approval = row["work_item"]["approval_ref"]
-            self.assertTrue(approval.startswith("controlbot:approval/infra-"))
+            self.assertEqual(approval, f"controlbot:approval/infra-{row['intent']['intent_id']}")
             self.assertIn(f'"approval_ref":"{approval}"', row["owner_decision_gate"])
+            factory_payload = row["owner_decision_gate"].split(
+                "<!-- factory-human-gate ", 1
+            )[1].split(" -->", 1)[0]
+            self.assertNotIn("approval_ref", json.loads(factory_payload))
+
+        self.assertNotEqual(
+            data["high"]["work_item"]["approval_ref"],
+            "controlbot:approval/caller-supplied",
+        )
 
     def test_planned_work_does_not_invent_approval_ref(self):
         work = scenario("safe")["work_item"]
@@ -209,11 +218,36 @@ class InfrastructureIntentTests(unittest.TestCase):
         self.assertNotIn("attempt_id", request)
 
     def test_slice_stays_under_size_budget(self):
-        source = ROOT / "src" / "InfrastructureIntent.php"
-        self.assertLessEqual(
-            len(source.read_text(encoding="utf-8").splitlines()),
-            400,
+        paths = [
+            "src/InfrastructureIntent.php",
+            "tests/infrastructure_intent_scenarios.php",
+            "tests/test_infrastructure_intent.py",
+            "docs/infrastructure-governance.md",
+        ]
+        base = "d1108445b1f2e4bbfbad1f93656c69ea051a8a1a"
+        probe = subprocess.run(
+            ["git", "cat-file", "-e", f"{base}^{{commit}}"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
         )
+        self.assertEqual(
+            probe.returncode,
+            0,
+            "The #200 base commit must be available to measure the real PR delta.",
+        )
+        diff = subprocess.run(
+            ["git", "diff", "--numstat", base, "HEAD", "--", *paths],
+            cwd=ROOT,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        changed = 0
+        for line in diff.stdout.splitlines():
+            additions, deletions, _ = line.split("\t", 2)
+            changed += int(additions) + int(deletions)
+        self.assertLessEqual(changed, 400)
 
 
 if __name__ == "__main__":

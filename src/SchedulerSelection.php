@@ -119,9 +119,16 @@ final class SchedulerSelection
     private static function sha256(mixed $value,string $label): string
     {if(!is_string($value)||preg_match('/^[0-9a-f]{64}$/D',$value)!==1)throw new InvalidArgumentException($label.' invalid.');return $value;}
     private static function slug(mixed $value,string $label): string
-    {if(!is_string($value)||preg_match('/^[a-z][a-z0-9._:-]{0,95}$/D',$value)!==1)throw new InvalidArgumentException($label.' invalid.');return $value;}
+    {return self::id($value,$label);}
     private static function id(mixed $value,string $label): string
-    {if(!is_string($value)||preg_match('/^[A-Za-z0-9][A-Za-z0-9._:@\/-]{0,179}$/D',$value)!==1)throw new InvalidArgumentException($label.' invalid.');return $value;}
+    {if(!is_string($value)||preg_match('/^[a-z][a-z0-9._-]{0,79}$/D',$value)!==1)throw new InvalidArgumentException($label.' invalid.');return $value;}
+    private static function ref(mixed $value,string $label): string
+    {
+        if(!is_string($value)||preg_match('/^[A-Za-z0-9][A-Za-z0-9._:@\\/#-]{0,179}$/D',$value)!==1
+            ||preg_match('/(?:(?:github_pat_|ghp_|gho_)[A-Za-z0-9_]{20,}|(?:sk|rk|pk)-[A-Za-z0-9_-]{12,}|(?:token|secret|password|cookie|authorization|dsn):)/i',$value)===1)
+            throw new InvalidArgumentException($label.' invalid.');
+        return $value;
+    }
     private static function workRef(mixed $value): string
     {if(!is_string($value)||preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#[1-9][0-9]*$/D',$value)!==1)throw new InvalidArgumentException('source_ref invalid.');return $value;}
     private static function safeText(mixed $value,string $label,int $max): string

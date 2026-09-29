@@ -10,7 +10,7 @@ final class LexLifecycle
     private const LEGAL_STATES = ['compliant', 'gap', 'unknown', 'not_applicable'];
     private const STAGES = ['construction', 'live'];
     private const REVIEWS = ['pending', 'approved', 'rejected'];
-    private const SENSITIVE = '/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|credential)/i';
+    private const SENSITIVE = '/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|otp|recovery[_ -]?code|session|credential)/i';
 
     public static function project(array $input): array
     {
@@ -93,6 +93,7 @@ final class LexLifecycle
         $out = [];
         foreach ($value as $ref) {
             if (!is_string($ref) || strlen($ref) < 8 || strlen($ref) > 220
+                || str_contains($ref, '..')
                 || preg_match(self::SENSITIVE, $ref) === 1
                 || preg_match('#^controlbot:[A-Za-z0-9][A-Za-z0-9._:/\\#-]+$#D', $ref) !== 1) {
                 throw new InvalidArgumentException('evidence_ref invalid.');

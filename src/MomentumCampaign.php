@@ -7,7 +7,7 @@ use InvalidArgumentException;
 
 final class MomentumCampaign
 {
-    private const CHANNELS=['email','organic_social','other','paid_social','search_ads','web'];
+    private const CHANNELS=['organic_social','other','owned_messaging','paid_social','search_ads','web'];
     private const OBJECTIVES=['acquisition','activation','awareness','reactivation','retention','revenue','research'];
     private const STATUSES=['draft','planned','approved','active','paused','completed','cancelled'];
     private const SENSITIVE='/(?:bearer\s+|password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn|(?:ghp_|gho_|github_pat_)|(?:sk|rk|pk)-)/i';

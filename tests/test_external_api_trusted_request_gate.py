@@ -19,7 +19,7 @@ class ExternalApiTrustedRequestGateTests(unittest.TestCase):
     def test_deny_is_preserved_and_step_up_requires_verified_context_evidence(self):
         deny=legacy("deny"); mutation=legacy("mutation")
         self.assertEqual(deny["decision"],"deny")
-        self.assertRegex(deny["step_up_ref"],r"^stepup:[a-f0-9]{32}$")
+        self.assertIsNone(deny["step_up_ref"])
         self.assertEqual(mutation["without"]["decision"],"step_up_required")
         self.assertEqual(mutation["with"]["decision"],"allow")
 

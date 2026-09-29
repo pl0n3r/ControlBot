@@ -20,7 +20,7 @@ class StaffControlPlaneTests(unittest.TestCase):
         d=scenario("invite"); self.assertEqual(d["ok"]["status"],"applied"); self.assertTrue(d["mfa_rejected"]); self.assertTrue(d["role_rejected"])
         self.assertNotIn("token",d["serialized"].lower()); self.assertNotIn("password",d["serialized"].lower())
     def test_mutations_are_typed_scoped_and_idempotent(self):
-        rows=scenario("mutations"); self.assertTrue(all(r["status"]=="applied" and r["mutations"]==1 and r["scope"]=="project:controlbot" and r["idempotency_key"]==r["expected"] for r in rows))
+        d=scenario("mutations"); rows=d["rows"]; self.assertTrue(all(r["status"]=="applied" and r["mutations"]==1 and r["scope"]=="project:controlbot" and r["idempotency_key"]==r["expected"] for r in rows)); self.assertTrue(d["payload_keys_distinct"])
     def test_ambiguous_mutation_reconciles_before_retry(self):
         d=scenario("ambiguous"); self.assertEqual((d["resolved"]["status"],d["mutations"],d["lookups"]),("applied",1,2)); self.assertEqual(d["unknown"]["status"],"unknown_outcome"); self.assertEqual(d["unknown_mutations"],1)
     def test_agents_cannot_invoke_owner_staff_actions(self):
@@ -29,6 +29,7 @@ class StaffControlPlaneTests(unittest.TestCase):
         d=scenario("audit"); self.assertTrue(d["secret_free"]); self.assertEqual(len(d["entries"]),2)
         a=d["result"]["audit"]; self.assertTrue(a["controlbot_audit_ref"].startswith("controlbot:audit/staff/")); self.assertTrue(a["product_audit_ref"].startswith("product:audit/"))
         self.assertEqual(set(a),{"controlbot_audit_ref","product_audit_ref","project_id","action","intent_id","outcome","occurred_at"})
+        self.assertTrue(d["gateway_error_caught"]); self.assertEqual(len(d["gateway_error_entries"]),2); self.assertEqual(d["gateway_error_entries"][-1]["result"],"unknown_outcome")
     def test_privacy_map_and_generated_docs_cover_staff_directory(self):
         data=json.loads((ROOT/"datos.yml").read_text())
         ids={row["id"] for row in data["treatments"]}; self.assertIn("staff_directory_contact",ids); self.assertIn("staff_directory_identity",ids)

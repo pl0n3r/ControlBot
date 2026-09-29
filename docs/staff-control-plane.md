@@ -14,4 +14,4 @@ Las mutaciones usan un `StaffActionIntent` project-scoped y un `StaffProductGate
 
 Cada acción exige identidad humana con autoridad `L4_OWNER`, capability `staff.manage`, scope `project:<id>` y un `VerifiedExternalSessionContext` ligado a la misma identidad con step-up `passkey` todavía vigente. Los roles de invite/change-role se validan contra el allowlist devuelto por el producto.
 
-La idempotency key se deriva de `project_id + intent_id`. Antes de mutar se consulta el status; un outcome `unknown` se reconcilia por lookup y nunca provoca una segunda mutación automática. Cada intento escribe auditoría minimizada de ControlBot y exige `product_audit_ref` para resultados no `not_found`.
+La idempotency key se deriva de `project_id + intent_id + action + staff_ref + requested_role`. Antes de mutar se consulta el status; un outcome `unknown` se reconcilia por lookup y nunca provoca una segunda mutación automática. Cada intento escribe auditoría minimizada de ControlBot y exige `product_audit_ref` para resultados no `not_found`.

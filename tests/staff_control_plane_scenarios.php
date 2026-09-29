@@ -50,11 +50,11 @@ final class StaffSessionSource implements ExternalApiSessionSource {
  }
 }
 final class StaffGateway implements StaffProductGateway {
- public int $mutations=0;public int $lookups=0;public array $lookupQueue=[];public array $lastIntent=[];public array $roles=['admin','staff'];
+ public int $mutations=0;public int $lookups=0;public array $lookupQueue=[];public array $lastIntent=[];public array $roles=['admin','staff'];public bool $throwOnMutate=false;
  public array $mutation=['intent_id'=>'intent_00000001','idempotency_key'=>'','status'=>'applied','product_audit_ref'=>'product:audit/action0001'];
  public function allowedRoles(string $projectId,int $now): array{return $this->roles;}
  public function lookup(string $projectId,string $intentId,string $idempotencyKey,int $now): array{$this->lookups++;if($this->lookupQueue!==[])return array_shift($this->lookupQueue);return ['intent_id'=>$intentId,'idempotency_key'=>$idempotencyKey,'status'=>'not_found','product_audit_ref'=>null];}
- public function mutate(array $intent,int $now): array{$this->mutations++;$this->lastIntent=$intent;return array_replace($this->mutation,['intent_id'=>$intent['intent_id'],'idempotency_key'=>$intent['idempotency_key']]);}
+ public function mutate(array $intent,int $now): array{$this->mutations++;$this->lastIntent=$intent;if($this->throwOnMutate)throw new RuntimeException('gateway failure');return array_replace($this->mutation,['intent_id'=>$intent['intent_id'],'idempotency_key'=>$intent['idempotency_key']]);}
 }
 function staff_access(string $kind='human',string $level='L4_OWNER',string $cap='staff.manage',string $scope='project:controlbot'): VerifiedAccessContext {
  $vault=new TokenVault(base64_encode(str_repeat('K',SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));$owners=new OwnerSessionService('pl0n3r',$vault);$session=[];$owners->establishTrustedOAuthSession($session,'pl0n3r','fixture-server-value');
@@ -65,9 +65,9 @@ function staff_auth(VerifiedAccessContext $access,string $method='passkey',strin
  return VerifiedExternalSessionContext::fromSource($access,new StaffSessionSource($method,$scope),'device:'.str_repeat('1',32),'session:'.str_repeat('2',32),'stepup:'.str_repeat('3',32),ACTION_NOW);
 }
 function staff_log(): AppendOnlyAuditLog{return new AppendOnlyAuditLog(tempnam(sys_get_temp_dir(),'staff-log-'));}
-function staff_intent(string $action='staff.suspend',?string $role=null,string $id='intent_00000001'): array {
- return ['version'=>1,'intent_id'=>$id,'project_id'=>'controlbot','staff_ref'=>'staff-alpha','action'=>$action,'requested_role'=>$role,'requested_by'=>'identity-owner',
-  'passkey_assertion_ref'=>'stepup:'.str_repeat('3',32),'idempotency_key'=>StaffControlPlane::idempotencyKey('controlbot',$id),'requested_at'=>ACTION_NOW];
+function staff_intent(string $action='staff.suspend',?string $role=null,string $id='intent_00000001',string $staff='staff-alpha',string $requestedBy='identity-owner'): array {
+ return ['version'=>1,'intent_id'=>$id,'project_id'=>'controlbot','staff_ref'=>$staff,'action'=>$action,'requested_role'=>$role,'requested_by'=>$requestedBy,
+  'passkey_assertion_ref'=>'stepup:'.str_repeat('3',32),'idempotency_key'=>StaffControlPlane::idempotencyKey('controlbot',$id,$action,$staff,$role),'requested_at'=>ACTION_NOW];
 }
 $case=$argv[1]??'';
 if($case==='summary'){
@@ -94,8 +94,14 @@ if($case==='summary'){
  $role=bad(fn()=>StaffControlPlane::execute(new StaffGateway(),staff_log(),$a,staff_auth($a),staff_intent('staff.invite','superadmin'),ACTION_NOW));
  echo json_encode(['ok'=>$ok,'mfa_rejected'=>$mfa,'role_rejected'=>$role,'serialized'=>json_encode($ok)],JSON_THROW_ON_ERROR),PHP_EOL;
 }elseif($case==='mutations'){
- $rows=[];foreach([['staff.suspend',null],['staff.reactivate',null],['staff.role.change','staff']] as $n=>$spec){$g=new StaffGateway();$a=staff_access();$i=staff_intent($spec[0],$spec[1],'intent_0000000'.($n+2));$r=StaffControlPlane::execute($g,staff_log(),$a,staff_auth($a),$i,ACTION_NOW);$rows[]=['status'=>$r['status'],'mutations'=>$g->mutations,'scope'=>'project:'.$g->lastIntent['project_id'],'idempotency_key'=>$g->lastIntent['idempotency_key'],'expected'=>StaffControlPlane::idempotencyKey('controlbot',$i['intent_id'])];}
- echo json_encode($rows,JSON_THROW_ON_ERROR),PHP_EOL;
+ $rows=[];foreach([['staff.suspend',null],['staff.reactivate',null],['staff.role.change','staff']] as $n=>$spec){$g=new StaffGateway();$a=staff_access();$i=staff_intent($spec[0],$spec[1],'intent_0000000'.($n+2));$r=StaffControlPlane::execute($g,staff_log(),$a,staff_auth($a),$i,ACTION_NOW);$rows[]=['status'=>$r['status'],'mutations'=>$g->mutations,'scope'=>'project:'.$g->lastIntent['project_id'],'idempotency_key'=>$g->lastIntent['idempotency_key'],'expected'=>StaffControlPlane::idempotencyKey('controlbot',$i['intent_id'],$i['action'],$i['staff_ref'],$i['requested_role'])];}
+ $same='intent_reuse01';$keys=[
+  staff_intent('staff.suspend',null,$same,'staff-alpha')['idempotency_key'],
+  staff_intent('staff.reactivate',null,$same,'staff-alpha')['idempotency_key'],
+  staff_intent('staff.suspend',null,$same,'staff-beta')['idempotency_key'],
+  staff_intent('staff.role.change','admin',$same,'staff-alpha')['idempotency_key'],
+ ];
+ echo json_encode(['rows'=>$rows,'payload_keys_distinct'=>count(array_unique($keys))===4],JSON_THROW_ON_ERROR),PHP_EOL;
 }elseif($case==='ambiguous'){
  $g=new StaffGateway();$a=staff_access();$i=staff_intent();$g->mutation['status']='unknown';$g->mutation['product_audit_ref']='product:audit/unknown0001';
  $g->lookupQueue=[['intent_id'=>$i['intent_id'],'idempotency_key'=>$i['idempotency_key'],'status'=>'not_found','product_audit_ref'=>null],['intent_id'=>$i['intent_id'],'idempotency_key'=>$i['idempotency_key'],'status'=>'applied','product_audit_ref'=>'product:audit/reconciled1']];
@@ -105,8 +111,11 @@ if($case==='summary'){
  echo json_encode(['resolved'=>$resolved,'mutations'=>$g->mutations,'lookups'=>$g->lookups,'unknown'=>$unknown,'unknown_mutations'=>$g2->mutations],JSON_THROW_ON_ERROR),PHP_EOL;
 }elseif($case==='authority'){
  $cases=[];foreach([['agent','L4_OWNER','staff.manage'],['human','L0_AI_AUTONOMOUS','staff.manage'],['human','L4_OWNER','config.write']] as $row){$g=new StaffGateway();$a=staff_access($row[0],$row[1],$row[2]);$cases[]=bad(fn()=>StaffControlPlane::execute($g,staff_log(),$a,staff_auth($a),staff_intent(),ACTION_NOW))&&$g->mutations===0;}
+ $g=new StaffGateway();$a=staff_access('human','L4_OWNER','staff.manage','project:other');$cases[]=bad(fn()=>StaffControlPlane::execute($g,staff_log(),$a,staff_auth($a,'passkey','project:other'),staff_intent(),ACTION_NOW))&&$g->mutations===0;
+ $g=new StaffGateway();$a=staff_access();$cases[]=bad(fn()=>StaffControlPlane::execute($g,staff_log(),$a,staff_auth($a),staff_intent('staff.suspend',null,'intent_00000009','staff-alpha','identity-other'),ACTION_NOW))&&$g->mutations===0;
  echo json_encode(['rejected'=>!in_array(false,$cases,true)],JSON_THROW_ON_ERROR),PHP_EOL;
 }elseif($case==='audit'){
  $g=new StaffGateway();$a=staff_access();$log=staff_log();$r=StaffControlPlane::execute($g,$log,$a,staff_auth($a),staff_intent(),ACTION_NOW);$serialized=json_encode($r,JSON_THROW_ON_ERROR);
- echo json_encode(['result'=>$r,'entries'=>$log->entries(),'secret_free'=>preg_match('/(?:password|token|credential|recovery|@example)/i',$serialized)===0],JSON_THROW_ON_ERROR),PHP_EOL;
+ $g2=new StaffGateway();$g2->throwOnMutate=true;$log2=staff_log();$caught=false;try{StaffControlPlane::execute($g2,$log2,$a,staff_auth($a),staff_intent('staff.suspend',null,'intent_00000008'),ACTION_NOW);}catch(Throwable){$caught=true;}$failureEntries=$log2->entries();
+ echo json_encode(['result'=>$r,'entries'=>$log->entries(),'secret_free'=>preg_match('/(?:password|token|credential|recovery|@example)/i',$serialized)===0,'gateway_error_caught'=>$caught,'gateway_error_entries'=>$failureEntries],JSON_THROW_ON_ERROR),PHP_EOL;
 }else{fwrite(STDERR,"scenario invalid\n");exit(2);}

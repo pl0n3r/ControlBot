@@ -68,10 +68,15 @@ final class StaffControlPlane
         ];
     }
 
-    public static function idempotencyKey(string $projectId,string $intentId): string
-    {
-        $project=self::id($projectId,'project_id');$intent=self::key($intentId,'intent_id');
-        return 'staffidem_'.substr(hash('sha256',$project.'|'.$intent),0,32);
+    public static function idempotencyKey(
+        string $projectId,string $intentId,string $action,string $staffRef,?string $requestedRole
+    ): string {
+        $project=self::id($projectId,'project_id');
+        $intent=self::key($intentId,'intent_id');
+        $action=self::one($action,self::ACTIONS,'action');
+        $staff=self::id($staffRef,'staff_ref');
+        $role=$requestedRole===null?'':self::slug($requestedRole,'requested_role');
+        return 'staffidem_'.substr(hash('sha256',implode('|',[$project,$intent,$action,$staff,$role])),0,32);
     }
 
     public static function execute(
@@ -105,7 +110,12 @@ final class StaffControlPlane
         if($before['status']==='unknown')
             return self::finish($audit,$intent,$before,'unknown_outcome',$now);
 
-        $result=self::outcome($gateway->mutate($intent,$now),$intent,false);
+        try {
+            $result=self::outcome($gateway->mutate($intent,$now),$intent,false);
+        } catch (\Throwable $error) {
+            self::finish($audit,$intent,['product_audit_ref'=>null],'unknown_outcome',$now);
+            throw $error;
+        }
         if($result['status']==='unknown'){
             $reconciled=self::outcome($gateway->lookup($intent['project_id'],$intent['intent_id'],$intent['idempotency_key'],$now),$intent,true);
             if(in_array($reconciled['status'],['applied','denied'],true))
@@ -122,13 +132,17 @@ final class StaffControlPlane
         self::fields($raw,['version','intent_id','project_id','staff_ref','action','requested_role','requested_by','passkey_assertion_ref','idempotency_key','requested_at'],'StaffActionIntent');
         if(($raw['version']??null)!==1) throw new InvalidArgumentException('StaffActionIntent version invalid.');
         $intent=self::key($raw['intent_id'],'intent_id');$project=self::id($raw['project_id'],'project_id');
+        $staff=self::id($raw['staff_ref'],'staff_ref');
+        $action=self::one($raw['action'],self::ACTIONS,'action');
+        $role=$raw['requested_role']===null?null:self::slug($raw['requested_role'],'requested_role');
         $requested=self::time($raw['requested_at'],'requested_at');
         if($requested>$now||$now-$requested>300) throw new InvalidArgumentException('staff intent expired.');
         $key=self::key($raw['idempotency_key'],'idempotency_key');
-        if(!hash_equals(self::idempotencyKey($project,$intent),$key)) throw new InvalidArgumentException('idempotency_key mismatch.');
-        return ['version'=>1,'intent_id'=>$intent,'project_id'=>$project,'staff_ref'=>self::id($raw['staff_ref'],'staff_ref'),
-            'action'=>self::one($raw['action'],self::ACTIONS,'action'),
-            'requested_role'=>$raw['requested_role']===null?null:self::slug($raw['requested_role'],'requested_role'),
+        if(!hash_equals(self::idempotencyKey($project,$intent,$action,$staff,$role),$key))
+            throw new InvalidArgumentException('idempotency_key mismatch.');
+        return ['version'=>1,'intent_id'=>$intent,'project_id'=>$project,'staff_ref'=>$staff,
+            'action'=>$action,
+            'requested_role'=>$role,
             'requested_by'=>self::id($raw['requested_by'],'requested_by'),
             'passkey_assertion_ref'=>self::opaque($raw['passkey_assertion_ref'],'passkey_assertion_ref','stepup'),
             'idempotency_key'=>$key,'requested_at'=>$requested];

@@ -7,6 +7,8 @@ use ControlBot\Approvals\AppendOnlyAuditLog;
 use ControlBot\Approvals\ApprovalEndpoint;
 use ControlBot\Approvals\HumanGate;
 use ControlBot\Business\VentureAccessRuntime;
+use ControlBot\Business\VentureAccessSource;
+use ControlBot\Business\VentureAccessSourceContract;
 use ControlBot\GitHub\ApiClient;
 use ControlBot\GitHub\ApiTransport;
 use ControlBot\GitHub\Gateway;
@@ -34,6 +36,7 @@ final class DecisionRuntime
         private readonly \Closure $githubFactory,
         array $repositories,
         private readonly ?DecisionConversationProvider $conversationProvider = null,
+        private readonly ?VentureAccessSource $ventureAccessSource = null,
     ) {
         if ($repositories === [] || count($repositories) > 20) {
             throw new InvalidArgumentException('Allowlist de repositorios inválida.');
@@ -53,6 +56,7 @@ final class DecisionRuntime
         OwnerSessionService $sessions,
         AppendOnlyAuditLog $audit,
         array $repositories,
+        ?VentureAccessSource $ventureAccessSource = null,
     ): self {
         $factory = static function (string $token): array {
             $api = new ApiClient($token, new ApiTransport());
@@ -69,6 +73,8 @@ final class DecisionRuntime
             $audit,
             $factory,
             $repositories,
+            null,
+            $ventureAccessSource,
         );
     }
 
@@ -103,6 +109,29 @@ final class DecisionRuntime
             return self::jsonResponse(200, $this->safeReleaseStatus($session));
         }
         return self::jsonResponse(404, ['error' => 'not-found']);
+    }
+
+    public function resolveVentureAccess(
+        array &$session,
+        string $repository,
+        array $request,
+        int $now,
+    ): array {
+        if (!in_array($repository, $this->repositories, true)) {
+            throw new InvalidArgumentException('Repositorio fuera de la allowlist runtime.');
+        }
+        $this->sessions->githubToken($session);
+        if ($this->ventureAccessSource === null) {
+            throw new RuntimeException('Venture access source no configurado.');
+        }
+        $query = VentureAccessSourceContract::query($request);
+        $resolved = $this->ventureAccessSource->resolve(
+            $query['identity_id'],
+            $query['scope'],
+            $query['capability'],
+            $now,
+        );
+        return VentureAccessSourceContract::resolved($resolved, $query, $now);
     }
 
     public function executeVentureAccess(

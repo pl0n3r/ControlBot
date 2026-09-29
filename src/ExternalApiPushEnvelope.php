@@ -78,6 +78,7 @@ final class ExternalApiPushEnvelope
         array $raw,
         bool $preferenceEnabled,
         bool $policyAllowsType,
+        bool $severityAllowsDelivery,
     ): array {
         $envelope=self::envelope($raw);
         return [
@@ -87,7 +88,8 @@ final class ExternalApiPushEnvelope
             'collapse_key'=>$envelope['collapse_key'],
             'preference_enabled'=>$preferenceEnabled,
             'policy_allows_type'=>$policyAllowsType,
-            'eligible'=>$preferenceEnabled&&$policyAllowsType,
+            'severity_allows_delivery'=>$severityAllowsDelivery,
+            'eligible'=>$preferenceEnabled&&$policyAllowsType&&$severityAllowsDelivery,
         ];
     }
 

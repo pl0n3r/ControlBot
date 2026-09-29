@@ -64,10 +64,11 @@ if($case==='closed'){
 }elseif($case==='delivery'){
     $raw=pushRaw();
     $out=[
-        'a'=>ExternalApiPushEnvelope::deliveryPolicy($raw,true,true),
-        'b'=>ExternalApiPushEnvelope::deliveryPolicy($raw,true,true),
-        'preference_off'=>ExternalApiPushEnvelope::deliveryPolicy($raw,false,true),
-        'policy_off'=>ExternalApiPushEnvelope::deliveryPolicy($raw,true,false),
+        'a'=>ExternalApiPushEnvelope::deliveryPolicy($raw,true,true,true),
+        'b'=>ExternalApiPushEnvelope::deliveryPolicy($raw,true,true,true),
+        'preference_off'=>ExternalApiPushEnvelope::deliveryPolicy($raw,false,true,true),
+        'policy_off'=>ExternalApiPushEnvelope::deliveryPolicy($raw,true,false,true),
+        'severity_off'=>ExternalApiPushEnvelope::deliveryPolicy($raw,true,true,false),
     ];
 }elseif($case==='pure'){
     $r=new ReflectionClass(ExternalApiPushEnvelope::class);

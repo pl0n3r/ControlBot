@@ -43,7 +43,7 @@ El cliente debe abrir la superficie correspondiente y recuperar el detalle media
 
 La collapse key es determinista para `type + target_ref`, pero no promete entrega exactly-once.
 
-`deliveryPolicy()` recibe explícitamente si las preferencias habilitan el aviso y si policy permite el tipo. El contrato no infiere escalación desde el evento y no envía nada.
+`deliveryPolicy()` recibe explícitamente si las preferencias habilitan el aviso, si policy permite el tipo y si la severidad declarada por el caller/policy permite notificar. El contrato no calcula severidad ni infiere escalación desde el evento y no envía nada.
 
 ## Fuera de alcance
 

@@ -53,8 +53,10 @@ class ExternalApiPushEnvelopeTests(unittest.TestCase):
         self.assertTrue(d["a"]["eligible"])
         self.assertFalse(d["preference_off"]["eligible"])
         self.assertFalse(d["policy_off"]["eligible"])
+        self.assertFalse(d["severity_off"]["eligible"])
         self.assertEqual(d["preference_off"]["preference_enabled"],False)
         self.assertEqual(d["policy_off"]["policy_allows_type"],False)
+        self.assertEqual(d["severity_off"]["severity_allows_delivery"],False)
 
     def test_contract_has_no_push_provider_storage_queue_retry_scheduler_or_send(self):
         d=scenario("pure")

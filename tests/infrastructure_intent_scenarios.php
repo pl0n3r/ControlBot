@@ -33,7 +33,7 @@ function rejected(callable $fn): bool
     try {
         $fn();
         return false;
-    } catch (Throwable) {
+    } catch (InvalidArgumentException) {
         return true;
     }
 }

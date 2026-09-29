@@ -33,7 +33,7 @@ $out=match($case){
     'valid'=>RecoveryWorkOrigin::fromFactoryHealth(intent(),health(),'rto_breached'),
     'explicit'=>RecoveryWorkOrigin::fromFactoryHealth(intent([
         'work_type'=>'operations','requested_capabilities'=>['incident.repair'],
-        'required_roles'=>['sre'],'authority_level'=>'owner-reviewed','priority_class'=>'critical',
+        'required_roles'=>['sre'],'authority_level'=>'owner_reviewed','priority_class'=>'critical',
         'policy_ref'=>'factory:recovery-critical',
     ]),health(),'rto_breached'),
     'unknown'=>RecoveryWorkOrigin::fromFactoryHealth(intent(),health([

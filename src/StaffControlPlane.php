@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace ControlBot\Staff;
 
+use ControlBot\Approvals\AppendOnlyAuditLog;
 use ControlBot\Business\VerifiedAccessContext;
 use ControlBot\ExternalApi\VerifiedExternalSessionContext;
 use InvalidArgumentException;
@@ -54,8 +55,8 @@ final class StaffControlPlane
     }
 
     public static function execute(
-        StaffProductGateway $gateway, VerifiedAccessContext $access, VerifiedExternalSessionContext $authentication,
-        array $intentRaw, int $now
+        StaffProductGateway $gateway, AppendOnlyAuditLog $audit, VerifiedAccessContext $access,
+        VerifiedExternalSessionContext $authentication, array $intentRaw, int $now
     ): array {
         self::positive($now,'now'); $intent=self::intent($intentRaw,$now);
         $a=$access->safeSummary(); $s=$authentication->safeSummary(); $step=$authentication->stepUp();
@@ -76,17 +77,18 @@ final class StaffControlPlane
             if($intent['requested_role']===null||!in_array($intent['requested_role'],$roles,true))
                 throw new InvalidArgumentException('requested staff role not allowed.');
         }elseif($intent['requested_role']!==null) throw new InvalidArgumentException('requested_role not allowed.');
+        self::audit($audit,$intent,'requested',null,$now);
 
         $before=self::outcome($gateway->lookup($intent['project_id'],$intent['intent_id'],$intent['idempotency_key'],$now),$intent,true);
-        if($before['status']!=='not_found') return self::finish($intent,$before,$before['status']==='applied'?'already_applied':self::publicStatus($before['status']),$now);
+        if($before['status']!=='not_found') return self::finish($audit,$intent,$before,$before['status']==='applied'?'already_applied':self::publicStatus($before['status']),$now);
 
         $after=self::outcome($gateway->mutate($intent,$now),$intent,false);
         if($after['status']==='unknown'){
             $after=self::outcome($gateway->lookup($intent['project_id'],$intent['intent_id'],$intent['idempotency_key'],$now),$intent,true);
             if(in_array($after['status'],['unknown','not_found'],true))
-                return self::finish($intent,$after,'unknown_outcome',$now);
+                return self::finish($audit,$intent,$after,'unknown_outcome',$now);
         }
-        return self::finish($intent,$after,self::publicStatus($after['status']),$now);
+        return self::finish($audit,$intent,$after,self::publicStatus($after['status']),$now);
     }
 
     private static function account(mixed $raw,string $project,int $now): array
@@ -136,15 +138,18 @@ final class StaffControlPlane
         return ['intent_id'=>$intent['intent_id'],'idempotency_key'=>$intent['idempotency_key'],'status'=>$status,'product_audit_ref'=>$audit];
     }
 
-    private static function finish(array $intent,array $outcome,string $status,int $now): array
+    private static function finish(AppendOnlyAuditLog $log,array $intent,array $outcome,string $status,int $now): array
     {
-        $product=$outcome['product_audit_ref'];
+        $product=$outcome['product_audit_ref']; self::audit($log,$intent,$status,$product,$now);
         $audit=['controlbot_audit_ref'=>'controlbot:audit/staff/'.hash('sha256',$intent['intent_id'].'|'.$intent['idempotency_key'].'|'.$status),
             'product_audit_ref'=>$product,'project_id'=>$intent['project_id'],'action'=>$intent['action'],
             'intent_id'=>$intent['intent_id'],'outcome'=>$status,'occurred_at'=>$now];
         return ['status'=>$status,'intent_id'=>$intent['intent_id'],'audit'=>$audit];
     }
 
+    private static function audit(AppendOnlyAuditLog $log,array $intent,string $result,?string $evidence,int $now): void {
+        $log->record(['actor'=>$intent['requested_by'],'action'=>$intent['action'],'repository'=>'pl0n3r/ControlBot','issue'=>40,'category'=>'staff','option'=>$intent['intent_id'],'sha'=>null,'result'=>$result,'evidence'=>$evidence,'at'=>$now]);
+    }
     private static function publicStatus(string $status): string { return $status==='unknown'?'unknown_outcome':$status; }
     private static function roles(mixed $raw): array {
         if(!is_array($raw)||!array_is_list($raw)||$raw===[]||count($raw)>32) throw new InvalidArgumentException('staff roles invalid.');

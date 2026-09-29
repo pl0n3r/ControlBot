@@ -20,5 +20,5 @@ class StaffControlPlaneTests(unittest.TestCase):
     def test_agents_cannot_invoke_owner_staff_actions(self):
         d=scenario("agent"); self.assertTrue(d["rejected"]); self.assertEqual(d["mutations"],0)
     def test_dual_audit_is_secret_free_and_minimized(self):
-        d=scenario("audit"); self.assertTrue(d["has_both"]); self.assertTrue(d["secret_free"]); self.assertEqual(set(d["result"]["audit"]),{"controlbot_audit_ref","product_audit_ref","project_id","action","intent_id","outcome","occurred_at"})
+        d=scenario("audit"); self.assertTrue(d["has_both"]); self.assertTrue(d["secret_free"]); self.assertEqual(len(d["entries"]),2); self.assertEqual(d["entries"][1]["evidence"],d["result"]["audit"]["product_audit_ref"]); self.assertEqual(set(d["result"]["audit"]),{"controlbot_audit_ref","product_audit_ref","project_id","action","intent_id","outcome","occurred_at"})
 if __name__=="__main__": unittest.main()

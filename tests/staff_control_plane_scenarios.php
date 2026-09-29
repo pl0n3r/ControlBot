@@ -71,6 +71,7 @@ function account(string $kind='staff'): array {
         'last_access_at'=>8900,'mfa_state'=>'enabled','source'=>'product:staff/api','observed_at'=>NOW,'account_kind'=>$kind];
 }
 function bad(callable $fn): bool{try{$fn();return false;}catch(InvalidArgumentException){return true;}}
+function alog(): AppendOnlyAuditLog{return new AppendOnlyAuditLog(tempnam(sys_get_temp_dir(),'staff-log-'));}
 
 $case=$argv[1]??'';
 if($case==='summary'){
@@ -81,33 +82,33 @@ if($case==='summary'){
     $result=StaffControlPlane::search($g,PROJECT,'equipo',NOW);$r=new ReflectionClass(StaffControlPlane::class);
     $out=['result'=>$result,'stateful_properties'=>count($r->getProperties()),'contains_raw_email'=>str_contains(json_encode($result),'person@example')];
 }elseif($case==='invite'){
-    $g=new Gateway();$a=access();$ok=StaffControlPlane::execute($g,$a,auth($a),intent('staff.invite','admin'),NOW);
-    $mfa=bad(fn()=>StaffControlPlane::execute(new Gateway(),$a,auth($a,'mfa'),intent('staff.invite','admin'),NOW));
-    $g2=new Gateway();$role=bad(fn()=>StaffControlPlane::execute($g2,$a,auth($a),intent('staff.invite','superadmin'),NOW));
+    $g=new Gateway();$a=access();$ok=StaffControlPlane::execute($g,alog(),$a,auth($a),intent('staff.invite','admin'),NOW);
+    $mfa=bad(fn()=>StaffControlPlane::execute(new Gateway(),alog(),$a,auth($a,'mfa'),intent('staff.invite','admin'),NOW));
+    $g2=new Gateway();$role=bad(fn()=>StaffControlPlane::execute($g2,alog(),$a,auth($a),intent('staff.invite','superadmin'),NOW));
     $out=['ok'=>$ok,'mfa_rejected'=>$mfa,'role_rejected'=>$role,'serialized'=>json_encode($ok)];
 }elseif($case==='mutations'){
     $rows=[];foreach([['staff.suspend',null],['staff.reactivate',null],['staff.role.change','staff']] as $idx=>$spec){
-        $g=new Gateway();$a=access();$i=intent($spec[0],$spec[1],'intent_0000000'.($idx+2));$r=StaffControlPlane::execute($g,$a,auth($a),$i,NOW);
+        $g=new Gateway();$a=access();$i=intent($spec[0],$spec[1],'intent_0000000'.($idx+2));$r=StaffControlPlane::execute($g,alog(),$a,auth($a),$i,NOW);
         $rows[]=['status'=>$r['status'],'mutations'=>$g->mutations,'scope'=>'project:'.$g->lastIntent['project_id'],'idempotency_key'=>$g->lastIntent['idempotency_key'],'action'=>$g->lastIntent['action']];
     }$out=$rows;
 }elseif($case==='ambiguous'){
     $g=new Gateway();$a=access();$i=intent();$g->mutation['status']='unknown';$g->mutation['product_audit_ref']='product:audit/unknown01';
     $g->lookupQueue=[['intent_id'=>$i['intent_id'],'idempotency_key'=>$i['idempotency_key'],'status'=>'not_found','product_audit_ref'=>null],
         ['intent_id'=>$i['intent_id'],'idempotency_key'=>$i['idempotency_key'],'status'=>'applied','product_audit_ref'=>'product:audit/reconciled01']];
-    $resolved=StaffControlPlane::execute($g,$a,auth($a),$i,NOW);
+    $resolved=StaffControlPlane::execute($g,alog(),$a,auth($a),$i,NOW);
     $g2=new Gateway();$g2->mutation=$g->mutation;$g2->lookupQueue=[['intent_id'=>$i['intent_id'],'idempotency_key'=>$i['idempotency_key'],'status'=>'not_found','product_audit_ref'=>null],
         ['intent_id'=>$i['intent_id'],'idempotency_key'=>$i['idempotency_key'],'status'=>'unknown','product_audit_ref'=>'product:audit/stillunknown']];
-    $unknown=StaffControlPlane::execute($g2,$a,auth($a),$i,NOW);
+    $unknown=StaffControlPlane::execute($g2,alog(),$a,auth($a),$i,NOW);
     $out=['resolved'=>$resolved,'mutations'=>$g->mutations,'lookups'=>$g->lookups,'unknown'=>$unknown,'unknown_mutations'=>$g2->mutations];
 }elseif($case==='boundary'){
     $g=new Gateway();$g->searchRow['records']=[account('customer')];$customer=bad(fn()=>StaffControlPlane::search($g,PROJECT,'x',NOW));
     $g2=new Gateway();$g2->searchRow['boundary']='mixed';$mixed=bad(fn()=>StaffControlPlane::search($g2,PROJECT,'x',NOW));
     $out=['customer_rejected'=>$customer,'mixed_rejected'=>$mixed];
 }elseif($case==='agent'){
-    $g=new Gateway();$a=access('L0_AI_AUTONOMOUS');$out=['rejected'=>bad(fn()=>StaffControlPlane::execute($g,$a,auth($a),intent(),NOW)),'mutations'=>$g->mutations];
+    $g=new Gateway();$a=access('L0_AI_AUTONOMOUS');$out=['rejected'=>bad(fn()=>StaffControlPlane::execute($g,alog(),$a,auth($a),intent(),NOW)),'mutations'=>$g->mutations];
 }elseif($case==='audit'){
-    $g=new Gateway();$a=access();$r=StaffControlPlane::execute($g,$a,auth($a),intent(),NOW);$s=json_encode($r);
-    $out=['result'=>$r,'has_both'=>str_starts_with($r['audit']['controlbot_audit_ref'],'controlbot:audit/staff/')&&str_starts_with($r['audit']['product_audit_ref'],'product:audit/'),
+    $g=new Gateway();$a=access();$log=alog();$r=StaffControlPlane::execute($g,$log,$a,auth($a),intent(),NOW);$s=json_encode($r);
+    $out=['result'=>$r,'entries'=>$log->entries(),'has_both'=>str_starts_with($r['audit']['controlbot_audit_ref'],'controlbot:audit/staff/')&&str_starts_with($r['audit']['product_audit_ref'],'product:audit/'),
         'secret_free'=>!preg_match('/(?:password|token|credential|cookie|secret|@example)/i',$s)];
 }else{fwrite(STDERR,"unknown staff scenario\n");exit(2);}
 echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;

@@ -47,6 +47,12 @@ final class RuntimeCapacitySignal
             throw new InvalidArgumentException('Unknown state must not assert runtime health or capacity.');
         }
 
+        $assignment = self::nullableRef($raw['assignment_ref'], 'assignment_ref');
+        $assignmentRequired = in_array($state, ['assigned', 'working', 'reviewing', 'blocked'], true);
+        if (($assignmentRequired && $assignment === null) || ($state === 'idle' && $assignment !== null)) {
+            throw new InvalidArgumentException('assignment_ref is incoherent with state.');
+        }
+
         $out = [
             'version' => 1,
             'source' => $source,
@@ -58,7 +64,7 @@ final class RuntimeCapacitySignal
             'heartbeat_at' => $heartbeatAt,
             'total_capacity' => $total,
             'occupied_capacity' => $occupied,
-            'assignment_ref' => self::nullableRef($raw['assignment_ref'], 'assignment_ref'),
+            'assignment_ref' => $assignment,
             'generation' => self::positiveInt($raw['generation'], 'generation'),
             'attempt' => self::positiveInt($raw['attempt'], 'attempt'),
             'capabilities' => self::capabilities($raw['capabilities']),

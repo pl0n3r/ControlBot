@@ -56,6 +56,11 @@ class LexLifecycleTests(unittest.TestCase):
             "blocked_legal_risk",
         )
 
+    def test_sensitive_or_ambiguous_review_evidence_fails_closed(self):
+        data = scenario("invalid-evidence")
+        self.assertTrue(data["session"])
+        self.assertTrue(data["traversal"])
+
     def test_docs_separate_construction_from_live_and_unknown_is_never_approval(self):
         text = (ROOT / "docs" / "lex-lifecycle.md").read_text(encoding="utf-8")
         for marker in (

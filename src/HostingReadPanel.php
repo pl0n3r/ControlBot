@@ -28,9 +28,9 @@ final class HostingReadPanel
         $auth=$grant->authorize($scope,$now);
         if(($auth['authorized']??false)!==true) throw new RuntimeException('hostinger.read denegado.');
 
-        $request=$profile->probeRequest()+[
+        $request=array_replace($profile->probeRequest(),[
             'operation'=>'hosting.snapshot.read','capability'=>'hostinger.read','resource'=>'hosting-panel',
-        ];
+        ]);
         try{$raw=($this->reader)($request);}catch(Throwable){throw new RuntimeException('Lectura Hostinger falló.');}
         if(!is_array($raw)||array_is_list($raw)) throw new InvalidArgumentException('Respuesta Hostinger inválida.');
         self::fields($raw,[

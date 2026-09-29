@@ -35,7 +35,7 @@ SupportSignal contiene únicamente metadata agregada:
 - evidence/freshness;
 - escalation ref opcional.
 
-No transporta conversaciones, cuerpos de tickets, attachments ni identificadores humanos. Las referencias son opacas namespace:<32hex>.
+No transporta conversaciones, cuerpos de tickets, attachments ni identificadores humanos. Las referencias usan el formato namespace:<32hex>. El validador garantiza namespace y forma; la opacidad real y la ausencia de PII son obligación del productor, que no debe codificar nombres, teléfonos ni identificadores semánticos dentro del valor hexadecimal.
 
 ## Scope
 

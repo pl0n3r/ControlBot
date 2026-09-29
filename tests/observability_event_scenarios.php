@@ -49,7 +49,10 @@ $out=match($case) {
         $secretKey=event(); $secretKey['correlation_keys']=['token:github_pat_abcdefghijklmnopqrstuvwxyz123456'];
         $projectSecret=event(); $projectSecret['project_id']='github_pat_abcdefghijklmnopqrstuvwxyz1234567890';
         $userinfo=event(); $userinfo['repository_id']='https://bot:hunter2@git-server/repo';
+        $userinfoEmpty=event(); $userinfoEmpty['repository_id']='https://:hunter2@git-server/repo';
+        $userinfoNoScheme=event(); $userinfoNoScheme['repository_id']='bot:hunter2@git-server/repo';
         $numeric=event('ci','ci_run',['sha'=>'abcdef1234567890abcdef1234567890abcdef12']); $numeric['correlation_keys']=['run:1234567890'];
+        $dateVersion=event('health','health_probe',['version'=>'2026.09.29.1','schema'=>'2026-09-29']);
         return [
             'secret'=>bad(fn()=>ObservabilityEvent::normalize($secret,120,$ttl)),
             'email'=>bad(fn()=>ObservabilityEvent::normalize($email,120,$ttl)),
@@ -60,7 +63,10 @@ $out=match($case) {
             'secret_key'=>bad(fn()=>ObservabilityEvent::normalize($secretKey,120,$ttl)),
             'project_secret'=>bad(fn()=>ObservabilityEvent::normalize($projectSecret,120,$ttl)),
             'uri_userinfo'=>bad(fn()=>ObservabilityEvent::normalize($userinfo,120,$ttl)),
+            'uri_userinfo_empty'=>bad(fn()=>ObservabilityEvent::normalize($userinfoEmpty,120,$ttl)),
+            'uri_userinfo_no_scheme'=>bad(fn()=>ObservabilityEvent::normalize($userinfoNoScheme,120,$ttl)),
             'numeric'=>ObservabilityEvent::normalize($numeric,120,$ttl),
+            'date_version'=>ObservabilityEvent::normalize($dateVersion,120,$ttl),
             'keys'=>ObservabilityEvent::normalize($dupe,120,$ttl)['correlation_keys'],
         ];
     })(),

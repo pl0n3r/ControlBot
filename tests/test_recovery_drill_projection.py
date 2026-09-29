@@ -48,6 +48,7 @@ class RecoveryDrillProjectionTests(unittest.TestCase):
             "sensitive-ref":"token-secret-value",
             "extra-field":"backup-material",
             "target-mismatch":"999",
+            "bad-observed-at":"0",
         }
         for case,sensitive in cases.items():
             with self.subTest(case=case):

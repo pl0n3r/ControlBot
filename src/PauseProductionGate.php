@@ -23,15 +23,14 @@ final class PauseProductionGate
             'operation_id'=>$operation->operationId(),
             'capability'=>$operation->capability(),
             'effect'=>$operation->effect(),
+            'pause_blocked'=>$pauseBlocked,
             'pause_allows'=>!$pauseBlocked,
             'requires_existing_authority'=>true,
             'authorization'=>'not_granted',
             'reason'=>$reason,
-            'effective_pause'=>[
-                'scope'=>$effective['effective_scope'],
-                'pause_id'=>$effective['effective_pause_id'],
-                'state'=>$effective['effective_state'],
-            ],
+            'effective_scope'=>$effective['effective_scope'],
+            'effective_pause_id'=>$effective['effective_pause_id'],
+            'effective_state'=>$effective['effective_state'],
         ];
         return $decision+['fingerprint'=>self::fingerprint($decision)];
     }

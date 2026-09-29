@@ -24,9 +24,10 @@ class IncidentLessonTests(unittest.TestCase):
         self.assertTrue(d["token"]); self.assertTrue(d["email"])
 
     def test_uncertain_evidence_preserves_owner_action_required(self):
-        d=scenario("uncertain")
-        self.assertTrue(d["owner_action_required"])
-        self.assertNotIn("Billing hard stop mechanism remains unverified.",d["root_cause_facts"])
+        data=scenario("uncertain")
+        for state,d in data.items():
+            self.assertTrue(d["owner_action_required"], (state,d))
+            self.assertNotIn("Billing hard stop mechanism remains unverified.",d["root_cause_facts"], (state,d))
 
     def test_independent_bug_is_not_promoted_to_root_cause_or_rule(self):
         d=scenario("independent"); bug="Coordination caller lacked checks write permission."

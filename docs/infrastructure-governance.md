@@ -49,7 +49,7 @@ Una intención `planned` produce un **pre-orden** `RunnerRequest` con WorkItem I
 
 Solo después de una asignación real, `InfrastructureIntent::toRunnerOrder()` agrega order/attempt/generation/runner/TTL y delega la validación final a `RunnerGateway::order()`. La intención no selecciona runners ni salta readiness.
 
-Owner Decision produce `factory-human-gate` con safe default de no ejecutar, mantiene `runner_request=null` y materializa siempre un `approval_ref` opaco `controlbot:approval/infra-<intent_id>` cuando la intención no trae uno. Ese mismo ref queda en el WorkItem y en el marker humano para que Factory readiness preserve el gate. Un estado `planned` sin gate humano no inventa `approval_ref`.
+Owner Decision produce `factory-human-gate` con safe default de no ejecutar, mantiene `runner_request=null` y materializa siempre un `approval_ref` canónico `controlbot:approval/infra-<intent_id>` derivado siempre del intent, aunque el caller aporte otro ref. Ese mismo ref queda en el WorkItem y en el marker propio de ControlBot para que Factory readiness preserve el gate; el payload cerrado `factory-human-gate` no se amplía. Un estado `planned` sin gate humano no inventa `approval_ref`.
 
 `required_roles` usa exclusivamente slugs del catálogo profesional Factory: `arquitectura`, `infraestructura`, `ingenieria-software`, `qa`, `seguridad`, `sre`. Un hard-deny domina cualquier escalamiento y no emite WorkItem, RunnerRequest ni marker que parezca autorizarlo.
 

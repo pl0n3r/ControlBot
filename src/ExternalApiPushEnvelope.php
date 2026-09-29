@@ -13,8 +13,9 @@ final class ExternalApiPushEnvelope
     ];
     private const COPY_KEYS=['attention_required','decision_required','result_available'];
     private const FRESHNESS=['current','stale','unknown'];
-    private const SENSITIVE='/(?:password|passwd|secret|token|cookie|authorization|bearer|credential|private[_ -]?key|public[_ -]?key|api[_ -]?key|otp|dsn)/i';
+    private const SENSITIVE='#(?:^|[:/])(?:password|passwd|secret|token|cookie|authorization|bearer|credential|private[_ -]?key|public[_ -]?key|api[_ -]?key|otp|dsn)(?:$|[:/])#i';
 
+    /** Normalize and validate the push envelope. */
     public static function envelope(array $raw): array
     {
         $expected=[
@@ -63,6 +64,7 @@ final class ExternalApiPushEnvelope
         ];
     }
 
+    /** Build a closed deep-link descriptor for authenticated detail fetch. */
     public static function deepLink(array $raw): array
     {
         $envelope=self::envelope($raw);
@@ -79,6 +81,7 @@ final class ExternalApiPushEnvelope
         ];
     }
 
+    /** Evaluate delivery eligibility only from explicit policy inputs. */
     public static function deliveryPolicy(
         array $raw,
         bool $preferenceEnabled,
@@ -98,6 +101,7 @@ final class ExternalApiPushEnvelope
         ];
     }
 
+    /** Derive a stable collapse key for one type and target pair. */
     private static function collapseKey(string $type,string $target): string
     {
         $hex=hash('sha256',$type.'|'.$target);
@@ -107,6 +111,7 @@ final class ExternalApiPushEnvelope
         ));
     }
 
+    /** Validate an internal target reference. */
     private static function targetRef(mixed $value): string
     {
         if(!is_string($value)||strlen($value)>180
@@ -116,6 +121,7 @@ final class ExternalApiPushEnvelope
         return $value;
     }
 
+    /** Validate an internal provenance reference. */
     private static function controlbotRef(mixed $value,string $label): string
     {
         if(!is_string($value)||strlen($value)>180
@@ -125,6 +131,7 @@ final class ExternalApiPushEnvelope
         return $value;
     }
 
+    /** Validate one opaque hexadecimal reference. */
     private static function opaque(mixed $value,string $label,?string $namespace): string
     {
         if(!is_string($value)) throw new InvalidArgumentException($label.' invalid.');
@@ -135,6 +142,7 @@ final class ExternalApiPushEnvelope
         return $value;
     }
 
+    /** Validate one value against a closed string set. */
     private static function enumValue(mixed $value,array $allowed,string $label): string
     {
         if(!is_string($value)||array_search($value,$allowed,true)===false)

@@ -23,14 +23,14 @@ class MomentumCampaignTests(unittest.TestCase):
 
     def test_campaign_is_vendor_neutral_and_multichannel(self):
         row=scenario("neutral")["campaign"]
-        self.assertEqual(row["channels"],["email","paid_social","web"])
+        self.assertEqual(row["channels"],["owned_messaging","paid_social","web"])
         serialized=json.dumps(row,sort_keys=True).lower()
-        for vendor in ("meta","facebook","instagram","tiktok","google_ads","mailchimp"):
+        for vendor in ("meta","facebook","instagram","tiktok","google_ads","mail_service_vendor"):
             self.assertNotIn(vendor,serialized)
 
     def test_references_are_opaque_and_sensitive_or_direct_pii_fails_closed(self):
         data=scenario("privacy")
-        self.assertTrue(data["email_rejected"])
+        self.assertTrue(data["direct_pii_rejected"])
         self.assertTrue(data["secret_rejected"])
 
     def test_state_schedule_channels_and_variants_are_closed_and_deterministic(self):

@@ -1,43 +1,31 @@
-# MOMENTUM Campaign Contract
+# Momentum Campaign v1
 
-Este contrato es el primer slice ejecutable de #126. Define identidad de marca y campañas por Venture sin acoplar el dominio a proveedores de paid media, mensajería o social publishing.
+`MomentumCampaign` es el primer boundary de MOMENTUM (#126). Normaliza una campaña de marketing sin ejecutar canales ni crear una fuente paralela de autoridad, presupuesto o datos de clientes.
 
-## Brand Context
+## Contrato
 
-Cada `BrandContext` pertenece exactamente a un `venture_id` y contiene únicamente referencias opacas:
-- `tone_ref`;
-- constraints versionables;
-- `source_ref`;
-- `observed_at`.
+La entrada v1 contiene únicamente identificadores y estado estructural: `campaign_id`, `venture_ref`, refs opacas de objective/audience/offer/CTA, canales cerrados, creative refs, status, budget/authority refs, provenance/freshness y result refs con attribution state.
 
-No guarda assets binarios, prompts, usuarios, credenciales ni secretos.
+Los canales v1 son provider-neutral: `organic_social`, `paid_social`, `search_ads`, `email` y `landing`. Los estados son `draft`, `ready`, `active`, `paused`, `completed` y `cancelled`.
 
-## Campaign
+Todos los refs salvo `venture_ref` y `campaign_id` son opacos y venture-scoped: `controlbot:venture/<venture>/<kind>/<32 hex>`. Esto impide reutilizar audiencia, creative, budget, authority, provenance o resultados entre Ventures por accidente. Las listas se deduplican y ordenan para producir una representación determinista.
 
-`Campaign` enlaza:
-- Venture + BrandContext;
-- objective;
-- audience/offer/CTA refs;
-- canales neutrales;
-- creative variant refs;
-- budget ref de CAPITAL;
-- schedule;
-- experiment refs;
-- evidence refs;
-- status.
+## Autoridad y presupuesto
 
-Los canales del core son categorías neutrales: `organic_social`, `paid_social`, `search_ads`, e&#109;ail, `web` y `other`. Un provider concreto será un adapter posterior y no modifica este contrato.
+`budget_ref` referencia presupuesto; no contiene monto y no autoriza gasto. `authority_ref` es opcional y tampoco concede permiso. El contrato no calcula `can_execute`, `spend_allowed` ni authority level. Esos límites siguen perteneciendo a CAPITAL/Decision Rights/Factory según el Business OS.
 
-## Aislamiento
+## Attribution y freshness
 
-Una Campaign solo puede usar el BrandContext del mismo Venture. El contrato no resuelve ni duplica Ventures: consume sus IDs canónicos como referencias. Market Scope #162 permanece independiente; `audience_ref` es opaca hasta que exista el contrato de mercados correspondiente.
+`attribution_state` conserva `observed | inferred | unknown`. `observed` e `inferred` exigen evidencia en `result_refs`; `unknown` exige lista vacía. `freshness=unknown` exige `source_ref=null` y `observed_at=null`, por lo que el contrato nunca fabrica provenance.
 
-## Privacidad y autoridad
+## Privacidad y seguridad
 
-Las refs sensibles al dominio usan namespaces canónicos (`audience:`, `offer:`, `cta:`, `creative:`, `budget:`, `experiment:`, `evidence:`) y un identificador opaco verificable de 32 caracteres hexadecimales minúsculos. Nombres, teléfonos, IDs semánticos, namespaces incorrectos y material con forma de password/token/secret/cookie/API key fallan cerrado. Datos CRM, listas de contactos y usuarios finales permanecen en su fuente autoritativa.
+No hay copy libre, nombres, emails, teléfonos, URLs externas, tokens, secretos ni credenciales. El schema exacto rechaza campos extra. Los refs se validan por namespace, Venture y formato opaco; referencias cross-venture fallan cerrado.
 
-`execution=false` es obligatorio. Este slice no publica, no gasta, no llama providers, no crea scheduler y no materializa Factory WorkItems. Los gates de budget/authority y la distribución por adapters pertenecen a slices posteriores.
+## Límites
 
-## Determinismo
+Este slice no integra Meta/Instagram/TikTok/Google, no publica, no envía email, no sincroniza CRM, no agenda tareas, no persiste, no ejecuta spend, no crea WorkItems y no llama FactoryRunner. Adapters, consentimiento persistente, paid media, email delivery y CRM se materializarán en slices separados cuando exista autoridad y evidencia para hacerlo.
 
-Listas de canales, variants, experiments, evidence y constraints se normalizan de forma ordenada y sin duplicados. Campos desconocidos, schedules incoherentes, estados inválidos y mezclas cross-Venture fallan cerrado. Una campaña `completed` requiere tanto `start_at` como `end_at`.
+## Reversión
+
+El cambio añade cuatro archivos sin migraciones ni estado. Revertirlos elimina completamente el contrato v1.

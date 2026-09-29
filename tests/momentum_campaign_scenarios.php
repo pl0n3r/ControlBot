@@ -1,76 +1,68 @@
 <?php
 declare(strict_types=1);
-
 require __DIR__.'/../src/MomentumCampaign.php';
 
-use ControlBot\Momentum\MomentumCampaign;
+use ControlBot\Business\MomentumCampaign;
 
-function brand(string $venture='venture-condor'): array {
-    return [
-        'version'=>1,'brand_context_id'=>'brand:11111111111111111111111111111111','venture_id'=>$venture,
-        'tone_ref'=>'tone:22222222222222222222222222222222','constraints'=>['brand-safe','no-dark-patterns'],
-        'source_ref'=>'source:33333333333333333333333333333333','observed_at'=>1000,
-    ];
+function bad(callable $fn): bool { try{$fn();return false;}catch(InvalidArgumentException){return true;} }
+function ref(string $kind,string $hex='11111111111111111111111111111111',string $venture='venture-alpha'): string {
+    return "controlbot:venture/$venture/$kind/$hex";
 }
-function campaign(string $venture='venture-condor'): array {
-    return [
-        'version'=>1,'campaign_id'=>'campaign:44444444444444444444444444444444','venture_id'=>$venture,
-        'brand_context_id'=>'brand:11111111111111111111111111111111','objective'=>'acquisition',
-        'audience_ref'=>'audience:55555555555555555555555555555555','offer_ref'=>'offer:66666666666666666666666666666666','cta_ref'=>'cta:77777777777777777777777777777777',
-        'channels'=>['web','e'.'mail','paid_social'],'creative_variant_refs'=>['creative:99999999999999999999999999999999','creative:88888888888888888888888888888888'],
-        'budget_ref'=>'budget:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','schedule'=>['start_at'=>1100,'end_at'=>2100],
-        'experiment_refs'=>['experiment:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'],'status'=>'planned',
-        'evidence_refs'=>['evidence:cccccccccccccccccccccccccccccccc'],'execution'=>false,
-    ];
-}
-function blocked(callable $fn): bool { try{$fn();return false;}catch(Throwable){return true;} }
+function campaign(array $o=[]): array { return array_replace([
+    'version'=>1,'campaign_id'=>'campaign:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'venture_ref'=>'controlbot:venture/venture-alpha','objective_ref'=>ref('objective'),
+    'audience_ref'=>ref('audience'),'offer_ref'=>ref('offer'),'cta_ref'=>ref('cta'),
+    'channels'=>['paid_social','email'],'creative_variant_refs'=>[ref('creative','22222222222222222222222222222222')],
+    'status'=>'ready','budget_ref'=>ref('budget'),'authority_ref'=>ref('authority'),
+    'source_ref'=>ref('source'),'observed_at'=>1700,'freshness'=>'current',
+    'result_refs'=>[ref('result','33333333333333333333333333333333')],'attribution_state'=>'observed',
+],$o); }
 
 $case=$argv[1]??'';
-if($case==='scope'){
-    echo json_encode([
-        'brand'=>MomentumCampaign::brandContext(brand()),
-        'campaign'=>MomentumCampaign::campaign(campaign(),brand()),
-        'cross_venture'=>blocked(fn()=>MomentumCampaign::campaign(campaign('venture-brvtal'),brand())),
-    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
-}
-if($case==='neutral'){
-    $row=MomentumCampaign::campaign(campaign(),brand());
-    echo json_encode(['campaign'=>$row],JSON_THROW_ON_ERROR),PHP_EOL; exit;
-}
-if($case==='privacy'){
-    $humanSlug=campaign(); $humanSlug['audience_ref']='John_Doe';
-    $phoneLike=campaign(); $phoneLike['audience_ref']='573001234567';
-    $wrongNamespace=campaign(); $wrongNamespace['audience_ref']='contact:55555555555555555555555555555555';
-    $namespacedName=campaign(); $namespacedName['audience_ref']='audience:JohnDoe';
-    $namespacedPhone=campaign(); $namespacedPhone['audience_ref']='audience:573001234567';
-    $secret=campaign(); $secret['budget_ref']='budget:token-supersecret';
-    echo json_encode([
-        'human_slug_rejected'=>blocked(fn()=>MomentumCampaign::campaign($humanSlug,brand())),
-        'phone_like_rejected'=>blocked(fn()=>MomentumCampaign::campaign($phoneLike,brand())),
-        'wrong_namespace_rejected'=>blocked(fn()=>MomentumCampaign::campaign($wrongNamespace,brand())),
-        'namespaced_name_rejected'=>blocked(fn()=>MomentumCampaign::campaign($namespacedName,brand())),
-        'namespaced_phone_rejected'=>blocked(fn()=>MomentumCampaign::campaign($namespacedPhone,brand())),
-        'secret_rejected'=>blocked(fn()=>MomentumCampaign::campaign($secret,brand())),
-    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
-}
 if($case==='closed'){
-    $duplicate=campaign(); $duplicate['channels']=['e'.'mail','e'.'mail'];
-    $extra=campaign(); $extra['provider']='meta';
-    $badSchedule=campaign(); $badSchedule['schedule']=['start_at'=>2000,'end_at'=>1000];
-    $active=campaign(); $active['status']='active'; $active['schedule']=['start_at'=>null,'end_at'=>null];
-    $completedMissingStart=campaign(); $completedMissingStart['status']='completed'; $completedMissingStart['schedule']=['start_at'=>null,'end_at'=>2100];
-    echo json_encode([
-        'canonical'=>MomentumCampaign::campaign(campaign(),brand()),
-        'duplicate_rejected'=>blocked(fn()=>MomentumCampaign::campaign($duplicate,brand())),
-        'extra_rejected'=>blocked(fn()=>MomentumCampaign::campaign($extra,brand())),
-        'schedule_rejected'=>blocked(fn()=>MomentumCampaign::campaign($badSchedule,brand())),
-        'active_without_start_rejected'=>blocked(fn()=>MomentumCampaign::campaign($active,brand())),
-        'completed_without_start_rejected'=>blocked(fn()=>MomentumCampaign::campaign($completedMissingStart,brand())),
-    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
-}
-if($case==='pure'){
-    $reflection=new ReflectionClass(MomentumCampaign::class);
-    $methods=array_map(static fn(ReflectionMethod $m): string=>$m->getName(),$reflection->getMethods(ReflectionMethod::IS_PUBLIC));
-    echo json_encode(['methods'=>$methods,'campaign'=>MomentumCampaign::campaign(campaign(),brand())],JSON_THROW_ON_ERROR),PHP_EOL; exit;
-}
-fwrite(STDERR,"Unknown MOMENTUM campaign scenario\n"); exit(2);
+    $out=[
+        'valid'=>MomentumCampaign::normalize(campaign()),
+        'bad_channel'=>bad(fn()=>MomentumCampaign::normalize(campaign(['channels'=>['meta_ads']]))),
+        'bad_status'=>bad(fn()=>MomentumCampaign::normalize(campaign(['status'=>'sending']))),
+        'bad_id'=>bad(fn()=>MomentumCampaign::normalize(campaign(['campaign_id'=>'campaign:felipe']))),
+    ];
+}elseif($case==='authority'){
+    $out=['row'=>MomentumCampaign::normalize(campaign()),'without_authority'=>MomentumCampaign::normalize(campaign(['authority_ref'=>null]))];
+}elseif($case==='attribution'){
+    $unknown=campaign(['freshness'=>'unknown','source_ref'=>null,'observed_at'=>null,'result_refs'=>[],'attribution_state'=>'unknown']);
+    $out=[
+        'observed'=>MomentumCampaign::normalize(campaign()),
+        'inferred'=>MomentumCampaign::normalize(campaign(['attribution_state'=>'inferred'])),
+        'unknown'=>MomentumCampaign::normalize($unknown),
+        'unknown_with_result'=>bad(fn()=>MomentumCampaign::normalize(array_replace($unknown,['result_refs'=>[ref('result')]]))),
+        'unknown_with_source'=>bad(fn()=>MomentumCampaign::normalize(array_replace($unknown,['source_ref'=>ref('source')]))),
+        'observed_without_result'=>bad(fn()=>MomentumCampaign::normalize(campaign(['result_refs'=>[]]))),
+    ];
+}elseif($case==='invalid'){
+    $extra=campaign();$extra['email']='person@example.com';
+    $out=[
+        'cross_venture'=>bad(fn()=>MomentumCampaign::normalize(campaign(['audience_ref'=>ref('audience','11111111111111111111111111111111','venture-beta')]))),
+        'duplicate_channel'=>bad(fn()=>MomentumCampaign::normalize(campaign(['channels'=>['email','email']]))),
+        'duplicate_creative'=>bad(fn()=>MomentumCampaign::normalize(campaign(['creative_variant_refs'=>[ref('creative'),ref('creative')]]))),
+        'extra_pii'=>bad(fn()=>MomentumCampaign::normalize($extra)),
+        'external_url'=>bad(fn()=>MomentumCampaign::normalize(campaign(['cta_ref'=>'https://example.invalid/action']))),
+        'secret_ref'=>bad(fn()=>MomentumCampaign::normalize(campaign(['venture_ref'=>'controlbot:venture/password']))),
+        'credential_ref'=>bad(fn()=>MomentumCampaign::normalize(campaign(['authority_ref'=>'controlbot:venture/venture-alpha/authority/token-value']))),
+    ];
+}elseif($case==='deterministic'){
+    $raw=campaign([
+        'channels'=>['paid_social','email'],
+        'creative_variant_refs'=>[ref('creative','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'),ref('creative','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')],
+        'result_refs'=>[ref('result','dddddddddddddddddddddddddddddddd'),ref('result','cccccccccccccccccccccccccccccccc')],
+    ]);
+    $out=['a'=>MomentumCampaign::normalize($raw),'b'=>MomentumCampaign::normalize($raw)];
+}elseif($case==='pure'){
+    $r=new ReflectionClass(MomentumCampaign::class);
+    $methods=array_map(static fn(ReflectionMethod $m): string=>$m->getName(),array_filter(
+        $r->getMethods(ReflectionMethod::IS_PUBLIC),
+        static fn(ReflectionMethod $m): bool=>$m->getDeclaringClass()->getName()===MomentumCampaign::class
+    ));
+    sort($methods,SORT_STRING);$out=['methods'=>$methods,'source'=>file_get_contents(__DIR__.'/../src/MomentumCampaign.php')];
+}else{fwrite(STDERR,"Unknown momentum campaign scenario\n");exit(2);}
+
+echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;

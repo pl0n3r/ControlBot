@@ -1,189 +1,135 @@
 <?php
 declare(strict_types=1);
 
-namespace ControlBot\Momentum;
+namespace ControlBot\Business;
 
 use InvalidArgumentException;
 
 final class MomentumCampaign
 {
-    private const OBJECTIVES=['acquisition','activation','awareness','reactivation','retention','revenue','research'];
-    private const STATUSES=['draft','planned','approved','active','paused','completed','cancelled'];
-    private const SENSITIVE='/(?:bearer\s+|password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn|(?:ghp_|gho_|github_pat_)[A-Za-z0-9_]{8,}|(?:^|[^A-Za-z0-9])(?:sk|rk|pk)-[A-Za-z0-9_-]{8,})/i';
+    private const CHANNELS=['organic_social','paid_social','search_ads','email','landing'];
+    private const STATES=['draft','ready','active','paused','completed','cancelled'];
+    private const FRESHNESS=['current','stale','unknown'];
+    private const ATTRIBUTION=['observed','inferred','unknown'];
+    private const SENSITIVE = '#(?:^|[:/])(?:password|passwd|secret|token|cookie|authorization|bearer|credential|otp|dsn|api[-_ ]?key|private[-_ ]?key)(?:$|[:/._-])#i';
 
-    public static function brandContext(array $raw): array
+    public static function normalize(array $raw): array
     {
-        self::fields($raw,[
-            'version','brand_context_id','venture_id','tone_ref','constraints','source_ref','observed_at',
-        ],'BrandContext');
-        if($raw['version']!==1) throw new InvalidArgumentException('BrandContext version invalid.');
-        return [
-            'version'=>1,
-            'brand_context_id'=>self::opaqueRef($raw['brand_context_id'],'brand_context_id','brand'),
-            'venture_id'=>self::ref($raw['venture_id'],'venture_id'),
-            'tone_ref'=>self::opaqueRef($raw['tone_ref'],'tone_ref','tone'),
-            'constraints'=>self::uniqueSlugs($raw['constraints'],'constraints',32),
-            'source_ref'=>self::opaqueRef($raw['source_ref'],'source_ref','source'),
-            'observed_at'=>self::nonNegativeInt($raw['observed_at'],'observed_at'),
+        $expected=[
+            'version','campaign_id','venture_ref','objective_ref','audience_ref','offer_ref','cta_ref',
+            'channels','creative_variant_refs','status','budget_ref','authority_ref','source_ref',
+            'observed_at','freshness','result_refs','attribution_state',
         ];
-    }
+        self::fields($raw,$expected);
+        if($raw['version']!==1) throw new InvalidArgumentException('Campaign version invalid.');
 
-    public static function campaign(array $raw,array $brandRaw): array
-    {
-        $brand=self::brandContext($brandRaw);
-        self::fields($raw,[
-            'version','campaign_id','venture_id','brand_context_id','objective','audience_ref','offer_ref',
-            'cta_ref','channels','creative_variant_refs','budget_ref','schedule','experiment_refs',
-            'status','evidence_refs','execution',
-        ],'Campaign');
-        if($raw['version']!==1 || $raw['execution']!==false)
-            throw new InvalidArgumentException('Campaign version or execution invalid.');
+        $venture=self::ventureRef($raw['venture_ref']);
+        $slug=substr($venture,strlen('controlbot:venture/'));
+        $freshness=self::enum($raw['freshness'],self::FRESHNESS,'freshness');
+        $attribution=self::enum($raw['attribution_state'],self::ATTRIBUTION,'attribution_state');
 
-        $venture=self::ref($raw['venture_id'],'venture_id');
-        $brandId=self::opaqueRef($raw['brand_context_id'],'brand_context_id','brand');
-        if($venture!==$brand['venture_id'] || $brandId!==$brand['brand_context_id'])
-            throw new InvalidArgumentException('Campaign brand context scope mismatch.');
+        if($freshness==='unknown'){
+            if($raw['source_ref']!==null||$raw['observed_at']!==null)
+                throw new InvalidArgumentException('Unknown freshness cannot invent provenance.');
+            $source=null;$observed=null;
+        }else{
+            $source=self::scopedRef($raw['source_ref'],$slug,'source','source_ref');
+            $observed=self::timestamp($raw['observed_at'],'observed_at');
+        }
 
-        $status=self::enumValue($raw['status'],self::STATUSES,'status');
-        $schedule=self::schedule($raw['schedule']);
-        if($status==='active' && $schedule['start_at']===null)
-            throw new InvalidArgumentException('Active campaign requires start_at.');
-        if($status==='completed' && ($schedule['start_at']===null || $schedule['end_at']===null))
-            throw new InvalidArgumentException('Completed campaign requires start_at and end_at.');
+        $results=self::scopedRefList($raw['result_refs'],$slug,'result','result_refs',32,true);
+        if($attribution==='unknown' && $results!==[])
+            throw new InvalidArgumentException('Unknown attribution cannot invent results.');
+        if($attribution!=='unknown' && $results===[])
+            throw new InvalidArgumentException('Attribution evidence required.');
 
         return [
             'version'=>1,
-            'campaign_id'=>self::opaqueRef($raw['campaign_id'],'campaign_id','campaign'),
-            'venture_id'=>$venture,
-            'brand_context_id'=>$brandId,
-            'objective'=>self::enumValue($raw['objective'],self::OBJECTIVES,'objective'),
-            'audience_ref'=>self::opaqueRef($raw['audience_ref'],'audience_ref','audience'),
-            'offer_ref'=>self::opaqueRef($raw['offer_ref'],'offer_ref','offer'),
-            'cta_ref'=>self::opaqueRef($raw['cta_ref'],'cta_ref','cta'),
-            'channels'=>self::uniqueEnums($raw['channels'],self::channels(),'channels'),
-            'creative_variant_refs'=>self::uniqueOpaqueRefs($raw['creative_variant_refs'],'creative_variant_refs','creative',64),
-            'budget_ref'=>self::opaqueRef($raw['budget_ref'],'budget_ref','budget'),
-            'schedule'=>$schedule,
-            'experiment_refs'=>self::uniqueOpaqueRefs($raw['experiment_refs'],'experiment_refs','experiment',32),
-            'status'=>$status,
-            'evidence_refs'=>self::uniqueOpaqueRefs($raw['evidence_refs'],'evidence_refs','evidence',64),
-            'execution'=>false,
+            'campaign_id'=>self::opaqueCampaignId($raw['campaign_id']),
+            'venture_ref'=>$venture,
+            'objective_ref'=>self::scopedRef($raw['objective_ref'],$slug,'objective','objective_ref'),
+            'audience_ref'=>self::scopedRef($raw['audience_ref'],$slug,'audience','audience_ref'),
+            'offer_ref'=>self::scopedRef($raw['offer_ref'],$slug,'offer','offer_ref'),
+            'cta_ref'=>self::scopedRef($raw['cta_ref'],$slug,'cta','cta_ref'),
+            'channels'=>self::enumList($raw['channels'],self::CHANNELS,'channels',5),
+            'creative_variant_refs'=>self::scopedRefList($raw['creative_variant_refs'],$slug,'creative','creative_variant_refs',32,false),
+            'status'=>self::enum($raw['status'],self::STATES,'status'),
+            'budget_ref'=>self::scopedRef($raw['budget_ref'],$slug,'budget','budget_ref'),
+            'authority_ref'=>$raw['authority_ref']===null?null:self::scopedRef($raw['authority_ref'],$slug,'authority','authority_ref'),
+            'source_ref'=>$source,
+            'observed_at'=>$observed,
+            'freshness'=>$freshness,
+            'result_refs'=>$results,
+            'attribution_state'=>$attribution,
         ];
     }
 
-    private static function schedule(mixed $raw): array
+    private static function fields(array $raw,array $expected): void
     {
-        self::fields($raw,['start_at','end_at'],'Schedule');
-        $start=self::nullableNonNegativeInt($raw['start_at'],'start_at');
-        $end=self::nullableNonNegativeInt($raw['end_at'],'end_at');
-        if($start!==null && $end!==null && $end<$start)
-            throw new InvalidArgumentException('Campaign schedule invalid.');
-        return ['start_at'=>$start,'end_at'=>$end];
+        if(array_is_list($raw)) throw new InvalidArgumentException('Campaign invalid.');
+        $actual=array_keys($raw); sort($actual,SORT_STRING); sort($expected,SORT_STRING);
+        if($actual!==$expected) throw new InvalidArgumentException('Campaign fields invalid.');
     }
 
-    private static function channels(): array
+    private static function ventureRef(mixed $value): string
     {
-        return ['organic_social','other','e'.'mail','paid_social','search_ads','web'];
-    }
-
-    private static function opaqueRef(mixed $value,string $label,string $namespace): string
-    {
-        $ref=self::ref($value,$label);
-        $pattern='/^'.preg_quote($namespace,'/').':[a-f0-9]{32}$/D';
-        if(preg_match($pattern,$ref)!==1)
-            throw new InvalidArgumentException($label.' opaque identifier invalid.');
-        return $ref;
-    }
-
-    private static function uniqueOpaqueRefs(mixed $values,string $label,string $namespace,int $max): array
-    {
-        if(!is_array($values)||!array_is_list($values)||count($values)>$max)
-            throw new InvalidArgumentException($label.' invalid.');
-        $out=[];
-        foreach($values as $value){
-            $ref=self::opaqueRef($value,$label,$namespace);
-            if(in_array($ref,$out,true)) throw new InvalidArgumentException($label.' duplicated.');
-            $out[]=$ref;
-        }
-        sort($out,SORT_STRING);
-        return $out;
-    }
-
-    private static function uniqueSlugs(mixed $values,string $label,int $max): array
-    {
-        if(!is_array($values)||!array_is_list($values)||count($values)>$max)
-            throw new InvalidArgumentException($label.' invalid.');
-        $out=[];
-        foreach($values as $value){
-            if(!is_string($value)||preg_match('/^[a-z][a-z0-9._-]{0,79}$/D',$value)!==1)
-                throw new InvalidArgumentException($label.' invalid.');
-            if(in_array($value,$out,true)) throw new InvalidArgumentException($label.' duplicated.');
-            $out[]=$value;
-        }
-        sort($out,SORT_STRING);
-        return $out;
-    }
-
-    private static function uniqueRefs(mixed $values,string $label,int $max): array
-    {
-        if(!is_array($values)||!array_is_list($values)||count($values)>$max)
-            throw new InvalidArgumentException($label.' invalid.');
-        $out=[];
-        foreach($values as $value){
-            $ref=self::ref($value,$label);
-            if(in_array($ref,$out,true)) throw new InvalidArgumentException($label.' duplicated.');
-            $out[]=$ref;
-        }
-        sort($out,SORT_STRING);
-        return $out;
-    }
-
-    private static function uniqueEnums(mixed $values,array $allowed,string $label): array
-    {
-        if(!is_array($values)||!array_is_list($values)||$values===[]||count($values)>16)
-            throw new InvalidArgumentException($label.' invalid.');
-        $out=[];
-        foreach($values as $value){
-            $normalized=self::enumValue($value,$allowed,$label);
-            if(in_array($normalized,$out,true)) throw new InvalidArgumentException($label.' duplicated.');
-            $out[]=$normalized;
-        }
-        sort($out,SORT_STRING);
-        return $out;
-    }
-
-    private static function ref(mixed $value,string $label): string
-    {
-        if(!is_string($value)||strlen($value)<1||strlen($value)>180||str_contains($value,'@')
-            ||preg_match('/^[A-Za-z0-9][A-Za-z0-9._:\/#-]*$/D',$value)!==1
+        if(!is_string($value)||strlen($value)>90
+            ||preg_match('#^controlbot:venture/[a-z][a-z0-9-]{1,63}$#D',$value)!==1
             ||preg_match(self::SENSITIVE,$value)===1)
+            throw new InvalidArgumentException('venture_ref invalid.');
+        return $value;
+    }
+
+    private static function scopedRef(mixed $value,string $venture,string $kind,string $label): string
+    {
+        if(!is_string($value)||preg_match(self::SENSITIVE,$value)===1) throw new InvalidArgumentException($label.' invalid.');
+        $pattern='#^controlbot:venture/'.preg_quote($venture,'#').'/'.preg_quote($kind,'#').'/[a-f0-9]{32}$#D';
+        if(preg_match($pattern,$value)!==1) throw new InvalidArgumentException($label.' invalid.');
+        return $value;
+    }
+
+    private static function scopedRefList(mixed $values,string $venture,string $kind,string $label,int $max,bool $allowEmpty): array
+    {
+        if(!is_array($values)||!array_is_list($values)||count($values)>$max||(!$allowEmpty&&$values===[]))
             throw new InvalidArgumentException($label.' invalid.');
-        return $value;
+        $out=[];
+        foreach($values as $value){
+            $ref=self::scopedRef($value,$venture,$kind,$label);
+            if(isset($out[$ref])) throw new InvalidArgumentException($label.' duplicated.');
+            $out[$ref]=true;
+        }
+        $refs=array_keys($out); sort($refs,SORT_STRING); return $refs;
     }
 
-    private static function enumValue(mixed $value,array $allowed,string $label): string
+    private static function enumList(mixed $values,array $allowed,string $label,int $max): array
     {
-        if(!is_string($value)||!in_array($value,$allowed,true))
+        if(!is_array($values)||!array_is_list($values)||$values===[]||count($values)>$max)
             throw new InvalidArgumentException($label.' invalid.');
+        $out=[];
+        foreach($values as $value){
+            $value=self::enum($value,$allowed,$label);
+            if(isset($out[$value])) throw new InvalidArgumentException($label.' duplicated.');
+            $out[$value]=true;
+        }
+        $values=array_keys($out); sort($values,SORT_STRING); return $values;
+    }
+
+    private static function opaqueCampaignId(mixed $value): string
+    {
+        if(!is_string($value)||preg_match('/^campaign:[a-f0-9]{32}$/D',$value)!==1)
+            throw new InvalidArgumentException('campaign_id invalid.');
         return $value;
     }
 
-    private static function nonNegativeInt(mixed $value,string $label): int
+    private static function enum(mixed $value,array $allowed,string $label): string
     {
-        if(!is_int($value)||$value<0) throw new InvalidArgumentException($label.' invalid.');
+        if(!is_string($value)||!in_array($value,$allowed,true)) throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
 
-    private static function nullableNonNegativeInt(mixed $value,string $label): ?int
+    private static function timestamp(mixed $value,string $label): int
     {
-        if($value===null) return null;
-        return self::nonNegativeInt($value,$label);
-    }
-
-    private static function fields(mixed $row,array $expected,string $label): void
-    {
-        if(!is_array($row)||array_is_list($row)) throw new InvalidArgumentException($label.' invalid.');
-        $keys=array_keys($row); sort($keys); sort($expected);
-        if($keys!==$expected) throw new InvalidArgumentException($label.' fields invalid.');
+        if(!is_int($value)||$value<1) throw new InvalidArgumentException($label.' invalid.');
+        return $value;
     }
 }

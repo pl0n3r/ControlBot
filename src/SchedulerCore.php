@@ -238,8 +238,6 @@ final class SchedulerCore
             ||!is_array($raw['accounts'])||!array_is_list($raw['accounts'])) {
             throw new InvalidArgumentException('Presence capacity invalid.');
         }
-        if(($raw['capacity_state']==='idle_capacity')!==($raw['idle_capacity']>0))
-            throw new InvalidArgumentException('Presence capacity state mismatch.');
         return ['idle_capacity'=>$raw['idle_capacity']];
     }
 

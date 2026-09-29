@@ -57,6 +57,17 @@ class InfrastructureObservationTests(unittest.TestCase):
         self.assertTrue(invalid["duplicate_binding"])
         self.assertTrue(invalid["dangling_service"])
         self.assertTrue(invalid["dangling_environment"])
+        for key in (
+            "cross_scope_service_project",
+            "cross_scope_service_venture",
+            "cross_scope_service_environment",
+            "cross_scope_environment_project",
+            "cross_scope_environment_venture",
+            "cross_scope_parent_project",
+            "cross_scope_parent_venture",
+            "ambiguous_environment_source",
+        ):
+            self.assertTrue(invalid[key], (key, invalid))
 
     def test_backup_and_restore_verification_remain_separate_signals(self):
         data = scenario("recovery-signals")

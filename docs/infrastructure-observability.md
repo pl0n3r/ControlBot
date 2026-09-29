@@ -34,6 +34,8 @@ Incident refs solo enlazan evidencia. No crean incidentes ni deciden severidad.
 
 No acepta un graph autocertificado por caller. Un capability solo se asocia cuando `project_ref` y `venture_ref` coinciden exactamente con el recurso. La vista inversa `venture → resources` usa únicamente `venture_ref` explícito; nunca cruza ventures por similitud de nombre, provider o account.
 
+Las relaciones explícitas tampoco autorizan cruces de scope: `service_ref` exige igualdad exacta de `project_ref + venture_ref + environment_ref`; `environment_ref` y `parent_ref` exigen igualdad de `project_ref + venture_ref`. Los `source_ref` de recursos `environment` deben ser unívocos; una referencia ambigua falla cerrado en vez de elegir por orden.
+
 El grafo describe **impacto potencial conocido por relaciones declaradas**. No fabrica customer impact ni blast radius cuando faltan relaciones.
 
 ## Reutilización y límites

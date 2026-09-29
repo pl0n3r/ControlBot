@@ -145,8 +145,9 @@ final class SchedulerCore
             $concurrencyBound+=min($count,$remaining);
         }
 
+        $jointBound=self::jointLaneProjectBound($eligible,$concurrency);
         $idle=$presence['idle_capacity'];
-        $dispatchable=min($idle,$readyCount,$claimBound,$concurrencyBound);
+        $dispatchable=min($idle,$readyCount,$jointBound);
         $reasons=[];
         if($idle===0) $reasons[]='authoritative_capacity_unavailable';
         if($readyCount<count($work)) $reasons[]='work_constraints';
@@ -165,6 +166,7 @@ final class SchedulerCore
             'version'=>1,'policy_ref'=>'factory-dispatcher-v2',
             'authoritative_idle_capacity'=>$idle,'dispatchable_capacity'=>$dispatchable,
             'ready_work_items'=>$readyCount,'claim_lanes'=>$claimBound,'concurrency_slots'=>$concurrencyBound,
+            'joint_constraint_slots'=>$jointBound,
             'reasons'=>$reasons,'work_items'=>$views,
         ];
     }
@@ -302,7 +304,12 @@ final class SchedulerCore
 
     private static function claimLaneBound(array $eligible): int
     {
-        if($eligible===[]) return 0;
+        return count(self::claimLanes($eligible));
+    }
+
+    private static function claimLanes(array $eligible): array
+    {
+        if($eligible===[]) return [];
         $parent=[]; $claimOwner=[];
         foreach($eligible as $id=>$row){
             $parent[$id]=$id;
@@ -311,9 +318,55 @@ final class SchedulerCore
                 else $claimOwner[$claim]=$id;
             }
         }
-        $roots=[];
-        foreach(array_keys($parent) as $id) $roots[self::root($parent,$id)]=true;
-        return count($roots);
+
+        $lanes=[];
+        foreach($eligible as $id=>$row){
+            $root=self::root($parent,$id);
+            $project=$row['item']['project_id'];
+            $lanes[$root][$project]=true;
+        }
+        ksort($lanes,SORT_STRING);
+        $out=[];
+        foreach($lanes as $projects){
+            $ids=array_keys($projects);
+            sort($ids,SORT_STRING);
+            $out[]=$ids;
+        }
+        return $out;
+    }
+
+    private static function jointLaneProjectBound(array $eligible,array $concurrency): int
+    {
+        $lanes=self::claimLanes($eligible);
+        if($lanes===[]) return 0;
+
+        $slots=[];
+        foreach($concurrency as $project=>$rule){
+            $remaining=max(0,$rule['limit']-$rule['active']);
+            $remaining=min($remaining,count($eligible));
+            for($i=0;$i<$remaining;$i++) $slots[$project.'#'.$i]=$project;
+        }
+        ksort($slots,SORT_STRING);
+
+        $owners=[]; $matched=0;
+        foreach(array_keys($lanes) as $lane){
+            $seen=[];
+            if(self::matchLane($lane,$lanes,$slots,$owners,$seen)) $matched++;
+        }
+        return $matched;
+    }
+
+    private static function matchLane(int $lane,array $lanes,array $slots,array &$owners,array &$seen): bool
+    {
+        foreach($slots as $slot=>$project){
+            if(!in_array($project,$lanes[$lane],true)||isset($seen[$slot])) continue;
+            $seen[$slot]=true;
+            if(!isset($owners[$slot])||self::matchLane($owners[$slot],$lanes,$slots,$owners,$seen)){
+                $owners[$slot]=$lane;
+                return true;
+            }
+        }
+        return false;
     }
 
     private static function union(array &$parent,string $a,string $b): void

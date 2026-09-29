@@ -1,10 +1,13 @@
 <?php
 declare(strict_types=1);
+
 namespace ControlBot\Infrastructure;
+
 use ControlBot\Business\CapitalPolicy;
 use ControlBot\Production\CapabilityPolicy;
 use ControlBot\Runner\RunnerGateway;
 use InvalidArgumentException;
+
 final class InfrastructureIntent
 {
     private const TYPES = ['read', 'plan', 'restart', 'capacity', 'rollback', 'reconcile'];
@@ -12,12 +15,21 @@ final class InfrastructureIntent
     private const BLAST = ['low', 'medium', 'high', 'unknown'];
     private const AUTHORITY = ['allow', 'deny', 'owner_decision_required', 'unknown'];
     private const PRIORITIES = ['critical', 'high', 'medium'];
-    private const FACTORY_ROLES = ['arquitectura', 'infraestructura', 'ingenieria-software', 'qa', 'seguridad', 'sre'];
+    private const FACTORY_ROLES = [
+        'arquitectura',
+        'infraestructura',
+        'ingenieria-software',
+        'qa',
+        'seguridad',
+        'sre',
+    ];
+
     public static function plan(array $raw, array $authorityRaw, ?array $capitalInput, int $now): array
     {
         if ($now < 1) {
             throw new InvalidArgumentException('InfrastructureIntent clock invalid.');
         }
+
         $intent = self::intent($raw);
         $authority = self::authority($authorityRaw);
         $basePolicy = CapabilityPolicy::classify($intent['capability']);
@@ -29,6 +41,7 @@ final class InfrastructureIntent
         $capital = null;
         $deny = [];
         $owner = [];
+
         if ($authority['scope'] !== $intent['scope']) {
             $deny[] = 'authority_scope_mismatch';
         } elseif ($authority['decision'] === 'deny') {
@@ -38,6 +51,7 @@ final class InfrastructureIntent
         } elseif ($authority['decision'] === 'unknown') {
             $deny[] = 'authority_unknown';
         }
+
         if (!$basePolicy['known'] || $basePolicy['decision'] === 'forbidden') {
             $deny[] = $basePolicy['reason'];
         } else {
@@ -48,11 +62,13 @@ final class InfrastructureIntent
                 $deny[] = 'readonly_intent_with_write_capability';
             }
         }
+
         if (!$policy['known'] || $policy['decision'] === 'forbidden') {
             $deny[] = $policy['reason'];
         } elseif ($policy['requires_owner_approval']) {
             $owner[] = 'policy_owner_required';
         }
+
         if ($intent['blast_radius'] === 'high') {
             $owner[] = 'high_blast_radius';
         } elseif ($intent['blast_radius'] === 'unknown') {
@@ -64,6 +80,7 @@ final class InfrastructureIntent
         if ($policy['requires_backup'] && $intent['evidence']['safe_point_ref'] === null) {
             $deny[] = 'backup_required_without_safe_point';
         }
+
         if ($intent['cost_applicable']) {
             if ($intent['budget_ref'] === null || $intent['cost_ref'] === null || $capitalInput === null) {
                 $deny[] = 'financial_evidence_unknown';
@@ -85,38 +102,57 @@ final class InfrastructureIntent
         } elseif ($capitalInput !== null) {
             throw new InvalidArgumentException('capital policy applicability mismatch.');
         }
+
         $deny = self::reasons($deny);
         $owner = self::reasons($owner);
         $status = $deny !== []
             ? 'denied'
             : ($owner !== [] ? 'owner_decision_required' : 'planned');
+
         $workItem = null;
         $runnerRequest = null;
         if ($status !== 'denied') {
-            if ($status === 'owner_decision_required' && $intent['approval_ref'] === null) {
+            if ($status === 'owner_decision_required') {
                 $intent['approval_ref'] = 'controlbot:approval/infra-' . $intent['intent_id'];
             }
             $workItem = self::factoryWorkItem($intent, $authority, $capital);
             if ($status === 'planned') {
                 $runnerRequest = self::runnerRequest([
-                    'version' => 1, 'work_item_id' => $workItem['work_id'], 'capability' => $intent['capability'], 'scope' => $intent['scope'],
-                    'instruction_ref' => $intent['instruction_ref'], 'evidence_refs' => $workItem['evidence_refs'],
+                    'version' => 1,
+                    'work_item_id' => $workItem['work_id'],
+                    'capability' => $intent['capability'],
+                    'scope' => $intent['scope'],
+                    'instruction_ref' => $intent['instruction_ref'],
+                    'evidence_refs' => $workItem['evidence_refs'],
                     'verify_after_write_ref' => $intent['evidence']['verify_ref'],
                 ]);
             }
         }
+
         return [
-            'version' => 1, 'status' => $status, 'execution' => false,
+            'version' => 1,
+            'status' => $status,
+            'execution' => false,
             'intent' => [
-                'intent_id' => $intent['intent_id'], 'intent_type' => $intent['intent_type'], 'scope' => $intent['scope'],
-                'blast_radius' => $intent['blast_radius'], 'capability' => $intent['capability'], 'mutating' => $mutating,
+                'intent_id' => $intent['intent_id'],
+                'intent_type' => $intent['intent_type'],
+                'scope' => $intent['scope'],
+                'blast_radius' => $intent['blast_radius'],
+                'capability' => $intent['capability'],
+                'mutating' => $mutating,
                 'cost_applicable' => $intent['cost_applicable'],
             ],
             'authority' => [
-                'decision' => $authority['decision'], 'reason_code' => $authority['reason_code'], 'scope' => $authority['scope'],
-                'evidence_ref' => $authority['evidence_ref'], 'policy' => $policy,
+                'decision' => $authority['decision'],
+                'reason_code' => $authority['reason_code'],
+                'scope' => $authority['scope'],
+                'evidence_ref' => $authority['evidence_ref'],
+                'policy' => $policy,
             ],
-            'capital' => $capital, 'evidence_contract' => $intent['evidence'], 'reasons' => $deny !== [] ? $deny : $owner, 'work_item' => $workItem,
+            'capital' => $capital,
+            'evidence_contract' => $intent['evidence'],
+            'reasons' => $deny !== [] ? $deny : $owner,
+            'work_item' => $workItem,
             'runner_request' => $runnerRequest,
             'owner_decision_gate' => $status === 'owner_decision_required'
                 ? self::ownerGate(
@@ -128,6 +164,7 @@ final class InfrastructureIntent
                 : null,
         ];
     }
+
     public static function toRunnerOrder(array $runnerRequestRaw, array $assignment, int $now): array
     {
         $request = self::runnerRequest($runnerRequestRaw);
@@ -137,15 +174,23 @@ final class InfrastructureIntent
         if ($now < 1 || !is_int($assignment['expires_at']) || $assignment['expires_at'] <= $now) {
             throw new InvalidArgumentException('RunnerAssignment timing invalid.');
         }
+
         return RunnerGateway::order([
-            'version' => 1, 'order_id' => self::uuid($assignment['order_id'], 'order_id'),
+            'version' => 1,
+            'order_id' => self::uuid($assignment['order_id'], 'order_id'),
             'attempt_id' => self::uuid($assignment['attempt_id'], 'attempt_id'),
-            'generation' => self::positiveInt($assignment['generation'], 'generation'), 'work_item_id' => $request['work_item_id'],
-            'runner_id' => self::uuid($assignment['runner_id'], 'runner_id'), 'capability' => $request['capability'],
-            'attempt' => self::positiveInt($assignment['attempt'], 'attempt'), 'scope' => $request['scope'], 'issued_at' => $now,
-            'expires_at' => $assignment['expires_at'], 'instruction_ref' => $request['instruction_ref'],
+            'generation' => self::positiveInt($assignment['generation'], 'generation'),
+            'work_item_id' => $request['work_item_id'],
+            'runner_id' => self::uuid($assignment['runner_id'], 'runner_id'),
+            'capability' => $request['capability'],
+            'attempt' => self::positiveInt($assignment['attempt'], 'attempt'),
+            'scope' => $request['scope'],
+            'issued_at' => $now,
+            'expires_at' => $assignment['expires_at'],
+            'instruction_ref' => $request['instruction_ref'],
         ]);
     }
+
     private static function intent(array $raw): array
     {
         self::fields($raw, [
@@ -161,6 +206,7 @@ final class InfrastructureIntent
         if (!is_bool($raw['cost_applicable'])) {
             throw new InvalidArgumentException('cost_applicable invalid.');
         }
+
         $type = self::enum($raw['intent_type'], self::TYPES, 'intent_type');
         $repository = self::safeText($raw['repository_ref'], 'repository_ref', 160);
         if (preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/D', $repository) !== 1) {
@@ -170,36 +216,53 @@ final class InfrastructureIntent
         if (!str_starts_with($instruction, 'controlbot:')) {
             throw new InvalidArgumentException('instruction_ref must belong to ControlBot.');
         }
+
         return [
-            'version' => 1, 'intent_id' => self::id($raw['intent_id'], 'intent_id'),
+            'version' => 1,
+            'intent_id' => self::id($raw['intent_id'], 'intent_id'),
             'origin_mode' => self::enum($raw['origin_mode'], ['directed', 'automatic'], 'origin_mode'),
-            'group_id' => self::factorySlug($raw['group_id'], 'group_id'), 'venture_id' => self::safeText($raw['venture_id'], 'venture_id', 120),
-            'project_id' => self::safeText($raw['project_id'], 'project_id', 120), 'repository_ref' => $repository, 'intent_type' => $type,
-            'priority' => self::enum($raw['priority'], self::PRIORITIES, 'priority'), 'scope' => self::ref($raw['scope'], 'scope'),
-            'blast_radius' => self::enum($raw['blast_radius'], self::BLAST, 'blast_radius'), 'capability' => self::capability($raw['capability']),
-            'depends_on' => self::strings($raw['depends_on'], 'depends_on', 50), 'claims' => self::strings($raw['claims'], 'claims', 50),
-            'policy_ref' => self::ref($raw['policy_ref'], 'policy_ref'), 'evidence_refs' => self::strings($raw['evidence_refs'], 'evidence_refs', 50),
+            'group_id' => self::factorySlug($raw['group_id'], 'group_id'),
+            'venture_id' => self::safeText($raw['venture_id'], 'venture_id', 120),
+            'project_id' => self::safeText($raw['project_id'], 'project_id', 120),
+            'repository_ref' => $repository,
+            'intent_type' => $type,
+            'priority' => self::enum($raw['priority'], self::PRIORITIES, 'priority'),
+            'scope' => self::ref($raw['scope'], 'scope'),
+            'blast_radius' => self::enum($raw['blast_radius'], self::BLAST, 'blast_radius'),
+            'capability' => self::capability($raw['capability']),
+            'depends_on' => self::strings($raw['depends_on'], 'depends_on', 50),
+            'claims' => self::strings($raw['claims'], 'claims', 50),
+            'policy_ref' => self::ref($raw['policy_ref'], 'policy_ref'),
+            'evidence_refs' => self::strings($raw['evidence_refs'], 'evidence_refs', 50),
             'idempotency_key' => self::safeText($raw['idempotency_key'], 'idempotency_key', 128),
             'authority_level' => self::factorySlug($raw['authority_level'], 'authority_level'),
             'budget_ref' => self::nullableRef($raw['budget_ref'], 'budget_ref'),
-            'approval_ref' => self::nullableRef($raw['approval_ref'], 'approval_ref'), 'instruction_ref' => $instruction,
-            'cost_applicable' => $raw['cost_applicable'], 'cost_ref' => self::nullableRef($raw['cost_ref'], 'cost_ref'),
+            'approval_ref' => self::nullableRef($raw['approval_ref'], 'approval_ref'),
+            'instruction_ref' => $instruction,
+            'cost_applicable' => $raw['cost_applicable'],
+            'cost_ref' => self::nullableRef($raw['cost_ref'], 'cost_ref'),
             'evidence' => self::evidence($raw['evidence'], $type),
         ];
     }
+
     private static function authority(array $raw): array
     {
-        self::fields($raw, ['decision', 'reason_code', 'scope', 'evidence_ref', 'policy_restrictions'], 'AuthorityProjection');
+        self::fields($raw, [
+            'decision', 'reason_code', 'scope', 'evidence_ref', 'policy_restrictions',
+        ], 'AuthorityProjection');
         if (!is_array($raw['policy_restrictions']) || !array_is_list($raw['policy_restrictions'])
             || count($raw['policy_restrictions']) > 8) {
             throw new InvalidArgumentException('policy_restrictions invalid.');
         }
         return [
             'decision' => self::enum($raw['decision'], self::AUTHORITY, 'authority.decision'),
-            'reason_code' => self::factorySlug($raw['reason_code'], 'authority.reason_code'), 'scope' => self::ref($raw['scope'], 'authority.scope'),
-            'evidence_ref' => self::ref($raw['evidence_ref'], 'authority.evidence_ref'), 'policy_restrictions' => $raw['policy_restrictions'],
+            'reason_code' => self::factorySlug($raw['reason_code'], 'authority.reason_code'),
+            'scope' => self::ref($raw['scope'], 'authority.scope'),
+            'evidence_ref' => self::ref($raw['evidence_ref'], 'authority.evidence_ref'),
+            'policy_restrictions' => $raw['policy_restrictions'],
         ];
     }
+
     private static function evidence(mixed $raw, string $type): array
     {
         self::fields($raw, [
@@ -213,8 +276,10 @@ final class InfrastructureIntent
             'impact_ref' => self::nullableRef($raw['impact_ref'], 'evidence.impact_ref'),
             'rollback_ref' => self::nullableRef($raw['rollback_ref'], 'evidence.rollback_ref'),
             'safe_point_ref' => self::nullableRef($raw['safe_point_ref'], 'evidence.safe_point_ref'),
-            'verify_ref' => self::nullableRef($raw['verify_ref'], 'evidence.verify_ref'), 'irreversible' => $raw['irreversible'],
+            'verify_ref' => self::nullableRef($raw['verify_ref'], 'evidence.verify_ref'),
+            'irreversible' => $raw['irreversible'],
         ];
+
         $mutating = in_array($type, self::MUTATING, true);
         if ($mutating) {
             if ($out['plan_ref'] === null || $out['impact_ref'] === null || $out['verify_ref'] === null) {
@@ -236,76 +301,144 @@ final class InfrastructureIntent
         }
         return $out;
     }
+
     private static function factoryWorkItem(array $intent, array $authority, ?array $capital): array
     {
-        $evidence = array_merge($intent['evidence_refs'], [$authority['evidence_ref']], array_filter([
-            $intent['cost_ref'], $intent['evidence']['plan_ref'], $intent['evidence']['impact_ref'],
-            $intent['evidence']['safe_point_ref'], $intent['evidence']['rollback_ref'],
-            $intent['evidence']['verify_ref'], $capital['budget']['source_ref'] ?? null,
+        $evidence = $intent['evidence_refs'];
+        $evidence[] = $authority['evidence_ref'];
+        foreach ([
+            $intent['cost_ref'],
+            $intent['evidence']['plan_ref'],
+            $intent['evidence']['impact_ref'],
+            $intent['evidence']['safe_point_ref'],
+            $intent['evidence']['rollback_ref'],
+            $intent['evidence']['verify_ref'],
+            $capital['budget']['source_ref'] ?? null,
             $capital['reserve']['source_ref'] ?? null,
-        ], 'is_string'));
+        ] as $ref) {
+            if (is_string($ref)) {
+                $evidence[] = $ref;
+            }
+        }
+        $evidence = self::strings($evidence, 'factory.evidence_refs', 50);
+
         $work = [
-            'work_id' => 'infra-' . $intent['intent_id'], 'origin_mode' => $intent['origin_mode'],
-            'origin_system' => 'controlbot', 'group_id' => $intent['group_id'],
-            'work_type' => 'infrastructure', 'requested_capabilities' => [$intent['capability']],
-            'required_roles' => self::FACTORY_ROLES, 'authority_level' => $intent['authority_level'],
+            'work_id' => 'infra-' . $intent['intent_id'],
+            'origin_mode' => $intent['origin_mode'],
+            'origin_system' => 'controlbot',
+            'group_id' => $intent['group_id'],
+            'work_type' => 'infrastructure',
+            'requested_capabilities' => [$intent['capability']],
+            'required_roles' => self::FACTORY_ROLES,
+            'authority_level' => $intent['authority_level'],
             'producer_ref' => 'controlbot:infrastructure-intent/' . $intent['intent_id'],
-            'priority_class' => $intent['priority'], 'depends_on' => $intent['depends_on'],
-            'claims' => $intent['claims'], 'policy_ref' => $intent['policy_ref'],
-            'evidence_refs' => self::strings($evidence, 'factory.evidence_refs', 50),
-            'idempotency_key' => $intent['idempotency_key'], 'venture_id' => $intent['venture_id'],
-            'project_id' => $intent['project_id'], 'repository_ref' => $intent['repository_ref'],
+            'priority_class' => $intent['priority'],
+            'depends_on' => $intent['depends_on'],
+            'claims' => $intent['claims'],
+            'policy_ref' => $intent['policy_ref'],
+            'evidence_refs' => $evidence,
+            'idempotency_key' => $intent['idempotency_key'],
+            'venture_id' => $intent['venture_id'],
+            'project_id' => $intent['project_id'],
+            'repository_ref' => $intent['repository_ref'],
         ];
-        foreach (['budget_ref', 'approval_ref'] as $optional) {
-            if ($intent[$optional] !== null) $work[$optional] = $intent[$optional];
+        if ($intent['budget_ref'] !== null) {
+            $work['budget_ref'] = $intent['budget_ref'];
+        }
+        if ($intent['approval_ref'] !== null) {
+            $work['approval_ref'] = $intent['approval_ref'];
         }
         return $work;
     }
+
     private static function runnerRequest(array $raw): array
     {
-        self::fields($raw, ['version', 'work_item_id', 'capability', 'scope', 'instruction_ref',
-            'evidence_refs', 'verify_after_write_ref'], 'RunnerRequest');
-        if (($raw['version'] ?? null) !== 1) throw new InvalidArgumentException('RunnerRequest version invalid.');
+        self::fields($raw, [
+            'version', 'work_item_id', 'capability', 'scope', 'instruction_ref',
+            'evidence_refs', 'verify_after_write_ref',
+        ], 'RunnerRequest');
+        if (($raw['version'] ?? null) !== 1) {
+            throw new InvalidArgumentException('RunnerRequest version invalid.');
+        }
         $instruction = self::ref($raw['instruction_ref'], 'runner.instruction_ref');
         if (!str_starts_with($instruction, 'controlbot:')) {
             throw new InvalidArgumentException('runner instruction_ref must belong to ControlBot.');
         }
         return [
-            'version' => 1, 'work_item_id' => self::safeText($raw['work_item_id'], 'runner.work_item_id', 160),
-            'capability' => self::capability($raw['capability']), 'scope' => self::ref($raw['scope'], 'runner.scope'),
-            'instruction_ref' => $instruction, 'evidence_refs' => self::strings($raw['evidence_refs'], 'runner.evidence_refs', 50),
-            'verify_after_write_ref' => self::nullableRef($raw['verify_after_write_ref'], 'runner.verify_after_write_ref'),
+            'version' => 1,
+            'work_item_id' => self::safeText($raw['work_item_id'], 'runner.work_item_id', 160),
+            'capability' => self::capability($raw['capability']),
+            'scope' => self::ref($raw['scope'], 'runner.scope'),
+            'instruction_ref' => $instruction,
+            'evidence_refs' => self::strings($raw['evidence_refs'], 'runner.evidence_refs', 50),
+            'verify_after_write_ref' => self::nullableRef(
+                $raw['verify_after_write_ref'],
+                'runner.verify_after_write_ref',
+            ),
         ];
     }
-    private static function ownerGate(string $id, string $scope, array $reasons, string $approvalRef): string
+
+    private static function ownerGate(
+        string $id,
+        string $scope,
+        array $reasons,
+        string $approvalRef,
+    ): string
     {
-        $money = array_filter($reasons,
-            static fn(string $reason): bool => preg_match('/(?:budget|capital|reserve|cost|money)/', $reason) === 1
-        ) !== [];
+        $money = false;
+        foreach ($reasons as $reason) {
+            if (preg_match('/(?:budget|capital|reserve|cost|money)/', $reason) === 1) {
+                $money = true;
+                break;
+            }
+        }
         $payload = [
             'category' => $money ? 'money' : 'product-direction',
             'context' => "Infrastructure intent {$id} in {$scope} requires Owner Decision before dispatch.",
             'options' => [
-                ['id' => 'A', 'label' => 'Authorize a separately validated follow-up',
+                [
+                    'id' => 'A',
+                    'label' => 'Authorize a separately validated follow-up',
                     'effect' => 'Keeps the current intent non-executable; a fresh validated follow-up may proceed.',
                     'pros' => ['Allows the requested change after explicit authority review.'],
                     'cons' => ['Requires fresh policy, impact, cost and verification evidence.'],
-                    'risk' => 'medium', 'cost' => 'Only the cost already evaluated by CapitalPolicy, if any.', 'reversible' => true],
-                ['id' => 'B', 'label' => 'Keep the intent blocked',
+                    'risk' => 'medium',
+                    'cost' => 'Only the cost already evaluated by CapitalPolicy, if any.',
+                    'reversible' => true,
+                ],
+                [
+                    'id' => 'B',
+                    'label' => 'Keep the intent blocked',
                     'effect' => 'No Runner order is emitted and no mutation is authorized.',
-                    'pros' => ['Preserves current infrastructure and authority boundaries.'], 'cons' => ['The requested change remains pending.'],
-                    'risk' => 'low', 'cost' => 'No additional execution cost.', 'reversible' => true],
+                    'pros' => ['Preserves current infrastructure and authority boundaries.'],
+                    'cons' => ['The requested change remains pending.'],
+                    'risk' => 'low',
+                    'cost' => 'No additional execution cost.',
+                    'reversible' => true,
+                ],
             ],
-            'recommendation' => 'B', 'safe_default' => 'B', 'title_simple' => 'Infrastructure change needs owner approval',
+            'recommendation' => 'B',
+            'safe_default' => 'B',
+            'title_simple' => 'Infrastructure change needs owner approval',
             'summary_simple' => "Intent {$id} cannot be dispatched automatically.",
             'why_recommended' => 'The safe default preserves infrastructure until authority, impact and cost are explicitly accepted.',
-            'blocks' => "Infrastructure intent {$id}.", 'approval_ref' => $approvalRef,
+            'blocks' => "Infrastructure intent {$id}.",
         ];
-        return '<!-- factory-human-gate ' . json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)
+        return '<!-- factory-human-gate '
+            . json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)
             . " -->\n<!-- controlbot-infrastructure-intent "
-            . json_encode(['intent_id' => $id, 'scope' => $scope, 'reasons' => $reasons, 'approval_ref' => $approvalRef],
-                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) . ' -->';
+            . json_encode(
+                [
+                    'intent_id' => $id,
+                    'scope' => $scope,
+                    'reasons' => $reasons,
+                    'approval_ref' => $approvalRef,
+                ],
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
+            )
+            . ' -->';
     }
+
     private static function reasons(array $values): array
     {
         $out = array_values(array_unique(array_filter(
@@ -315,22 +448,35 @@ final class InfrastructureIntent
         sort($out);
         return $out;
     }
+
     private static function fields(mixed $row, array $expected, string $label): void
     {
-        if (!is_array($row) || array_is_list($row)) throw new InvalidArgumentException($label . ' invalid.');
-        $actual = array_keys($row); sort($actual); sort($expected);
-        if ($actual !== $expected) throw new InvalidArgumentException($label . ' fields invalid.');
+        if (!is_array($row) || array_is_list($row)) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
+        $actual = array_keys($row);
+        sort($actual);
+        sort($expected);
+        if ($actual !== $expected) {
+            throw new InvalidArgumentException($label . ' fields invalid.');
+        }
     }
+
     private static function strings(mixed $values, string $label, int $limit): array
     {
         if (!is_array($values) || !array_is_list($values) || count($values) > $limit) {
             throw new InvalidArgumentException($label . ' invalid.');
         }
         $out = [];
-        foreach ($values as $value) $out[self::safeText($value, $label, 240)] = true;
-        $out = array_keys($out); sort($out);
+        foreach ($values as $value) {
+            $normalized = self::safeText($value, $label, 240);
+            $out[$normalized] = true;
+        }
+        $out = array_keys($out);
+        sort($out);
         return $out;
     }
+
     private static function safeText(mixed $value, string $label, int $max): string
     {
         if (!is_string($value) || $value === '' || strlen($value) > $max
@@ -343,6 +489,7 @@ final class InfrastructureIntent
         }
         return $value;
     }
+
     private static function ref(mixed $value, string $label): string
     {
         $value = self::safeText($value, $label, 240);
@@ -351,10 +498,12 @@ final class InfrastructureIntent
         }
         return $value;
     }
+
     private static function nullableRef(mixed $value, string $label): ?string
     {
         return $value === null ? null : self::ref($value, $label);
     }
+
     private static function id(mixed $value, string $label): string
     {
         if (!is_string($value) || preg_match('/^[a-z][a-z0-9._-]{0,79}$/D', $value) !== 1) {
@@ -362,11 +511,15 @@ final class InfrastructureIntent
         }
         return $value;
     }
+
     private static function factorySlug(mixed $value, string $label): string
     {
-        if (!is_string($value) || preg_match('/^[a-z][a-z0-9_.:-]{0,63}$/D', $value) !== 1) throw new InvalidArgumentException($label . ' invalid.');
+        if (!is_string($value) || preg_match('/^[a-z][a-z0-9_.:-]{0,63}$/D', $value) !== 1) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
         return $value;
     }
+
     private static function capability(mixed $value): string
     {
         if (!is_string($value)
@@ -375,16 +528,23 @@ final class InfrastructureIntent
         }
         return $value;
     }
+
     private static function enum(mixed $value, array $allowed, string $label): string
     {
-        if (!is_string($value) || !in_array($value, $allowed, true)) throw new InvalidArgumentException($label . ' invalid.');
+        if (!is_string($value) || !in_array($value, $allowed, true)) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
         return $value;
     }
+
     private static function positiveInt(mixed $value, string $label): int
     {
-        if (!is_int($value) || $value < 1) throw new InvalidArgumentException($label . ' invalid.');
+        if (!is_int($value) || $value < 1) {
+            throw new InvalidArgumentException($label . ' invalid.');
+        }
         return $value;
     }
+
     private static function uuid(mixed $value, string $label): string
     {
         if (!is_string($value)

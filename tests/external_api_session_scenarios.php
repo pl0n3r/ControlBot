@@ -20,7 +20,8 @@ function xu(array $o=[]): array { return array_replace([
     'version'=>1,'step_up_ref'=>'stepup:33333333333333333333333333333333',
     'session_ref'=>'session:22222222222222222222222222222222',
     'device_ref'=>'device:11111111111111111111111111111111','identity_id'=>'owner-human',
-    'method'=>'passkey','verified_at'=>1500,'expires_at'=>1750,
+    'method'=>'passkey','verified_at'=>1500,'expires_at'=>1750,'state'=>'active',
+    'revoked_at'=>null,'revocation_reason'=>null,
 ],$o); }
 
 $case=$argv[1]??'';

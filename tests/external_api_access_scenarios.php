@@ -106,12 +106,16 @@ if($case==='nominal'){
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
 if($case==='owner_read'){
+    $agent=snapshot('owner.cockpit.read'); $agent['identity']['kind']='agent';
     echo json_encode([
         'owner'=>ExternalApiAccess::authorize(
             issued('owner.cockpit.read'),'GET','/api/v1/cockpit',SCOPE,NOW
         ),
         'lower'=>ExternalApiAccess::authorize(
             issued('owner.cockpit.read','L3_GROUP_INSTITUTION'),'GET','/api/v1/cockpit',SCOPE,NOW
+        ),
+        'agent'=>ExternalApiAccess::authorize(
+            issued('owner.cockpit.read','L4_OWNER',SCOPE,$agent),'GET','/api/v1/cockpit',SCOPE,NOW
         ),
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }

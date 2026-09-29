@@ -83,12 +83,7 @@ final class CustomerFeedbackSignal
             $ref=self::opaqueRef($signal['feedback_ref'],'feedback_ref','feedback');
             if(isset($seen[$ref])) throw new InvalidArgumentException('feedback_ref duplicated.');
             $seen[$ref]=true;
-            $normalized=$signal;
-            $normalized['targets']=self::targets($signal['targets']);
-            $normalized['evidence_refs']=self::refs($signal['evidence_refs']);
-            $normalized['origin']=self::enumValue($signal['origin'],self::ORIGINS,'origin');
-            $normalized['freshness']=self::enumValue($signal['freshness'],self::FRESHNESS,'freshness');
-            $normalized['nature']=self::enumValue($signal['nature'],self::NATURE,'nature');
+            $normalized=self::validateEnvelope($signal);
             $out[]=$normalized;
         }
         usort($out,static fn(array $a,array $b): int=>$a['feedback_ref']<=>$b['feedback_ref']);
@@ -124,7 +119,7 @@ final class CustomerFeedbackSignal
         if($confidence!==null && (!is_finite($confidence)||$confidence<0.0||$confidence>1.0))
             throw new InvalidArgumentException('confidence invalid.');
 
-        return [
+        return self::validateEnvelope([
             'version'=>1,
             'feedback_ref'=>self::opaqueRef($raw['feedback_ref'],'feedback_ref','feedback'),
             'venture_id'=>$ventureId,
@@ -134,6 +129,47 @@ final class CustomerFeedbackSignal
             'source_ref'=>$sourceRef,
             'evidence_refs'=>$evidenceRefs,
             'observed_at'=>$observedAt,
+            'freshness'=>$freshness,
+            'confidence'=>$confidence,
+            'nature'=>$nature,
+        ]);
+    }
+
+    private static function validateEnvelope(array $signal): array
+    {
+        self::fields($signal,self::OUTPUT_FIELDS,'CustomerFeedbackSignal');
+        if(($signal['version']??null)!==1)
+            throw new InvalidArgumentException('CustomerFeedbackSignal version invalid.');
+
+        $feedbackRef=self::opaqueRef($signal['feedback_ref'],'feedback_ref','feedback');
+        $venture=self::venture($signal['venture_id']);
+        $product=self::opaqueRef($signal['product_ref'],'product_ref','product');
+        $origin=self::enumValue($signal['origin'],self::ORIGINS,'origin');
+        $targets=self::targets($signal['targets']);
+        $source=self::sourceRef($signal['source_ref'],$origin);
+        $evidence=self::refs($signal['evidence_refs']);
+        $freshness=self::enumValue($signal['freshness'],self::FRESHNESS,'freshness');
+        $nature=self::enumValue($signal['nature'],self::NATURE,'nature');
+        $observed=self::nullableTimestamp($signal['observed_at'],'observed_at');
+        $confidence=self::nullableConfidence($signal['confidence']);
+
+        if($freshness==='unknown' && ($observed!==null||$evidence!==[]||$nature!=='unknown'))
+            throw new InvalidArgumentException('Unknown feedback must fail closed.');
+        if($freshness!=='unknown' && ($observed===null||$evidence===[]||$nature==='unknown'))
+            throw new InvalidArgumentException('Known feedback requires observed evidence.');
+        if(in_array('product_intelligence',$targets,true) && $product==='')
+            throw new InvalidArgumentException('product_intelligence requires product_ref.');
+
+        return [
+            'version'=>1,
+            'feedback_ref'=>$feedbackRef,
+            'venture_id'=>$venture,
+            'product_ref'=>$product,
+            'origin'=>$origin,
+            'targets'=>$targets,
+            'source_ref'=>$source,
+            'evidence_refs'=>$evidence,
+            'observed_at'=>$observed,
             'freshness'=>$freshness,
             'confidence'=>$confidence,
             'nature'=>$nature,
@@ -173,6 +209,41 @@ final class CustomerFeedbackSignal
         }
         sort($out,SORT_STRING);
         return $out;
+    }
+
+    private static function venture(mixed $value): string
+    {
+        if(!is_string($value)||preg_match('/^venture-[a-z0-9][a-z0-9-]{1,79}$/D',$value)!==1)
+            throw new InvalidArgumentException('venture_id invalid.');
+        return $value;
+    }
+
+    private static function sourceRef(mixed $value,string $origin): string
+    {
+        if(!is_string($value)) throw new InvalidArgumentException('source_ref invalid.');
+        $support='/^customer-success:support\/support:[a-f0-9]{32}$/D';
+        $snapshot='/^customer-success:snapshot\/snapshot:[a-f0-9]{32}\/(?:activation|adoption|churn_risk|onboarding|reliability_impact|renewal_signal|satisfaction|support_burden|usage_recency)$/D';
+        if($origin==='support_pattern' && preg_match($support,$value)===1) return $value;
+        if($origin!=='support_pattern' && preg_match($snapshot,$value)===1) return $value;
+        throw new InvalidArgumentException('source_ref invalid for origin.');
+    }
+
+    private static function nullableTimestamp(mixed $value,string $label): ?int
+    {
+        if($value===null) return null;
+        if(!is_int($value)||$value<1) throw new InvalidArgumentException($label.' invalid.');
+        return $value;
+    }
+
+    private static function nullableConfidence(mixed $value): ?float
+    {
+        if($value===null) return null;
+        if(!is_int($value)&&!is_float($value))
+            throw new InvalidArgumentException('confidence invalid.');
+        $number=(float)$value;
+        if(!is_finite($number)||$number<0.0||$number>1.0)
+            throw new InvalidArgumentException('confidence invalid.');
+        return $number;
     }
 
     private static function opaqueRef(mixed $value,string $label,string $namespace): string

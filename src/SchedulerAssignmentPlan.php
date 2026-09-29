@@ -19,7 +19,10 @@ final class ValidatedSchedulerSelection
         return $this->value;
     }
 
-    private function __clone(): void {}
+    public function __clone(): void
+    {
+        throw new LogicException('ValidatedSchedulerSelection cannot be cloned.');
+    }
 
     public function __serialize(): array
     {

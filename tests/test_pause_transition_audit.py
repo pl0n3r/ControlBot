@@ -32,6 +32,7 @@ class PauseTransitionAuditTests(unittest.TestCase):
         self.assertTrue(data["invalid_pair"])
         self.assertTrue(data["chain_gap"])
         self.assertTrue(data["second_creation"])
+        self.assertTrue(data["history_provenance"])
         self.assertEqual(data["tail_event"]["after_state"],"releasing")
 
     def test_regressive_timestamp_or_history_rewrite_fails_closed(self):

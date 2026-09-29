@@ -71,7 +71,7 @@ final class PauseTransitionAudit
         if(!array_is_list($existing)||count($existing)>256)
             throw new InvalidArgumentException('Pause audit history invalid.');
         $event=self::auditEvent($eventRaw);
-        $normalized=[];$lastAt=null;$seen=[];$stateByPause=[];
+        $normalized=[];$lastAt=null;$seen=[];$stateByPause=[];$originByPause=[];
         foreach($existing as $raw){
             $row=self::auditEvent($raw);
             if(isset($seen[$row['event_id']]))
@@ -81,6 +81,7 @@ final class PauseTransitionAudit
             $current=$stateByPause[$row['pause_id']]??null;
             if($row['before_state']!==$current)
                 throw new InvalidArgumentException('Pause audit history chain invalid.');
+            self::sameOrigin($originByPause,$row);
             $seen[$row['event_id']]=$row;
             $stateByPause[$row['pause_id']]=$row['after_state'];
             $lastAt=$row['occurred_at'];
@@ -97,6 +98,7 @@ final class PauseTransitionAudit
         $current=$stateByPause[$event['pause_id']]??null;
         if($event['before_state']!==$current)
             throw new InvalidArgumentException('Pause audit history chain invalid.');
+        self::sameOrigin($originByPause,$event);
 
         $normalized[]=$event;
         return $normalized;
@@ -139,6 +141,14 @@ final class PauseTransitionAudit
         self::actor($raw['actor']);
         self::secretFree($basis);
         return $raw;
+    }
+
+    private static function sameOrigin(array &$origins,array $row): void
+    {
+        $keys=['scope_type','scope_id','source','reason','policy_version','incident_id','evidence_ref'];
+        $origin=array_intersect_key($row,array_flip($keys));
+        if(!isset($origins[$row['pause_id']])){$origins[$row['pause_id']]=$origin;return;}
+        if($origins[$row['pause_id']]!==$origin) throw new InvalidArgumentException('Pause audit history provenance mismatch.');
     }
 
     private static function sameIdentityAndProvenance(array $before,array $after): void

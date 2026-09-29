@@ -3,16 +3,46 @@ declare(strict_types=1);
 namespace ControlBot\Scheduler;
 use ControlBot\Runtime\AgentRuntime;
 use InvalidArgumentException;
+use LogicException;
+
+final class ValidatedSchedulerSelection
+{
+    private function __construct(private readonly array $value) {}
+
+    public static function fromDecision(array $request,array $decision,array $currentRows): self
+    {
+        return new self(SchedulerSelection::validateDecision($request,$decision,$currentRows));
+    }
+
+    public function value(): array
+    {
+        return $this->value;
+    }
+
+    private function __clone(): void {}
+
+    public function __serialize(): array
+    {
+        throw new LogicException('ValidatedSchedulerSelection cannot be serialized.');
+    }
+
+    public function __unserialize(array $data): void
+    {
+        throw new LogicException('ValidatedSchedulerSelection cannot be unserialized.');
+    }
+}
 
 final class SchedulerAssignmentPlan
 {
     private const POLICY='factory-dispatcher-v2';
 
     public static function plan(
-        array $selectionRaw,array $workRaw,array $sessionRaw,array $agentRaw,
+        mixed $selectionRaw,array $workRaw,array $sessionRaw,array $agentRaw,
         string $reservationId,string $assignmentId,int $now,int $staleAfter=90,int $offlineAfter=300
     ): array {
-        $selection=self::selection($selectionRaw);$work=SchedulerCore::workItem($workRaw);
+        if(!$selectionRaw instanceof ValidatedSchedulerSelection)
+            throw new InvalidArgumentException('Validated selection provenance invalid.');
+        $selection=$selectionRaw->value();$work=SchedulerCore::workItem($workRaw);
         $session=AgentRuntime::session($sessionRaw);$agent=AgentRuntime::agent($agentRaw);
         if(!in_array($work['state'],['queued','eligible'],true)||$work['reservation_id']!==null||$work['assigned_session_id']!==null)
             throw new InvalidArgumentException('WorkItem already owned or not assignable.');
@@ -51,17 +81,6 @@ final class SchedulerAssignmentPlan
         return $plan+['fingerprint'=>self::fingerprint($plan)];
     }
 
-    private static function selection(array $raw): array
-    {
-        self::fields($raw,['version','policy_ref','request_fingerprint','selected_key','selection_reason','telemetry','selected'],'ValidatedSelection');
-        if(($raw['version']??null)!==1||($raw['policy_ref']??null)!==self::POLICY
-            ||!is_string($raw['request_fingerprint'])||preg_match('/^[0-9a-f]{64}$/D',$raw['request_fingerprint'])!==1
-            ||!is_array($raw['selected'])) throw new InvalidArgumentException('Validated selection invalid.');
-        self::fields($raw['selected'],['key','source_ref','priority','generation','required_capabilities','account_id'],'ValidatedSelection selected');
-        if(($raw['selected_key']??null)!==($raw['selected']['key']??null)) throw new InvalidArgumentException('Validated selection key mismatch.');
-        return $raw;
-    }
-
     private static function matchesWork(array $selection,array $work): void
     {
         $selected=$selection['selected'];$expected=[
@@ -82,10 +101,4 @@ final class SchedulerAssignmentPlan
 
     private static function fingerprint(array $value): string
     {return hash('sha256',json_encode($value,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));}
-    private static function fields(mixed $raw,array $expected,string $label): void
-    {
-        if(!is_array($raw)||array_is_list($raw)) throw new InvalidArgumentException($label.' invalid.');
-        $actual=array_keys($raw);sort($actual,SORT_STRING);sort($expected,SORT_STRING);
-        if($actual!==$expected) throw new InvalidArgumentException(($label.' fields invalid.'));
-    }
 }

@@ -46,6 +46,7 @@ if($case==='sensitive'){
         event(['summary'=>'full transcript from browser session']),
         event(['summary'=>'chain-of-thought reasoning trace']),
         event(['evidence_ref'=>'https://github.com/pl0n3r/ControlBot/issues/365?token=secret']),
+        event(['evidence_ref'=>'external:3001234567']),
     ];
     echo json_encode(['rejected'=>array_map(fn($row)=>rejected(fn()=>AgentReplayCore::build([$row])),$samples)],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }

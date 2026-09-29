@@ -22,6 +22,9 @@
 | audit_log | usage | actor, action, repository, issue, category, option, sha, result, evidence, at | security_audit | review_required | review_required | ninguno_declarado | review_required |
 | chat_response_opt_in | usage | agent_id, tab_id, repository, issue_number, question_text, response_text, status, received_at, opt_in | agent_response_relay | review_required | review_required | ninguno_declarado | review_required |
 | dashboard_health_status | usage | health | dashboard_operational_status | review_required | review_required | ninguno_declarado | review_required |
+| staff_access_projection | usage | last_access_at, mfa_state | staff_administration | review_required | review_required | ninguno_declarado | review_required |
+| staff_contact_projection | contact | masked_email | staff_administration | review_required | review_required | ninguno_declarado | review_required |
+| staff_identity_projection | identification | staff_id, display_name, role, status | staff_administration | review_required | review_required | ninguno_declarado | review_required |
 
 ## Derechos y revisión
 

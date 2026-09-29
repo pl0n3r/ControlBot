@@ -2,6 +2,10 @@
   "version": 1,
   "project": "pl0n3r/ControlBot",
   "phase": "construccion",
+  "d063_attestation": {
+    "nothing_live": true,
+    "no_real_customer_data": true
+  },
   "controller": {
     "name": "[COMPLETAR POR EL DUEÑO]",
     "identifier": "[COMPLETAR POR EL DUEÑO]",
@@ -12,7 +16,12 @@
     {
       "id": "account_profiles",
       "category": "identification",
-      "fields": ["account_alias", "profile_alias", "browser", "plan"],
+      "fields": [
+        "account_alias",
+        "profile_alias",
+        "browser",
+        "plan"
+      ],
       "purpose": "account_inventory",
       "basis": "review_required",
       "retention": "review_required",
@@ -22,7 +31,17 @@
     {
       "id": "agent_status",
       "category": "usage",
-      "fields": ["agent_id", "account_alias", "profile_alias", "tab_id", "status", "last_heartbeat_at", "mode", "repository", "issue_number"],
+      "fields": [
+        "agent_id",
+        "account_alias",
+        "profile_alias",
+        "tab_id",
+        "status",
+        "last_heartbeat_at",
+        "mode",
+        "repository",
+        "issue_number"
+      ],
       "purpose": "agent_orchestration",
       "basis": "review_required",
       "retention": "review_required",
@@ -32,7 +51,18 @@
     {
       "id": "audit_log",
       "category": "usage",
-      "fields": ["actor", "action", "repository", "issue", "category", "option", "sha", "result", "evidence", "at"],
+      "fields": [
+        "actor",
+        "action",
+        "repository",
+        "issue",
+        "category",
+        "option",
+        "sha",
+        "result",
+        "evidence",
+        "at"
+      ],
       "purpose": "security_audit",
       "basis": "review_required",
       "retention": "review_required",
@@ -42,7 +72,17 @@
     {
       "id": "chat_response_opt_in",
       "category": "usage",
-      "fields": ["agent_id", "tab_id", "repository", "issue_number", "question_text", "response_text", "status", "received_at", "opt_in"],
+      "fields": [
+        "agent_id",
+        "tab_id",
+        "repository",
+        "issue_number",
+        "question_text",
+        "response_text",
+        "status",
+        "received_at",
+        "opt_in"
+      ],
       "purpose": "agent_response_relay",
       "basis": "review_required",
       "retention": "review_required",
@@ -52,8 +92,50 @@
     {
       "id": "dashboard_health_status",
       "category": "usage",
-      "fields": ["health"],
+      "fields": [
+        "health"
+      ],
       "purpose": "dashboard_operational_status",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "staff_access_projection",
+      "category": "usage",
+      "fields": [
+        "last_access_at",
+        "mfa_state"
+      ],
+      "purpose": "staff_administration",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "staff_contact_projection",
+      "category": "contact",
+      "fields": [
+        "masked_email"
+      ],
+      "purpose": "staff_administration",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
+      "id": "staff_identity_projection",
+      "category": "identification",
+      "fields": [
+        "staff_id",
+        "display_name",
+        "role",
+        "status"
+      ],
+      "purpose": "staff_administration",
       "basis": "review_required",
       "retention": "review_required",
       "consent": "review_required",

@@ -62,6 +62,7 @@ if($scenario==='append'){
     $history=PauseTransitionAudit::append($history,$second);
     $replay=PauseTransitionAudit::append($history,$second);
     $conflict=PauseTransitionAudit::event(active(),releasing(),'owner-other',110);
+    $drift=PauseTransitionAudit::event(active(['scope_id'=>'other-project']),releasing(['scope_id'=>'other-project']),'owner-main',115);
     echo json_encode([
         'count'=>count($history),'replay_same'=>$replay===$history,
         'conflict'=>rejected(fn()=>PauseTransitionAudit::append($history,$conflict)),
@@ -70,6 +71,7 @@ if($scenario==='append'){
         'invalid_pair'=>rejected(fn()=>PauseTransitionAudit::append([],forged($first,['before_state'=>'active']))),
         'chain_gap'=>rejected(fn()=>PauseTransitionAudit::append($history,PauseTransitionAudit::event(active(),released(),'owner-main',120))),
         'second_creation'=>rejected(fn()=>PauseTransitionAudit::append($history,PauseTransitionAudit::event(null,pauseState('unknown'),'owner-main',130))),
+        'history_provenance'=>rejected(fn()=>PauseTransitionAudit::append([$first],$drift)),
     ],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 if($scenario==='history'){

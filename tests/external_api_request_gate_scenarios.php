@@ -13,6 +13,8 @@ require __DIR__.'/../src/VerifiedAccessContext.php';
 require __DIR__.'/../src/ExternalApiContract.php';
 require __DIR__.'/../src/ExternalApiAccess.php';
 require __DIR__.'/../src/ExternalApiSession.php';
+require __DIR__.'/../src/ExternalApiSessionSource.php';
+require __DIR__.'/../src/VerifiedExternalSessionContext.php';
 require __DIR__.'/../src/ExternalApiRequestGate.php';
 
 use ControlBot\Approvals\AppendOnlyAuditLog;
@@ -20,6 +22,8 @@ use ControlBot\Business\VerifiedAccessContext;
 use ControlBot\Business\VentureAccessSource;
 use ControlBot\Decisions\DecisionRuntime;
 use ControlBot\ExternalApi\ExternalApiRequestGate;
+use ControlBot\ExternalApi\ExternalApiSessionSource;
+use ControlBot\ExternalApi\VerifiedExternalSessionContext;
 use ControlBot\Security\OwnerSessionService;
 use ControlBot\Security\TokenVault;
 
@@ -31,11 +35,15 @@ final class GateSource implements VentureAccessSource {
     public function __construct(private array $row) {}
     public function resolve(string $identityId,string $scope,string $capability,int $now): array { return $this->row; }
 }
-function gi(): array { return ['version'=>1,'identity_id'=>'identity-owner','kind'=>'human','display_name'=>'Owner','state'=>'active','source_ref'=>'controlbot:identity/owner','observed_at'=>6900]; }
-function gg(string $cap,string $level='L4_OWNER',string $scope=GATE_SCOPE): array { return ['version'=>1,'grant_id'=>'grant-owner-api','identity_id'=>'identity-owner','role'=>$level==='L4_OWNER'?'owner':'portfolio_admin','capability'=>$cap,'scope'=>$scope,'authority_level'=>$level,'policy_ref'=>GATE_POLICY,'budget_limit'=>null,'granted_at'=>6800,'expires_at'=>8000]; }
-function gsnap(string $cap,string $level='L4_OWNER',string $scope=GATE_SCOPE): array { return ['identity'=>gi(),'scope'=>$scope,'active_policy_refs'=>[GATE_POLICY],'grant'=>gg($cap,$level,$scope)]; }
-function gctx(string $cap,string $level='L4_OWNER',string $scope=GATE_SCOPE): VerifiedAccessContext {
-    $source=new GateSource(gsnap($cap,$level,$scope));
+final class GateSessionSource implements ExternalApiSessionSource {
+    public function __construct(private array $row) {}
+    public function resolve(string $identityId,string $scope,string $deviceRef,string $sessionRef,?string $stepUpRef,int $now): array { return $this->row; }
+}
+function gi(string $identity='identity-owner'): array { return ['version'=>1,'identity_id'=>$identity,'kind'=>'human','display_name'=>'Owner','state'=>'active','source_ref'=>'controlbot:identity/owner','observed_at'=>6900]; }
+function gg(string $cap,string $level='L4_OWNER',string $scope=GATE_SCOPE,string $identity='identity-owner'): array { return ['version'=>1,'grant_id'=>'grant-owner-api','identity_id'=>$identity,'role'=>$level==='L4_OWNER'?'owner':'portfolio_admin','capability'=>$cap,'scope'=>$scope,'authority_level'=>$level,'policy_ref'=>GATE_POLICY,'budget_limit'=>null,'granted_at'=>6800,'expires_at'=>8000]; }
+function gsnap(string $cap,string $level='L4_OWNER',string $scope=GATE_SCOPE,string $identity='identity-owner'): array { return ['identity'=>gi($identity),'scope'=>$scope,'active_policy_refs'=>[GATE_POLICY],'grant'=>gg($cap,$level,$scope,$identity)]; }
+function gctx(string $cap,string $level='L4_OWNER',string $scope=GATE_SCOPE,string $identity='identity-owner'): VerifiedAccessContext {
+    $source=new GateSource(gsnap($cap,$level,$scope,$identity));
     $vault=new TokenVault(base64_encode(str_repeat('A',SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));
     $owners=new OwnerSessionService('pl0n3r',$vault); $session=[];
     $owners->establishTrustedOAuthSession($session,'pl0n3r','fixture-server-value');
@@ -44,7 +52,7 @@ function gctx(string $cap,string $level='L4_OWNER',string $scope=GATE_SCOPE): Ve
         $runtime=DecisionRuntime::fromServer($owners,$audit,['pl0n3r/ControlBot'],$source);
         return VerifiedAccessContext::fromDecisionRuntime(
             $runtime,$session,'pl0n3r/ControlBot',
-            ['identity_id'=>'identity-owner','scope'=>$scope,'capability'=>$cap],GATE_NOW
+            ['identity_id'=>$identity,'scope'=>$scope,'capability'=>$cap],GATE_NOW
         );
     } finally { @unlink($path); }
 }
@@ -53,14 +61,20 @@ function gsession(array $o=[]): array { return array_replace(['version'=>1,'sess
 function gu(array $o=[]): array { return array_replace(['version'=>1,'step_up_ref'=>'stepup:33333333333333333333333333333333','session_ref'=>'session:22222222222222222222222222222222','device_ref'=>'device:11111111111111111111111111111111','identity_id'=>'identity-owner','method'=>'passkey','verified_at'=>6950,'expires_at'=>7200,'state'=>'active','revoked_at'=>null,'revocation_reason'=>null],$o); }
 function bad(callable $fn): bool { try{$fn();return false;}catch(InvalidArgumentException){return true;} }
 function badType(callable $fn): bool { try{$fn();return false;}catch(TypeError){return true;} }
+function gauth(VerifiedAccessContext $ctx,array $device,array $session,?array $up): VerifiedExternalSessionContext {
+    $source=new GateSessionSource(['version'=>1,'device'=>$device,'session'=>$session,'step_up'=>$up,'observed_at'=>GATE_NOW,'freshness'=>'fresh','source_ref'=>'controlbot:session-source/gate-fixture']);
+    return VerifiedExternalSessionContext::fromSource($ctx,$source,$device['device_ref']??'', $session['session_ref']??'', $up['step_up_ref']??null,GATE_NOW);
+}
 function gate(VerifiedAccessContext $ctx,string $method,string $path,?array $up=null,array $device=[],array $session=[]): array {
-    return ExternalApiRequestGate::authorize($ctx,$method,$path,GATE_SCOPE,$device?:gd(),$session?:gsession(),$up,GATE_NOW);
+    $device=$device?:gd();$session=$session?:gsession();
+    return ExternalApiRequestGate::authorize($ctx,$method,$path,GATE_SCOPE,gauth($ctx,$device,$session,$up),GATE_NOW);
 }
 
 $case=$argv[1]??'';
 if($case==='read'){
     $out=[
         'valid'=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit'),
+        'with_step'=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit',gu()),
         'revoked_device'=>bad(fn()=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit',null,gd(['state'=>'revoked','revoked_at'=>6990,'revocation_reason'=>'owner_revoked']))),
     ];
 }elseif($case==='deny'){
@@ -84,10 +98,20 @@ if($case==='read'){
     $device=gd();$device['access_token']='forbidden';
     $step=gu();$step['policy_ref']='controlbot:policy/client';
     $out=[
-        'raw_context'=>badType(fn()=>ExternalApiRequestGate::authorize([], 'GET','/api/v1/cockpit',GATE_SCOPE,gd(),gsession(),null,GATE_NOW)),
+        'raw_context'=>badType(fn()=>ExternalApiRequestGate::authorize([], 'GET','/api/v1/cockpit',GATE_SCOPE,gauth(gctx('owner.cockpit.read'),gd(),gsession(),null),GATE_NOW)),
         'session_auth_field'=>bad(fn()=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit',null,gd(),$session)),
         'device_secret'=>bad(fn()=>gate(gctx('owner.cockpit.read'),'GET','/api/v1/cockpit',null,$device)),
         'step_auth_field'=>bad(fn()=>gate(gctx('owner.decision.write'),'POST','/api/v1/owner-decisions/{decision_id}/decision',$step)),
+    ];
+}elseif($case==='trusted_mismatch'){
+    $access=gctx('owner.cockpit.read');
+    $other=gctx('owner.cockpit.read','L4_OWNER',GATE_SCOPE,'identity-other');
+    $otherAuth=gauth($other,gd(['identity_id'=>'identity-other']),gsession(['identity_id'=>'identity-other']),null);
+    $beta=gctx('owner.cockpit.read','L4_OWNER','venture:beta');
+    $betaAuth=gauth($beta,gd(),gsession(['scope'=>'venture:beta']),null);
+    $out=[
+        'identity'=>bad(fn()=>ExternalApiRequestGate::authorize($access,'GET','/api/v1/cockpit',GATE_SCOPE,$otherAuth,GATE_NOW)),
+        'scope'=>bad(fn()=>ExternalApiRequestGate::authorize($access,'GET','/api/v1/cockpit',GATE_SCOPE,$betaAuth,GATE_NOW)),
     ];
 }elseif($case==='pure'){
     $r=new ReflectionClass(ExternalApiRequestGate::class);

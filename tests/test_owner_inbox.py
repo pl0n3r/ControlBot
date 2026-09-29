@@ -32,11 +32,12 @@ class OwnerInboxTests(unittest.TestCase):
         d=scenario("safe")
         self.assertEqual(d["sorted"]["evidence_refs"],["controlbot:evidence/aa","controlbot:evidence/zz"])
         self.assertTrue(d["duplicate"] and d["html"] and d["secret"] and d["mail"] and d["number"])
+        self.assertTrue(d["local_phone_title"] and d["local_phone_summary"] and d["local_phone_impact"])
 
     def test_collection_deduplicates_and_orders_without_hidden_score(self):
         d=scenario("collection")
         self.assertEqual([x["class"] for x in d["entries"]],["critical","decision","decision","watch","fyi"])
-        self.assertEqual([x["entry_ref"] for x in d["entries"][1:3]],["controlbot:inbox/entry-d1","controlbot:inbox/entry-d2"])
+        self.assertEqual([x["entry_ref"] for x in d["entries"][1:3]],["controlbot:inbox/entry-d2","controlbot:inbox/entry-d1"])
         self.assertTrue(d["duplicate"])
         self.assertNotIn("score",json.dumps(d).lower())
 

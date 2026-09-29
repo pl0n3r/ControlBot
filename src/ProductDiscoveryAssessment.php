@@ -50,7 +50,8 @@ final class ProductDiscoveryAssessment
             ||$hypothesisRef!==$plan['hypothesis_ref']
             ||$primaryMetricRef!==$plan['primary_metric_ref']
             ||$outcomeId!==$outcome['outcome_id']
-            ||$outcome['experiment_ref']!==$plan['experiment_ref'])
+            ||$outcome['experiment_ref']!==$plan['experiment_ref']
+            ||$outcome['evaluation_window']!==$plan['evaluation_window'])
             throw new InvalidArgumentException('DiscoveryAssessment binding mismatch.');
 
         if($plan['scope']!=='venture'
@@ -61,7 +62,10 @@ final class ProductDiscoveryAssessment
 
         $reliable=$outcome['status']==='measured'
             &&$outcome['freshness']==='fresh'
-            &&$outcome['nature']==='observed';
+            &&$outcome['nature']==='observed'
+            &&$outcome['confidence']>0
+            &&$plan['hypothesis_freshness']==='fresh'
+            &&$plan['hypothesis_confidence']!=='unknown';
 
         if(!$reliable && $classification!=='INCONCLUSIVE')
             throw new InvalidArgumentException('DiscoveryAssessment unreliable evidence must be inconclusive.');
@@ -96,9 +100,7 @@ final class ProductDiscoveryAssessment
     private static function ref(mixed $value,string $namespace): string
     {
         if(!is_string($value)
-            ||preg_match('/^'.preg_quote($namespace,'/').':[a-f0-9]{32}$/D',$value)!==1
-            ||preg_match(self::SENSITIVE,$value)===1
-            ||preg_match(self::DIRECT_PII,$value)===1)
+            ||preg_match('/^'.preg_quote($namespace,'/').':[a-f0-9]{32}$/D',$value)!==1)
             throw new InvalidArgumentException($namespace.' ref invalid.');
         return $value;
     }
@@ -145,6 +147,7 @@ final class ProductDiscoveryAssessment
     {
         if(is_array($value)){foreach($value as $item) self::safe($item);return;}
         if(is_string($value)
+            &&preg_match('/^(?:assessment|experiment|initiative|hypothesis|metric|rule|evidence):[a-f0-9]{32}$/D',$value)!==1
             &&(preg_match(self::SENSITIVE,$value)===1||preg_match(self::DIRECT_PII,$value)===1))
             throw new InvalidArgumentException('DiscoveryAssessment contains sensitive material.');
     }

@@ -60,6 +60,24 @@ final class ExternalApiMobileAudit
         if(str_starts_with($outcome,'verification_')&&$result===null)
             throw new InvalidArgumentException('verification outcome requires result_ref.');
 
+        $allowedRefs=match($outcome){
+            'read_served'=>[],
+            'mutation_accepted','mutation_rejected'=>['decision_ref','approval_ref'],
+            'factory_handoff'=>['decision_ref','approval_ref','work_item_ref'],
+            'verification_succeeded','verification_failed'=>[
+                'decision_ref','approval_ref','work_item_ref','result_ref',
+            ],
+        };
+        foreach([
+            'decision_ref'=>$decision,
+            'approval_ref'=>$approval,
+            'work_item_ref'=>$workItem,
+            'result_ref'=>$result,
+        ] as $refName=>$refValue){
+            if($refValue!==null&&!in_array($refName,$allowedRefs,true))
+                throw new InvalidArgumentException('audit ref not allowed for outcome.');
+        }
+
         $identity=self::slug($accessSummary['identity_id']??null,'identity_id');
         $grant=self::slug($accessSummary['grant_id']??null,'grant_id');
         $capability=self::capability($accessSummary['capability']??null);
@@ -72,7 +90,8 @@ final class ExternalApiMobileAudit
         $policies=self::policyRefs($accessSummary['policy_refs']??null);
         $device=self::opaque($authSummary['device_ref']??null,'device_ref','device');
         $session=self::opaque($authSummary['session_ref']??null,'session_ref','session');
-        $step=$authSummary['step_up_ref']===null?null:self::opaque($authSummary['step_up_ref'],'step_up_ref','stepup');
+        $stepRaw=$authSummary['step_up_ref']??null;
+        $step=$stepRaw===null?null:self::opaque($stepRaw,'step_up_ref','stepup');
 
         $record=[
             'version'=>1,

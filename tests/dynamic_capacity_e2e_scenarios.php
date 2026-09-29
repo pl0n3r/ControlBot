@@ -117,7 +117,14 @@ function readinessContext(array $presence,int $generation,string $reservation,st
         'expected_generation'=>$generation,'expected_owner_session_id'=>$owner,
     ],$extra);
 }
-function blocked(callable $fn): bool { try{$fn();return false;}catch(Throwable){return true;} }
+function blocked(callable $fn,string $expectedMessage): bool {
+    try {
+        $fn();
+        return false;
+    } catch (InvalidArgumentException $e) {
+        return $e->getMessage()===$expectedMessage;
+    }
+}
 function handoff(): array {
     return AgentRuntime::handoff([
         'version'=>1,'handoff_id'=>'handoff-217','assignment_id'=>ASSIGNMENT,
@@ -157,15 +164,18 @@ function lifecycle(): array {
             ]],
         ]),
     );
-    $duplicateOwners=blocked(fn()=>SchedulerCore::readiness(
-        readinessWork(2,'reservation-2','session-b'),
-        readinessContext($snapshots['recovered'],2,'reservation-2','session-b',[
-            'reservations'=>[
-                ['reservation_id'=>'reservation-2','owner_session_id'=>'session-a','generation'=>1,'active'=>true],
-                ['reservation_id'=>'reservation-3','owner_session_id'=>'session-b','generation'=>2,'active'=>true],
-            ],
-        ]),
-    ));
+    $duplicateOwners=blocked(
+        fn()=>SchedulerCore::readiness(
+            readinessWork(2,'reservation-2','session-b'),
+            readinessContext($snapshots['recovered'],2,'reservation-2','session-b',[
+                'reservations'=>[
+                    ['reservation_id'=>'reservation-2','owner_session_id'=>'session-a','generation'=>1,'active'=>true],
+                    ['reservation_id'=>'reservation-3','owner_session_id'=>'session-b','generation'=>2,'active'=>true],
+                ],
+            ]),
+        ),
+        'Multiple active reservation owners invalid.',
+    );
 
     return [
         'declared_capacity'=>AgentRuntime::account(account())['capacity'],

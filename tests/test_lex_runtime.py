@@ -50,6 +50,7 @@ class LexRuntimeTests(unittest.TestCase):
         self.assertEqual(data["stale"]["after"]["obligations"][0]["status"], "unknown")
         self.assertEqual(data["stale"]["reevaluation_state"], "unknown")
         self.assertNotEqual(data["stale"]["reevaluation_state"], "compliant")
+        self.assertEqual(data["empty"]["reevaluation_state"], "unknown")
 
     def test_e2e_never_executes_provider_or_expands_factory_authority(self):
         data = scenario("authority")

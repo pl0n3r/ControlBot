@@ -32,6 +32,9 @@ class CustomerFeedbackSignalTests(unittest.TestCase):
         refs=[row["feedback_ref"] for row in data["collection"]]
         self.assertEqual(refs,sorted(refs))
         self.assertTrue(data["duplicatedCollection"])
+        self.assertTrue(data["forgedSource"])
+        self.assertTrue(data["forgedScope"])
+        self.assertTrue(data["forgedUnknown"])
 
     def test_evidence_freshness_confidence_and_nature_remain_fail_closed(self):
         data=scenario("fail_closed")

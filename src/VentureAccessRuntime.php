@@ -7,6 +7,9 @@ use InvalidArgumentException;
 
 final class VentureAccessRuntime
 {
+    private static ?\WeakMap $infrastructureAuthorities = null;
+    private static ?\WeakMap $verifiedInfrastructureContexts = null;
+
     private const REQUEST_FIELDS = ['version','command_id','idempotency_key','operation','reason_code','expires_at','payload'];
     private const CONTEXT_FIELDS = ['identity','scope','active_policy_refs','grant','budget_guard','production_authority'];
     private const RESTRICTION_DECISIONS = ['allow','deny','owner_decision_required'];
@@ -60,6 +63,106 @@ final class VentureAccessRuntime
         }
 
         return self::result('applied',$core['state'],$command,self::kind($command['operation']),'authorized',$now,null,'applied');
+    }
+
+    public static function projectInfrastructureAuthority(
+        mixed $verifiedContext,
+        string $capability,
+        string $requiredAuthorityLevel,
+        int $now,
+        array $policyRestrictions = [],
+    ): object {
+        if (!$verifiedContext instanceof VerifiedAccessContext || $now < 1) {
+            throw new InvalidArgumentException('Verified access context provenance invalid.');
+        }
+        $used = self::verifiedInfrastructureContextStore();
+        if (isset($used[$verifiedContext])) {
+            throw new InvalidArgumentException('Verified access context replay invalid.');
+        }
+        $context = $verifiedContext->decisionContext();
+        $grant = $verifiedContext->grant();
+        if (!array_is_list($policyRestrictions) || count($policyRestrictions) > 8) {
+            throw new InvalidArgumentException('Infrastructure authority restrictions invalid.');
+        }
+        foreach ($policyRestrictions as $restriction) {
+            if (!is_string($restriction) || $restriction === '' || strlen($restriction) > 120) {
+                throw new InvalidArgumentException('Infrastructure authority restrictions invalid.');
+            }
+        }
+
+        $rights = DecisionRights::evaluate($context, $grant, [
+            'capability' => $capability,
+            'required_authority_level' => $requiredAuthorityLevel,
+            'budget_amount' => null,
+        ], $now);
+
+        $decision = 'deny';
+        $reason = 'authority_unknown';
+        if (($rights['decision'] ?? null) === 'deny') {
+            $reason = is_string($rights['reasons'][0] ?? null) ? $rights['reasons'][0] : 'authority_denied';
+        } elseif (($rights['decision'] ?? null) === 'owner_decision_required') {
+            $decision = 'owner_decision_required';
+            $reason = is_string($rights['reasons'][0] ?? null)
+                ? $rights['reasons'][0] : 'authority_owner_required';
+        } elseif (($rights['decision'] ?? null) === 'allow') {
+            $decision = 'allow';
+            $reason = 'authorized';
+        }
+        $used[$verifiedContext] = true;
+
+        $projection = new \stdClass();
+        $evidence = hash('sha256', json_encode([
+            $context['scope'], $capability, $requiredAuthorityLevel, $decision, $reason,
+            $policyRestrictions, $now,
+        ], JSON_THROW_ON_ERROR));
+        self::infrastructureAuthorityStore()[$projection] = [
+            'decision' => $decision,
+            'reason_code' => $reason,
+            'scope' => $context['scope'],
+            'evidence_ref' => 'controlbot:venture-access-authority/' . $evidence,
+            'policy_restrictions' => $policyRestrictions,
+            'capability' => $capability,
+            'required_authority_level' => $requiredAuthorityLevel,
+        ];
+
+        return $projection;
+    }
+
+    public static function consumeInfrastructureAuthority(
+        mixed $projection,
+        string $capability,
+        string $requiredAuthorityLevel,
+    ): array {
+        if (!is_object($projection)) {
+            throw new InvalidArgumentException('Infrastructure authority provenance invalid.');
+        }
+        $store = self::infrastructureAuthorityStore();
+        if (!isset($store[$projection])) {
+            throw new InvalidArgumentException('Infrastructure authority provenance invalid.');
+        }
+        $authority = $store[$projection];
+        if ($authority['capability'] !== $capability
+            || $authority['required_authority_level'] !== $requiredAuthorityLevel) {
+            throw new InvalidArgumentException('Infrastructure authority action mismatch.');
+        }
+        unset($store[$projection]);
+        return [
+            'decision' => $authority['decision'],
+            'reason_code' => $authority['reason_code'],
+            'scope' => $authority['scope'],
+            'evidence_ref' => $authority['evidence_ref'],
+            'policy_restrictions' => $authority['policy_restrictions'],
+        ];
+    }
+
+    private static function infrastructureAuthorityStore(): \WeakMap
+    {
+        return self::$infrastructureAuthorities ??= new \WeakMap();
+    }
+
+    private static function verifiedInfrastructureContextStore(): \WeakMap
+    {
+        return self::$verifiedInfrastructureContexts ??= new \WeakMap();
     }
 
     private static function restriction(mixed $raw,string $label): array

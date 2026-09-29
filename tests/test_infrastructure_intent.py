@@ -81,7 +81,7 @@ class InfrastructureIntentTests(unittest.TestCase):
             self.assertIn('"safe_default":"B"', row["owner_decision_gate"])
 
         self.assertIn("high_blast_radius", data["high"]["reasons"])
-        self.assertIn("venture_access_owner_required", data["authority"]["reasons"])
+        self.assertIn("authority_escalation_required", data["authority"]["reasons"])
         self.assertIn("budget_limit_exceeded", data["over_budget"]["reasons"])
 
         for key in ("unknown", "scope_mismatch"):
@@ -123,6 +123,73 @@ class InfrastructureIntentTests(unittest.TestCase):
         serialized = json.dumps(data["safe"]).lower()
         for forbidden in ("password", "bearer ", "github_pat_", "private key"):
             self.assertNotIn(forbidden, serialized)
+
+    def test_caller_cannot_self_certify_allow_authority(self):
+        data = scenario("provenance")
+        self.assertTrue(data["fabricated_array_rejected"])
+        self.assertTrue(data["copied_object_rejected"])
+
+    def test_trusted_authority_preserves_governed_outcomes(self):
+        data = scenario("provenance")
+
+        allow = data["trusted_allow"]
+        self.assertEqual(allow["status"], "planned")
+        self.assertIsNotNone(allow["work_item"])
+        self.assertIsNotNone(allow["runner_request"])
+        self.assertEqual(allow["authority"]["decision"], "allow")
+
+        owner = data["trusted_owner"]
+        self.assertEqual(owner["status"], "owner_decision_required")
+        self.assertIsNotNone(owner["work_item"])
+        self.assertIsNone(owner["runner_request"])
+        self.assertIsNotNone(owner["owner_decision_gate"])
+
+        deny = data["trusted_deny"]
+        self.assertEqual(deny["status"], "denied")
+        self.assertIsNone(deny["work_item"])
+        self.assertIsNone(deny["runner_request"])
+
+    def test_trusted_authority_preserves_scope_and_owner_fail_closed(self):
+        data = scenario("provenance")
+
+        mismatch = data["scope_mismatch"]
+        self.assertEqual(mismatch["status"], "denied")
+        self.assertIn("authority_scope_mismatch", mismatch["reasons"])
+        self.assertIsNone(mismatch["runner_request"])
+
+        owner = data["trusted_owner"]
+        self.assertEqual(owner["status"], "owner_decision_required")
+        self.assertIsNone(owner["runner_request"])
+
+    def test_authority_provenance_is_not_structurally_forgeable(self):
+        data = scenario("provenance")
+        self.assertTrue(data["fabricated_array_rejected"])
+        self.assertTrue(data["copied_object_rejected"])
+        self.assertTrue(data["cross_capability_rejected"])
+        self.assertTrue(data["context_copy_rejected"])
+        self.assertTrue(data["context_replay_rejected"])
+        self.assertEqual(data["first_use_status"], "planned")
+        self.assertTrue(data["projection_replay_rejected"])
+        self.assertEqual(data["projection_json"], "{}")
+
+    def test_authority_provenance_remains_pure_and_secret_free(self):
+        data = scenario("provenance")
+        serialized = json.dumps(data).lower()
+        for forbidden in ("password", "bearer ", "github_pat_", "private key"):
+            self.assertNotIn(forbidden, serialized)
+
+        evidence = data["trusted_allow"]["authority"]["evidence_ref"]
+        self.assertTrue(evidence.startswith("controlbot:venture-access-authority/"))
+        self.assertEqual(data["current_deny_status"], "denied")
+
+        source = (ROOT / "src" / "VentureAccessRuntime.php").read_text(encoding="utf-8")
+        issuer = source.split(
+            "public static function projectInfrastructureAuthority", 1
+        )[1].split("public static function consumeInfrastructureAuthority", 1)[0]
+        self.assertIn("DecisionRights::evaluate", issuer)
+        self.assertNotIn("IdentityCenter::", issuer)
+        self.assertNotIn("self::execute(", issuer)
+        self.assertNotIn("$state", issuer)
 
     def test_mutating_intent_requires_plan_rollback_and_verification_contract(self):
         data = scenario("mutation")

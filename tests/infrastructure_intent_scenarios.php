@@ -2,23 +2,38 @@
 declare(strict_types=1);
 
 foreach ([
-    'BudgetGuard', 'VentureIdentity', 'DecisionRights', 'CapitalPolicy',
-    'CapabilityPolicy', 'RunnerGateway', 'InfrastructureIntent',
+    'Approvals', 'OwnerSession', 'GitHub', 'ApprovalEndpoint', 'BudgetGuard',
+    'VentureIdentity', 'VentureAccessSource', 'DecisionRights', 'DecisionRuntime',
+    'VerifiedAccessContext', 'IdentityCenter', 'CapitalPolicy', 'CapabilityPolicy',
+    'RunnerGateway', 'VentureAccessRuntime', 'InfrastructureIntent',
 ] as $file) {
     require __DIR__ . '/../src/' . $file . '.php';
 }
 
+use ControlBot\Approvals\AppendOnlyAuditLog;
+use ControlBot\Business\VerifiedAccessContext;
+use ControlBot\Business\VentureAccessRuntime;
+use ControlBot\Business\VentureAccessSource;
+use ControlBot\Decisions\DecisionRuntime;
 use ControlBot\Infrastructure\InfrastructureIntent;
+use ControlBot\Security\OwnerSessionService;
+use ControlBot\Security\TokenVault;
 use InvalidArgumentException;
 
 const NOW = 2050;
+
+final class InfrastructureAuthoritySource implements VentureAccessSource
+{
+    public function __construct(private array $row) {}
+    public function resolve(string $identityId,string $scope,string $capability,int $now): array { return $this->row; }
+}
 
 function rejected(callable $fn): bool
 {
     try {
         $fn();
         return false;
-    } catch (InvalidArgumentException) {
+    } catch (Throwable) {
         return true;
     }
 }
@@ -77,17 +92,64 @@ function intent(array $replace = []): array
     ], $replace);
 }
 
-function authority(string $decision = 'allow', string $scope = 'project:controlbot'): array
+function accessIdentity(string $id = 'identity-admin'): array
 {
     return [
-        'decision' => $decision,
-        'reason_code' => $decision === 'allow'
-            ? 'venture_access_allow'
-            : 'venture_access_owner_required',
-        'scope' => $scope,
-        'evidence_ref' => 'controlbot:venture-access/issue-189',
-        'policy_restrictions' => [],
+        'version'=>1, 'identity_id'=>$id, 'kind'=>'human', 'display_name'=>strtoupper($id),
+        'state'=>'active', 'source_ref'=>'controlbot:identity/'.$id, 'observed_at'=>1900,
     ];
+}
+
+function accessGrant(string $scope, string $capability = 'hostinger.read', string $authorityLevel = 'L2_VENTURE_ADMIN'): array
+{
+    return [
+        'version'=>1, 'grant_id'=>'grant-authority', 'identity_id'=>'identity-admin',
+        'role'=>$authorityLevel === 'L1_OPERATOR' ? 'operator' : 'venture_admin',
+        'capability'=>$capability, 'scope'=>$scope,
+        'authority_level'=>$authorityLevel, 'policy_ref'=>'controlbot:policy/business-os-v1',
+        'budget_limit'=>null, 'granted_at'=>1800, 'expires_at'=>2600,
+    ];
+}
+
+function verifiedContext(string $scope,string $capability,string $authorityLevel): VerifiedAccessContext
+{
+    $source=new InfrastructureAuthoritySource([
+        'identity'=>accessIdentity(),'scope'=>$scope,
+        'active_policy_refs'=>['controlbot:policy/business-os-v1'],
+        'grant'=>accessGrant($scope,$capability,$authorityLevel),
+    ]);
+    $vault=new TokenVault(base64_encode(str_repeat('K',SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));
+    $sessions=new OwnerSessionService('pl0n3r',$vault); $session=[];
+    $sessions->establishTrustedOAuthSession($session,'pl0n3r','fixture-server-value');
+    $path=tempnam(sys_get_temp_dir(),'infra-authority-'); $audit=new AppendOnlyAuditLog($path);
+    try {
+        $runtime=DecisionRuntime::fromServer($sessions,$audit,['pl0n3r/controlbot'],$source);
+        return VerifiedAccessContext::fromDecisionRuntime(
+            $runtime,$session,'pl0n3r/controlbot',
+            ['identity_id'=>'identity-admin','scope'=>$scope,'capability'=>$capability],NOW
+        );
+    } finally { @unlink($path); }
+}
+
+function authority(
+    string $decision = 'allow',
+    string $scope = 'project:controlbot',
+    string $capability = 'hostinger.read',
+    string $authorityLevel = 'L2_VENTURE_ADMIN',
+): object {
+    $grantCapability=$decision === 'deny'
+        ? ($capability === 'hostinger.read' ? 'venture.read' : 'hostinger.read')
+        : $capability;
+    $grantLevel=$decision === 'owner_decision_required' ? 'L1_OPERATOR' : $authorityLevel;
+    return VentureAccessRuntime::projectInfrastructureAuthority(
+        verifiedContext($scope,$grantCapability,$grantLevel),
+        $capability,$authorityLevel,NOW,
+    );
+}
+
+function authorityFor(array $intent, string $decision = 'allow', ?string $scope = null): object
+{
+    return authority($decision, $scope ?? $intent['scope'], $intent['capability'], strtoupper($intent['authority_level']));
 }
 
 function capital(bool $over = false): array
@@ -219,7 +281,7 @@ if ($name === 'safe') {
         ),
         'over_budget' => InfrastructureIntent::plan(
             $costIntent,
-            authority('allow', 'venture:platform'),
+            authorityFor($costIntent),
             capital(true),
             NOW,
         ),
@@ -257,8 +319,13 @@ if ($name === 'safe') {
         NOW,
     );
     $secret = intent(['instruction_ref' => 'controlbot:token:supersecret']);
-    $authSecret = authority();
-    $authSecret['evidence_ref'] = 'controlbot:secret:value';
+    $authSecret = [
+        'decision' => 'allow',
+        'reason_code' => 'venture_access_allow',
+        'scope' => 'project:controlbot',
+        'evidence_ref' => 'controlbot:secret:value',
+        'policy_restrictions' => [],
+    ];
     $out = [
         'safe' => $safe,
         'order' => $order,
@@ -268,6 +335,85 @@ if ($name === 'safe') {
         'authority_secret_rejected' => rejected(
             fn() => InfrastructureIntent::plan(intent(), $authSecret, null, NOW)
         ),
+    ];
+} elseif ($name === 'provenance') {
+    $fabricated = [
+        'decision' => 'allow',
+        'reason_code' => 'venture_access_allow',
+        'scope' => 'project:controlbot',
+        'evidence_ref' => 'controlbot:venture-access/fabricated',
+        'policy_restrictions' => [],
+    ];
+    $copiedObject = (object) $fabricated;
+    $allow = InfrastructureIntent::plan(
+        intent(['intent_id' => 'intent-provenance-allow']),
+        authority(),
+        null,
+        NOW,
+    );
+    $owner = InfrastructureIntent::plan(
+        intent(['intent_id' => 'intent-provenance-owner']),
+        authority('owner_decision_required'),
+        null,
+        NOW,
+    );
+    $deny = InfrastructureIntent::plan(
+        intent(['intent_id' => 'intent-provenance-deny']),
+        authority('deny'),
+        null,
+        NOW,
+    );
+    $scopeMismatch = InfrastructureIntent::plan(
+        intent(['intent_id' => 'intent-provenance-scope']),
+        authority('allow', 'venture:other'),
+        null,
+        NOW,
+    );
+    $projection = authority();
+    $context = verifiedContext('project:controlbot','hostinger.read','L2_VENTURE_ADMIN');
+    $contextCopy = (object)['decisionContext'=>$context->decisionContext(),'grant'=>$context->grant()];
+    VentureAccessRuntime::projectInfrastructureAuthority($context, 'hostinger.read', 'L2_VENTURE_ADMIN', NOW);
+    $singleUseIntent = intent(['intent_id' => 'intent-provenance-single-use']);
+    $singleUseProjection = authority();
+    $firstUse = InfrastructureIntent::plan($singleUseIntent, $singleUseProjection, null, NOW);
+    $crossCapability = intent([
+        'intent_id' => 'intent-provenance-cross-capability',
+        'intent_type' => 'rollback',
+        'capability' => 'deploy.rollback_artifact',
+        'evidence' => mutationEvidence(),
+    ]);
+    $freshDenied = InfrastructureIntent::plan(
+        intent(['intent_id' => 'intent-provenance-current-deny']),
+        authority('deny'),
+        null,
+        NOW,
+    );
+    $out = [
+        'fabricated_array_rejected' => rejected(
+            fn() => InfrastructureIntent::plan(intent(), $fabricated, null, NOW)
+        ),
+        'copied_object_rejected' => rejected(
+            fn() => InfrastructureIntent::plan(intent(), $copiedObject, null, NOW)
+        ),
+        'trusted_allow' => $allow,
+        'trusted_owner' => $owner,
+        'trusted_deny' => $deny,
+        'scope_mismatch' => $scopeMismatch,
+        'projection_json' => json_encode($projection, JSON_THROW_ON_ERROR),
+        'context_copy_rejected' => rejected(fn() => VentureAccessRuntime::projectInfrastructureAuthority(
+            $contextCopy, 'hostinger.read', 'L2_VENTURE_ADMIN', NOW
+        )),
+        'context_replay_rejected' => rejected(fn() => VentureAccessRuntime::projectInfrastructureAuthority(
+            $context, 'hostinger.read', 'L2_VENTURE_ADMIN', NOW
+        )),
+        'cross_capability_rejected' => rejected(
+            fn() => InfrastructureIntent::plan($crossCapability, authority(), null, NOW)
+        ),
+        'first_use_status' => $firstUse['status'],
+        'projection_replay_rejected' => rejected(
+            fn() => InfrastructureIntent::plan($singleUseIntent, $singleUseProjection, null, NOW)
+        ),
+        'current_deny_status' => $freshDenied['status'],
     ];
 } elseif ($name === 'mutation') {
     $base = intent([
@@ -300,23 +446,23 @@ if ($name === 'safe') {
         'cost_ref' => 'controlbot:finance/cost-read',
     ]);
     $out = [
-        'valid' => InfrastructureIntent::plan($base, authority(), null, NOW),
+        'valid' => InfrastructureIntent::plan($base, authorityFor($base), null, NOW),
         'missing_plan_rejected' => rejected(
-            fn() => InfrastructureIntent::plan($missingPlan, authority(), null, NOW)
+            fn() => InfrastructureIntent::plan($missingPlan, authorityFor($missingPlan), null, NOW)
         ),
         'missing_verify_rejected' => rejected(
-            fn() => InfrastructureIntent::plan($missingVerify, authority(), null, NOW)
+            fn() => InfrastructureIntent::plan($missingVerify, authorityFor($missingVerify), null, NOW)
         ),
         'missing_recovery_rejected' => rejected(
-            fn() => InfrastructureIntent::plan($missingRecovery, authority(), null, NOW)
+            fn() => InfrastructureIntent::plan($missingRecovery, authorityFor($missingRecovery), null, NOW)
         ),
-        'missing_backup' => InfrastructureIntent::plan($missingBackup, authority(), null, NOW),
+        'missing_backup' => InfrastructureIntent::plan($missingBackup, authorityFor($missingBackup), null, NOW),
         'read_mutation_rejected' => rejected(
-            fn() => InfrastructureIntent::plan($readMutation, authority(), null, NOW)
+            fn() => InfrastructureIntent::plan($readMutation, authorityFor($readMutation), null, NOW)
         ),
-        'weak_capability' => InfrastructureIntent::plan($weakCapability, authority(), null, NOW),
-        'readonly_write' => InfrastructureIntent::plan($readonlyWrite, authority(), null, NOW),
-        'cost_unknown' => InfrastructureIntent::plan($costUnknown, authority(), null, NOW),
+        'weak_capability' => InfrastructureIntent::plan($weakCapability, authorityFor($weakCapability), null, NOW),
+        'readonly_write' => InfrastructureIntent::plan($readonlyWrite, authorityFor($readonlyWrite), null, NOW),
+        'cost_unknown' => InfrastructureIntent::plan($costUnknown, authorityFor($costUnknown), null, NOW),
     ];
 } else {
     fwrite(STDERR, "Unknown infrastructure intent scenario\n");

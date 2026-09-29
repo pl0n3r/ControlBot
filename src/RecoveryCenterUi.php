@@ -25,6 +25,7 @@ final class RecoveryCenterUi
         ?array $factoryHealthRaw,
         ?BackupReceipt $receipt,
     ): array {
+        if(func_num_args()!==5) throw new InvalidArgumentException('Recovery UI action input is not supported.');
         $profile=RecoveryProfile::normalize($profileRaw);
         $evidence=self::evidence($evidenceRaw,$profileRaw,$receipt);
         $drill=self::drill($drillRaw,$profileRaw,$evidenceRaw,$receipt);

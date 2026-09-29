@@ -15,7 +15,7 @@ final class ExternalApiPushEnvelope
     private const FRESHNESS=['current','stale','unknown'];
     private const SENSITIVE_COMPONENTS =
         '#(?:^|[:/])(?:password|passwd|secret|cookie|authorization|bearer|credential|'
-        .'private[_ -]?key|public[_ -]?key|api[_ -]?key|otp|dsn)(?:$|[:/])#i';
+        .'private[_ -]?key|public[_ -]?key|api[_ -]?key|otp|dsn)(?:$|[:/.])#i';
     private const SENSITIVE_TOKEN = '#(?:^|[:/])token(?:$|[:/._-])#i';
 
     /** Normalize and validate the push envelope. */

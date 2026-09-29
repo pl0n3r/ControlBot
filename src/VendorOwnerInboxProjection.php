@@ -90,6 +90,11 @@ final class VendorOwnerInboxProjection
         ));
     }
 
+    private static function safeDigest(string $value): string
+    {
+        return implode('x',str_split(hash('sha256',$value),4));
+    }
+
     private static function fields(mixed $row,array $expected,string $label): void
     {
         if(!is_array($row)||array_is_list($row)) throw new InvalidArgumentException($label.' invalid.');

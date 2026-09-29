@@ -16,5 +16,5 @@ class IncidentUiTests(unittest.TestCase):
   html=render("valid");self.assertIn('name="viewport"',html);self.assertIn(":focus-visible",html);self.assertIn("prefers-reduced-motion",html);self.assertNotIn("<form",html.lower());self.assertNotIn("<button",html.lower())
  def test_incident_78_preserves_causal_categories_and_serial_recovery(self):
   html=render("incident78")
-  for text in ("Private Actions capacity was exhausted","Coordination caller lacked checks write permission","Hourly coordination fan out","Production observer cadence moved","Canario #86 → cola serial 72 → #77 → #80 → #71 → #84 → #73 → #75"):self.assertIn(text,html)
+  for text in ("Private Actions capacity was exhausted","Coordination caller lacked checks write permission","Hourly coordination fan out","Production observer cadence moved","Canario #86 → cola serial #72 → #77 → #80 → #71 → #84 → #73 → #75"):self.assertIn(text,html)
 if __name__=="__main__":unittest.main()

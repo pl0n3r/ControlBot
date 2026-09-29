@@ -12,6 +12,8 @@ def scenario(name):
     )
     if run.returncode != 0:
         raise AssertionError(run.stderr.strip() or f"scenario {name} failed with {run.returncode}")
+    if run.stderr.strip():
+        raise AssertionError(f"scenario {name} wrote to stderr: {run.stderr.strip()}")
     return json.loads(run.stdout)
 
 class ExternalApiOwnerE2ETests(unittest.TestCase):
@@ -47,12 +49,12 @@ class ExternalApiOwnerE2ETests(unittest.TestCase):
 
     def test_invalid_mobile_state_fails_closed_before_work_origin(self):
         d=scenario("invalid_state")
-        self.assertEqual(d["stale"]["freshness_gate"],"fail")
-        self.assertEqual(d["unknown"]["freshness_gate"],"fail")
-        self.assertFalse(d["stale"]["queueable"])
-        self.assertFalse(d["unknown"]["queueable"])
-        self.assertFalse(d["work_origin_called_for_stale"])
-        self.assertFalse(d["work_origin_called_for_unknown"])
+        self.assertEqual(d["stale"]["policy"]["freshness_gate"],"fail")
+        self.assertEqual(d["unknown"]["policy"]["freshness_gate"],"fail")
+        self.assertFalse(d["stale"]["policy"]["queueable"])
+        self.assertFalse(d["unknown"]["policy"]["queueable"])
+        self.assertIsNone(d["stale"]["origin"])
+        self.assertIsNone(d["unknown"]["origin"])
         self.assertTrue(d["no_step"])
         self.assertTrue(d["revoked"])
 

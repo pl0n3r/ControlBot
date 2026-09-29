@@ -74,13 +74,15 @@ function runAssessment(
     array $experimentOverrides=[],
     array $outcomeOverrides=[],
     ?array $baseline=null,
-    ?array $variant=null
+    ?array $variant=null,
+    string $hypothesisFresh='fresh',
+    string $hypothesisConfidence='high'
 ): array {
     return ProductDiscoveryAssessment::assess(
         assessment($classification,$assessmentOverrides),
         experiment($experimentOverrides),
         initiative(),
-        hypothesis(),
+        hypothesis($hypothesisFresh,$hypothesisConfidence),
         outcome($outcomeOverrides),
         $baseline??metric('metric-baseline',10),
         $variant??metric('metric-variant',15),
@@ -103,6 +105,7 @@ if($case==='valid'){
         'metric'=>bad(fn()=>runAssessment('VALIDATED',['primary_metric_ref'=>'metric:'.H3])),
         'outcome'=>bad(fn()=>runAssessment('VALIDATED',['outcome_id'=>'outcome-other'])),
         'outcome_experiment'=>bad(fn()=>runAssessment('VALIDATED',[],[],['experiment_ref'=>'experiment:'.H4])),
+        'window'=>bad(fn()=>runAssessment('VALIDATED',[],[],['evaluation_window'=>['start_at'=>101,'end_at'=>200]])),
     ];
 }elseif($case==='classification'){
     $out=[
@@ -124,6 +127,12 @@ if($case==='valid'){
         'inferred_ok'=>runAssessment('INCONCLUSIVE',[],[],[],null,$inferred)['classification'],
         'unknown_reject'=>bad(fn()=>runAssessment('VALIDATED',[],[],[],null,$unknown)),
         'unknown_ok'=>runAssessment('INCONCLUSIVE',[],[],[],null,$unknown)['classification'],
+        'zero_confidence_reject'=>bad(fn()=>runAssessment('VALIDATED',[],[],[],null,metric('metric-variant',15,'measured','fresh','observed',0.0))),
+        'zero_confidence_ok'=>runAssessment('INCONCLUSIVE',[],[],[],null,metric('metric-variant',15,'measured','fresh','observed',0.0))['classification'],
+        'hypothesis_stale_reject'=>bad(fn()=>runAssessment('VALIDATED',[],[],[],null,null,'stale','medium')),
+        'hypothesis_stale_ok'=>runAssessment('INCONCLUSIVE',[],[],[],null,null,'stale','medium')['classification'],
+        'hypothesis_unknown_reject'=>bad(fn()=>runAssessment('INVALIDATED',[],[],[],null,null,'unknown','unknown')),
+        'hypothesis_unknown_ok'=>runAssessment('INCONCLUSIVE',[],[],[],null,null,'unknown','unknown')['classification'],
     ];
 }elseif($case==='numbers'){
     $out=[
@@ -146,6 +155,7 @@ if($case==='valid'){
             'venture-alpha','product-alpha'
         )),
         'bad_ref'=>bad(fn()=>runAssessment('VALIDATED',['assessment_ref'=>'assessment:secret@example.com'])),
+        'numeric_opaque_ref'=>runAssessment('VALIDATED',['assessment_ref'=>'assessment:12345678901234567890123456789012'])['assessment_ref'],
     ];
 }elseif($case==='source'){
     $out=['source'=>file_get_contents(__DIR__.'/../src/ProductDiscoveryAssessment.php')];

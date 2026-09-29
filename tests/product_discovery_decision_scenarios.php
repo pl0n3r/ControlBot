@@ -25,7 +25,7 @@ function hyp(): array { return [
  'constraint_refs'=>['constraint:'.E],'evidence_refs'=>['evidence:'.F],
  'source_ref'=>'source:'.A,'freshness'=>'fresh','confidence'=>'high',
 ];}
-function exp(): array { return [
+function experimentFixture(): array { return [
  'version'=>1,'experiment_ref'=>'experiment:'.C,'initiative_id'=>'initiative:'.A,
  'hypothesis_ref'=>'hypothesis:'.B,'kind'=>'prototype','primary_metric_ref'=>'metric:'.D,
  'evaluation_window'=>['start_at'=>100,'end_at'=>200],'validation_cost_ref'=>'cost:'.E,'state'=>'EXPERIMENT_READY',
@@ -55,7 +55,7 @@ function decision(string $value='BUILD',array $extra=[]): array { return array_r
 ],$extra);}
 function runDecision(string $value='BUILD',string $class='VALIDATED',array $extra=[]): array {
  return ProductDiscoveryDecision::decide(
-  decision($value,$extra),assess($class),exp(),ini(),hyp(),outcome(),
+  decision($value,$extra),assess($class),experimentFixture(),ini(),hyp(),outcome(),
   metric('metric-baseline',10),metric('metric-variant',15),'venture-alpha','product-alpha'
  );
 }
@@ -88,7 +88,7 @@ if($case==='bindings'){
  $out=[
   'build'=>runDecision(),
   'self_certify'=>bad(fn()=>ProductDiscoveryDecision::decide(
-   $extra,assess(),exp(),ini(),hyp(),outcome(),metric('metric-baseline',10),metric('metric-variant',15),
+   $extra,assess(),experimentFixture(),ini(),hyp(),outcome(),metric('metric-baseline',10),metric('metric-variant',15),
    'venture-alpha','product-alpha'
   )),
  ];
@@ -100,7 +100,7 @@ if($case==='bindings'){
  $first=runDecision('PARK','INVALIDATED');$second=runDecision('PARK','INVALIDATED');
  $out=[
   'extra'=>bad(fn()=>ProductDiscoveryDecision::decide(
-   $extra,assess('INVALIDATED'),exp(),ini(),hyp(),outcome(),metric('metric-baseline',10),metric('metric-variant',15),
+   $extra,assess('INVALIDATED'),experimentFixture(),ini(),hyp(),outcome(),metric('metric-baseline',10),metric('metric-variant',15),
    'venture-alpha','product-alpha'
   )),
   'deterministic'=>$first===$second,

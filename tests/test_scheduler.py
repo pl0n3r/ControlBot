@@ -187,6 +187,7 @@ class SchedulerTests(unittest.TestCase):
     def test_scheduler_simulation_is_deterministic(self):
         first=fixture("dynamic_capacity_e2e_scenarios.php","lifecycle")
         second=fixture("dynamic_capacity_e2e_scenarios.php","lifecycle")
+        self.assertTrue(first["readiness"]["previous"]["ready"])
         self.assertEqual(first,second)
 
 

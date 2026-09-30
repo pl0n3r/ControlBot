@@ -19,14 +19,19 @@ class SecurityAlertingTests(unittest.TestCase):
         self.assertEqual(self.data["primary_healthy"]["decision"],"primary_channel")
 
     def test_noncritical_event_does_not_escalate_without_policy(self):
+        self.assertEqual(self.data["warning_primary"]["decision"],"primary_channel")
+        self.assertEqual(self.data["warning_primary"]["channel"],"primary")
         self.assertEqual(self.data["warning_no_alert"]["decision"],"no_alert")
         self.assertIsNone(self.data["warning_no_alert"]["payload"])
         self.assertEqual(self.data["warning_escalated"]["decision"],"independent_channel")
 
     def test_unknown_independent_channel_fails_closed_to_owner_review(self):
-        d=self.data["unknown_independent"]
-        self.assertEqual(d["decision"],"owner_review")
-        self.assertEqual(d["channel"],"owner_review")
+        independent=self.data["unknown_independent"]
+        self.assertEqual(independent["decision"],"owner_review")
+        self.assertEqual(independent["channel"],"owner_review")
+        primary=self.data["unknown_primary"]
+        self.assertEqual(primary["decision"],"owner_review")
+        self.assertEqual(primary["channel"],"owner_review")
 
     def test_alert_intent_is_idempotent(self):
         a=self.data["idempotent_a"]

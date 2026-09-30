@@ -100,6 +100,23 @@ if($scenario==='ui_tool_usage_shape'){
     echo json_encode(['measured'=>$validMeasured,'unknown'=>$validUnknown,'tampered_unknown_blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 
+if($scenario==='ui_product_metric_shape'){
+    $snapshot=baseSnapshot();
+    $results=[];
+    foreach([
+        'department'=>static function(array &$row):void{$row['department']='finance';},
+        'freshness'=>static function(array &$row):void{$row['freshness']='unknown';},
+        'future'=>static function(array &$row):void{$row['observed_at']=3001;$row['age_seconds']=0;},
+        'age'=>static function(array &$row):void{$row['age_seconds']=999;},
+    ] as $name=>$mutate){
+        $view=FactoryLiveCostSnapshot::build($snapshot);
+        $mutate($view['product_analytics'][0]);
+        $blocked=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blocked=true;}
+        $results[$name]=$blocked;
+    }
+    echo json_encode($results,JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+
 if($scenario==='ui'){
     $snapshot=baseSnapshot();
     echo FactoryLiveUi::render($snapshot,null,null,FactoryLiveCostSnapshot::build($snapshot)),PHP_EOL;exit;

@@ -7,8 +7,6 @@ use InvalidArgumentException;
 
 final class WeeklyFocus
 {
-    private const PRIORITY=['critical'=>0,'high'=>1,'medium'=>2,'low'=>3];
-
     public static function normalize(array $raw): array
     {
         self::fields($raw,['focus_id','week_start','scope','ordered_refs','version','created_at','updated_at','updated_by'],'WeeklyFocus');
@@ -41,7 +39,7 @@ final class WeeklyFocus
         ]));
     }
 
-    public static function select(array $focusRaw,array $candidateRows,array $metadataRaw): array
+    public static function preference(array $focusRaw,array $candidateRows,array $metadataRaw): array
     {
         $focus=self::normalize($focusRaw);
         $request=SchedulerSelection::request($candidateRows);
@@ -50,39 +48,40 @@ final class WeeklyFocus
         $metaKeys=array_keys($metadataRaw); sort($metaKeys,SORT_STRING);
         if($keys!==$metaKeys) throw new InvalidArgumentException('focus metadata mismatch.');
 
-        $positions=[]; foreach($focus['ordered_refs'] as $i=>$ref) $positions[$ref]=$i;
+        $positions=[]; foreach($focus['ordered_refs'] as $i=>$ref) $positions[$ref]=$i+1;
         $eligible=[];
         foreach($request['candidates'] as $candidate){
             $meta=self::meta($metadataRaw[$candidate['key']]);
             if(!$candidate['readiness']['ready']||$meta['ref_state']==='unavailable') continue;
             $eligible[]=[
-                'candidate'=>$candidate,'focus_ref'=>$meta['focus_ref'],'policy_rank'=>$meta['policy_rank'],
+                'candidate'=>$candidate,'focus_ref'=>$meta['focus_ref'],
                 'focus_position'=>$positions[$meta['focus_ref']]??null,
             ];
         }
         if($eligible===[]) return [
-            'version'=>1,'request_fingerprint'=>$request['fingerprint'],'selected_key'=>null,'selected_source_ref'=>null,
-            'policy_rank'=>null,'priority'=>null,'focus_version'=>$focus['version'],'focus_position'=>null,
-            'focus_influenced'=>false,'selection_reason'=>'no_eligible_candidate',
+            'version'=>1,'request_fingerprint'=>$request['fingerprint'],'preferred_key'=>null,'preferred_source_ref'=>null,
+            'priority'=>null,'focus_version'=>null,'focus_position'=>null,
+            'focus_influenced'=>false,'preference_reason'=>'no_eligible_candidate',
         ];
 
-        $minPolicy=min(array_column($eligible,'policy_rank'));
-        $eligible=array_values(array_filter($eligible,static fn(array $row):bool=>$row['policy_rank']===$minPolicy));
-        $minPriority=min(array_map(static fn(array $row):int=>self::PRIORITY[$row['candidate']['priority']],$eligible));
-        $cohort=array_values(array_filter($eligible,static fn(array $row):bool=>self::PRIORITY[$row['candidate']['priority']]===$minPriority));
-        usort($cohort,static function(array $a,array $b):int{
+        $priorities=array_values(array_unique(array_column(array_column($eligible,'candidate'),'priority')));
+        if(count($priorities)!==1) throw new InvalidArgumentException('WeeklyFocus canonical cohort mismatch.');
+        $canonicalFirstKey=$eligible[0]['candidate']['key'];
+        usort($eligible,static function(array $a,array $b):int{
             $ap=$a['focus_position']??PHP_INT_MAX; $bp=$b['focus_position']??PHP_INT_MAX;
             return [$ap,$a['candidate']['key']]<=>[$bp,$b['candidate']['key']];
         });
-        $selected=$cohort[0];
-        $influenced=count($cohort)>1&&$selected['focus_position']!==null;
+        $preferred=$eligible[0];
+        $influenced=count($eligible)>1
+            && $preferred['focus_position']!==null
+            && $preferred['candidate']['key']!==$canonicalFirstKey;
         return [
             'version'=>1,'request_fingerprint'=>$request['fingerprint'],
-            'selected_key'=>$selected['candidate']['key'],'selected_source_ref'=>$selected['candidate']['source_ref'],
-            'policy_rank'=>$selected['policy_rank'],'priority'=>$selected['candidate']['priority'],
-            'focus_version'=>$focus['version'],'focus_position'=>$selected['focus_position'],
+            'preferred_key'=>$preferred['candidate']['key'],'preferred_source_ref'=>$preferred['candidate']['source_ref'],
+            'priority'=>$preferred['candidate']['priority'],
+            'focus_version'=>$preferred['focus_position']===null?null:$focus['version'],'focus_position'=>$preferred['focus_position'],
             'focus_influenced'=>$influenced,
-            'selection_reason'=>$influenced?'weekly_focus_tiebreak':'scheduler_precedence',
+            'preference_reason'=>$influenced?'weekly_focus_tiebreak':'canonical_cohort_order',
         ];
     }
 
@@ -106,12 +105,10 @@ final class WeeklyFocus
 
     private static function meta(mixed $raw): array
     {
-        self::fields($raw,['focus_ref','policy_rank','ref_state'],'FocusCandidateMetadata');
-        if(!is_int($raw['policy_rank'])||$raw['policy_rank']<0||$raw['policy_rank']>1000000)
-            throw new InvalidArgumentException('policy_rank invalid.');
+        self::fields($raw,['focus_ref','ref_state'],'FocusCandidateMetadata');
         if(!is_string($raw['ref_state'])||!in_array($raw['ref_state'],['available','unavailable'],true))
             throw new InvalidArgumentException('ref_state invalid.');
-        return ['focus_ref'=>self::focusRef($raw['focus_ref']),'policy_rank'=>$raw['policy_rank'],'ref_state'=>$raw['ref_state']];
+        return ['focus_ref'=>self::focusRef($raw['focus_ref']),'ref_state'=>$raw['ref_state']];
     }
     private static function focusRefs(mixed $values): array
     {
@@ -120,10 +117,9 @@ final class WeeklyFocus
     }
     private static function focusRef(mixed $value): string
     {
-        if(!is_string($value)) throw new InvalidArgumentException('focus_ref invalid.');
-        if(preg_match('/^controlbot:(?:project|epic)\/[a-z][a-z0-9._-]{0,79}$/D',$value)===1) return $value;
-        if(preg_match('#^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*$#D',$value)===1) return $value;
-        throw new InvalidArgumentException('focus_ref invalid.');
+        if(!is_string($value)||preg_match('/^controlbot:(?:project|epic)\/[a-z][a-z0-9._-]{0,79}$/D',$value)!==1)
+            throw new InvalidArgumentException('focus_ref invalid.');
+        return $value;
     }
     private static function day(mixed $value): string
     {

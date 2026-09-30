@@ -19,6 +19,11 @@ class SonarRecoveryCleanupTests(unittest.TestCase):
             "La prueba del workflow experimental no debe reintroducirse.",
         )
 
+    def test_only_cleanup_guardrail_remains(self):
+        self.assertTrue(Path(__file__).is_file())
+        self.assertFalse(RECOVERY_WORKFLOW.exists())
+        self.assertFalse(OBSOLETE_TEST.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

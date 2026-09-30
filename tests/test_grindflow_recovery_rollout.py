@@ -60,7 +60,7 @@ class GrindFlowRecoveryRolloutTests(unittest.TestCase):
                        "credential", "api_key", "private_key", "hostinger", "google_drive"):
             self.assertNotIn(marker, lowered)
         self.assertEqual(
-            re.findall(r'https?://[^"\\s]+', lowered),
+            re.findall(r'https?://[^"\s]+', lowered),
             ["https://github.com/pl0n3r/controlbot/issues/465"],
         )
 

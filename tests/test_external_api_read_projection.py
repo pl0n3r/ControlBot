@@ -50,7 +50,9 @@ class ExternalApiReadProjectionTests(unittest.TestCase):
         self.assertTrue(all(d.values()))
 
     def test_projection_is_deterministic_and_external_io_free(self):
-        self.assertEqual(scenario("cockpit"),scenario("cockpit"))
+        first_cockpit=scenario("cockpit")
+        second_cockpit=scenario("cockpit")
+        self.assertEqual(first_cockpit,second_cockpit)
         pure=scenario("pure")
         self.assertEqual(pure["methods"],["cockpit","ownerInbox"])
         source=pure["source"].lower()

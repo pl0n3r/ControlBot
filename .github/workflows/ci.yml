@@ -44,9 +44,11 @@ jobs:
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
         with:
           php-version: '8.5'
-          coverage: none
-      - name: Ejecutar regresiones ControlBot
-        run: python3 -m unittest discover -s tests -p 'test_*.py'
+          coverage: xdebug
+      - name: Instalar coverage.py
+        run: python3 -m pip install --disable-pip-version-check coverage==7.16.2
+      - name: Ejecutar regresiones ControlBot con cobertura
+        run: python3 scripts/generate_coverage.py
 
   validar:
     name: Validar

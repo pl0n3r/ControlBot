@@ -54,6 +54,18 @@ jobs:
             exit 1
           }
 
+      - name: Preparar PHP 8.5 con cobertura
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: xdebug
+
+      - name: Instalar coverage.py
+        run: python3 -m pip install --disable-pip-version-check coverage==7.16.2
+
+      - name: Generar cobertura Python y PHP
+        run: python3 scripts/generate_coverage.py
+
       - name: Analizar con SonarQube Cloud
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9
         env:
@@ -62,6 +74,9 @@ jobs:
           args: >-
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=pl0n3r_factory-control
+            -Dsonar.tests=tests
+            -Dsonar.python.coverage.reportPaths=build/coverage/python.xml
+            -Dsonar.php.coverage.reportPaths=build/coverage/php-clover.xml
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
 

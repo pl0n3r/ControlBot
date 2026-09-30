@@ -23,9 +23,11 @@ function securityAlertPolicy(bool $noncritical=false,int $version=1): array{
 }
 
 $criticalIndependent=SecurityAlertChannel::project(securityAlertEvent(),securityAlertChannels('degraded','healthy'),securityAlertPolicy());
+$warningPrimary=SecurityAlertChannel::project(securityAlertEvent('warning'),securityAlertChannels('healthy','unknown'),securityAlertPolicy());
 $warningNoAlert=SecurityAlertChannel::project(securityAlertEvent('warning'),securityAlertChannels('degraded','healthy'),securityAlertPolicy());
 $warningEscalated=SecurityAlertChannel::project(securityAlertEvent('warning'),securityAlertChannels('degraded','healthy'),securityAlertPolicy(true));
 $unknownIndependent=SecurityAlertChannel::project(securityAlertEvent(),securityAlertChannels('unavailable','unknown'),securityAlertPolicy());
+$unknownPrimary=SecurityAlertChannel::project(securityAlertEvent(),securityAlertChannels('unknown','healthy'),securityAlertPolicy());
 $idempotentA=SecurityAlertChannel::project(securityAlertEvent(),securityAlertChannels('down','healthy'),securityAlertPolicy(false,3));
 $idempotentB=SecurityAlertChannel::project(securityAlertEvent('critical','provider_reported',2100),securityAlertChannels('down','healthy'),securityAlertPolicy(false,3));
 $unknownConfidence=SecurityAlertChannel::project(securityAlertEvent('critical','unknown'),securityAlertChannels('stale','healthy'),securityAlertPolicy());
@@ -33,9 +35,11 @@ $primaryHealthy=SecurityAlertChannel::project(securityAlertEvent(),securityAlert
 
 echo json_encode([
     'critical_independent'=>$criticalIndependent,
+    'warning_primary'=>$warningPrimary,
     'warning_no_alert'=>$warningNoAlert,
     'warning_escalated'=>$warningEscalated,
     'unknown_independent'=>$unknownIndependent,
+    'unknown_primary'=>$unknownPrimary,
     'idempotent_a'=>$idempotentA,
     'idempotent_b'=>$idempotentB,
     'unknown_confidence'=>$unknownConfidence,

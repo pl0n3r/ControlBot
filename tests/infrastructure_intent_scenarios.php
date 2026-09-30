@@ -417,6 +417,14 @@ if ($name === 'safe') {
         'cross_capability_rejected' => rejected(
             fn() => InfrastructureIntent::plan($crossCapability, authority(), null, NOW)
         ),
+        'authority_level_mismatch_rejected' => rejected(
+            fn() => InfrastructureIntent::plan(
+                intent(['authority_level' => 'l1_operator']),
+                authority(),
+                null,
+                NOW,
+            )
+        ),
         'first_use_status' => $firstUse['status'],
         'projection_replay_rejected' => rejected(
             fn() => InfrastructureIntent::plan($singleUseIntent, $singleUseProjection, null, NOW)

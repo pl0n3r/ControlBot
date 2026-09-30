@@ -166,6 +166,7 @@ class InfrastructureIntentTests(unittest.TestCase):
         self.assertTrue(data["fabricated_array_rejected"])
         self.assertTrue(data["copied_object_rejected"])
         self.assertTrue(data["cross_capability_rejected"])
+        self.assertTrue(data["authority_level_mismatch_rejected"])
         self.assertTrue(data["context_copy_rejected"])
         self.assertTrue(data["context_replay_rejected"])
         self.assertTrue(data["invalid_restriction_rejected"])

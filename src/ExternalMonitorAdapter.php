@@ -60,14 +60,14 @@ final class ExternalMonitorAdapter
         $channel=self::choice($context['channel'],['webhook'],'channel');
         $evidence=self::safeRef($context['evidence_ref'],'evidence_ref');
         $dedupe=hash('sha256',json_encode([$severity,$code,$refs],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
-        if(!$intent['required']) return ['assessment'=>$assessment,'attempted'=>false,'dedupe_key'=>$dedupe,'receipt'=>null];
+        if(!$intent['required']) return ['attempted'=>false,'dedupe_key'=>$dedupe,'receipt'=>null];
         $payload=['version'=>1,'severity'=>$severity,'code'=>$code,'dedupe_key'=>$dedupe,'evidence_refs'=>$refs];
         $delivery=($this->alertTransport)($payload);
         self::fields($delivery,['status','code'],'AlertTransportResult');
         $status=self::choice($delivery['status'],['delivered','failed'],'delivery.status');
         $deliveryCode=self::slug($delivery['code'],'delivery.code');
         $deliveryId='delivery:'.substr(hash('sha256',$dedupe.'|'.$observed.'|'.$channel),0,32);
-        return ['assessment'=>$assessment,'attempted'=>true,'dedupe_key'=>$dedupe,'receipt'=>[
+        return ['attempted'=>true,'dedupe_key'=>$dedupe,'receipt'=>[
             'delivery_id'=>$deliveryId,'channel'=>$channel,'status'=>$status,'code'=>$deliveryCode,
             'observed_at'=>$observed,'evidence_ref'=>$evidence,
         ]];

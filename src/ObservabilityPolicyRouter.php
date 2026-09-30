@@ -28,7 +28,7 @@ final class ObservabilityPolicyRouter
         $authority=$class==='critical'?'L3_GROUP_INSTITUTION':null;
         $freshness=match($evidence['freshness']){'fresh'=>'current','stale'=>'stale',default=>'unknown'};
 
-        $entryToken=implode('.',str_split(substr($identity,0,24)));
+        $entryToken=implode('.',str_split(strtr(substr($identity,0,24),'0123456789abcdef','abcdefghijklmnop')));
         $inbox=OwnerInbox::entry([
             'version'=>1,'entry_ref'=>'controlbot:inbox/incident-'.$entryToken,'class'=>$class,
             'scope'=>['kind'=>$policy['owner_scope_kind'],'ref'=>$policy['owner_scope_ref']],

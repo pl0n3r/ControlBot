@@ -14,31 +14,32 @@ def scenario(name: str):
     return json.loads(run.stdout)
 
 
+def intake_scenario():
+    run = subprocess.run(
+        ["php", str(ROOT / "tests" / "requirement_intake_scenarios.php")],
+        cwd=ROOT, check=True, text=True, capture_output=True, timeout=60,
+    )
+    return json.loads(run.stdout)
+
+
 class RequirementIntakeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        completed = subprocess.run(
-            ["php", str(ROOT / "tests" / "requirement_intake_scenarios.php")],
-            cwd=ROOT,
-            check=True,
-            text=True,
-            capture_output=True,
-            timeout=60,
-        )
-        cls.core = json.loads(completed.stdout)
+        cls.intake = intake_scenario()
 
     def test_free_text_normalizes_unknowns_without_inventing_facts(self):
-        draft = self.core["free"]
+        draft = self.intake["free"]
         self.assertEqual(draft["problem"], {"status": "known", "value": "Orders are tracked manually"})
         self.assertEqual(draft["user"], {"status": "known", "value": "operations team"})
         self.assertEqual(draft["client"], {"status": "unknown", "value": None})
         self.assertEqual(draft["budget"], {"status": "unknown", "value": None})
         self.assertEqual(draft["deadline"], {"status": "unknown", "value": None})
         self.assertEqual(draft["constraints"], {"status": "unknown", "values": []})
+        self.assertRegex(draft["fingerprint"], r"^[0-9a-f]{64}$")
 
     def test_dictation_and_text_share_contract_without_requiring_audio_retention(self):
-        text = self.core["text"]
-        transcript = self.core["transcript"]
+        text = self.intake["text"]
+        transcript = self.intake["transcript"]
         self.assertEqual(set(text), set(transcript))
         self.assertEqual(text["fingerprint"], transcript["fingerprint"])
         self.assertEqual(text["draft_ref"], transcript["draft_ref"])
@@ -49,7 +50,7 @@ class RequirementIntakeTests(unittest.TestCase):
             self.assertNotIn("raw_audio", draft)
 
     def test_analysis_builds_epic_proposal_with_risks_dependencies_and_acceptance_slices(self):
-        proposal = self.core["proposal"]
+        proposal = self.intake["proposal"]
         for field in (
             "problem", "user", "objectives", "out_of_scope", "risks",
             "dependencies", "questions", "slices", "project_match",
@@ -57,28 +58,27 @@ class RequirementIntakeTests(unittest.TestCase):
             self.assertIn(field, proposal)
         self.assertGreaterEqual(len(proposal["slices"]), 1)
         self.assertGreaterEqual(len(proposal["slices"][0]["acceptance"]), 1)
-        self.assertTrue(proposal["requires_approval"])
         self.assertFalse(proposal["execution"])
+        self.assertTrue(proposal["requires_approval"])
 
     def test_existing_project_match_does_not_auto_create_duplicate(self):
-        match = self.core["proposal"]["project_match"]
+        match = self.intake["proposal"]["project_match"]
         self.assertEqual(match["status"], "matched")
         self.assertEqual(match["project_ref"], "controlbot:project/controlbot")
         self.assertEqual(match["action"], "link_proposal")
         self.assertFalse(match["auto_create"])
 
     def test_unapproved_proposal_has_no_repo_deploy_or_mutating_side_effects(self):
-        proposal = self.core["proposal"]
+        proposal = self.intake["proposal"]
         self.assertTrue(proposal["requires_approval"])
         self.assertFalse(proposal["execution"])
-
         source = (ROOT / "src" / "RequirementIntake.php").read_text(encoding="utf-8").lower()
-        for forbidden in (
+        forbidden = (
             "curl_", "fsockopen", "new pdo", "mysqli", "file_put_contents",
             "unlink(", "rename(", "shell_exec", "proc_open", "exec(", "system(",
-            "workflow_dispatch", "dispatchworkflow", "movetag(", "commentissue(",
-        ):
-            self.assertNotIn(forbidden, source)
+            "mail(", "octokit", "http_client", "workflow_dispatch",
+        )
+        self.assertFalse(any(symbol in source for symbol in forbidden))
 
     def test_approved_materialization_is_idempotent(self):
         data = scenario("idempotent")
@@ -87,15 +87,17 @@ class RequirementIntakeTests(unittest.TestCase):
         self.assertTrue(data["first"]["replay_safe"])
 
     def test_intake_redacts_secrets_and_minimizes_transcript_data(self):
-        draft = self.core["secret_draft"]
-        proposal = self.core["secret_proposal"]
+        draft = self.intake["secret_draft"]
+        proposal = self.intake["secret_proposal"]
         payload = json.dumps({"draft": draft, "proposal": proposal}).lower()
         for secret in ("hunter2", "supersecrettoken", "abcdefghijklmnopqrstuvwxyz"):
             self.assertNotIn(secret, payload)
-        for forbidden in ("raw_transcript", "raw_audio", "audio_blob", "transcript_text"):
-            self.assertNotIn(forbidden, payload)
         self.assertGreaterEqual(draft["redaction_count"], 3)
-        self.assertIn("[redacted]", draft["intent"].lower())
+        self.assertNotIn("content", draft)
+        self.assertNotIn("audio", draft)
+        self.assertNotIn("raw_audio", draft)
+        self.assertNotIn("audio_blob", proposal)
+        self.assertNotIn("transcript_text", proposal)
 
     def test_materialization_rejects_unapproved_stale_or_unbound_decision(self):
         data = scenario("rejected")

@@ -13,12 +13,16 @@ class SonarCiAnalysisWorkflowTests(unittest.TestCase):
     def setUpClass(cls):
         cls.text = WORKFLOW.read_text(encoding="utf-8")
 
-    def test_workflow_is_pr_and_main_only_with_pinned_scanner_and_minimal_permissions(self):
+    def test_workflow_supports_pr_main_and_manual_exact_main_with_pinned_scanner_and_minimal_permissions(self):
         text = self.text
         self.assertIn("pull_request:", text)
         self.assertIn("push:", text)
+        self.assertIn("workflow_dispatch:", text)
         self.assertGreaterEqual(text.count("branches: [main]"), 2)
-        self.assertNotIn("workflow_dispatch:", text)
+        self.assertIn(
+            "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')",
+            text,
+        )
         self.assertIn("permissions:\n  contents: read", text)
         self.assertNotRegex(text, r"(?m)^\s+(checks|issues|pull-requests|actions):\s+write\s*$")
         self.assertIn("fetch-depth: 0", text)

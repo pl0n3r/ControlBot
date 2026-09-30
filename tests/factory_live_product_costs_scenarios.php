@@ -72,6 +72,31 @@ if($scenario==='secret'){
     $blocked=false;try{FactoryLiveCostSnapshot::build($snapshot);}catch(Throwable){$blocked=true;}
     echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
+
+if($scenario==='ui_usage_above_limit'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $view['limits']=['status'=>'measured','items'=>[array_merge($view['limits']['items'][0],['used'=>10001,'limit'=>10000])]];
+    $blocked=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blocked=true;}
+    echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($scenario==='ui_incoherent_time'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $view['limits']['items'][0]['observed_at']=3001;
+    $blockedFuture=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blockedFuture=true;}
+    $view=FactoryLiveCostSnapshot::build($snapshot);$view['limits']['items'][0]['age_seconds']=999;
+    $blockedAge=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blockedAge=true;}
+    echo json_encode(['future'=>$blockedFuture,'age'=>$blockedAge],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($scenario==='ui_tool_usage_shape'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $validMeasured=true;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$validMeasured=false;}
+    $unknown=FactoryLiveCostSnapshot::build(baseSnapshot(null,null,false));
+    $validUnknown=true;try{FactoryLiveUi::render(baseSnapshot(null,null,false),null,null,$unknown);}catch(Throwable){$validUnknown=false;}
+    $unknown['tool_usage']['source_ref']='controlbot:tampered';
+    $blocked=false;try{FactoryLiveUi::render(baseSnapshot(null,null,false),null,null,$unknown);}catch(Throwable){$blocked=true;}
+    echo json_encode(['measured'=>$validMeasured,'unknown'=>$validUnknown,'tampered_unknown_blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+
 if($scenario==='ui'){
     $snapshot=baseSnapshot();
     echo FactoryLiveUi::render($snapshot,null,null,FactoryLiveCostSnapshot::build($snapshot)),PHP_EOL;exit;

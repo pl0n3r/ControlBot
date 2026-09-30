@@ -1,19 +1,19 @@
 <?php
 declare(strict_types=1);
+require __DIR__.'/../src/SecurityEvent.php';
 require __DIR__.'/../src/SecurityAlertChannel.php';
 
 use ControlBot\Security\SecurityAlertChannel;
+use ControlBot\Security\SecurityEvent;
 
 function securityAlertEvent(string $severity='critical',string $confidence='provider_reported',int $observedAt=2000): array{
-    return [
+    return SecurityEvent::normalize([
         'version'=>1,'provider'=>'github','event_id'=>'evt-001','observed_at'=>$observedAt,'occurred_at'=>1900,
         'event_type'=>'new_device','severity'=>$severity,'account_scope'=>'controlbot:account/owner-primary',
         'confidence'=>$confidence,
         'device'=>['type'=>'desktop','platform'=>'macOS','browser'=>'Chrome','location'=>['country'=>'CO','region'=>'Risaralda','city'=>'Pereira']],
         'actor'=>null,
-        'event_identity'=>'security-event:provider:'.str_repeat('a',40),
-        'fingerprint'=>str_repeat('b',64),
-    ];
+    ]);
 }
 function securityAlertChannels(string $primary,string $independent): array{
     return ['primary_state'=>$primary,'independent_state'=>$independent];

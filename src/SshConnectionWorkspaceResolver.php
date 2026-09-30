@@ -77,11 +77,12 @@ final class SshConnectionWorkspaceResolver
 
     private static function fromBroker(array $result): array
     {
-        return [
+        $out=[
             'ok'=>false,'reason'=>is_string($result['reason']??null)?$result['reason']:'broker_denied',
             'result'=>null,'path'=>null,
-            ...isset($result['error'])?['error'=>$result['error']]:[],
         ];
+        if (array_key_exists('error',$result)) $out['error']=$result['error'];
+        return $out;
     }
 
     private static function deny(string $reason): array

@@ -71,6 +71,35 @@ class FactoryLiveLearningTests(unittest.TestCase):
         self.assertIn("ControlBot",html)
         self.assertIn("UNKNOWN",html)
 
+    def test_missing_scope_does_not_infer_global_metric(self):
+        row=json.loads(scenario("missing_scope"))
+        self.assertEqual(row["status"],"UNKNOWN");self.assertIsNone(row["value"])
+        self.assertIsNone(row["source_ref"]);self.assertEqual(row["freshness"],"unknown")
+
+    def test_explicit_global_scope_populates_global_metric(self):
+        group=json.loads(scenario("explicit_global"))
+        self.assertEqual(group["global"]["value"],11)
+        self.assertEqual(group["global"]["status"],"GREEN")
+        self.assertIsInstance(group["global"]["source_ref"],str)
+        self.assertEqual(group["global"]["freshness"],"current")
+        self.assertEqual(group["by_project"]["Condor"]["value"],3)
+        self.assertNotIn("ControlBot",group["by_project"])
+
+    def test_project_slug_is_normalized_and_unknown_project_rejected(self):
+        row=json.loads(scenario("project_contract"))
+        self.assertEqual(row["metric_value"],7)
+        self.assertEqual(row["layer_project"],"BRVTAL")
+        self.assertTrue(row["unknown_rejected"])
+        self.assertTrue(row["conflict_rejected"])
+
+    def test_ui_does_not_infer_global_from_missing_dimension(self):
+        html=scenario("ui_missing_scope")
+        self.assertIn("product_business",html)
+        self.assertIn("UNKNOWN",html)
+        # The project-less layer must not acquire a synthetic GLOBAL dimension label.
+        fragment=html.split("product_business",1)[1].split("</article>",1)[0]
+        self.assertNotIn("GLOBAL",fragment)
+
     def test_unlinked_recurrence_is_unknown(self):
         row=json.loads(scenario("recurrence"))
         self.assertEqual(row["status"],"UNKNOWN");self.assertIsNone(row["value"])

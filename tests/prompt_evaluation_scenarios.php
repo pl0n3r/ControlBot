@@ -74,6 +74,34 @@ if($scenario==='deterministic'){
     );
     echo json_encode(['same'=>$a===$b,'a'=>$a,'b'=>$b],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
+if($scenario==='provenance'){
+    $base=PromptEvaluation::compare(setrow(),$current,$candidate);
+    $metric=$candidate; $metric['metrics']['acceptance_rate']=0.91;
+    $safety=$candidate; $safety['safety_result']='fail';
+    $policy=$candidate; $policy['policy_result']='fail';
+    echo json_encode([
+        'base'=>$base,
+        'current_helper'=>PromptEvaluation::resultFingerprint($current),
+        'candidate_helper'=>PromptEvaluation::resultFingerprint($candidate),
+        'metric'=>PromptEvaluation::compare(setrow(),$current,$metric),
+        'safety'=>PromptEvaluation::compare(setrow(),$current,$safety),
+        'policy'=>PromptEvaluation::compare(setrow(),$current,$policy),
+    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($scenario==='substitution'){
+    $base=PromptEvaluation::compare(setrow(),$current,$candidate);
+    $substitute=$candidate; $substitute['metrics']['rework_rate']=0.11;
+    $changed=PromptEvaluation::compare(setrow(),$current,$substitute);
+    echo json_encode([
+        'evaluation_changed'=>$base['fingerprint']!==$changed['fingerprint'],
+        'current_stable'=>$base['current_result_fingerprint']===$changed['current_result_fingerprint'],
+        'candidate_changed'=>$base['candidate_result_fingerprint']!==$changed['candidate_result_fingerprint'],
+        'old_candidate_rejects_substitute'=>!hash_equals(
+            $base['candidate_result_fingerprint'],
+            PromptEvaluation::resultFingerprint($substitute)
+        ),
+    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
 if($scenario==='pure'){
     $source=strtolower(file_get_contents(__DIR__.'/../src/PromptEvaluation.php'));
     $forbidden=['new pdo','mysqli','curl_','shell_exec','proc_open','passthru(','system(','exec(','file_put_contents','scheduler','promptregistry::register'];

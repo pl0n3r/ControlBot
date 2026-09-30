@@ -73,7 +73,9 @@ final class PromptUi
                 throw new InvalidArgumentException('Prompt UI evaluation binding invalid.');
         }
         if($current['prompt_version']!==$promotion['current_version']||$candidate['prompt_version']!==$promotion['candidate_version']
-            ||!hash_equals($set['fingerprint'],$promotion['evaluation_set_fingerprint']))
+            ||!hash_equals($set['fingerprint'],$promotion['evaluation_set_fingerprint'])
+            ||!hash_equals(PromptEvaluation::resultFingerprint($current),$promotion['current_result_fingerprint'])
+            ||!hash_equals(PromptEvaluation::resultFingerprint($candidate),$promotion['candidate_result_fingerprint']))
             throw new InvalidArgumentException('Prompt UI provenance mismatch.');
         usort($versions,static fn(array $a,array $b): int=>$a['version']<=>$b['version']);
         return $versions;
@@ -81,21 +83,23 @@ final class PromptUi
 
     private static function promotion(array $raw): array
     {
-        $expected=['version','decision','template_id','current_version','candidate_version','evaluation_fingerprint','evaluation_set_fingerprint','reasons','human_gate_required','authority','fingerprint'];
+        $expected=['version','decision','template_id','current_version','candidate_version','evaluation_fingerprint','evaluation_set_fingerprint','current_result_fingerprint','candidate_result_fingerprint','reasons','human_gate_required','authority','fingerprint'];
         self::fields($raw,$expected);
         if($raw['version']!==1||!in_array($raw['decision'],self::DECISIONS,true)||$raw['human_gate_required']!==true||$raw['authority']!=='human_approval_required')
             throw new InvalidArgumentException('Prompt promotion projection invalid.');
         if(!is_string($raw['template_id'])||preg_match('/^[a-z][a-z0-9._-]{1,63}$/D',$raw['template_id'])!==1
             ||!is_int($raw['current_version'])||!is_int($raw['candidate_version'])||$raw['current_version']<1||$raw['candidate_version']<=$raw['current_version'])
             throw new InvalidArgumentException('Prompt promotion identity invalid.');
-        foreach(['evaluation_fingerprint','evaluation_set_fingerprint'] as $key)
+        foreach(['evaluation_fingerprint','evaluation_set_fingerprint','current_result_fingerprint','candidate_result_fingerprint'] as $key)
             if(!is_string($raw[$key])||preg_match('/^[a-f0-9]{64}$/D',$raw[$key])!==1) throw new InvalidArgumentException('Prompt promotion fingerprint invalid.');
         if(!is_array($raw['reasons'])||!array_is_list($raw['reasons'])||$raw['reasons']===[]) throw new InvalidArgumentException('Prompt promotion reasons invalid.');
         $reasons=$raw['reasons']; sort($reasons,SORT_STRING);
         foreach($reasons as $reason) if(!is_string($reason)||!in_array($reason,self::REASONS,true)) throw new InvalidArgumentException('Prompt promotion reason invalid.');
         if($raw['decision']==='eligible_for_human_approval'&&$reasons!==['evaluation_supports_candidate']) throw new InvalidArgumentException('Prompt promotion evidence invalid.');
         $canonical=['version'=>1,'decision'=>$raw['decision'],'template_id'=>$raw['template_id'],'current_version'=>$raw['current_version'],'candidate_version'=>$raw['candidate_version'],
-            'evaluation_fingerprint'=>$raw['evaluation_fingerprint'],'evaluation_set_fingerprint'=>$raw['evaluation_set_fingerprint'],'reasons'=>$reasons,'human_gate_required'=>true,'authority'=>'human_approval_required'];
+            'evaluation_fingerprint'=>$raw['evaluation_fingerprint'],'evaluation_set_fingerprint'=>$raw['evaluation_set_fingerprint'],
+            'current_result_fingerprint'=>$raw['current_result_fingerprint'],'candidate_result_fingerprint'=>$raw['candidate_result_fingerprint'],
+            'reasons'=>$reasons,'human_gate_required'=>true,'authority'=>'human_approval_required'];
         $fingerprint=hash('sha256',json_encode($canonical,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_PRESERVE_ZERO_FRACTION));
         if(!is_string($raw['fingerprint'])||!hash_equals($fingerprint,$raw['fingerprint'])) throw new InvalidArgumentException('Prompt promotion integrity invalid.');
         return $canonical+['fingerprint'=>$fingerprint];

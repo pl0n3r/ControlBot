@@ -47,7 +47,21 @@ function evaluation(string $decision='candidate_better',array $replace=[],string
     return array_replace(PromptEvaluation::compare($set,$current,$candidate),$replace);
 }
 function decide(?array $rows=null,?array $eval=null): array {
-    return PromptPromotionDecision::decide($rows??history(),'support-agent',2,$eval??evaluation());
+    return PromptPromotionDecision::decide(
+        $rows??history(),
+        'support-agent',
+        2,
+        $eval??evaluation()
+    );
+}
+function refingerprint(array $evaluation): array {
+    $canonical=$evaluation;
+    unset($canonical['fingerprint']);
+    $evaluation['fingerprint']=hash(
+        'sha256',
+        json_encode($canonical,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_PRESERVE_ZERO_FRACTION)
+    );
+    return $evaluation;
 }
 
 $scenario=$argv[1]??'';
@@ -97,9 +111,45 @@ if($scenario==='deterministic'){
         'one'=>$one,
     ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
 }
+if($scenario==='provenance'){
+    $eval=evaluation();
+    $out=decide(null,$eval);
+    $badCurrent=$eval; $badCurrent['current_result_fingerprint']=str_repeat('a',64);
+    $badCandidate=$eval; $badCandidate['candidate_result_fingerprint']=str_repeat('b',64);
+    echo json_encode([
+        'out'=>$out,
+        'evaluation'=>$eval,
+        'tampered_current'=>rejected(fn()=>decide(null,$badCurrent)),
+        'tampered_candidate'=>rejected(fn()=>decide(null,$badCandidate)),
+    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($scenario==='provenance_gate'){
+    $eligible=decide();
+    $hold=decide(null,evaluation('keep_current'));
+    echo json_encode([
+        'eligible'=>$eligible,
+        'hold'=>$hold,
+        'same_set'=>$eligible['evaluation_set_fingerprint']===evaluation()['evaluation_set_fingerprint'],
+    ],JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
+if($scenario==='provenance_format'){
+    $base=evaluation(); $cases=[];
+    foreach(['current_result_fingerprint','candidate_result_fingerprint'] as $field){
+        foreach(['uppercase'=>str_repeat('A',64),'short'=>'abc','null'=>null] as $label=>$value){
+            $mutated=$base;
+            $mutated[$field]=$value;
+            $mutated=refingerprint($mutated);
+            $cases[$field.'_'.$label]=rejected(fn()=>decide(null,$mutated));
+        }
+        $missing=$base;
+        unset($missing[$field]);
+        $cases[$field.'_missing']=rejected(fn()=>decide(null,$missing));
+    }
+    echo json_encode($cases,JSON_THROW_ON_ERROR),PHP_EOL; exit;
+}
 if($scenario==='pure'){
     $source=strtolower(file_get_contents(__DIR__.'/../src/PromptPromotionDecision.php'));
-    $forbidden=['new pdo','mysqli','curl_','shell_exec','proc_open','passthru(','system(','exec(','file_put_contents','scheduler','productionauthority'];
+    $forbidden=['new pdo','mysqli','curl_','shell_exec','proc_open','passthru(','system(','exec(','file_put_contents','scheduler','productionauthority','promptevaluation::compare'];
     $hits=[]; foreach($forbidden as $needle){if(str_contains($source,$needle))$hits[]=$needle;}
     $out=decide();
     echo json_encode(['hits'=>$hits,'authority'=>$out['authority'],'human_gate_required'=>$out['human_gate_required']],JSON_THROW_ON_ERROR),PHP_EOL; exit;

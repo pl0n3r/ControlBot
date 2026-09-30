@@ -46,6 +46,30 @@ class PromptEvaluationTests(unittest.TestCase):
         self.assertTrue(data["same"])
         self.assertEqual(data["a"]["fingerprint"], data["b"]["fingerprint"])
 
+    def test_compare_binds_current_and_candidate_result_fingerprints(self):
+        data = scenario("provenance")
+        self.assertEqual(data["base"]["current_result_fingerprint"], data["current_helper"])
+        self.assertEqual(data["base"]["candidate_result_fingerprint"], data["candidate_helper"])
+        self.assertEqual(len(data["base"]["current_result_fingerprint"]), 64)
+        self.assertEqual(len(data["base"]["candidate_result_fingerprint"]), 64)
+
+    def test_result_fingerprint_changes_with_metrics_or_safety_policy(self):
+        data = scenario("provenance")
+        base = data["base"]["candidate_result_fingerprint"]
+        for key in ("metric", "safety", "policy"):
+            self.assertNotEqual(base, data[key]["candidate_result_fingerprint"], key)
+            self.assertEqual(
+                data["base"]["current_result_fingerprint"],
+                data[key]["current_result_fingerprint"],
+            )
+
+    def test_compare_fingerprint_rejects_result_substitution(self):
+        data = scenario("substitution")
+        self.assertTrue(data["evaluation_changed"])
+        self.assertTrue(data["current_stable"])
+        self.assertTrue(data["candidate_changed"])
+        self.assertTrue(data["old_candidate_rejects_substitute"])
+
     def test_evaluation_is_pure_and_cannot_expand_authority(self):
         data = scenario("pure")
         self.assertEqual(data["hits"], [])

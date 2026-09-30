@@ -40,6 +40,26 @@ if($case==='tamper'){
     $b=bundle();$b['promotion']['evaluation_set_fingerprint']=str_repeat('a',64);
     echo json_encode(['rejected'=>rejected(fn()=>PromptUi::render($b['history'],$b['set'],$b['current'],$b['candidate'],$b['promotion']))],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
+if($case==='result_binding'){
+    $b=bundle();$html=PromptUi::render($b['history'],$b['set'],$b['current'],$b['candidate'],$b['promotion']);
+    echo json_encode([
+        'current'=>hash_equals($b['promotion']['current_result_fingerprint'],PromptEvaluation::resultFingerprint($b['current'])),
+        'candidate'=>hash_equals($b['promotion']['candidate_result_fingerprint'],PromptEvaluation::resultFingerprint($b['candidate'])),
+        'rendered'=>str_contains($html,'acceptance_rate')&&str_contains($html,'evaluation_supports_candidate'),
+    ],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($case==='metric_substitution'){
+    $b=bundle();$b['candidate']['metrics']['acceptance_rate']=0.91;
+    echo json_encode(['rejected'=>rejected(fn()=>PromptUi::render($b['history'],$b['set'],$b['current'],$b['candidate'],$b['promotion']))],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($case==='safety_policy_substitution'){
+    $b=bundle();$safety=$b;$policy=$b;
+    $safety['candidate']['safety_result']='fail';$policy['candidate']['policy_result']='fail';
+    echo json_encode([
+        'safety_rejected'=>rejected(fn()=>PromptUi::render($safety['history'],$safety['set'],$safety['current'],$safety['candidate'],$safety['promotion'])),
+        'policy_rejected'=>rejected(fn()=>PromptUi::render($policy['history'],$policy['set'],$policy['current'],$policy['candidate'],$policy['promotion'])),
+    ],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
 if($case==='candidate_contract'){
     $b=bundle();$b['history'][3]['supersedes']=2;
     echo json_encode(['rejected'=>rejected(fn()=>PromptUi::render($b['history'],$b['set'],$b['current'],$b['candidate'],$b['promotion']))],JSON_THROW_ON_ERROR),PHP_EOL;exit;

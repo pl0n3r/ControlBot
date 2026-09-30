@@ -27,34 +27,63 @@ function focus(array $ordered,int $version=1,int $updated=100): array {
         'updated_by'=>'controlbot:actor/owner',
     ];
 }
+function metadata(array $pairs): array {
+    $out=[];
+    foreach($pairs as $key=>$ref) $out[$key]=['focus_ref'=>$ref,'ref_state'=>'available'];
+    return $out;
+}
 
-$a='controlbot:project/alpha'; $b='controlbot:project/beta'; $incident='controlbot:epic/incident';
+$a='controlbot:project/alpha';
+$b='controlbot:project/beta';
 $candidates=[candidate('work-a',701,'high'),candidate('work-b',702,'high')];
-$meta=[
-    'work-a'=>['focus_ref'=>$a,'policy_rank'=>10,'ref_state'=>'available'],
-    'work-b'=>['focus_ref'=>$b,'policy_rank'=>10,'ref_state'=>'available'],
-];
+$meta=metadata(['work-a'=>$a,'work-b'=>$b]);
 
-$first=WeeklyFocus::select(focus([$b,$a]),$candidates,$meta);
+$first=WeeklyFocus::preference(focus([$b,$a]),$candidates,$meta);
 $revised=WeeklyFocus::revise(focus([$b,$a]),[$a,$b],1,200,'controlbot:actor/owner');
-$second=WeeklyFocus::select($revised,$candidates,$meta);
+$second=WeeklyFocus::preference($revised,$candidates,$meta);
 
-$incidentCandidates=[candidate('work-a',701,'critical'),candidate('work-incident',703,'low')];
-$incidentMeta=[
-    'work-a'=>['focus_ref'=>$a,'policy_rank'=>10,'ref_state'=>'available'],
-    'work-incident'=>['focus_ref'=>$incident,'policy_rank'=>0,'ref_state'=>'available'],
-];
-$precedence=WeeklyFocus::select(focus([$a,$incident]),$incidentCandidates,$incidentMeta);
+$lowCannotWin=false;
+try {
+    WeeklyFocus::preference(
+        focus([$b,$a]),
+        [candidate('work-high',710,'high'),candidate('work-low',711,'low')],
+        metadata(['work-high'=>$a,'work-low'=>$b])
+    );
+} catch(InvalidArgumentException) { $lowCannotWin=true; }
 
-$blockedCandidates=[candidate('work-blocked',704,'high',false),candidate('work-b',702,'high')];
-$blockedMeta=[
-    'work-blocked'=>['focus_ref'=>$a,'policy_rank'=>10,'ref_state'=>'available'],
-    'work-b'=>['focus_ref'=>$b,'policy_rank'=>10,'ref_state'=>'available'],
-];
-$blocked=WeeklyFocus::select(focus([$a,$b]),$blockedCandidates,$blockedMeta);
+$parallelAuthorityAbsent=
+    !array_key_exists('selected_key',$first)
+    && array_key_exists('preferred_key',$first)
+    && !array_key_exists('policy_rank',$first);
 
-$unavailableMeta=$meta; $unavailableMeta['work-a']['ref_state']='unavailable';
-$unavailable=WeeklyFocus::select(focus([$a,$b]),$candidates,$unavailableMeta);
+$criticalProtected=false;
+try {
+    WeeklyFocus::preference(
+        focus([$b,$a]),
+        [candidate('work-critical',712,'critical'),candidate('work-high',713,'high')],
+        metadata(['work-critical'=>$a,'work-high'=>$b])
+    );
+} catch(InvalidArgumentException) { $criticalProtected=true; }
+
+$blocked=WeeklyFocus::preference(
+    focus([$a,$b]),
+    [candidate('work-blocked',704,'high',false),candidate('work-b',702,'high')],
+    metadata(['work-blocked'=>$a,'work-b'=>$b])
+);
+
+$unavailableMeta=$meta;
+$unavailableMeta['work-a']['ref_state']='unavailable';
+$unavailable=WeeklyFocus::preference(focus([$a,$b]),$candidates,$unavailableMeta);
+
+$untypedRejected=false;
+try { WeeklyFocus::normalize(focus(['https://github.com/pl0n3r/ControlBot/issues/7'])); }
+catch(InvalidArgumentException) { $untypedRejected=true; }
+
+$shared=WeeklyFocus::preference(
+    focus([$a]),
+    [candidate('work-a',720,'high'),candidate('work-b',721,'high')],
+    metadata(['work-a'=>$a,'work-b'=>$a])
+);
 
 $conflict=false;
 try { WeeklyFocus::revise(focus([$a,$b]),[$b,$a],2,200,'controlbot:actor/owner'); }
@@ -66,11 +95,18 @@ $history=[
 ];
 $at150=WeeklyFocus::activeAt($history,150);
 $at250=WeeklyFocus::activeAt($history,250);
-$clear=WeeklyFocus::revise($history[1],[],2,300,'controlbot:actor/owner');
-$clearSelection=WeeklyFocus::select($clear,$candidates,$meta);
 
 echo json_encode([
-    'first'=>$first,'second'=>$second,'precedence'=>$precedence,'blocked'=>$blocked,
-    'unavailable'=>$unavailable,'conflict_rejected'=>$conflict,'history_150'=>$at150,
-    'history_250'=>$at250,'clear'=>$clear,'clear_selection'=>$clearSelection,
+    'first'=>$first,
+    'second'=>$second,
+    'low_cannot_win'=>$lowCannotWin,
+    'parallel_authority_absent'=>$parallelAuthorityAbsent,
+    'critical_protected'=>$criticalProtected,
+    'blocked'=>$blocked,
+    'unavailable'=>$unavailable,
+    'untyped_rejected'=>$untypedRejected,
+    'shared'=>$shared,
+    'conflict_rejected'=>$conflict,
+    'history_150'=>$at150,
+    'history_250'=>$at250,
 ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;

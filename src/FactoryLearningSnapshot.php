@@ -61,7 +61,8 @@ final class FactoryLearningSnapshot
                     if(array_key_exists('auto',$data)&&!is_bool($data['auto']))throw new InvalidArgumentException('Incident auto flag invalid.');
                     $title=is_string($data['title']??null)?trim($data['title']):$signal['label'];
                     $item=$signal+['title'=>$title];
-                    if(($data['auto']??false)===true)$auto[]=$item;else $real[]=$item;
+                    $isAuto=($data['auto']??false)===true||preg_match('/^\[AUTO\]/i',$title)===1;
+                    if($isAuto)$auto[]=$item;else $real[]=$item;
                 }
 
                 if($section==='learning'&&isset($data['lesson_ref'],$data['incident_ref'],$data['recurrence_count'])

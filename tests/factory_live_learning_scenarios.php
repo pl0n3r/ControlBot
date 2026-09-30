@@ -23,7 +23,7 @@ function learningFixture(): array {
         'evidence_ref'=>'https://github.com/pl0n3r/ControlBot/issues/700'
     ],188);
     $work[]=lsig('incident:auto','github_project_snapshot','pending','current',[
-        'title'=>'[AUTO] CI warning','kind'=>'incident','open'=>true,'auto'=>true,'layer'=>'ci_cd','project'=>'ControlBot',
+        'title'=>'[AUTO] CI warning','kind'=>'incident','open'=>true,'layer'=>'ci_cd','project'=>'ControlBot',
         'evidence_ref'=>'https://github.com/pl0n3r/ControlBot/issues/701'
     ],189);
     $work[]=lsig('work:metric-spoof','github_project_snapshot','healthy','current',[

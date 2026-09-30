@@ -19,36 +19,44 @@ use ControlBot\Production\SecretsBroker;
 const NOW = 1_799_997_000;
 const SECRET = 'fixture-hostinger-secret-839201';
 
-function secretRef(string $capability): SecretReference
-{
+function secretRef(
+    string $capability,
+    string $project = 'brvtal',
+    string $environment = 'production',
+    string $secretKind = 'password',
+): SecretReference {
     return SecretReference::fromRecord([
         'version' => 1,
         'reference_id' => '11111111-2222-4333-8444-555555555555',
         'capability' => $capability,
-        'project' => 'brvtal',
-        'environment' => 'production',
+        'project' => $project,
+        'environment' => $environment,
         'provider' => 'hostinger',
-        'secret_kind' => 'password',
+        'secret_kind' => $secretKind,
         'generation' => 1,
         'issued_at' => '2027-01-15T07:00:00Z',
         'revoked_at' => null,
     ]);
 }
 
-function profile(): ConnectionProfile
-{
+function profile(
+    string $project = 'brvtal',
+    string $environment = 'production',
+    string $usernameRef = 'vault:user:brvtal',
+    string $fingerprint = 'SHA256:abcdefghijklmnop',
+): ConnectionProfile {
     return ConnectionProfile::fromServerRecord([
         'version' => 1,
         'profile_id' => 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
-        'project' => 'brvtal',
-        'environment' => 'production',
+        'project' => $project,
+        'environment' => $environment,
         'provider' => 'hostinger',
         'transport' => 'ssh',
         'host' => 'example.internal',
         'port' => 22,
-        'username_ref' => 'vault:user:brvtal',
+        'username_ref' => $usernameRef,
         'secret_ref' => '11111111-2222-4333-8444-555555555555',
-        'host_fingerprint' => 'SHA256:abcdefghijklmnop',
+        'host_fingerprint' => $fingerprint,
         'status' => 'connected',
         'verified_at' => '2027-01-15T07:00:00+00:00',
         'last_health_at' => '2027-01-15T07:00:00+00:00',
@@ -240,6 +248,148 @@ if ($name === 'missing_grant') {
         'first' => $executor->execute($operation, $grant, profile(), $ref, $request),
         'second' => $executor->execute($operation, $grant, profile(), $ref, $request),
         'transport_calls' => $calls,
+    ];
+} elseif ($name === 'safe_connection_context') {
+    $calls = 0;
+    $observed = null;
+    $ref = secretRef('ssh.readonly', secretKind: 'private_key');
+    $executor = new HostingerExecutor(
+        brokerFor($ref),
+        static function (array $descriptor, string $secret) use (&$calls, &$observed): array {
+            $calls++;
+            $observed = $descriptor;
+            return [
+                'status' => 'success',
+                'code' => 'ssh_read_ok',
+                'summary' => 'safe context observed',
+                'artifacts' => [],
+                'duration_ms' => 5,
+            ];
+        },
+    );
+
+    $valid = $executor->execute(
+        ProductionOperation::fromId('ssh.readonly'),
+        grant('ssh.readonly', 'ssh.readonly'),
+        profile(),
+        $ref,
+        request(),
+    );
+
+    $profileProjectCalls = 0;
+    $profileProjectExecutor = new HostingerExecutor(
+        brokerFor($ref),
+        static function () use (&$profileProjectCalls): array {
+            $profileProjectCalls++;
+            return ['status' => 'success', 'code' => 'unexpected', 'summary' => 'unexpected', 'artifacts' => [], 'duration_ms' => 1];
+        },
+    );
+    $profileProject = $profileProjectExecutor->execute(
+        ProductionOperation::fromId('ssh.readonly'),
+        grant('ssh.readonly', 'ssh.readonly'),
+        profile(project: 'other'),
+        $ref,
+        request(),
+    );
+
+    $profileEnvironmentCalls = 0;
+    $profileEnvironmentExecutor = new HostingerExecutor(
+        brokerFor($ref),
+        static function () use (&$profileEnvironmentCalls): array {
+            $profileEnvironmentCalls++;
+            return ['status' => 'success', 'code' => 'unexpected', 'summary' => 'unexpected', 'artifacts' => [], 'duration_ms' => 1];
+        },
+    );
+    $profileEnvironment = $profileEnvironmentExecutor->execute(
+        ProductionOperation::fromId('ssh.readonly'),
+        grant('ssh.readonly', 'ssh.readonly'),
+        profile(environment: 'staging'),
+        $ref,
+        request(),
+    );
+
+    $secretProjectCalls = 0;
+    $secretProjectRef = secretRef('ssh.readonly', project: 'other');
+    $secretProjectExecutor = new HostingerExecutor(
+        brokerFor($secretProjectRef),
+        static function () use (&$secretProjectCalls): array {
+            $secretProjectCalls++;
+            return ['status' => 'success', 'code' => 'unexpected', 'summary' => 'unexpected', 'artifacts' => [], 'duration_ms' => 1];
+        },
+    );
+    $secretProject = $secretProjectExecutor->execute(
+        ProductionOperation::fromId('ssh.readonly'),
+        grant('ssh.readonly', 'ssh.readonly'),
+        profile(),
+        $secretProjectRef,
+        request(),
+    );
+
+    $secretEnvironmentCalls = 0;
+    $secretEnvironmentRef = secretRef('ssh.readonly', environment: 'staging');
+    $secretEnvironmentExecutor = new HostingerExecutor(
+        brokerFor($secretEnvironmentRef),
+        static function () use (&$secretEnvironmentCalls): array {
+            $secretEnvironmentCalls++;
+            return ['status' => 'success', 'code' => 'unexpected', 'summary' => 'unexpected', 'artifacts' => [], 'duration_ms' => 1];
+        },
+    );
+    $secretEnvironment = $secretEnvironmentExecutor->execute(
+        ProductionOperation::fromId('ssh.readonly'),
+        grant('ssh.readonly', 'ssh.readonly'),
+        profile(),
+        $secretEnvironmentRef,
+        request(),
+    );
+
+    $validatedKindCalls = 0;
+    $validatedKindDescriptor = null;
+    $callerKindRef = secretRef('ssh.readonly', secretKind: 'password');
+    $brokerKindRef = secretRef('ssh.readonly', secretKind: 'private_key');
+    $validatedKindExecutor = new HostingerExecutor(
+        brokerFor($brokerKindRef),
+        static function (array $descriptor, string $secret) use (
+            &$validatedKindCalls,
+            &$validatedKindDescriptor,
+        ): array {
+            $validatedKindCalls++;
+            $validatedKindDescriptor = $descriptor;
+            return [
+                'status' => 'success',
+                'code' => 'ssh_read_ok',
+                'summary' => 'broker-validated secret kind observed',
+                'artifacts' => [],
+                'duration_ms' => 5,
+            ];
+        },
+    );
+    $validatedKind = $validatedKindExecutor->execute(
+        ProductionOperation::fromId('ssh.readonly'),
+        grant('ssh.readonly', 'ssh.readonly'),
+        profile(),
+        $callerKindRef,
+        request(),
+    );
+
+    $out = [
+        'result' => $valid,
+        'descriptor' => $observed,
+        'transport_calls' => $calls,
+        'contains_secret_value' => str_contains(
+            json_encode($observed, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+            SECRET,
+        ),
+        'profile_project_mismatch' => $profileProject,
+        'profile_project_calls' => $profileProjectCalls,
+        'profile_environment_mismatch' => $profileEnvironment,
+        'profile_environment_calls' => $profileEnvironmentCalls,
+        'secret_project_mismatch' => $secretProject,
+        'secret_project_calls' => $secretProjectCalls,
+        'secret_environment_mismatch' => $secretEnvironment,
+        'secret_environment_calls' => $secretEnvironmentCalls,
+        'validated_kind_result' => $validatedKind,
+        'validated_kind_descriptor' => $validatedKindDescriptor,
+        'validated_kind_calls' => $validatedKindCalls,
     ];
 } elseif ($name === 'fake_transport') {
     $calls = 0;

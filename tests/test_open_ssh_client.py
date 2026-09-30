@@ -11,6 +11,13 @@ class OpenSshClientTests(unittest.TestCase):
         d=scenario("success")
         self.assertEqual(d["result"]["code"],"ssh_readonly_probe_ok"); self.assertEqual(len(d["calls"]),2)
         self.assertEqual([c[0] for c in d["calls"]],["ssh-keyscan","ssh"]); self.assertEqual(d["calls"][1][-1],"true")
+    def test_review_regressions_keep_ipv6_default_port_and_key_newline(self):
+        d=scenario("review_regressions")
+        self.assertEqual(d["ipv6"]["result"]["status"],"success")
+        self.assertTrue(d["ipv6"]["known_line"].startswith("::1 ssh-ed25519 "))
+        self.assertNotIn("[::1]:22",d["ipv6"]["known_line"])
+        self.assertEqual(d["no_newline"]["result"]["status"],"success")
+        self.assertTrue(d["no_newline"]["key_final_newline"])
     def test_host_identity_failures_stop_before_authenticated_ssh(self):
         for d in scenario("host_failures").values():
             self.assertEqual(len(d["calls"]),1); self.assertNotEqual(d["result"]["status"],"success")

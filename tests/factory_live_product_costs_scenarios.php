@@ -101,4 +101,32 @@ if($scenario==='ui'){
     $snapshot=baseSnapshot();
     echo FactoryLiveUi::render($snapshot,null,null,FactoryLiveCostSnapshot::build($snapshot)),PHP_EOL;exit;
 }
+if($scenario==='ui_unknown'){
+    $snapshot=baseSnapshot(null,null,false);
+    echo FactoryLiveUi::render($snapshot,null,null,FactoryLiveCostSnapshot::build($snapshot)),PHP_EOL;exit;
+}
+if($scenario==='ui_usage_above_limit'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $view['limits']['items'][0]['used']=$view['limits']['items'][0]['limit']+1;
+    $blocked=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blocked=true;}
+    echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($scenario==='ui_future_usage'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $view['limits']['items'][0]['observed_at']=$view['observed_at']+1;
+    $blocked=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blocked=true;}
+    echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($scenario==='ui_bad_age'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $view['limits']['items'][0]['age_seconds']++;
+    $blocked=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blocked=true;}
+    echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($scenario==='ui_bad_tool_usage'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $view['tool_usage']['status']='unknown';
+    $blocked=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blocked=true;}
+    echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
 fwrite(STDERR,"scenario inválido\n");exit(2);

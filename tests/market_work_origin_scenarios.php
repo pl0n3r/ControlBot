@@ -18,18 +18,19 @@ function gate444(string $domain,array $overrides=[]):array{return array_replace(
 function gates444():array{return array_map(fn(string $d):array=>gate444($d),MW_DOMAINS);}
 function replace444(array $rows,string $domain,array $overrides):array{return array_map(fn(array $g):array=>$g['domain']===$domain?array_replace($g,$overrides):$g,$rows);}
 function ready444(array $rows):array{return MarketReadiness::forCountry(market444(),'venture-condor','CO',$rows);}
+function evidence444(string $hex='a'):string{return 'controlbot:market-evidence/'.str_repeat($hex,32);}
 function context444(array $overrides=[]):array{return array_replace([
  'version'=>1,'venture_id'=>'venture-condor','market_id'=>'market-condor-co','country'=>'CO','group_id'=>'group-condor',
  'project_id'=>'project-controlbot','repository_ref'=>'pl0n3r/ControlBot','authority_level'=>'owner_required','policy_ref'=>'controlbot:policy/business-os-v1',
  'approval_ref'=>'controlbot:approval/market-co','budget_ref'=>'controlbot:budget/market-co','priority_class'=>'high',
- 'depends_on'=>['factory:work/prerequisite'],'evidence_refs'=>['controlbot:market-evidence/co'],
+ 'depends_on'=>['factory:work/prerequisite'],'evidence_refs'=>[evidence444()],
  'profiles'=>[
    'payments'=>['work_type'=>'operations','requested_capabilities'=>['market-remediation'],'required_roles'=>['ingenieria-software','producto']],
    'support'=>['work_type'=>'operations','requested_capabilities'=>['market-remediation'],'required_roles'=>['producto']],
  ],'execution'=>false,
 ],$overrides);}
 function origin444(array $rows,array $context=[]):array{return MarketWorkOrigin::materialize(ready444($rows),$context?:context444());}
-function invalid444(array $result):bool{return $result['status']==='blocked'&&$result['reasons']===['invalid_input']&&$result['work_items']===[];}
+function invalid444(array $result):bool{return $result['status']==='blocked'&&$result['reasons']===['invalid_input']&&$result['work_items']===[]&&$result['execution']===false;}
 
 $case=$argv[1]??'';
 if($case==='fresh'){
@@ -42,6 +43,12 @@ if($case==='fresh'){
  $out=['unknown'=>$unknown,'stale'=>$stale,'scope'=>invalid444(origin444(replace444(gates444(),'payments',['status'=>'blocked']),$scope)),
   'profile'=>invalid444(origin444(replace444(gates444(),'payments',['status'=>'blocked']),$profile)),
   'extra'=>invalid444(origin444(replace444(gates444(),'payments',['status'=>'blocked']),$extra))];
+}elseif($case==='context_evidence'){
+ $rows=replace444(gates444(),'payments',['status'=>'blocked']); $a=evidence444('a'); $b=evidence444('b');
+ $invalid=['phone'=>['3001234567'],'email'=>['owner@example.com'],'free_text'=>['Customer Name'],
+  'secret'=>['token=market-secret'],'malformed'=>['controlbot:evidence/nothex'],'duplicate'=>[$a,$a]];
+ $out=['valid'=>origin444($rows,context444(['evidence_refs'=>[$b,$a]]))];
+ foreach($invalid as $key=>$refs)$out[$key]=invalid444(origin444($rows,context444(['evidence_refs'=>$refs])));
 }elseif($case==='governance'){
  $out=origin444(replace444(gates444(),'payments',['status'=>'blocked']));
 }elseif($case==='deterministic'){

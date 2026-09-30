@@ -3,7 +3,10 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
 def scenario(name):
-    p=subprocess.run(["php",str(ROOT/"tests"/"observability_incident_scenarios.php"),name],cwd=ROOT,check=True,text=True,capture_output=True)
+    p=subprocess.run(
+        ["php",str(ROOT/"tests"/"observability_incident_scenarios.php"),name],
+        cwd=ROOT,check=True,text=True,capture_output=True,timeout=60,
+    )
     return json.loads(p.stdout)
 
 class ObservabilityIncidentTests(unittest.TestCase):
@@ -26,6 +29,7 @@ class ObservabilityIncidentTests(unittest.TestCase):
         self.assertEqual((d["timeline"]["incident_ref"],d["timeline"]["recovered_at"]),(i["incident_id"],120))
         self.assertTrue({"incident.monitoring","incident.resolved"}<={e["kind"] for e in i["timeline_events"]})
         self.assertEqual((d["stale_status"],d["unknown_status"]),("open","open"))
+        self.assertEqual(d["reopened_status"],"open")
 
     def test_temporal_proximity_without_shared_evidence_does_not_correlate(self):
         incidents=scenario("separate")["incidents"]

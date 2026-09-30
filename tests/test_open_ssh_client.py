@@ -18,13 +18,6 @@ class OpenSshClientTests(unittest.TestCase):
         self.assertNotIn("[::1]:22",d["ipv6"]["known_line"])
         self.assertEqual(d["no_newline"]["result"]["status"],"success")
         self.assertTrue(d["no_newline"]["key_final_newline"])
-    def test_review_regressions_ipv6_and_trimmed_private_key(self):
-        d=scenario("review_regressions")
-        self.assertEqual(d["ipv6"]["result"]["status"],"success")
-        self.assertTrue(d["ipv6"]["observed"]["known_hosts"].startswith("::1 ssh-ed25519 "))
-        self.assertNotIn("[::1]:22",d["ipv6"]["observed"]["known_hosts"])
-        self.assertEqual(d["no_newline"]["result"]["status"],"success")
-        self.assertTrue(d["no_newline"]["observed"]["key_has_newline"])
     def test_host_identity_failures_stop_before_authenticated_ssh(self):
         for d in scenario("host_failures").values():
             self.assertEqual(len(d["calls"]),1); self.assertNotEqual(d["result"]["status"],"success")

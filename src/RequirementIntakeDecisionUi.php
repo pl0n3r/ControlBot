@@ -255,14 +255,93 @@ final class RequirementIntakeDecisionUi
         return ['status' => 'known', 'values' => self::textList($r['values'], "$label.values")];
     }
 
-    private static function textList(mixed $rows,string $label): array{if(!is_array($rows)||!array_is_list($rows)||count($rows)>100)self::bad($label);$out=[];foreach($rows as $r)$out[]=self::text($r,$label);return array_values(array_unique($out));}
-    private static function text(mixed $v,string $label): string{if(!is_string($v)||trim($v)===''||strlen($v)>500||preg_match('/[\x00-\x1F\x7F]/',$v))self::bad($label);self::secretFree($v);return trim($v);}
-    private static function typed(mixed $v,string $ns,string $label): string{if(!is_string($v)||preg_match('/^'.preg_quote($ns,'/').':[a-f0-9]{40}$/D',$v)!==1)self::bad($label);return $v;}
-    private static function one(mixed $v,array $a,string $label): string{if(!is_string($v)||!in_array($v,$a,true))self::bad($label);return $v;}
-    private static function hex(mixed $v,string $label): string{if(!is_string($v)||preg_match('/^[a-f0-9]{64}$/D',$v)!==1)self::bad($label);return $v;}
-    private static function digest(array $v): string{return hash('sha256',serialize(self::ordered($v)));}
-    private static function ordered(mixed $v): mixed{if(!is_array($v))return $v;if(!array_is_list($v))ksort($v,SORT_STRING);foreach($v as $k=>$x)$v[$k]=self::ordered($x);return $v;}
-    private static function secretFree(mixed $v): void{$s=is_string($v)?$v:json_encode($v,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);if(preg_match(self::SENSITIVE,$s))self::bad('RequirementDecisionView contains sensitive material');}
-    private static function fields(mixed $r,array $e,string $label): void{if(!is_array($r)||array_is_list($r))self::bad($label);$k=array_keys($r);if(count($k)!==count($e)||array_diff($k,$e)||array_diff($e,$k))self::bad("$label fields");}
-    private static function bad(string $m): never{throw new InvalidArgumentException("$m invalid.");}
+    private static function textList(mixed $rows, string $label): array
+    {
+        if (!is_array($rows) || !array_is_list($rows) || count($rows) > 100) {
+            self::bad($label);
+        }
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = self::text($r, $label);
+        }
+        return array_values(array_unique($out));
+    }
+
+    private static function text(mixed $v, string $label): string
+    {
+        if (!is_string($v) || trim($v) === '' || strlen($v) > 500 || preg_match('/[\x00-\x1F\x7F]/', $v)) {
+            self::bad($label);
+        }
+        self::secretFree($v);
+        return trim($v);
+    }
+
+    private static function typed(mixed $v, string $ns, string $label): string
+    {
+        if (!is_string($v) || preg_match('/^' . preg_quote($ns, '/') . ':[a-f0-9]{40}$/D', $v) !== 1) {
+            self::bad($label);
+        }
+        return $v;
+    }
+
+    private static function one(mixed $v, array $a, string $label): string
+    {
+        if (!is_string($v) || !in_array($v, $a, true)) {
+            self::bad($label);
+        }
+        return $v;
+    }
+
+    private static function hex(mixed $v, string $label): string
+    {
+        if (!is_string($v) || preg_match('/^[a-f0-9]{64}$/D', $v) !== 1) {
+            self::bad($label);
+        }
+        return $v;
+    }
+
+    private static function digest(array $v): string
+    {
+        return hash('sha256', serialize(self::ordered($v)));
+    }
+
+    private static function ordered(mixed $v): mixed
+    {
+        if (!is_array($v)) {
+            return $v;
+        }
+        if (!array_is_list($v)) {
+            ksort($v, SORT_STRING);
+        }
+        foreach ($v as $k => $x) {
+            $v[$k] = self::ordered($x);
+        }
+        return $v;
+    }
+
+    private static function secretFree(mixed $v): void
+    {
+        $s = is_string($v)
+            ? $v
+            : json_encode($v, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (preg_match(self::SENSITIVE, $s)) {
+            self::bad('RequirementDecisionView contains sensitive material');
+        }
+    }
+
+    private static function fields(mixed $r, array $e, string $label): void
+    {
+        if (!is_array($r) || array_is_list($r)) {
+            self::bad($label);
+        }
+        $k = array_keys($r);
+        if (count($k) !== count($e) || array_diff($k, $e) || array_diff($e, $k)) {
+            self::bad("$label fields");
+        }
+    }
+
+    private static function bad(string $m): never
+    {
+        throw new InvalidArgumentException("$m invalid.");
+    }
 }

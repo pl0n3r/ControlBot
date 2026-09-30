@@ -33,11 +33,13 @@ function presence(array $running,bool $safe,bool $non,int $generationOverride=0)
 }
 $case=$argv[1]??'';
 if($case==='preemption'){
- $selected=work('work-incident',395,'incident','high'); $running=work('work-running',394,'engineering','high','running',4,'reservation-run','session_run'); $s=validated([$selected,$running],'work-incident'); $t=trace($s);
+ $selected=work('work-incident',395,'incident','high'); $running=work('work-running',394,'engineering','medium','running',4,'reservation-run','session_run'); $s=validated([$selected,$running],'work-incident'); $t=trace($s);
  $blocked=SchedulerPolicyGuard::preemptionIntent($s,[$selected,$running],$t,presence($running,false,true),'work-running','session_run',4);
  $safe=SchedulerPolicyGuard::preemptionIntent($s,[$selected,$running],$t,presence($running,true,true),'work-running','session_run',4);
  $stale=SchedulerPolicyGuard::preemptionIntent($s,[$selected,$running],$t,presence($running,true,true,5),'work-running','session_run',4);
- echo json_encode(compact('blocked','safe','stale'),JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+ $mediumIncident=work('work-medium-incident',396,'incident','medium'); $higherRunning=work('work-higher',393,'engineering','high','running',4,'reservation-higher','session_run'); $higherSelection=validated([$mediumIncident,$higherRunning],'work-medium-incident');
+ $higher=SchedulerPolicyGuard::preemptionIntent($higherSelection,[$mediumIncident,$higherRunning],trace($higherSelection),presence($higherRunning,true,false),'work-higher','session_run',4);
+ echo json_encode(compact('blocked','safe','stale','higher'),JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
 }
 if($case==='focus'){
  $high=work('work-high',395); $critical=work('work-critical',58,'engineering','critical'); $badSel=validated([$high,$critical],'work-high');

@@ -10,6 +10,12 @@ final class SchedulerPolicyGuard
 {
     private const POLICY='factory-dispatcher-v2';
     private const ACTIVE_STATES=['assigned','running','review'];
+    private const LOWER_PRIORITIES=[
+        'critical'=>['high','medium','low'],
+        'high'=>['medium','low'],
+        'medium'=>['low'],
+        'low'=>[],
+    ];
 
     public static function focusGuard(
         ValidatedSchedulerSelection $selection,
@@ -76,6 +82,7 @@ final class SchedulerPolicyGuard
         $reasons=[];
         if(!self::protected($selected)) $reasons[]='selected_not_preemption_authority';
         if(self::protected($running)) $reasons[]='running_work_protected';
+        elseif(!in_array($running['priority'],self::LOWER_PRIORITIES[$selected['priority']],true)) $reasons[]='running_priority_not_lower';
         foreach(($guard['reasons']??[]) as $reason) $reasons[]=$reason;
         $reasons=array_values(array_unique($reasons));
         sort($reasons,SORT_STRING);

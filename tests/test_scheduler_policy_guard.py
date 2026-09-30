@@ -12,7 +12,7 @@ class SchedulerPolicyGuardTests(unittest.TestCase):
         self.assertTrue(s["allowed"]); self.assertEqual((s["policy_ref"],s["selected_work_item_id"],s["running_work_item_id"],s["reasons"]),("factory-dispatcher-v2","work-incident","work-running",[]))
     def test_non_preemptible_requires_safe_point_and_current_generation(self):
         d=scenario("preemption")
-        self.assertFalse(d["blocked"]["allowed"]); self.assertIn("non_preemptible_outside_safe_point",d["blocked"]["reasons"]); self.assertTrue(d["safe"]["allowed"]); self.assertFalse(d["stale"]["allowed"]); self.assertIn("stale_generation",d["stale"]["reasons"])
+        self.assertFalse(d["blocked"]["allowed"]); self.assertIn("non_preemptible_outside_safe_point",d["blocked"]["reasons"]); self.assertTrue(d["safe"]["allowed"]); self.assertFalse(d["stale"]["allowed"]); self.assertIn("stale_generation",d["stale"]["reasons"]); self.assertFalse(d["higher"]["allowed"]); self.assertIn("running_priority_not_lower",d["higher"]["reasons"])
     def test_weekly_focus_cannot_outrank_ready_incident_or_critical_work(self):
         d=scenario("focus")
         self.assertTrue(d["critical_rejected"]); self.assertTrue(d["incident_rejected"]); self.assertEqual(d["protected_selected"]["selected_key"],"work-critical"); self.assertTrue(d["protected_selected"]["focus"]["influenced"])

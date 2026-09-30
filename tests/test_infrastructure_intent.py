@@ -168,6 +168,8 @@ class InfrastructureIntentTests(unittest.TestCase):
         self.assertTrue(data["cross_capability_rejected"])
         self.assertTrue(data["context_copy_rejected"])
         self.assertTrue(data["context_replay_rejected"])
+        self.assertTrue(data["invalid_restriction_rejected"])
+        self.assertTrue(data["invalid_context_replay_rejected"])
         self.assertEqual(data["first_use_status"], "planned")
         self.assertTrue(data["projection_replay_rejected"])
         self.assertEqual(data["projection_json"], "{}")

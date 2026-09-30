@@ -176,6 +176,18 @@ final class RequirementIntake
             'fingerprint'=>self::hexDigest($raw['fingerprint'],'fingerprint'),
         ];
         self::secretFree($normalized);
+        $facts=[];
+        foreach(self::FACT_FIELDS as $field) $facts[$field]=$normalized[$field];
+        foreach(self::LIST_FIELDS as $field) $facts[$field]=$normalized[$field];
+        $expected=self::digest([
+            'source_ref'=>$normalized['source_ref'],
+            'captured_at'=>$normalized['captured_at'],
+            'intent'=>$normalized['intent'],
+            'facts'=>$facts,
+        ]);
+        if($normalized['fingerprint']!==$expected
+            ||$normalized['draft_ref']!=='requirement-draft:'.substr($expected,0,40))
+            throw new InvalidArgumentException('RequirementDraft integrity invalid.');
         return $normalized;
     }
 

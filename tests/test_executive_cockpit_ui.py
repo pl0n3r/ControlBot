@@ -19,6 +19,17 @@ class ExecutiveCockpitUiTests(unittest.TestCase):
   html=render("base")
   self.assertIn("owner-alpha",html); self.assertIn("factoryrunner",html); self.assertIn("Runtime",html)
   bad=json.loads(render("unsafe")); self.assertTrue(all(bad.values()))
+ def test_nested_projection_shapes_fail_closed(self):
+  bad = json.loads(render("unsafe"))
+  for key in (
+   "responsible_extra",
+   "finance_extra",
+   "product_health_extra",
+   "infrastructure_extra",
+   "runtime_extra",
+   "counts_extra",
+  ):
+   self.assertTrue(bad[key], key)
  def test_venture_drilldown_is_scoped_deterministic_and_internal(self):
   html=render("order")
   self.assertLess(html.index("Alpha"),html.index("Beta"))

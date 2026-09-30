@@ -22,14 +22,44 @@ function entry(string $class,string $ref,string $venture='venture-alpha'):array{
 function cockpit(array $ventures):array{return ['version'=>1,'group_id'=>'group-one','ventures'=>$ventures];}
 function inbox():array{return ['version'=>1,'entries'=>[entry('critical','critical'),entry('decision','decision'),entry('watch','watch'),entry('fyi','fyi')]];}
 function blocked(callable $fn):bool{try{$fn();return false;}catch(InvalidArgumentException){return true;}}
+function cockpitWithExtra(array $path, string $field, mixed $value): array
+{
+ $data = cockpit([venture()]);
+ $node = &$data['ventures'][0];
+ foreach ($path as $segment) {
+  $node = &$node[$segment];
+ }
+ $node[$field] = $value;
+
+ return $data;
+}
 $case=$argv[1]??'';
 if($case==='base') echo ExecutiveCockpitUi::render(cockpit([venture()]),inbox());
 elseif($case==='stale') echo ExecutiveCockpitUi::render(cockpit([venture('venture-alpha',h('degraded','stale'),h('unknown','unknown'))]),inbox());
 elseif($case==='order') echo ExecutiveCockpitUi::render(cockpit([venture('venture-beta'),venture('venture-alpha')]),inbox());
-elseif($case==='unsafe'){
- $extra=cockpit([venture()]);$extra['ventures'][0]['manual_work_state']='ready';
- $secret=cockpit([venture()]);$secret['ventures'][0]['venture']['title']='Bearer abcdefghijklmnopqrstuvwxyz';
- $pii=inbox();$pii['entries'][0]['summary']='Contact alice@example.com';
- echo json_encode(['extra'=>blocked(fn()=>ExecutiveCockpitUi::render($extra,inbox())),
-  'secret'=>blocked(fn()=>ExecutiveCockpitUi::render($secret,inbox())),'pii'=>blocked(fn()=>ExecutiveCockpitUi::render(cockpit([venture()]),$pii))]);
-}else{fwrite(STDERR,"unknown scenario\n");exit(2);}
+elseif ($case === 'unsafe') {
+ $specs = [
+  'extra' => [[], 'manual_work_state', 'ready'],
+  'responsible_extra' => [['venture', 'responsible'], 'manual_role', 'owner'],
+  'runtime_extra' => [['runtime'], 'manual_work_state', 'ready'],
+  'finance_extra' => [['finance'], 'manual_score', 'green'],
+  'product_health_extra' => [['product_health'], 'manual_score', 'green'],
+  'infrastructure_extra' => [['infrastructure'], 'manual_state', 'green'],
+  'counts_extra' => [['owner_inbox_counts'], 'manual_priority', 'high'],
+ ];
+ $result = [];
+ foreach ($specs as $name => [$path, $field, $value]) {
+  $payload = cockpitWithExtra($path, $field, $value);
+  $result[$name] = blocked(fn () => ExecutiveCockpitUi::render($payload, inbox()));
+ }
+ $secret = cockpit([venture()]);
+ $secret['ventures'][0]['venture']['title'] = 'Bearer abcdefghijklmnopqrstuvwxyz';
+ $pii = inbox();
+ $pii['entries'][0]['summary'] = 'Contact alice@example.com';
+ $result['secret'] = blocked(fn () => ExecutiveCockpitUi::render($secret, inbox()));
+ $result['pii'] = blocked(fn () => ExecutiveCockpitUi::render(cockpit([venture()]), $pii));
+ echo json_encode($result);
+} else {
+ fwrite(STDERR, "unknown scenario\n");
+ exit(2);
+}

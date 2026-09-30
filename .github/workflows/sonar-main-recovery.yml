@@ -1,0 +1,101 @@
+name: Sonar main recovery
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  checks: write
+
+concurrency:
+  group: sonar-main-recovery-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Recover Sonar exact-main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for Sonar and rerequest once if needed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          SONAR_APP_ID: '12526'
+        run: |
+          set -euo pipefail
+
+          get_suite() {
+            gh api "repos/$REPOSITORY/commits/$SHA/check-suites?per_page=100" \
+              --jq ".check_suites | map(select(.app.id == ${SONAR_APP_ID})) | sort_by(.id) | last // {}"
+          }
+
+          deadline=$((SECONDS + 180))
+          suite_id=""
+          status=""
+          conclusion=""
+
+          while (( SECONDS < deadline )); do
+            suite="$(get_suite)"
+            suite_id="$(jq -r '.id // empty' <<<"$suite")"
+            if [[ -z "$suite_id" ]]; then
+              sleep 10
+              continue
+            fi
+
+            status="$(jq -r '.status // empty' <<<"$suite")"
+            conclusion="$(jq -r '.conclusion // empty' <<<"$suite")"
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "Sonar already succeeded for $SHA."
+                exit 0
+              fi
+              break
+            fi
+            sleep 10
+          done
+
+          if [[ -z "$suite_id" ]]; then
+            echo "::error::SonarQubeCloud check suite did not appear for $SHA."
+            exit 1
+          fi
+          if [[ "$status" != "completed" ]]; then
+            echo "::error::SonarQubeCloud check suite did not reach a terminal state."
+            exit 1
+          fi
+
+          echo "Sonar ended as $conclusion; requesting one retry for suite $suite_id."
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/$REPOSITORY/check-suites/$suite_id/rerequest" \
+            --silent
+
+          deadline=$((SECONDS + 300))
+          observed_reset=false
+          while (( SECONDS < deadline )); do
+            suite="$(gh api "repos/$REPOSITORY/check-suites/$suite_id")"
+            status="$(jq -r '.status // empty' <<<"$suite")"
+            conclusion="$(jq -r '.conclusion // empty' <<<"$suite")"
+
+            if [[ "$status" != "completed" ]]; then
+              observed_reset=true
+              sleep 10
+              continue
+            fi
+            if [[ "$conclusion" == "success" ]]; then
+              echo "Sonar rerequest succeeded for $SHA."
+              exit 0
+            fi
+            if [[ "$observed_reset" == "true" ]]; then
+              echo "::error::Sonar rerequest finished as $conclusion."
+              exit 1
+            fi
+            sleep 10
+          done
+
+          echo "::error::Sonar rerequest did not complete successfully within the bounded wait."
+          exit 1

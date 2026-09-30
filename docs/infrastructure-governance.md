@@ -2,6 +2,12 @@
 
 #189 convierte una intención explícita en una decisión gobernada antes de cualquier ejecución. Esta capa **no ejecuta** provider APIs, SSH, SQL, IaC, deploys ni mutaciones productivas. `execution=false` permanece explícito.
 
+## Provenance nominal de authority
+
+`InfrastructureIntent` no acepta authority construida como array. La frontera nominal es `VerifiedAccessContext`, emitida server-side por `VerifiedAccessContext::fromDecisionRuntime()`; copiar sus campos no reproduce provenance.
+
+`VentureAccessRuntime::projectInfrastructureAuthority()` acepta esa instancia, evalúa `capability + required_authority_level` con `DecisionRights` y emite una proyección opaca, action-bound y single-use. Contexto y proyección se protegen con `WeakMap`: copia, replay o action mismatch fallan cerrado. No se añaden secretos, HMAC, DB ni policy engine paralelo.
+
 ## Flujo canónico
 
 `InfrastructureIntent → authority/policy → CapitalPolicy cuando aplica → Factory WorkItem v1 → RunnerRequest → asignación → RunnerGateway::order()`

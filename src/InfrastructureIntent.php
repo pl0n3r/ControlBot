@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace ControlBot\Infrastructure;
 
 use ControlBot\Business\CapitalPolicy;
+use ControlBot\Business\VentureAccessRuntime;
 use ControlBot\Production\CapabilityPolicy;
 use ControlBot\Runner\RunnerGateway;
 use InvalidArgumentException;
@@ -24,14 +25,18 @@ final class InfrastructureIntent
         'sre',
     ];
 
-    public static function plan(array $raw, array $authorityRaw, ?array $capitalInput, int $now): array
+    public static function plan(array $raw, mixed $authorityProjection, ?array $capitalInput, int $now): array
     {
         if ($now < 1) {
             throw new InvalidArgumentException('InfrastructureIntent clock invalid.');
         }
 
         $intent = self::intent($raw);
-        $authority = self::authority($authorityRaw);
+        $authority = self::authority(VentureAccessRuntime::consumeInfrastructureAuthority(
+            $authorityProjection,
+            $intent['capability'],
+            strtoupper($intent['authority_level']),
+        ));
         $basePolicy = CapabilityPolicy::classify($intent['capability']);
         $policy = CapabilityPolicy::classify(
             $intent['capability'],

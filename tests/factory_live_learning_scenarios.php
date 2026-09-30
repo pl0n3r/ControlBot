@@ -117,4 +117,36 @@ if($scenario==='ui'){
     echo FactoryLiveUi::render($snapshot,$matrix,$learning),PHP_EOL;exit;
 }
 if($scenario==='recurrence'){[, $learning]=learningBuilt(learningFixture());echo json_encode($learning['recurrence'],JSON_THROW_ON_ERROR),PHP_EOL;exit;}
+
+if($scenario==='no_evidence'){
+    $raw=learningFixture();
+    $raw['work'][]=lsig('work:no-evidence','github_project_snapshot','healthy','current',[
+        'title'=>'No evidence layer','layer'=>'application','project'=>'Condor'
+    ],196);
+    $raw['learning'][]=lsig('learning:no-evidence','incident_lesson','healthy','current',[
+        'title'=>'No evidence metric','metric'=>'lessons_per_week_project','metric_value'=>13,'project'=>'BRVTAL'
+    ],196);
+    [, $learning]=learningBuilt($raw);
+    $layer=array_values(array_filter($learning['layers']['application']['signals'],fn(array $x):bool=>$x['id']==='work:no-evidence'))[0]??null;
+    echo json_encode([
+        'layer_status'=>$learning['layers']['application']['status'],
+        'signal'=>$layer,
+        'metric'=>$learning['metrics']['lessons_per_week_project']['by_project']['BRVTAL']??null,
+    ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+}
+if($scenario==='valid_evidence'){
+    $raw=learningFixture();
+    $raw['learning'][]=lsig('learning:valid-evidence','incident_lesson','degraded','current',[
+        'title'=>'Valid evidence metric','metric'=>'lessons_per_week_project','metric_value'=>13,'project'=>'BRVTAL',
+        'evidence_ref'=>'https://github.com/pl0n3r/brvtal/issues/533'
+    ],196);
+    [, $learning]=learningBuilt($raw);
+    echo json_encode($learning['metrics']['lessons_per_week_project']['by_project']['BRVTAL'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+}
+if($scenario==='ui_invalid_evidence'){
+    [$snapshot,$learning]=learningBuilt(learningFixture());$matrix=FactoryLiveMatrix::build($snapshot);
+    $learning['layers']['application']['signals'][0]['evidence_href']=null;
+    $blocked=false;try{FactoryLiveUi::render($snapshot,$matrix,$learning);}catch(Throwable){$blocked=true;}
+    echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
 fwrite(STDERR,"scenario inválido\n");exit(2);

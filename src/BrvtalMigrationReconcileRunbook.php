@@ -48,7 +48,7 @@ final class BrvtalMigrationReconcileRunbook
         }
 
         if (!isset($done['database.backup'])) {
-            return self::next('database.backup', 'write', $input);
+            return self::next('database.backup', 'backup', $input);
         }
 
         if (!isset($done['migration.registry.reconcile'])) {

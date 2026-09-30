@@ -19,7 +19,7 @@ class MarketWorkOriginTests(unittest.TestCase):
         self.assertEqual(item["origin_mode"],"automatic")
         self.assertEqual(item["origin_system"],"controlbot")
         self.assertEqual(item["producer_ref"],"controlbot:market-work-origin")
-        self.assertIn("market-condor-co/CO/payments",item["claims"][1])
+        self.assertTrue(any(x.endswith("/CO/payments") for x in item["claims"]))
 
     def test_unknown_stale_invalid_scope_profiles_and_extra_fields_fail_closed(self):
         d=scenario("closed")

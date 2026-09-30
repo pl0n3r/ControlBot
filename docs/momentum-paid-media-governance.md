@@ -1,18 +1,12 @@
-# MOMENTUM Paid Media Governance v1
+# MOMENTUM Paid Media Governance v2
 
-`MomentumPaidMedia` es una frontera de **planificación pura** para campañas con canal `paid_social` o `search_ads`. No ejecuta anuncios, pagos, colas ni adapters de proveedor.
+#434 cierra el trust boundary detectado tras #432. `MomentumPaidMedia` sigue siendo planificación pura: no ejecuta anuncios, pagos, colas ni adapters.
 
-## Contrato
+## Authority nominal
+La entrada recibe un `VerifiedAccessContext` emitido por `DecisionRuntime`; copias estructurales no autorizan. El caller no suministra capability ni authority: `launch|pause|reallocate` usan server-side `momentum.paid_media.plan` con mínimo `L2_VENTURE_ADMIN` porque todas portan spend/CAPITAL. La policy canónica debe estar activa y `grant.policy_ref` debe ser exactamente `controlbot:policy/business-os-v1`.
 
-- La campaña se normaliza con `MomentumCampaign` y debe mantener el mismo Venture, `budget_ref` y canal paid.
-- La autoridad se decide con `DecisionRights::evaluate`; un `budget_ref`, `secret_scope_ref` o cualquier referencia opaca nunca concede permiso.
-- El gasto se valida con `CapitalPolicy::evaluate` en el mismo Venture, moneda y monto de propuesta.
-- `freshness=stale|unknown`, authority deny o CAPITAL deny produce `denied`.
-- Cualquier owner gate se conserva como `owner_decision_required`.
-- Una reallocation puede redistribuir dentro del mismo total; aumentar el gasto total o exceder el límite explícito requiere Owner Decision.
-- `secret_scope_ref` es solo `scope:<32 hex>`; credenciales, tokens y campos extra fallan cerrado.
-- Toda salida mantiene `execution=false`.
+## Evidencia y freshness
+`current` se valida contra `$now`: timestamps futuros → `evidence_from_future`; edad >300s → `evidence_expired`; `stale|unknown` fallan cerrado. `spend_ref`, `evidence_refs` y `blast_radius_ref` son referencias opacas y deterministas. Blast radius es evidencia descriptiva **no autoritativa**: no rebaja ni eleva authority por sí solo.
 
-## Límites
-
-ControlBot proyecta intención gobernada. Decision Rights conserva autoridad y CAPITAL conserva presupuesto. Factory/FactoryRunner siguen siendo las superficies de cola/ejecución fuera de este contrato. No hay API de Meta, Google, TikTok, payment, bidding, scheduler, persistencia ni side effects.
+## CAPITAL y límites
+Campaign/Venture, budget, moneda y proposal amount deben coincidir con CAPITAL. `reallocate` exige reallocation; expansión del total mantiene Owner Decision. Toda salida conserva `execution=false`. No hay provider APIs, pagos, scheduler, persistencia, FactoryRunner, credenciales, PII ni RBAC paralelo.

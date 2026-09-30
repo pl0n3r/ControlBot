@@ -166,11 +166,18 @@ final class FactoryLiveUi
         $products='';
         foreach($view['product_analytics'] as $row){
             self::fields($row,['department','project','metric','value','status','source_ref','observed_at','freshness','age_seconds'],'product_metric');
+            $department=self::one($row['department'],['product','data_analytics'],'product metric department');
             $status=self::one($row['status'],['measured','unknown'],'product metric status');
-            $fresh=self::one($row['freshness'],['current','stale','unknown'],'product metric freshness');
+            $fresh=self::one($row['freshness'],['current','stale'],'product metric freshness');
+            $project=self::text($row['project']);$metric=self::text($row['metric']);$source=self::text($row['source_ref']);
+            if(!is_int($row['observed_at'])||$row['observed_at']<1||$row['observed_at']>$view['observed_at'])
+                throw new InvalidArgumentException('Product metric observed_at invalid.');
+            if(!is_int($row['age_seconds'])||$row['age_seconds']<0
+                ||$row['age_seconds']!==$view['observed_at']-$row['observed_at'])
+                throw new InvalidArgumentException('Product metric age invalid.');
             $value=$row['value']===null?'UNKNOWN':self::value($row['value']);
-            $products.='<article class="learning-card"><span>'.self::e(self::text($row['department'])).' · '.self::e(self::text($row['project'])).'</span><strong>'.self::e($value).'</strong><small class="matrix-meta">'
-                .self::e(self::text($row['metric'])).' · '.self::e(self::text($row['source_ref'])).' · '.self::e((string)$row['observed_at']).' · '.self::e($fresh).' · '.self::e($status).'</small></article>';
+            $products.='<article class="learning-card"><span>'.self::e($department).' · '.self::e($project).'</span><strong>'.self::e($value).'</strong><small class="matrix-meta">'
+                .self::e($metric).' · '.self::e($source).' · '.self::e((string)$row['observed_at']).' · '.self::e($fresh).' · '.self::e($status).'</small></article>';
         }
         if($products==='')$products='<article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin métricas canónicas medidas</small></article>';
 

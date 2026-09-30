@@ -78,6 +78,7 @@ class RemoteWorkspaceBrokerTests(unittest.TestCase):
             self.assertNotIn(legacy,source)
 
     def test_broker_has_no_network_filesystem_write_or_subprocess(self):
+        # Keep privileged-I/O denial source-based so accidental calls fail before runtime integration.
         source=(ROOT/"src"/"RemoteWorkspaceBroker.php").read_text()
         forbidden=(
             "curl_","fsockopen","stream_socket_client","file_put_contents","fopen(",

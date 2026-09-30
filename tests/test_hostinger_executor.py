@@ -54,6 +54,77 @@ class HostingerExecutorTests(unittest.TestCase):
         self.assertEqual(data["second"]["reason"], "non_idempotent_replay")
         self.assertEqual(data["transport_calls"], 1)
 
+    def test_transport_receives_safe_connection_context(self):
+        data = scenario("safe_connection_context")
+        descriptor = data["descriptor"]
+
+        self.assertTrue(data["result"]["accepted"])
+        self.assertEqual(data["transport_calls"], 1)
+        self.assertEqual(descriptor["username_ref"], "vault:user:brvtal")
+        self.assertEqual(
+            descriptor["expected_fingerprint"],
+            "SHA256:abcdefghijklmnop",
+        )
+        self.assertEqual(descriptor["secret_kind"], "private_key")
+        self.assertEqual(descriptor["project"], "brvtal")
+        self.assertEqual(descriptor["environment"], "production")
+
+    def test_transport_descriptor_never_contains_secret_material(self):
+        data = scenario("safe_connection_context")
+        descriptor = data["descriptor"]
+
+        self.assertFalse(data["contains_secret_value"])
+        for forbidden_key in (
+            "secret_ref",
+            "reference_id",
+            "secret",
+            "secret_value",
+            "password",
+            "private_key",
+            "api_token",
+            "token",
+        ):
+            self.assertNotIn(forbidden_key, descriptor)
+
+        serialized = json.dumps(descriptor).lower()
+        self.assertNotIn("fixture-hostinger-secret", serialized)
+        self.assertNotIn("11111111-2222-4333-8444-555555555555", serialized)
+
+    def test_transport_context_matches_validated_profile_and_secret_kind(self):
+        data = scenario("safe_connection_context")
+        descriptor = data["descriptor"]
+
+        self.assertEqual(descriptor["project"], "brvtal")
+        self.assertEqual(descriptor["environment"], "production")
+        self.assertEqual(descriptor["username_ref"], "vault:user:brvtal")
+        self.assertEqual(
+            descriptor["expected_fingerprint"],
+            "SHA256:abcdefghijklmnop",
+        )
+
+        for key in (
+            "profile_project_mismatch",
+            "profile_environment_mismatch",
+            "secret_project_mismatch",
+            "secret_environment_mismatch",
+        ):
+            self.assertFalse(data[key]["accepted"])
+
+        for key in (
+            "profile_project_calls",
+            "profile_environment_calls",
+            "secret_project_calls",
+            "secret_environment_calls",
+        ):
+            self.assertEqual(data[key], 0)
+
+        self.assertTrue(data["validated_kind_result"]["accepted"])
+        self.assertEqual(data["validated_kind_calls"], 1)
+        self.assertEqual(
+            data["validated_kind_descriptor"]["secret_kind"],
+            "private_key",
+        )
+
     def test_fake_transport_requires_no_real_credentials(self):
         data = scenario("fake_transport")
         self.assertTrue(data["result"]["accepted"])

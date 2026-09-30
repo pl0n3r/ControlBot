@@ -102,15 +102,26 @@ final class HostingerExecutor
 
         $brokerResult = $this->broker->execute(
             $secretContext,
-            function (string $secret) use ($operation, $profile, $request, $ledgerKey): mixed {
+            function (
+                string $secret,
+                array $secretMetadata,
+            ) use (
+                $operation,
+                $profile,
+                $profileRecord,
+                $request,
+                $ledgerKey,
+            ): mixed {
                 if ($operation->effect() === 'write' && !$operation->retrySafe()) {
                     $this->writeLedger[$ledgerKey] = true;
                 }
 
-                return ($this->transport)(
-                    $operation->transportDescriptor($profile->destination(), $request),
-                    $secret,
-                );
+                $descriptor = $operation->transportDescriptor($profile->destination(), $request);
+                $descriptor['username_ref'] = $profileRecord['username_ref'];
+                $descriptor['expected_fingerprint'] = $profileRecord['host_fingerprint'];
+                $descriptor['secret_kind'] = $secretMetadata['secret_kind'];
+
+                return ($this->transport)($descriptor, $secret);
             },
         );
 

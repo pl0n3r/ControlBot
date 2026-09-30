@@ -8,7 +8,13 @@ use InvalidArgumentException;
 
 final class RequirementIntakeDecisionUi
 {
-    private const SENSITIVE = '/(?:-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----|\bbearer\s+[A-Za-z0-9._~+\/-]{8,}|\b(?:password|passwd|token|secret|api[_ -]?key|private[_ -]?key|dsn|otp|recovery[_ -]?code|session[_ -]?token)\s*[:=]\s*[^\s,;]+|\b(?:ghp_|gho_|github_pat_)[A-Za-z0-9_]{20,}|\b(?:sk|rk|pk)-[A-Za-z0-9_-]{12,})/i';
+    private const SENSITIVE =
+        '/(?:-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----|' .
+        '\bbearer\s+[A-Za-z0-9._~+\/-]{8,}|' .
+        '\b(?:password|passwd|token|secret|api[_ -]?key|' .
+        'private[_ -]?key|dsn|otp|recovery[_ -]?code|session[_ -]?token)\s*[:=]\s*[^\s,;]+|' .
+        '\b(?:ghp_|gho_|github_pat_)[A-Za-z0-9_]{20,}|' .
+        '\b(?:sk|rk|pk)-[A-Za-z0-9_-]{12,})/i';
 
     public static function project(array $raw): array
     {

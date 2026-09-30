@@ -113,6 +113,8 @@ final class FactoryLiveUi
     {
         self::fields($signal,['id','label','project','scope','status','source_ref','observed_at','freshness','age_seconds','evidence_href'],'learning.signal');
         $status=self::one($signal['status'],self::MATRIX_STATUS,'learning.signal.status');
+        if($status!=='UNKNOWN'&&$signal['evidence_href']===null)
+            throw new InvalidArgumentException('Learning signal evidence required.');
         $source=$signal['source_ref']===null?'UNKNOWN':self::text($signal['source_ref']);
         $age=$signal['age_seconds']===null?'UNKNOWN':self::scalar($signal['age_seconds']).'s';
         $project=$signal['project']!==null
@@ -142,6 +144,8 @@ final class FactoryLiveUi
     {
         self::fields($metric,['status','value','source_ref','observed_at','freshness','age_seconds','evidence_href'],'learning.metric.value');
         $status=self::one($metric['status'],self::MATRIX_STATUS,'learning.metric.status');
+        if($status!=='UNKNOWN'&&$metric['evidence_href']===null)
+            throw new InvalidArgumentException('Learning metric evidence required.');
         $value=$metric['value']===null?'UNKNOWN':self::value($metric['value']);
         $source=$metric['source_ref']===null?'UNKNOWN':self::text($metric['source_ref']);
         $age=$metric['age_seconds']===null?'UNKNOWN':self::scalar($metric['age_seconds']).'s';

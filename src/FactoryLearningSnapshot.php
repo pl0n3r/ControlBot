@@ -120,10 +120,13 @@ final class FactoryLearningSnapshot
             $scope=self::choice($data['scope'],['global'],'scope');
         if($project!==null&&$scope!==null)
             throw new InvalidArgumentException('Learning project/scope conflict.');
+        $evidenceHref=self::href($data['evidence_ref']??$data['issue_ref']??$row['source_ref']);
+        $status=self::status($state,$fresh);
+        if($evidenceHref===null&&$status!=='UNKNOWN')$status='UNKNOWN';
         return [
-            'id'=>$row['id'],'label'=>$label,'project'=>$project,'scope'=>$scope,'status'=>self::status($state,$fresh),
+            'id'=>$row['id'],'label'=>$label,'project'=>$project,'scope'=>$scope,'status'=>$status,
             'source_ref'=>$row['source_ref'],'observed_at'=>$row['observed_at'],'freshness'=>$fresh,
-            'age_seconds'=>$row['age_seconds'],'evidence_href'=>self::href($data['evidence_ref']??$data['issue_ref']??$row['source_ref']),
+            'age_seconds'=>$row['age_seconds'],'evidence_href'=>$evidenceHref,
         ];
     }
 
@@ -144,6 +147,7 @@ final class FactoryLearningSnapshot
 
     private static function metric(array $signal,mixed $value): array
     {
+        if($signal['evidence_href']===null)return self::unknownMetric();
         return [
             'status'=>$signal['status'],'value'=>$value,'source_ref'=>$signal['source_ref'],
             'observed_at'=>$signal['observed_at'],'freshness'=>$signal['freshness'],

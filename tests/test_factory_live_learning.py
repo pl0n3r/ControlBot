@@ -100,6 +100,35 @@ class FactoryLiveLearningTests(unittest.TestCase):
         fragment=html.split("product_business",1)[1].split("</article>",1)[0]
         self.assertNotIn("GLOBAL",fragment)
 
+    def test_layer_without_resolvable_evidence_fails_closed(self):
+        d=json.loads(scenario("no_evidence"))
+        self.assertEqual(d["layer_status"],"UNKNOWN")
+        self.assertEqual(d["signal"]["status"],"UNKNOWN")
+        self.assertIsNone(d["signal"]["evidence_href"])
+        self.assertIsInstance(d["signal"]["source_ref"],str)
+
+    def test_metric_without_resolvable_evidence_fails_closed(self):
+        row=json.loads(scenario("no_evidence"))["metric"]
+        self.assertIsNone(row)
+
+    def test_unlinked_newer_metric_cannot_displace_evidenced_metric(self):
+        row=json.loads(scenario("metric_competition"))
+        self.assertEqual(row["status"],"GREEN");self.assertEqual(row["value"],7)
+        self.assertTrue(row["evidence_href"].startswith("https://github.com/"))
+
+    def test_resolvable_evidence_preserves_status(self):
+        row=json.loads(scenario("valid_evidence"))
+        self.assertEqual(row["status"],"AMBER");self.assertEqual(row["value"],13)
+        self.assertTrue(row["evidence_href"].startswith("https://github.com/"))
+
+    def test_ui_never_renders_non_unknown_without_evidence_link(self):
+        self.assertTrue(json.loads(scenario("ui_invalid_evidence"))["blocked"])
+
+    def test_multi_project_learning_regressions_remain_green(self):
+        d=json.loads(scenario("full"))
+        self.assertEqual(set(d["metrics"]["lessons_per_week_project"]["by_project"]),{"Condor","ControlBot"})
+        self.assertEqual(d["metrics"]["lessons_per_week_project"]["global"]["status"],"UNKNOWN")
+
     def test_unlinked_recurrence_is_unknown(self):
         row=json.loads(scenario("recurrence"))
         self.assertEqual(row["status"],"UNKNOWN");self.assertIsNone(row["value"])

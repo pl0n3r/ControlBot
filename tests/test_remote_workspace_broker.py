@@ -55,6 +55,28 @@ class RemoteWorkspaceBrokerTests(unittest.TestCase):
         self.assertIn("[REDACTED]",encoded)
         self.assertFalse(d["failure"]["ok"])
 
+    def test_deduplication_refactor_keeps_shared_helpers_centralized(self):
+        source=(ROOT/"src"/"RemoteWorkspaceBroker.php").read_text()
+        for token in (
+            "private const META_FIELDS",
+            "private const CONTEXT_FIELDS",
+            "private const SCOPE_FIELDS",
+            "private static function hasExactKeys",
+            "private static function sameScope",
+            "private static function result",
+        ):
+            self.assertIn(token,source)
+        for legacy in (
+            "private const META =",
+            "private const CONTEXT =",
+            "private static function metadata(",
+            "private static function context(",
+            "private static function executorId(",
+            "private static function referenceId(",
+            "private static function slug(",
+        ):
+            self.assertNotIn(legacy,source)
+
     def test_broker_has_no_network_filesystem_write_or_subprocess(self):
         source=(ROOT/"src"/"RemoteWorkspaceBroker.php").read_text()
         forbidden=(

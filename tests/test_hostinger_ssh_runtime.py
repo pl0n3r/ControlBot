@@ -24,22 +24,26 @@ class HostingerSshRuntimeTests(unittest.TestCase):
         data = scenario("valid")
         self.assertTrue(data["result"]["accepted"])
         self.assertEqual(data["result"]["result"]["status"], "success")
-        self.assertEqual(data["client_calls"], 1)
-        self.assertTrue(data["secret_seen"])
+        self.assertEqual(data["result"]["result"]["evidence"]["code"], "ssh_readonly_probe_ok")
+        self.assertEqual(data["runner_calls"], 2)
+        self.assertEqual(data["keyscan_calls"], 1)
+        self.assertEqual(data["ssh_calls"], 1)
+        self.assertTrue(data["key_material_seen"])
 
     def test_grant_profile_or_secret_mismatch_stops_before_ssh_client(self):
         data = scenario("preclient")
         for case in data.values():
             self.assertFalse(case["result"]["accepted"])
-            self.assertEqual(case["client_calls"], 0)
+            self.assertEqual(case["runner_calls"], 0)
+            self.assertFalse(case["threw"])
 
     def test_identity_failures_stop_before_client_without_username_leak(self):
         data = scenario("identity")
         for case in data.values():
-            self.assertEqual(case["client_calls"], 0)
+            self.assertEqual(case["runner_calls"], 0)
             encoded = json.dumps(case["result"])
             self.assertNotIn("deploy_user_539", encoded)
-            self.assertNotIn("fixture-private-key-material-539", encoded)
+            self.assertNotIn("BEGIN OPENSSH PRIVATE KEY", encoded)
             self.assertNotEqual(
                 (case["result"].get("result") or {}).get("status"),
                 "success",
@@ -47,21 +51,30 @@ class HostingerSshRuntimeTests(unittest.TestCase):
 
     def test_secret_stays_inside_privileged_callbacks_and_never_escapes(self):
         data = scenario("valid")
-        self.assertTrue(data["secret_seen"])
+        self.assertTrue(data["key_material_seen"])
         encoded = json.dumps(data["result"])
-        self.assertNotIn("fixture-private-key-material-539", encoded)
+        self.assertNotIn("BEGIN OPENSSH PRIVATE KEY", encoded)
         self.assertNotIn("deploy_user_539", encoded)
-        self.assertIn("[REDACTED]", encoded)
+        self.assertNotIn("11111111-2222-4333-8444-555555555555", encoded)
 
     def test_destination_fingerprint_and_username_are_server_side_authoritative(self):
         data = scenario("authority")
-        observed = data["valid"]["request"]
-        self.assertEqual(observed["host"], "example.internal")
-        self.assertEqual(observed["port"], 22)
-        self.assertEqual(observed["expected_fingerprint"], "SHA256:abcdefghijklmnop")
-        self.assertEqual(observed["username"], "deploy_user_539")
-        self.assertTrue(data["override_rejected"])
-        self.assertEqual(data["override_client_calls"], 0)
+        valid = data["valid"]
+        self.assertEqual(valid["keyscan_host"], "example.internal")
+        self.assertEqual(valid["keyscan_port"], 22)
+        self.assertEqual(valid["ssh_target"], "deploy_user_539@example.internal")
+
+        fingerprint = data["bad_fingerprint"]
+        self.assertEqual(fingerprint["keyscan_calls"], 1)
+        self.assertEqual(fingerprint["ssh_calls"], 0)
+        self.assertEqual(
+            fingerprint["result"]["result"]["evidence"]["code"],
+            "ssh_host_key_mismatch",
+        )
+
+        override = data["caller_override"]
+        self.assertTrue(override["threw"])
+        self.assertEqual(override["runner_calls"], 0)
 
     def test_runtime_uses_fakes_and_preserves_existing_regressions(self):
         source = (

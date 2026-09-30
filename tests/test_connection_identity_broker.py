@@ -46,6 +46,12 @@ class ConnectionIdentityBrokerTests(unittest.TestCase):
         self.assertEqual(data["new"]["generation"],2)
         self.assertNotIn("deploy_user_rotated",json.dumps(data["new"]))
 
+        temporal=scenario("temporal")
+        self.assertTrue(temporal["bad_date"])
+        self.assertTrue(temporal["revoke_before"])
+        self.assertTrue(temporal["rotate_before"])
+        self.assertTrue(temporal["rotate_equal"])
+
     def test_results_and_errors_redact_resolved_username(self):
         data=scenario("redaction")
         self.assertFalse(data["contains_username"])

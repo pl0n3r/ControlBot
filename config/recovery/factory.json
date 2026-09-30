@@ -2,29 +2,10 @@
   "version": 1,
   "project_ref": "controlbot:project/project-factory",
   "manifest_ref": "controlbot:recovery-manifest/project-factory-v1",
-  "targets": {
-    "rpo_minutes": 15,
-    "rto_minutes": 60
-  },
-  "retention": {
-    "hourly": 24,
-    "daily": 7,
-    "weekly": 8,
-    "monthly": 12
-  },
-  "sources": {
-    "database": "not_applicable",
-    "media": "not_applicable",
-    "repository": "required",
-    "configuration": "required"
-  },
-  "strategy": {
-    "copies_required": 3,
-    "media_types_required": 2,
-    "offsite_required": true,
-    "immutable_required": true,
-    "undetected_restore_failures_target": 0
-  },
+  "targets": {"rpo_minutes": 15, "rto_minutes": 60},
+  "retention": {"hourly": 24, "daily": 7, "weekly": 8, "monthly": 12},
+  "sources": {"database": "not_applicable", "media": "not_applicable", "repository": "required", "configuration": "required"},
+  "strategy": {"copies_required": 3, "media_types_required": 2, "offsite_required": true, "immutable_required": true, "undetected_restore_failures_target": 0},
   "encryption_required": true,
   "restore_drill_cadence_hours": 168,
   "source_ref": "https://github.com/pl0n3r/ControlBot/issues/462",

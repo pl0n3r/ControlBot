@@ -7,6 +7,7 @@ def scenario(name):
 
 REQUIRED={"work_id","origin_mode","origin_system","group_id","work_type","requested_capabilities","required_roles","authority_level","priority_class","depends_on","claims","policy_ref","evidence_refs","idempotency_key"}
 ALLOWED=REQUIRED|{"producer_ref","requested_by","venture_id","project_id","repository_ref","severity","budget_ref","approval_ref","observed_at"}
+OPAQUE_EVIDENCE=r"^controlbot:[a-z][a-z0-9-]{1,31}/[a-f0-9]{32}$"
 
 class MarketWorkOriginTests(unittest.TestCase):
     def test_fresh_blocked_gap_materializes_factory_work_item_v1(self):
@@ -29,6 +30,29 @@ class MarketWorkOriginTests(unittest.TestCase):
             self.assertTrue(d[key]["unresolved_domains"])
         for key in ("scope","profile","extra"):
             self.assertTrue(d[key],key)
+
+    def test_context_evidence_refs_require_canonical_opaque_refs(self):
+        item=scenario("context_evidence")["valid"]["work_items"][0]
+        expected={
+            "controlbot:market-evidence/"+"a"*32,
+            "controlbot:market-evidence/"+"b"*32,
+        }
+        self.assertTrue(expected.issubset(item["evidence_refs"]))
+        self.assertEqual(item["evidence_refs"],sorted(set(item["evidence_refs"])))
+        for ref in item["evidence_refs"]:
+            self.assertRegex(ref,OPAQUE_EVIDENCE)
+
+    def test_context_evidence_refs_reject_pii_secrets_free_text_malformed_and_duplicates(self):
+        d=scenario("context_evidence")
+        for key in ("phone","email","free_text","secret","malformed","duplicate"):
+            self.assertTrue(d[key],key)
+
+    def test_context_evidence_refs_preserve_historical_limit_of_50(self):
+        d=scenario("context_evidence_limit")
+        self.assertEqual(d["fifty"]["status"],"blocked")
+        self.assertEqual(d["fifty"]["reasons"],["unresolved_readiness"])
+        self.assertFalse(d["fifty"]["execution"])
+        self.assertTrue(d["fifty_one"])
 
     def test_work_item_matches_factory_fields_without_freshness(self):
         item=scenario("fresh")["work_items"][0]
@@ -71,5 +95,8 @@ class MarketWorkOriginTests(unittest.TestCase):
         for forbidden in ("curl_","mysqli","pdo(","factoryrunner","scheduler","dispatcher","file_put_contents","shell_exec","exec("):
             self.assertNotIn(forbidden,source)
         self.assertNotIn("@",json.dumps(d))
+        rejected=scenario("context_evidence")
+        for key in ("phone","email","free_text","secret","malformed","duplicate"):
+            self.assertTrue(rejected[key],key)
 
 if __name__=="__main__": unittest.main()

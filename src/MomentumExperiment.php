@@ -122,37 +122,41 @@ final class MomentumExperiment
     {
         if(!is_array($values)||!array_is_list($values)||count($values)>$max)
             throw new InvalidArgumentException($namespace.' refs invalid.');
-        $out=[];
-        foreach($values as $value){
-            $ref=self::opaque($value,$namespace);
-            if(isset($out[$ref])) throw new InvalidArgumentException($namespace.' ref duplicated.');
-            $out[$ref]=true;
-        }
-        $refs=array_keys($out);sort($refs,SORT_STRING);return $refs;
+        $refs=array_map(static fn(mixed $value): string=>self::opaque($value,$namespace),$values);
+        if(count(array_unique($refs,SORT_STRING))!==count($refs))
+            throw new InvalidArgumentException($namespace.' ref duplicated.');
+        sort($refs,SORT_STRING);
+        return $refs;
     }
 
     private static function opaque(mixed $value,string $namespace): string
     {
-        if(!is_string($value)||preg_match('/^'.preg_quote($namespace,'/').':[a-f0-9]{32}$/D',$value)!==1)
+        if(!is_string($value)) throw new InvalidArgumentException($namespace.' ref invalid.');
+        $prefix=$namespace.':';
+        if(!str_starts_with($value,$prefix)) throw new InvalidArgumentException($namespace.' ref invalid.');
+        $hex=substr($value,strlen($prefix));
+        if(strlen($hex)!==32||!ctype_xdigit($hex)||strtolower($hex)!==$hex)
             throw new InvalidArgumentException($namespace.' ref invalid.');
         return $value;
     }
 
     private static function nullableOpaque(mixed $value,string $namespace): ?string
     {
-        return $value===null?null:self::opaque($value,$namespace);
+        if($value===null) return null;
+        return self::opaque($value,$namespace);
     }
 
     private static function venture(mixed $value): string
     {
-        if(!is_string($value)||preg_match('/^[a-z][a-z0-9-]{1,63}$/D',$value)!==1)
+        if(!is_string($value)||strlen($value)<2||strlen($value)>64
+            ||preg_match('/\\A[a-z][a-z0-9-]+\\z/D',$value)!==1)
             throw new InvalidArgumentException('venture_id invalid.');
         return $value;
     }
 
     private static function enumValue(mixed $value,array $allowed,string $label): string
     {
-        if(!is_string($value)||!in_array($value,$allowed,true))
+        if(!is_string($value)||array_search($value,$allowed,true)===false)
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
@@ -160,7 +164,9 @@ final class MomentumExperiment
     private static function fields(mixed $row,array $expected,string $label): void
     {
         if(!is_array($row)||array_is_list($row)) throw new InvalidArgumentException($label.' invalid.');
-        $actual=array_keys($row);sort($actual);sort($expected);
-        if($actual!==$expected) throw new InvalidArgumentException($label.' fields invalid.');
+        $actual=array_keys($row);
+        if(count($actual)!==count($expected)
+            ||array_diff($actual,$expected)!==[]||array_diff($expected,$actual)!==[])
+            throw new InvalidArgumentException($label.' fields invalid.');
     }
 }

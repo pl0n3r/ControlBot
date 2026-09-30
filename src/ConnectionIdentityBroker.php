@@ -233,10 +233,13 @@ final class ConnectionIdentityBroker
 
     private static function epoch(string $value): int
     {
-        $parsed = date_create_immutable($value);
-        if ($parsed === false || $parsed->format(DATE_ATOM) !== $value) {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D', $value) !== 1) {
             throw new InvalidArgumentException('Timestamp inválido.');
         }
-        return $parsed->getTimestamp();
+        $epoch = strtotime($value);
+        if ($epoch === false || gmdate('Y-m-d\\TH:i:s\\Z', $epoch) !== $value) {
+            throw new InvalidArgumentException('Timestamp inválido.');
+        }
+        return $epoch;
     }
 }

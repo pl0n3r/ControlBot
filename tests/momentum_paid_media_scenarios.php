@@ -108,11 +108,12 @@ if($case==='nominal'){
  $secret=plan();$secret['spend']['spend_ref']='spend:token-super-secret';
  $budget=plan();$budget['spend']['budget_ref']='budget:ffffffffffffffffffffffffffffffff';
  $wrongCapital=capital();$wrongCapital['proposal']['amount_minor']=1900000;
- $blast=plan();$blast['spend']['blast_radius_ref']='blast-radius:99999999999999999999999999999999';
+ $blast=plan();$blast['spend']['blast_radius']='high';
+ $invalidBlast=plan();$invalidBlast['spend']['blast_radius']='critical';
  $more=['currency'=>'COP','current_total_minor'=>5000000,'proposed_total_minor'=>5500000,'limit_minor'=>6000000];
  echo json_encode(['a'=>run(plan()),'b'=>run(plan()),'duplicate'=>run($bad),'secret'=>run($secret),
   'budget_mismatch'=>run($budget),'capital_mismatch'=>run(plan(),null,$wrongCapital),'blast'=>run($blast),
-  'expand'=>run(plan('reallocate',reallocation:$more))],JSON_THROW_ON_ERROR);
+  'invalid_blast'=>run($invalidBlast),'expand'=>run(plan('reallocate',reallocation:$more))],JSON_THROW_ON_ERROR);
 }elseif($case==='pure'){
  $r=new ReflectionClass(MomentumPaidMedia::class);
  echo json_encode(['methods'=>array_map(fn($m)=>$m->getName(),$r->getMethods(ReflectionMethod::IS_PUBLIC)),'plan'=>run(plan())],JSON_THROW_ON_ERROR);

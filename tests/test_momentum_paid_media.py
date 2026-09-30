@@ -33,9 +33,10 @@ class MomentumPaidMediaTests(unittest.TestCase):
   self.assertEqual(spend["spend_ref"],"spend:cccccccccccccccccccccccccccccccc")
   self.assertEqual(spend["evidence_refs"],["evidence:dddddddddddddddddddddddddddddddd","evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"])
   self.assertEqual(d["duplicate"]["status"],"denied")
-  self.assertEqual(d["a"]["spend"]["blast_radius_ref"],"blast-radius:ffffffffffffffffffffffffffffffff")
-  self.assertEqual(d["blast"]["spend"]["blast_radius_ref"],"blast-radius:99999999999999999999999999999999")
+  self.assertEqual(d["a"]["spend"]["blast_radius"],"medium")
+  self.assertEqual(d["blast"]["spend"]["blast_radius"],"high")
   self.assertEqual(d["blast"]["status"],"planned")
+  self.assertEqual(d["invalid_blast"]["status"],"denied")
   self.assertEqual(d["expand"]["status"],"owner_decision_required")
 
  def test_governance_has_no_provider_payment_queue_or_side_effects(self):

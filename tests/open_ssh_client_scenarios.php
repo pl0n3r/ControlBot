@@ -31,6 +31,7 @@ function invoke(string $mode,array $req=[],?string $privateKey=null): array {
         $key=$argv[array_search('-i',$argv,true)+1]; $known=null;
         foreach ($argv as $arg) if (str_starts_with($arg,'UserKnownHostsFile=')) $known=substr($arg,19);
         $paths=[$key,$known]; $modes=[fileperms($key)&0777,fileperms($known)&0777];
+        $observed=['key_has_newline'=>str_ends_with((string)file_get_contents($key),"\n"),'known_hosts'=>trim((string)file_get_contents($known))];
         $keyFinalNewline=str_ends_with((string)file_get_contents($key),"\n");
         $knownLine=trim((string)file_get_contents($known));
         if ($mode==='ssh_timeout') return processResult(1,'leak='.secret(),true,20);

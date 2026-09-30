@@ -45,9 +45,9 @@ final class OpenSshClient
         $keyPath=$knownPath=null;
         $result=self::result('failed','ssh_process_failed','SSH read-only probe failed.',$elapsed);
         try {
-            $keyPath=$this->temp('cb-key-',$secret);
-            $knownPath=$this->temp('cb-host-',$hostKey['line']."
-");
+            $normalizedKey=str_ends_with($secret,"\n") ? $secret : $secret."\n";
+            $keyPath=$this->temp('cb-key-',$normalizedKey);
+            $knownPath=$this->temp('cb-host-',$hostKey['line']."\n");
             $ssh=$this->run(self::sshArgv($r,$keyPath,$knownPath,$remaining),$remaining);
             $elapsed+=$ssh['duration_ms'];
             $result=$ssh['timed_out'] || $elapsed>$r['timeout_ms']
@@ -106,7 +106,10 @@ final class OpenSshClient
             if (count($parts)!==3 || !in_array($parts[0],$targets,true) || !in_array($parts[1],self::KEY_TYPES,true)) continue;
             $blob=base64_decode($parts[2],true); if ($blob===false || $blob==='') continue;
             $valid=true; $fp='SHA256:'.rtrim(base64_encode(hash('sha256',$blob,true)),'=');
-            if (hash_equals($r['expected_fingerprint'],$fp)) return ['state'=>'match','line'=>trim($line)];
+            if (hash_equals($r['expected_fingerprint'],$fp)) {
+                $target=$r['port']===22 ? $r['host'] : '['.$r['host'].']:'.$r['port'];
+                return ['state'=>'match','line'=>$target.' '.$parts[1].' '.$parts[2]];
+            }
         }
         return ['state'=>$valid?'mismatch':'invalid','line'=>null];
     }

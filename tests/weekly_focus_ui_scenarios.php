@@ -41,6 +41,12 @@ $conflict = WeeklyFocusUi::reorderIntent($focus, [
     'controlbot:project/alpha',
 ], 2);
 $clear = WeeklyFocusUi::clearIntent($focus, 3);
+$clearedFocus = WeeklyFocus::normalize(array_replace($focus, [
+    'ordered_refs' => [],
+    'version' => 4,
+    'updated_at' => 400,
+]));
+$emptyView = WeeklyFocusUi::project($clearedFocus, []);
 
 echo json_encode([
     'view' => $view,
@@ -48,4 +54,5 @@ echo json_encode([
     'mobile' => $mobile,
     'conflict' => $conflict,
     'clear' => $clear,
+    'empty_view' => $emptyView,
 ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

@@ -85,6 +85,7 @@ final class FactoryLiveCostSnapshot
         $expected=hash('sha256',json_encode($canonical,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
         if(!hash_equals($expected,$snapshot['fingerprint']))
             throw new InvalidArgumentException('Factory live fingerprint mismatch.');
+        self::safe($snapshot);
         if(!isset($snapshot['sections']['work'])||!is_array($snapshot['sections']['work'])||!array_is_list($snapshot['sections']['work']))
             throw new InvalidArgumentException('Factory live work invalid.');
         self::fields($snapshot['tool_usage'],['id','authority','state','source_ref','observed_at','freshness','age_seconds','data'],'tool_usage');

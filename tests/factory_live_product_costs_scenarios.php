@@ -23,7 +23,7 @@ function signal(string $id,string $department,int|float $value): array
 
 function baseSnapshot(?int $used=4200,?int $limit=10000,bool $withSignals=true): array
 {
-    $raw=[];
+    $raw=['tool_usage'=>null];
     if($withSignals)$raw['work']=[
         signal('work:product','product',0),
         signal('work:analytics','data_analytics',42),

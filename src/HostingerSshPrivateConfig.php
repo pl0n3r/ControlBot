@@ -89,8 +89,7 @@ final class HostingerSshPrivateConfig
             'profile' => $this->profile->safeSnapshot(),
             'capability' => 'ssh.readonly',
             'secret_kind' => 'private_key',
-            'private_key' => null,
-            'username' => null,
+            'material_exposed' => false,
         ];
     }
 

@@ -64,6 +64,7 @@ class SecurityUiTests(unittest.TestCase):
         action = self.d["unread"]["cards"][0]["actions"]["acknowledge"]
         self.assertEqual(action["surfaces"], ["mobile", "desktop"])
         self.assertTrue(action["keyboard_focusable"])
+        self.assertTrue(action["focus_visible"])
         self.assertFalse(action["requires_hover"])
         self.assertFalse(action["requires_drag"])
         self.assertTrue(action["enabled"])

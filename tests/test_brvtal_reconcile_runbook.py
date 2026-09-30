@@ -152,5 +152,21 @@ class BrvtalReconcileRunbookTests(unittest.TestCase):
         self.assertIsNone(out["next_intent"])
 
 
+    def test_completed_steps_must_be_prefix_of_schema_branch(self):
+        clean = project(schema_state="clean", completed_steps=["migration.status"])
+        self.assertEqual(clean["next_intent"]["operation"], "migration.verify")
+
+        invalid_sequences = (
+            ("reconcile_needed", ["migration.status", "migration.registry.reconcile"]),
+            ("reconcile_needed", ["migration.status", "database.backup", "migration.verify"]),
+            ("clean", ["migration.status", "health.check"]),
+            ("ambiguous", ["migration.status", "migration.verify"]),
+        )
+        for schema_state, completed_steps in invalid_sequences:
+            with self.subTest(schema_state=schema_state, completed_steps=completed_steps):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    project(schema_state=schema_state, completed_steps=completed_steps)
+
+
 if __name__ == "__main__":
     unittest.main()

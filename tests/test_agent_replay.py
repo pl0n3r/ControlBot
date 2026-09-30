@@ -57,6 +57,7 @@ class AgentReplayTests(unittest.TestCase):
 
     def test_default_replay_excludes_transcripts_thoughts_and_secrets(self):
         data = scenario("agent_replay_core_scenarios.php", "sensitive")
+        self.assertEqual(len(data["rejected"]), 5)
         self.assertTrue(all(data["rejected"]))
 
     def test_handoff_preserves_workitem_identity_without_actor_confusion(self):

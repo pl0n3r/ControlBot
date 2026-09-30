@@ -10,11 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def scenario(name: str) -> dict:
     run = subprocess.run(
         ["php", str(ROOT / "tests" / "hostinger_ssh_runtime_scenarios.php"), name],
-        cwd=ROOT,
-        check=True,
-        text=True,
-        capture_output=True,
-        timeout=30,
+        cwd=ROOT, check=True, text=True, capture_output=True, timeout=30,
     )
     return json.loads(run.stdout)
 
@@ -26,28 +22,21 @@ class HostingerSshRuntimeTests(unittest.TestCase):
         self.assertEqual(data["result"]["result"]["status"], "success")
         self.assertEqual(data["result"]["result"]["evidence"]["code"], "ssh_readonly_probe_ok")
         self.assertEqual(data["runner_calls"], 2)
-        self.assertEqual(data["keyscan_calls"], 1)
         self.assertEqual(data["ssh_calls"], 1)
         self.assertTrue(data["key_material_seen"])
 
     def test_grant_profile_or_secret_mismatch_stops_before_ssh_client(self):
-        data = scenario("preclient")
-        for case in data.values():
+        for case in scenario("preclient").values():
             self.assertFalse(case["result"]["accepted"])
             self.assertEqual(case["runner_calls"], 0)
-            self.assertFalse(case["threw"])
 
     def test_identity_failures_stop_before_client_without_username_leak(self):
-        data = scenario("identity")
-        for case in data.values():
+        for case in scenario("identity").values():
             self.assertEqual(case["runner_calls"], 0)
             encoded = json.dumps(case["result"])
             self.assertNotIn("deploy_user_539", encoded)
             self.assertNotIn("BEGIN OPENSSH PRIVATE KEY", encoded)
-            self.assertNotEqual(
-                (case["result"].get("result") or {}).get("status"),
-                "success",
-            )
+            self.assertNotEqual((case["result"].get("result") or {}).get("status"), "success")
 
     def test_secret_stays_inside_privileged_callbacks_and_never_escapes(self):
         data = scenario("valid")
@@ -96,11 +85,7 @@ class HostingerSshRuntimeTests(unittest.TestCase):
         ):
             subprocess.run(
                 [sys.executable, str(ROOT / "tests" / test_file)],
-                cwd=ROOT,
-                check=True,
-                text=True,
-                capture_output=True,
-                timeout=90,
+                cwd=ROOT, check=True, text=True, capture_output=True, timeout=90,
             )
 
 

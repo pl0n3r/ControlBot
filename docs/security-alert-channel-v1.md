@@ -10,10 +10,10 @@
 
 ## Decisión
 
-1. Un evento no crítico produce `no_alert` salvo que `escalate_noncritical=true`.
-2. Un evento elegible usa `primary_channel` solo cuando el primario está `healthy`.
-3. Si el primario no está sano y el canal independiente está `healthy`, produce `independent_channel`.
-4. Si no existe un canal de entrega confirmado sano, produce `owner_review`. En particular, `independent_state=unknown` nunca se interpreta como entrega posible.
+1. Si el canal primario está `healthy`, el evento usa `primary_channel`; ser no crítico no impide usar el canal normal.
+2. Para un evento `critical`, el canal independiente solo se selecciona cuando el primario está explícitamente `degraded|down|stale|unavailable` y el independiente está `healthy`.
+3. Un evento no crítico con primario no sano no escala al independiente salvo que `escalate_noncritical=true`; sin esa policy produce `no_alert`.
+4. Si el estado primario requerido es `unknown`, o una escalada requerida no dispone de canal independiente confirmado sano, se produce `owner_review`. Un estado desconocido nunca se interpreta como entrega posible.
 
 La selección del canal no modifica `confidence`. Severidad y certeza siguen siendo dimensiones independientes.
 

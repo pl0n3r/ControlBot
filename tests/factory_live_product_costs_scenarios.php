@@ -72,6 +72,51 @@ if($scenario==='secret'){
     $blocked=false;try{FactoryLiveCostSnapshot::build($snapshot);}catch(Throwable){$blocked=true;}
     echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
+
+if($scenario==='ui_usage_above_limit'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $view['limits']['items'][0]['used']=10001;
+    $view['tool_usage']['used']=10001;
+    $blocked=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blocked=true;}
+    echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($scenario==='ui_incoherent_time'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $view['limits']['items'][0]['observed_at']=3001;$view['limits']['items'][0]['age_seconds']=0;
+    $view['tool_usage']['observed_at']=3001;$view['tool_usage']['age_seconds']=0;
+    $blockedFuture=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blockedFuture=true;}
+    $view=FactoryLiveCostSnapshot::build($snapshot);
+    $view['limits']['items'][0]['age_seconds']=999;$view['tool_usage']['age_seconds']=999;
+    $blockedAge=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blockedAge=true;}
+    echo json_encode(['future'=>$blockedFuture,'age'=>$blockedAge],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($scenario==='ui_tool_usage_shape'){
+    $snapshot=baseSnapshot();$view=FactoryLiveCostSnapshot::build($snapshot);
+    $validMeasured=true;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$validMeasured=false;}
+    $unknown=FactoryLiveCostSnapshot::build(baseSnapshot(null,null,false));
+    $validUnknown=true;try{FactoryLiveUi::render(baseSnapshot(null,null,false),null,null,$unknown);}catch(Throwable){$validUnknown=false;}
+    $unknown['tool_usage']['source_ref']='controlbot:tampered';
+    $blocked=false;try{FactoryLiveUi::render(baseSnapshot(null,null,false),null,null,$unknown);}catch(Throwable){$blocked=true;}
+    echo json_encode(['measured'=>$validMeasured,'unknown'=>$validUnknown,'tampered_unknown_blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+
+if($scenario==='ui_product_metric_shape'){
+    $snapshot=baseSnapshot();
+    $results=[];
+    foreach([
+        'department'=>static function(array &$row):void{$row['department']='finance';},
+        'freshness'=>static function(array &$row):void{$row['freshness']='unknown';},
+        'future'=>static function(array &$row):void{$row['observed_at']=3001;$row['age_seconds']=0;},
+        'age'=>static function(array &$row):void{$row['age_seconds']=999;},
+    ] as $name=>$mutate){
+        $view=FactoryLiveCostSnapshot::build($snapshot);
+        $mutate($view['product_analytics'][0]);
+        $blocked=false;try{FactoryLiveUi::render($snapshot,null,null,$view);}catch(Throwable){$blocked=true;}
+        $results[$name]=$blocked;
+    }
+    echo json_encode($results,JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+
 if($scenario==='ui'){
     $snapshot=baseSnapshot();
     echo FactoryLiveUi::render($snapshot,null,null,FactoryLiveCostSnapshot::build($snapshot)),PHP_EOL;exit;

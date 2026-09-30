@@ -38,7 +38,7 @@ final class FactoryLiveUi
         $tool=self::card($snapshot['tool_usage'],'tool_usage');
         $matrixHtml=$matrix===null?'':self::matrix($matrix);
         $learningHtml=$learning===null?'':self::learning($learning);
-        $productCostsHtml=$productCosts===null?'':self::productCosts($productCosts);
+        $productCostsHtml=$productCosts===null?'':self::productCosts($productCosts,$snapshot['observed_at']);
         return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ControlBot · Fábrica viva</title><style>'.self::styles().'</style></head><body><main class="shell" aria-labelledby="factory-live-title"><header class="top"><p class="eyebrow"><span>CONTROLBOT</span> / FÁBRICA VIVA</p><h1 id="factory-live-title">Fábrica viva</h1><p>Solo lectura · evidencia, freshness y antigüedad visibles.</p></header>'.$matrixHtml.$learningHtml.$productCostsHtml.$body.'<section class="panel section" data-section="tool_usage"><p class="eyebrow">HERRAMIENTAS</p><h2>Uso de herramientas</h2><div class="signal-grid">'.$tool.'</div></section></main></body></html>';
     }
 
@@ -155,20 +155,29 @@ final class FactoryLiveUi
             .self::e($value).'</strong><small class="matrix-meta">'.self::e($source).' · '.self::e($age).' · '.self::e($status).'</small>'.$link.'</article>';
     }
 
-    private static function productCosts(array $view): string
+    private static function productCosts(array $view,int $snapshotObservedAt): string
     {
         self::fields($view,['version','observed_at','product_analytics','costs','limits','tool_usage'],'product_costs');
-        if($view['version']!==1||!is_int($view['observed_at'])||!is_array($view['product_analytics']))
+        if($view['version']!==1||!is_int($view['observed_at'])||$view['observed_at']<1
+            ||$view['observed_at']!==$snapshotObservedAt
+            ||!is_array($view['product_analytics'])||!array_is_list($view['product_analytics']))
             throw new InvalidArgumentException('Product costs view invalid.');
 
         $products='';
         foreach($view['product_analytics'] as $row){
             self::fields($row,['department','project','metric','value','status','source_ref','observed_at','freshness','age_seconds'],'product_metric');
+            $department=self::one($row['department'],['product','data_analytics'],'product metric department');
             $status=self::one($row['status'],['measured','unknown'],'product metric status');
-            $fresh=self::one($row['freshness'],['current','stale','unknown'],'product metric freshness');
+            $fresh=self::one($row['freshness'],['current','stale'],'product metric freshness');
+            $project=self::text($row['project']);$metric=self::text($row['metric']);$source=self::text($row['source_ref']);
+            if(!is_int($row['observed_at'])||$row['observed_at']<1||$row['observed_at']>$view['observed_at'])
+                throw new InvalidArgumentException('Product metric observed_at invalid.');
+            if(!is_int($row['age_seconds'])||$row['age_seconds']<0
+                ||$row['age_seconds']!==$view['observed_at']-$row['observed_at'])
+                throw new InvalidArgumentException('Product metric age invalid.');
             $value=$row['value']===null?'UNKNOWN':self::value($row['value']);
-            $products.='<article class="learning-card"><span>'.self::e(self::text($row['department'])).' · '.self::e(self::text($row['project'])).'</span><strong>'.self::e($value).'</strong><small class="matrix-meta">'
-                .self::e(self::text($row['metric'])).' · '.self::e(self::text($row['source_ref'])).' · '.self::e((string)$row['observed_at']).' · '.self::e($fresh).' · '.self::e($status).'</small></article>';
+            $products.='<article class="learning-card"><span>'.self::e($department).' · '.self::e($project).'</span><strong>'.self::e($value).'</strong><small class="matrix-meta">'
+                .self::e($metric).' · '.self::e($source).' · '.self::e((string)$row['observed_at']).' · '.self::e($fresh).' · '.self::e($status).'</small></article>';
         }
         if($products==='')$products='<article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin métricas canónicas medidas</small></article>';
 
@@ -180,19 +189,65 @@ final class FactoryLiveUi
         $limitStatus=self::one($view['limits']['status'],['measured','unknown'],'limit status');
         if(!is_array($view['limits']['items'])||!array_is_list($view['limits']['items']))
             throw new InvalidArgumentException('Limit items invalid.');
-        $limits='';
-        foreach($view['limits']['items'] as $row){
-            self::fields($row,['used','limit','source_ref','observed_at','freshness','age_seconds'],'limit');
-            if(!is_int($row['used'])||$row['used']<0||!is_int($row['limit'])||$row['limit']<0)
-                throw new InvalidArgumentException('Limit item invalid.');
-            $limits.='<article class="learning-card"><span>Uso / límite</span><strong>'.self::e((string)$row['used']).' / '.self::e((string)$row['limit']).'</strong><small class="matrix-meta">'
-                .self::e(self::text($row['source_ref'])).' · '.self::e((string)$row['observed_at']).' · '.self::e(self::text($row['freshness'])).'</small></article>';
+
+        $limitMeasurement=null;
+        if($limitStatus==='unknown'){
+            if($view['limits']['items']!==[])throw new InvalidArgumentException('Limit status incoherent.');
+        }else{
+            if(count($view['limits']['items'])!==1)throw new InvalidArgumentException('Limit status incoherent.');
+            $limitMeasurement=self::usageMeasurement($view['limits']['items'][0],$view['observed_at'],'limit');
         }
-        if(($limitStatus==='unknown')!==($view['limits']['items']===[]))
-            throw new InvalidArgumentException('Limit status incoherent.');
+
+        self::fields($view['tool_usage'],['status','used','limit','source_ref','observed_at','freshness','age_seconds'],'tool_usage_view');
+        $toolStatus=self::one($view['tool_usage']['status'],['measured','unknown'],'tool usage status');
+        $toolMeasurement=null;
+        if($toolStatus==='unknown'){
+            if($view['tool_usage']['used']!==null||$view['tool_usage']['limit']!==null
+                ||$view['tool_usage']['source_ref']!==null||$view['tool_usage']['observed_at']!==null
+                ||$view['tool_usage']['freshness']!=='unknown'||$view['tool_usage']['age_seconds']!==null)
+                throw new InvalidArgumentException('Tool usage unknown incoherent.');
+        }else{
+            $toolMeasurement=self::usageMeasurement([
+                'used'=>$view['tool_usage']['used'],'limit'=>$view['tool_usage']['limit'],
+                'source_ref'=>$view['tool_usage']['source_ref'],'observed_at'=>$view['tool_usage']['observed_at'],
+                'freshness'=>$view['tool_usage']['freshness'],'age_seconds'=>$view['tool_usage']['age_seconds'],
+            ],$view['observed_at'],'tool_usage_view');
+        }
+
+        if($limitStatus!==$toolStatus)
+            throw new InvalidArgumentException('Limit/tool usage status mismatch.');
+        if($toolStatus==='measured'&&$limitMeasurement!==$toolMeasurement)
+            throw new InvalidArgumentException('Limit/tool usage measurement mismatch.');
+
+        $limits='';
+        if($limitMeasurement!==null){
+            $limits='<article class="learning-card"><span>Uso / límite</span><strong>'.self::e((string)$limitMeasurement['used']).' / '.self::e((string)$limitMeasurement['limit']).'</strong><small class="matrix-meta">'
+                .self::e($limitMeasurement['source_ref']).' · '.self::e((string)$limitMeasurement['observed_at']).' · '.self::e($limitMeasurement['freshness']).'</small></article>';
+        }
         if($limits==='')$limits='<article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin fuente canónica medida</small></article>';
 
         return '<section class="panel section" data-section="product_analytics_costs"><p class="eyebrow">PRODUCTO / DATOS / COSTES</p><h2>Producto y analítica</h2><div class="learning-grid">'.$products.'</div><h3>Costes medidos</h3><div class="learning-grid"><article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin medición monetaria canónica</small></article></div><h3>Límites</h3><div class="learning-grid">'.$limits.'</div></section>';
+    }
+
+    private static function usageMeasurement(mixed $row,int $viewObservedAt,string $label): array
+    {
+        self::fields($row,['used','limit','source_ref','observed_at','freshness','age_seconds'],$label);
+        if(!is_int($row['used'])||$row['used']<0||!is_int($row['limit'])||$row['limit']<0
+            ||$row['used']>$row['limit'])
+            throw new InvalidArgumentException('Usage measurement invalid.');
+        $source=self::text($row['source_ref']);
+        if($source!==$row['source_ref'])
+            throw new InvalidArgumentException('Usage source invalid.');
+        if(!is_int($row['observed_at'])||$row['observed_at']<1||$row['observed_at']>$viewObservedAt)
+            throw new InvalidArgumentException('Usage observed_at invalid.');
+        $fresh=self::one($row['freshness'],['current','stale'],'usage freshness');
+        if(!is_int($row['age_seconds'])||$row['age_seconds']<0
+            ||$row['age_seconds']!==$viewObservedAt-$row['observed_at'])
+            throw new InvalidArgumentException('Usage age invalid.');
+        return [
+            'used'=>$row['used'],'limit'=>$row['limit'],'source_ref'=>$source,
+            'observed_at'=>$row['observed_at'],'freshness'=>$fresh,'age_seconds'=>$row['age_seconds'],
+        ];
     }
 
     private static function incidentList(mixed $items,string $label): string

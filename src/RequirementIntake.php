@@ -208,7 +208,7 @@ final class RequirementIntake
             $score=0;$matched=[];
             foreach($terms as $term){
                 $needle=self::lower($term);
-                if(mb_strlen($needle)<3) continue;
+                if(strlen($needle)<3) continue;
                 if(str_contains($haystack,$needle)){ $score++; $matched[]=$term; }
             }
             if($score>0) $scored[]=['project_ref'=>$project['project_ref'],'score'=>$score,'matched_terms'=>$matched];
@@ -345,7 +345,7 @@ final class RequirementIntake
         return $value;
     }
 
-    private static function lower(string $value): string { return mb_strtolower($value,'UTF-8'); }
+    private static function lower(string $value): string { return strtolower($value); }
 
     private static function secretFree(mixed $value): void
     {

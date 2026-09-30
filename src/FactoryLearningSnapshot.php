@@ -46,7 +46,7 @@ final class FactoryLearningSnapshot
                     $layers[$layer]['status']=self::worse($layers[$layer]['status'],$signal['status']);
                 }
 
-                if(array_key_exists('metric',$data)){
+                if($section==='learning'&&array_key_exists('metric',$data)){
                     $metric=self::choice($data['metric'],self::METRICS,'metric');
                     if(!array_key_exists('metric_value',$data))throw new InvalidArgumentException('Metric value missing.');
                     self::metricValue($data['metric_value']);
@@ -54,13 +54,14 @@ final class FactoryLearningSnapshot
                     if(self::betterEvidence($candidate,$metrics[$metric]))$metrics[$metric]=$candidate;
                 }
 
-                if(($data['kind']??null)==='incident'){
+                if(($data['kind']??null)==='incident'&&($data['open']??null)===true){
+                    if(array_key_exists('auto',$data)&&!is_bool($data['auto']))throw new InvalidArgumentException('Incident auto flag invalid.');
                     $title=is_string($data['title']??null)?trim($data['title']):$signal['label'];
                     $item=$signal+['title'=>$title];
-                    if(($data['auto']??false)===true||str_starts_with($title,'[AUTO]'))$auto[]=$item;else $real[]=$item;
+                    if(($data['auto']??false)===true)$auto[]=$item;else $real[]=$item;
                 }
 
-                if(isset($data['lesson_ref'],$data['incident_ref'],$data['recurrence_count'])
+                if($section==='learning'&&isset($data['lesson_ref'],$data['incident_ref'],$data['recurrence_count'])
                     && is_string($data['lesson_ref'])&&trim($data['lesson_ref'])!==''
                     && is_string($data['incident_ref'])&&trim($data['incident_ref'])!==''
                     && is_int($data['recurrence_count'])&&$data['recurrence_count']>=0){

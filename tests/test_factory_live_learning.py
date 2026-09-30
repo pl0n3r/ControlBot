@@ -32,6 +32,7 @@ class FactoryLiveLearningTests(unittest.TestCase):
 
     def test_learning_metrics_keep_source_and_age(self):
         d=json.loads(scenario("full"));self.assertEqual(list(d["metrics"]),METRICS)
+        self.assertEqual(d["metrics"]["mttr_seconds"]["value"],420)
         for metric in METRICS:
             row=d["metrics"][metric];self.assertNotEqual(row["status"],"UNKNOWN");self.assertIsNotNone(row["value"])
             self.assertIsInstance(row["source_ref"],str);self.assertIsInstance(row["age_seconds"],int)

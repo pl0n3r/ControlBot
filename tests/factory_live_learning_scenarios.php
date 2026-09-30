@@ -19,13 +19,17 @@ function learningFixture(): array {
         'title'=>$layer,'layer'=>$layer,'project'=>'ControlBot','evidence_ref'=>'https://github.com/pl0n3r/ControlBot/issues/'.(600+$i)
     ],180+$i);
     $work[]=lsig('incident:real','github_project_snapshot','degraded','current',[
-        'title'=>'Database outage','kind'=>'incident','layer'=>'infrastructure','project'=>'ControlBot',
+        'title'=>'Database outage','kind'=>'incident','open'=>true,'layer'=>'infrastructure','project'=>'ControlBot',
         'evidence_ref'=>'https://github.com/pl0n3r/ControlBot/issues/700'
     ],188);
     $work[]=lsig('incident:auto','github_project_snapshot','pending','current',[
-        'title'=>'[AUTO] CI warning','kind'=>'incident','auto'=>true,'layer'=>'ci_cd','project'=>'ControlBot',
+        'title'=>'[AUTO] CI warning','kind'=>'incident','open'=>true,'auto'=>true,'layer'=>'ci_cd','project'=>'ControlBot',
         'evidence_ref'=>'https://github.com/pl0n3r/ControlBot/issues/701'
     ],189);
+    $work[]=lsig('work:metric-spoof','github_project_snapshot','healthy','current',[
+        'title'=>'Untrusted metric source','metric'=>'mttr_seconds','metric_value'=>0,'project'=>'ControlBot',
+        'evidence_ref'=>'https://github.com/pl0n3r/ControlBot/issues/702'
+    ],199);
     $metrics=[
         'lessons_per_week_project'=>3,'incidents_by_class'=>'deployment:1','mttr_seconds'=>420,
         'blockers_with_cause'=>2,'fix_feat_ratio'=>'2:5','learning_gaps'=>1,

@@ -111,11 +111,13 @@ final class FactoryLiveUi
 
     private static function learningSignal(mixed $signal): string
     {
-        self::fields($signal,['id','label','project','status','source_ref','observed_at','freshness','age_seconds','evidence_href'],'learning.signal');
+        self::fields($signal,['id','label','project','scope','status','source_ref','observed_at','freshness','age_seconds','evidence_href'],'learning.signal');
         $status=self::one($signal['status'],self::MATRIX_STATUS,'learning.signal.status');
         $source=$signal['source_ref']===null?'UNKNOWN':self::text($signal['source_ref']);
         $age=$signal['age_seconds']===null?'UNKNOWN':self::scalar($signal['age_seconds']).'s';
-        $project=$signal['project']===null?'GLOBAL':self::text($signal['project']);
+        $project=$signal['project']!==null
+            ?self::text($signal['project'])
+            :($signal['scope']==='global'?'GLOBAL':'UNKNOWN');
         $link=$signal['evidence_href']===null?'':'<a class="issue-link" href="'.self::e(self::matrixHref($signal['evidence_href'])).'">Evidencia</a>';
         return '<div class="learning-signal"><b>'.self::e(self::text($signal['label'])).'</b><small class="matrix-meta">'
             .self::e($project).' · '.self::e($source).' · '.self::e($age).' · '.self::e($status).'</small>'.$link.'</div>';
@@ -123,20 +125,20 @@ final class FactoryLiveUi
 
     private static function learningMetric(string $name,mixed $metric): string
     {
-        if($name==='recurrence')return self::learningMetricValue($name,'GLOBAL',$metric);
+        if($name==='recurrence')return self::learningMetricValue('GLOBAL',$metric);
         self::fields($metric,['global','by_project'],'learning.metric');
         if(!is_array($metric['by_project'])||array_is_list($metric['by_project']))
             throw new InvalidArgumentException('Learning metric projects invalid.');
-        $body=self::learningMetricValue($name,'GLOBAL',$metric['global']);
+        $body=self::learningMetricValue('GLOBAL',$metric['global']);
         foreach($metric['by_project'] as $project=>$value){
             if(!is_string($project)||trim($project)==='')
                 throw new InvalidArgumentException('Learning metric project invalid.');
-            $body.=self::learningMetricValue($name,$project,$value);
+            $body.=self::learningMetricValue($project,$value);
         }
         return '<section class="learning-metric-group"><h4>'.self::e($name).'</h4>'.$body.'</section>';
     }
 
-    private static function learningMetricValue(string $name,string $scope,mixed $metric): string
+    private static function learningMetricValue(string $scope,mixed $metric): string
     {
         self::fields($metric,['status','value','source_ref','observed_at','freshness','age_seconds','evidence_href'],'learning.metric.value');
         $status=self::one($metric['status'],self::MATRIX_STATUS,'learning.metric.status');

@@ -44,7 +44,7 @@ final class FactoryLearningSnapshot
             if(!is_array($rows)||!array_is_list($rows)||$rows===[])
                 throw new InvalidArgumentException('Learning section invalid.');
             foreach($rows as $row){
-                $signal=self::signal($row);
+                $signal=self::signal($row,$section);
                 $data=is_array($row['data'])&&!array_is_list($row['data'])?$row['data']:[];
 
                 if(array_key_exists('layer',$data)){
@@ -61,14 +61,13 @@ final class FactoryLearningSnapshot
                     if(!array_key_exists('metric_value',$data))throw new InvalidArgumentException('Metric value missing.');
                     self::metricValue($data['metric_value']);
                     $candidate=self::metric($signal,$data['metric_value']);
-                    $project=$signal['project'];
-                    if($project===null){
-                        if(self::betterEvidence($candidate,$metrics[$metric]['global']))
-                            $metrics[$metric]['global']=$candidate;
-                    }else{
+                    $project=$signal['project'];$scope=$signal['scope'];
+                    if($project!==null){
                         $current=$metrics[$metric]['by_project'][$project]??self::unknownMetric();
                         if(self::betterEvidence($candidate,$current))
                             $metrics[$metric]['by_project'][$project]=$candidate;
+                    }elseif($scope==='global'&&self::betterEvidence($candidate,$metrics[$metric]['global'])){
+                        $metrics[$metric]['global']=$candidate;
                     }
                 }
 
@@ -101,7 +100,7 @@ final class FactoryLearningSnapshot
         ];
     }
 
-    private static function signal(mixed $row): array
+    private static function signal(mixed $row,string $section): array
     {
         self::fields($row,['id','authority','state','source_ref','observed_at','freshness','age_seconds','data'],'signal');
         $state=self::choice($row['state'],self::STATES,'state');
@@ -115,14 +114,32 @@ final class FactoryLearningSnapshot
         if($fresh==='stale'&&$state==='healthy')throw new InvalidArgumentException('Stale learning signal cannot be green.');
         $data=is_array($row['data'])&&!array_is_list($row['data'])?$row['data']:[];
         $label=is_string($data['title']??null)?trim($data['title']):$row['id'];
-        $project=null;
-        if(array_key_exists('project',$data))
-            $project=self::choice($data['project'],self::PROJECTS,'project');
+        $project=array_key_exists('project',$data)?self::project($data['project']):null;
+        $scope=null;
+        if($section==='learning'&&array_key_exists('scope',$data))
+            $scope=self::choice($data['scope'],['global'],'scope');
+        if($project!==null&&$scope!==null)
+            throw new InvalidArgumentException('Learning project/scope conflict.');
         return [
-            'id'=>$row['id'],'label'=>$label,'project'=>$project,'status'=>self::status($state,$fresh),
+            'id'=>$row['id'],'label'=>$label,'project'=>$project,'scope'=>$scope,'status'=>self::status($state,$fresh),
             'source_ref'=>$row['source_ref'],'observed_at'=>$row['observed_at'],'freshness'=>$fresh,
             'age_seconds'=>$row['age_seconds'],'evidence_href'=>self::href($data['evidence_ref']??$data['issue_ref']??$row['source_ref']),
         ];
+    }
+
+    private static function project(mixed $value): string
+    {
+        if(!is_string($value))throw new InvalidArgumentException('project invalid.');
+        $key=strtolower(preg_replace('/[^a-z0-9]/i','',$value)??'');
+        $map=[
+            'condor'=>'Condor','grindflow'=>'GrindFlow','brvtal'=>'BRVTAL',
+            'factoryrunner'=>'FactoryRunner','controlbot'=>'ControlBot',
+            'autofactory'=>'AutoFactory','factory'=>'Factory',
+        ];
+        $project=$map[$key]??null;
+        if($project===null||!in_array($project,self::PROJECTS,true))
+            throw new InvalidArgumentException('project invalid.');
+        return $project;
     }
 
     private static function metric(array $signal,mixed $value): array

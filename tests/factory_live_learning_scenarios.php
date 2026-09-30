@@ -72,6 +72,41 @@ if($scenario==='fingerprint'){
     try{FactoryLearningSnapshot::build($snapshot);}catch(Throwable){$invalidBlocked=true;}
     echo json_encode(['valid'=>$valid,'invalid_blocked'=>$invalidBlocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
+if($scenario==='missing_scope'){
+    $raw=learningFixture();unset($raw['learning'][0]['data']['project']);
+    [, $learning]=learningBuilt($raw);
+    echo json_encode($learning['metrics']['lessons_per_week_project']['global'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+}
+if($scenario==='explicit_global'){
+    $raw=learningFixture();unset($raw['learning'][0]['data']['project']);
+    $raw['learning'][0]['data']['scope']='global';$raw['learning'][0]['data']['metric_value']=11;
+    [, $learning]=learningBuilt($raw);
+    echo json_encode($learning['metrics']['lessons_per_week_project'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+}
+if($scenario==='project_contract'){
+    $raw=learningFixture();
+    $raw['learning'][0]['data']['project']='brvtal';
+    $raw['work'][0]['data']['project']='brvtal';
+    [, $learning]=learningBuilt($raw);
+    $metric=$learning['metrics']['lessons_per_week_project']['by_project']['BRVTAL']??null;
+    $layerProject=$learning['layers']['product_business']['signals'][0]['project']??null;
+    $unknownRejected=false;
+    $bad=learningFixture();$bad['learning'][0]['data']['project']='unknown-project';
+    try{learningBuilt($bad);}catch(Throwable){$unknownRejected=true;}
+    $conflictRejected=false;
+    $conflict=learningFixture();$conflict['learning'][0]['data']['scope']='global';
+    try{learningBuilt($conflict);}catch(Throwable){$conflictRejected=true;}
+    echo json_encode([
+        'metric_value'=>$metric['value']??null,'layer_project'=>$layerProject,
+        'unknown_rejected'=>$unknownRejected,'conflict_rejected'=>$conflictRejected
+    ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+}
+if($scenario==='ui_missing_scope'){
+    $raw=learningFixture();
+    unset($raw['work'][0]['data']['project']);
+    [$snapshot,$learning]=learningBuilt($raw);$matrix=FactoryLiveMatrix::build($snapshot);
+    echo FactoryLiveUi::render($snapshot,$matrix,$learning),PHP_EOL;exit;
+}
 if($scenario==='full'){[, $learning]=learningBuilt(learningFixture());echo json_encode($learning,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;}
 if($scenario==='missing'){
     $raw=learningFixture();$raw['work']=array_values(array_filter($raw['work'],fn(array $x):bool=>($x['data']['layer']??null)!=='security_privacy'));

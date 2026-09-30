@@ -56,6 +56,17 @@ function learningBuilt(array $raw): array {
     $snapshot=FactoryLiveSnapshot::build($raw,200);
     return [$snapshot,FactoryLearningSnapshot::build($snapshot)];
 }
+
+if($scenario==='fingerprint'){
+    [$snapshot,]=$unused=learningBuilt(learningFixture());
+    $snapshot['fingerprint']='021f1312f923fc8e6e4e43ee70eef9ff1402571831c973c518a02db5a6f06873';
+    $valid=true;
+    try{FactoryLearningSnapshot::build($snapshot);}catch(Throwable){$valid=false;}
+    $snapshot['fingerprint']='not-a-sha256';
+    $invalidBlocked=false;
+    try{FactoryLearningSnapshot::build($snapshot);}catch(Throwable){$invalidBlocked=true;}
+    echo json_encode(['valid'=>$valid,'invalid_blocked'=>$invalidBlocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
 if($scenario==='full'){[, $learning]=learningBuilt(learningFixture());echo json_encode($learning,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;}
 if($scenario==='missing'){
     $raw=learningFixture();$raw['work']=array_values(array_filter($raw['work'],fn(array $x):bool=>($x['data']['layer']??null)!=='security_privacy'));

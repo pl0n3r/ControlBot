@@ -26,7 +26,11 @@ final class FactoryLearningSnapshot
         self::fields($snapshot,['version','observed_at','sections','tool_usage','fingerprint'],'snapshot');
         if($snapshot['version']!==1||!is_int($snapshot['observed_at'])||!is_array($snapshot['sections']))
             throw new InvalidArgumentException('Learning snapshot invalid.');
-        self::safe($snapshot);
+        if(!is_string($snapshot['fingerprint'])||preg_match('/^[a-f0-9]{64}$/D',$snapshot['fingerprint'])!==1)
+            throw new InvalidArgumentException('Learning fingerprint invalid.');
+        $safeSnapshot=$snapshot;
+        unset($safeSnapshot['fingerprint']);
+        self::safe($safeSnapshot);
 
         $layers=[];foreach(self::LAYERS as $layer)$layers[$layer]=['status'=>'UNKNOWN','signals'=>[]];
         $metrics=[];foreach(self::METRICS as $metric)$metrics[$metric]=self::unknownMetric();

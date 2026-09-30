@@ -43,6 +43,11 @@ class FactoryLiveLearningTests(unittest.TestCase):
         self.assertEqual(row["status"],"UNKNOWN");self.assertIsNone(row["value"])
         self.assertIsNone(row["source_ref"]);self.assertEqual(row["freshness"],"unknown")
 
+
+    def test_derived_fingerprint_is_structural_not_pii(self):
+        d=json.loads(scenario("fingerprint"))
+        self.assertEqual(d,{"valid":True,"invalid_blocked":True})
+
     def test_auto_notices_are_separate_from_real_incidents(self):
         d=json.loads(scenario("full")); real=d["incidents"]["real"]; auto=d["incidents"]["auto_notices"]
         self.assertEqual([x["title"] for x in real],["Database outage"])

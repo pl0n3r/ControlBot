@@ -60,6 +60,11 @@ class WeeklyFocusUiTests(unittest.TestCase):
         self.assertEqual(clear["status"], "ready")
         self.assertEqual(clear["save_request"], {"ordered_refs": [], "expected_version": 3})
         self.assertFalse(clear["affects_running_work"])
+        empty = self.d["empty_view"]
+        self.assertFalse(empty["explicit_focus"])
+        self.assertEqual(empty["items"], [])
+        self.assertFalse(empty["clear_focus"]["enabled"])
+        self.assertFalse(empty["clear_focus"]["affects_running_work"])
         source = (ROOT / "src" / "WeeklyFocusUi.php").read_text(encoding="utf-8").lower()
         forbidden = ("curl_", "fsockopen", "new pdo", "mysqli", "file_put_contents", "unlink(", "shell_exec", "proc_open", "exec(", "system(")
         self.assertFalse(any(token in source for token in forbidden))

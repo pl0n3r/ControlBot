@@ -19,6 +19,11 @@ function gates444():array{return array_map(fn(string $d):array=>gate444($d),MW_D
 function replace444(array $rows,string $domain,array $overrides):array{return array_map(fn(array $g):array=>$g['domain']===$domain?array_replace($g,$overrides):$g,$rows);}
 function ready444(array $rows):array{return MarketReadiness::forCountry(market444(),'venture-condor','CO',$rows);}
 function evidence444(string $hex='a'):string{return 'controlbot:market-evidence/'.str_repeat($hex,32);}
+function evidenceList444(int $count):array{
+ $out=[];
+ for($i=1;$i<=$count;$i++)$out[]='controlbot:market-evidence/'.str_pad(dechex($i),32,'0',STR_PAD_LEFT);
+ return $out;
+}
 function context444(array $overrides=[]):array{return array_replace([
  'version'=>1,'venture_id'=>'venture-condor','market_id'=>'market-condor-co','country'=>'CO','group_id'=>'group-condor',
  'project_id'=>'project-controlbot','repository_ref'=>'pl0n3r/ControlBot','authority_level'=>'owner_required','policy_ref'=>'controlbot:policy/business-os-v1',
@@ -49,6 +54,12 @@ if($case==='fresh'){
   'secret'=>['token=market-secret'],'malformed'=>['controlbot:evidence/nothex'],'duplicate'=>[$a,$a]];
  $out=['valid'=>origin444($rows,context444(['evidence_refs'=>[$b,$a]]))];
  foreach($invalid as $key=>$refs)$out[$key]=invalid444(origin444($rows,context444(['evidence_refs'=>$refs])));
+}elseif($case==='context_evidence_limit'){
+ $rows=replace444(gates444(),'support',['status'=>'unknown']);
+ $fifty=origin444($rows,context444(['evidence_refs'=>evidenceList444(50)]));
+ $fiftyOne=origin444($rows,context444(['evidence_refs'=>evidenceList444(51)]));
+ $out=['fifty'=>['status'=>$fifty['status'],'reasons'=>$fifty['reasons'],'execution'=>$fifty['execution']],
+  'fifty_one'=>invalid444($fiftyOne)];
 }elseif($case==='governance'){
  $out=origin444(replace444(gates444(),'payments',['status'=>'blocked']));
 }elseif($case==='deterministic'){

@@ -120,7 +120,7 @@ final class ControlBotBackup
     private static function time(mixed $v,string $key): int {if(!is_int($v)||$v<1)throw new InvalidArgumentException($key.' invalid.');return $v;}
     private static function size(mixed $v): int {if(!is_int($v)||$v<1||$v>10_000_000_000_000)throw new InvalidArgumentException('size_bytes invalid.');return $v;}
     private static function checksum(mixed $v): string {if(!is_string($v)||preg_match('/^[a-f0-9]{64}$/D',$v)!==1)throw new InvalidArgumentException('checksum invalid.');return $v;}
-    private static function ref(mixed $v,string $key): string {if(!is_string($v)||preg_match('/^[a-z][a-z0-9._:/-]{3,159}$/D',$v)!==1||preg_match('~^(?:https?|s3|ssh)://~i',$v)===1)throw new InvalidArgumentException($key.' invalid.');self::safe($v);return $v;}
+    private static function ref(mixed $v,string $key): string {if(!is_string($v)||preg_match('~^[a-z][a-z0-9._:/-]{3,159}$~D',$v)!==1||preg_match('~^(?:https?|s3|ssh)://~i',$v)===1)throw new InvalidArgumentException($key.' invalid.');self::safe($v);return $v;}
     private static function choice(mixed $v,array $allowed,string $key): string {if(!is_string($v)||!in_array($v,$allowed,true))throw new InvalidArgumentException($key.' invalid.');return $v;}
     private static function safe(string $v): void {if(preg_match(self::SENSITIVE,$v)===1)throw new InvalidArgumentException('Sensitive receipt metadata invalid.');}
     private static function scopeKey(array $b): string {return $b['project'].'|'.$b['environment'].'|'.$b['resource'];}

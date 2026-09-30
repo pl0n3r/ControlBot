@@ -37,6 +37,7 @@ class MomentumPerformanceTests(unittest.TestCase):
   d=scenario("guardrails")
   for k in ("paid_stale","currency","duplicate","missing","outside","spend_ref"): self.assertTrue(d[k],k)
   self.assertEqual(d["stale"]["freshness"],"stale"); self.assertIsNone(d["stale"]["derived"]["spend_minor"])
+  self.assertIsNone(d["pipeline_stale"]["derived"]["spend_minor"]); self.assertIsNone(d["pipeline_stale"]["derived"]["observed_revenue_minor"])
   self.assertEqual(d["stale"]["evidence_refs"],sorted(d["stale"]["evidence_refs"]))
 
  def test_projection_has_no_pii_tracking_provider_or_side_effects(self):

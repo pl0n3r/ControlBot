@@ -12,6 +12,7 @@ class MomentumWorkOriginTests(unittest.TestCase):
   self.assertEqual(d["status"],"materialized"); self.assertFalse(d["execution"])
   self.assertEqual((w["origin_mode"],w["origin_system"],w["authority_level"]),("automatic","momentum","l2_venture_admin"))
   self.assertEqual(w["work_type"],"marketing_growth"); self.assertEqual(w["producer_ref"],"momentum:work-origin")
+  self.assertEqual(w["required_roles"],["datos-analitica","marketing"])
   self.assertEqual(w["policy_ref"],"controlbot:policy/business-os-v1"); self.assertEqual(w["budget_ref"],"budget:"+"1"*32)
   required={"work_id","origin_mode","origin_system","group_id","work_type","requested_capabilities","required_roles",
    "authority_level","producer_ref","priority_class","depends_on","claims","policy_ref","evidence_refs","idempotency_key"}

@@ -47,6 +47,13 @@ class MarketWorkOriginTests(unittest.TestCase):
         for key in ("phone","email","free_text","secret","malformed","duplicate"):
             self.assertTrue(d[key],key)
 
+    def test_context_evidence_refs_preserve_historical_limit_of_50(self):
+        d=scenario("context_evidence_limit")
+        self.assertEqual(d["fifty"]["status"],"blocked")
+        self.assertEqual(d["fifty"]["reasons"],["unresolved_readiness"])
+        self.assertFalse(d["fifty"]["execution"])
+        self.assertTrue(d["fifty_one"])
+
     def test_work_item_matches_factory_fields_without_freshness(self):
         item=scenario("fresh")["work_items"][0]
         self.assertTrue(REQUIRED.issubset(item))

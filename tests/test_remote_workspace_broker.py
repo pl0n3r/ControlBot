@@ -19,6 +19,7 @@ class RemoteWorkspaceBrokerTests(unittest.TestCase):
         self.assertTrue(d["ok"]["ok"])
         self.assertEqual(d["calls"],1)
         self.assertEqual(d["unauthorized"]["reason"],"executor_not_authorized")
+        self.assertFalse(d["unauthorized"]["ok"])
         self.assertFalse(d["mismatch"]["ok"])
 
     def test_agent_surface_never_exposes_real_path(self):

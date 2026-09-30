@@ -192,6 +192,15 @@ final class BrvtalMigrationReconcileRunbook
         }
 
         $order = match ($input['schema_state']) {
+            'reconcile_needed' => self::STEPS,
+            'clean' => ['migration.status', 'migration.verify', 'health.check', 'smoke.run'],
+            'ambiguous' => ['migration.status'],
+        };
+        if ($input['completed_steps'] !== array_slice($order, 0, count($input['completed_steps']))) {
+            throw new InvalidArgumentException('Runbook completed_steps order invalid.');
+        }
+
+        $order = match ($input['schema_state']) {
             'clean' => ['migration.status', 'migration.verify', 'health.check', 'smoke.run'],
             'ambiguous' => ['migration.status'],
             default => self::STEPS,

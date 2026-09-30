@@ -20,6 +20,7 @@ final class SecurityAlertChannel
         $primary=$channels['primary_state'];
         $independent=$channels['independent_state'];
         $primaryUnavailable=in_array($primary,['degraded','down','stale','unavailable'],true);
+        $independentEligible=$event['severity']==='critical'||$policy['escalate_noncritical'];
 
         if($primary==='healthy') {
             $decision='primary_channel';
@@ -27,25 +28,15 @@ final class SecurityAlertChannel
         } elseif($primary==='unknown') {
             $decision='owner_review';
             $channel='owner_review';
-        } elseif($event['severity']==='critical') {
-            if($primaryUnavailable&&$independent==='healthy') {
-                $decision='independent_channel';
-                $channel='independent';
-            } else {
-                $decision='owner_review';
-                $channel='owner_review';
-            }
-        } elseif($policy['escalate_noncritical']) {
-            if($primaryUnavailable&&$independent==='healthy') {
-                $decision='independent_channel';
-                $channel='independent';
-            } else {
-                $decision='owner_review';
-                $channel='owner_review';
-            }
-        } else {
+        } elseif(!$independentEligible) {
             $decision='no_alert';
             $channel='none';
+        } elseif($primaryUnavailable&&$independent==='healthy') {
+            $decision='independent_channel';
+            $channel='independent';
+        } else {
+            $decision='owner_review';
+            $channel='owner_review';
         }
 
         $payload=$decision==='no_alert'?null:[

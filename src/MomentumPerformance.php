@@ -37,7 +37,7 @@ final class MomentumPerformance
         $funnel=self::funnel($raw['funnel'],$period);
         $cost=self::money($raw['cost'],'Cost',['observed','unknown'],$currency,$period,false);
 
-        $current=$fresh==='current';
+        $current=$fresh==='current'&&$pipeline['freshness']==='current';
         $spendMinor=$current&&$spend['classification']==='observed'&&$spend['freshness']==='current'?$spend['amount_minor']:null;
         $funnelKnown=$current&&$funnel['classification']!=='unknown'&&$funnel['freshness']==='current';
         $leads=$funnelKnown?$funnel['leads']:null; $conversions=$funnelKnown?$funnel['conversions']:null;

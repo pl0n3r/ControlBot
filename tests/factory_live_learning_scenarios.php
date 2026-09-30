@@ -39,6 +39,11 @@ function learningFixture(): array {
         'title'=>$metric,'metric'=>$metric,'metric_value'=>$value,'project'=>'ControlBot',
         'evidence_ref'=>'https://github.com/pl0n3r/ControlBot/issues/'.$n++
     ],190);
+    $learning[0]['data']['metric_value']=7;
+    $learning[]=lsig('learning:lessons_per_week_project:condor','incident_lesson','healthy','current',[
+        'title'=>'lessons_per_week_project Condor','metric'=>'lessons_per_week_project','metric_value'=>3,'project'=>'Condor',
+        'evidence_ref'=>'https://github.com/pl0n3r/Condor/issues/1'
+    ],191);
     $learning[0]['data']['recurrence_count']=0;
     return [
         'production'=>[lsig('production:controlbot','observability_project_status','healthy','current',[

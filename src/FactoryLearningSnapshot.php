@@ -7,6 +7,7 @@ use InvalidArgumentException;
 
 final class FactoryLearningSnapshot
 {
+    private const PROJECTS=['Condor','GrindFlow','BRVTAL','FactoryRunner','ControlBot','AutoFactory','Factory'];
     private const LAYERS=[
         'product_business','application','data','infrastructure','ci_cd','quality',
         'security_privacy','production_observability','governance_agents','costs_limits',
@@ -33,7 +34,9 @@ final class FactoryLearningSnapshot
         self::safe($safeSnapshot);
 
         $layers=[];foreach(self::LAYERS as $layer)$layers[$layer]=['status'=>'UNKNOWN','signals'=>[]];
-        $metrics=[];foreach(self::METRICS as $metric)$metrics[$metric]=self::unknownMetric();
+        $metrics=[];foreach(self::METRICS as $metric)$metrics[$metric]=[
+            'global'=>self::unknownMetric(),'by_project'=>[],
+        ];
         $real=[];$auto=[];$recurrence=self::unknownMetric();
 
         foreach(self::SECTIONS as $section){
@@ -58,7 +61,15 @@ final class FactoryLearningSnapshot
                     if(!array_key_exists('metric_value',$data))throw new InvalidArgumentException('Metric value missing.');
                     self::metricValue($data['metric_value']);
                     $candidate=self::metric($signal,$data['metric_value']);
-                    if(self::betterEvidence($candidate,$metrics[$metric]))$metrics[$metric]=$candidate;
+                    $project=$signal['project'];
+                    if($project===null){
+                        if(self::betterEvidence($candidate,$metrics[$metric]['global']))
+                            $metrics[$metric]['global']=$candidate;
+                    }else{
+                        $current=$metrics[$metric]['by_project'][$project]??self::unknownMetric();
+                        if(self::betterEvidence($candidate,$current))
+                            $metrics[$metric]['by_project'][$project]=$candidate;
+                    }
                 }
 
                 if(($data['kind']??null)==='incident'&&($data['open']??null)===true){
@@ -80,6 +91,7 @@ final class FactoryLearningSnapshot
         }
 
         foreach($layers as &$layer)usort($layer['signals'],static fn(array $a,array $b):int=>$a['id']<=>$b['id']);unset($layer);
+        foreach($metrics as &$metric)ksort($metric['by_project'],SORT_STRING);unset($metric);
         usort($real,static fn(array $a,array $b):int=>$a['id']<=>$b['id']);
         usort($auto,static fn(array $a,array $b):int=>$a['id']<=>$b['id']);
 
@@ -103,8 +115,11 @@ final class FactoryLearningSnapshot
         if($fresh==='stale'&&$state==='healthy')throw new InvalidArgumentException('Stale learning signal cannot be green.');
         $data=is_array($row['data'])&&!array_is_list($row['data'])?$row['data']:[];
         $label=is_string($data['title']??null)?trim($data['title']):$row['id'];
+        $project=null;
+        if(array_key_exists('project',$data))
+            $project=self::choice($data['project'],self::PROJECTS,'project');
         return [
-            'id'=>$row['id'],'label'=>$label,'status'=>self::status($state,$fresh),
+            'id'=>$row['id'],'label'=>$label,'project'=>$project,'status'=>self::status($state,$fresh),
             'source_ref'=>$row['source_ref'],'observed_at'=>$row['observed_at'],'freshness'=>$fresh,
             'age_seconds'=>$row['age_seconds'],'evidence_href'=>self::href($data['evidence_ref']??$data['issue_ref']??$row['source_ref']),
         ];

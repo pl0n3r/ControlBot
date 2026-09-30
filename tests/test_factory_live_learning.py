@@ -32,11 +32,44 @@ class FactoryLiveLearningTests(unittest.TestCase):
 
     def test_learning_metrics_keep_source_and_age(self):
         d=json.loads(scenario("full"));self.assertEqual(list(d["metrics"]),METRICS)
-        self.assertEqual(d["metrics"]["mttr_seconds"]["value"],420)
+        self.assertEqual(d["metrics"]["mttr_seconds"]["by_project"]["ControlBot"]["value"],420)
         for metric in METRICS:
-            row=d["metrics"][metric];self.assertNotEqual(row["status"],"UNKNOWN");self.assertIsNotNone(row["value"])
-            self.assertIsInstance(row["source_ref"],str);self.assertIsInstance(row["age_seconds"],int)
-            self.assertTrue(row["evidence_href"].startswith("https://"))
+            row=d["metrics"][metric];self.assertEqual(row["global"]["status"],"UNKNOWN")
+            self.assertIsNone(row["global"]["value"])
+            self.assertIn("ControlBot",row["by_project"])
+            value=row["by_project"]["ControlBot"];self.assertNotEqual(value["status"],"UNKNOWN");self.assertIsNotNone(value["value"])
+            self.assertIsInstance(value["source_ref"],str);self.assertIsInstance(value["age_seconds"],int)
+            self.assertTrue(value["evidence_href"].startswith("https://"))
+
+    def test_learning_metrics_preserve_multiple_projects(self):
+        metric=json.loads(scenario("full"))["metrics"]["lessons_per_week_project"]
+        self.assertEqual(metric["by_project"]["Condor"]["value"],3)
+        self.assertEqual(metric["by_project"]["ControlBot"]["value"],7)
+        for project in ("Condor","ControlBot"):
+            row=metric["by_project"][project]
+            self.assertIsInstance(row["source_ref"],str)
+            self.assertIsInstance(row["age_seconds"],int)
+            self.assertEqual(row["freshness"],"current")
+
+    def test_global_metric_is_unknown_without_global_evidence(self):
+        global_metric=json.loads(scenario("full"))["metrics"]["lessons_per_week_project"]["global"]
+        self.assertEqual(global_metric["status"],"UNKNOWN")
+        self.assertIsNone(global_metric["value"])
+        self.assertIsNone(global_metric["source_ref"])
+        self.assertEqual(global_metric["freshness"],"unknown")
+
+    def test_layer_drill_down_preserves_project(self):
+        d=json.loads(scenario("full"))
+        projects={signal["project"] for layer in d["layers"].values() for signal in layer["signals"]}
+        self.assertIn("ControlBot",projects)
+        self.assertNotIn(None,projects)
+
+    def test_ui_renders_project_and_global_learning(self):
+        html=scenario("ui")
+        self.assertIn("GLOBAL",html)
+        self.assertIn("Condor",html)
+        self.assertIn("ControlBot",html)
+        self.assertIn("UNKNOWN",html)
 
     def test_unlinked_recurrence_is_unknown(self):
         row=json.loads(scenario("recurrence"))

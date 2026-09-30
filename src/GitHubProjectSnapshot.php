@@ -81,7 +81,7 @@ final class GitHubProjectSnapshot
     private function checks(array $payload): array
     {
         $total = self::natural($payload['total_count'] ?? null, 'checks.total_count', true);
-        $rows = self::list($payload['check_runs'] ?? null, 'checks.check_runs');
+        $rows = self::rows($payload['check_runs'] ?? null, 'checks.check_runs');
 
         $items = [];
         foreach ($rows as $row) {
@@ -110,7 +110,7 @@ final class GitHubProjectSnapshot
 
     private function pullRequests(array $rows): array
     {
-        self::listValue($rows, 'pull_requests');
+        self::assertList($rows, 'pull_requests');
         $items = [];
         foreach ($rows as $row) {
             $row = self::object($row, 'pull_request');
@@ -132,14 +132,14 @@ final class GitHubProjectSnapshot
 
     private function issues(array $rows): array
     {
-        self::listValue($rows, 'issues');
+        self::assertList($rows, 'issues');
         $items = [];
         foreach ($rows as $row) {
             $row = self::object($row, 'issue');
             if (array_key_exists('pull_request', $row)) {
                 continue;
             }
-            $labels = self::list($row['labels'] ?? null, 'issue.labels');
+            $labels = self::rows($row['labels'] ?? null, 'issue.labels');
             if (count($labels) > 50) {
                 throw new RuntimeException('Issue labels too many.');
             }
@@ -160,7 +160,10 @@ final class GitHubProjectSnapshot
 
     private function release(array $rows): ?array
     {
-        self::listValue($rows, 'releases');
+        self::assertList($rows, 'releases');
+        if (count($rows) > 1) {
+            throw new RuntimeException('Release response ambiguous.');
+        }
         if ($rows === []) {
             return null;
         }
@@ -180,7 +183,7 @@ final class GitHubProjectSnapshot
     private function workflow(array $payload): ?array
     {
         $total = self::natural($payload['total_count'] ?? null, 'workflow.total_count', true);
-        $rows = self::list($payload['workflow_runs'] ?? null, 'workflow.runs');
+        $rows = self::rows($payload['workflow_runs'] ?? null, 'workflow.runs');
         if ($total < count($rows)) {
             throw new RuntimeException('Workflow count invalid.');
         }
@@ -207,7 +210,7 @@ final class GitHubProjectSnapshot
         ];
     }
 
-    private static function list(mixed $value, string $label): array
+    private static function rows(mixed $value, string $label): array
     {
         if (!is_array($value) || !array_is_list($value) || count($value) > self::LIMIT) {
             throw new RuntimeException($label . ' invalid.');
@@ -215,7 +218,7 @@ final class GitHubProjectSnapshot
         return $value;
     }
 
-    private static function listValue(array $value, string $label): void
+    private static function assertList(array $value, string $label): void
     {
         if (!array_is_list($value) || count($value) > self::LIMIT) {
             throw new RuntimeException($label . ' invalid.');

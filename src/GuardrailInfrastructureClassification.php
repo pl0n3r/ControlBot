@@ -81,9 +81,10 @@ final class GuardrailInfrastructureClassification
             &&!hash_equals($active,$external['fingerprint'])
         ){
             $source=$correlated['source_ref'];
+            $projectId=self::projectIdFromSourceRef($source);
             $canary=SchedulerCore::workItem([
                 'version'=>1,'work_item_id'=>'infra-canary-'.substr($active,0,20),
-                'project_id'=>'controlbot','source_ref'=>$source,'type'=>'verification',
+                'project_id'=>$projectId,'source_ref'=>$source,'type'=>'verification',
                 'priority'=>'critical','state'=>'queued','dependency_ids'=>[],
                 'required_capabilities'=>['ci'],'generation'=>1,'attempt'=>1,
                 'reservation_id'=>null,'assigned_session_id'=>null,
@@ -172,6 +173,16 @@ final class GuardrailInfrastructureClassification
             'fingerprint'=>self::sha($r['fingerprint'],'external fingerprint'),
             'evidence_ref'=>self::ref($r['evidence_ref'],'external evidence_ref'),
         ];
+    }
+
+    private static function projectIdFromSourceRef(string $sourceRef): string
+    {
+        if(preg_match('/^[A-Za-z0-9_.-]+\/([A-Za-z0-9_.-]+)#[1-9][0-9]*$/D',$sourceRef,$match)!==1)
+            throw new InvalidArgumentException('source_ref invalid.');
+        $projectId=strtolower($match[1]);
+        if(preg_match('/^[a-z][a-z0-9._-]{0,79}$/D',$projectId)!==1)
+            throw new InvalidArgumentException('source_ref project_id invalid.');
+        return $projectId;
     }
 
     private static function nullableSha(mixed $v,string $l): ?string{return $v===null?null:self::sha($v,$l);}

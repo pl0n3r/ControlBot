@@ -135,20 +135,11 @@ class LabelsWorkflowTests(unittest.TestCase):
         self.assertEqual(calls.count("--method DELETE"), len(ALIASES))
         for legacy in ALIASES:
             encoded = quote(legacy, safe="")
-            self.assertIn(
-                f"issues?state=all&labels={encoded}&per_page=100",
-                calls,
-            )
-            self.assertIn(
-                f"--method DELETE repos/pl0n3r/ControlBot/labels/{encoded}",
-                calls,
-            )
+            self.assertIn(f"issues?state=all&labels={encoded}&per_page=100", calls)
+            self.assertIn(f"--method DELETE repos/pl0n3r/ControlBot/labels/{encoded}", calls)
         for canonical in ALIASES.values():
             encoded = quote(canonical, safe="")
-            self.assertNotIn(
-                f"--method DELETE repos/pl0n3r/ControlBot/labels/{encoded}",
-                calls,
-            )
+            self.assertNotIn(f"--method DELETE repos/pl0n3r/ControlBot/labels/{encoded}", calls)
 
     def test_cleanup_preserves_alias_when_target_is_missing(self):
         result, calls = self.run_cleanup("targets-missing")
@@ -163,7 +154,6 @@ class LabelsWorkflowTests(unittest.TestCase):
         self.assertNotIn("--method DELETE", calls)
         self.assertNotIn("/issues?state=all&labels=", calls)
 
-
     def test_cleanup_supports_multiple_legacy_pairs(self):
         self.test_cleanup_covers_exact_factory_legacy_aliases()
 
@@ -174,21 +164,16 @@ class LabelsWorkflowTests(unittest.TestCase):
                 result, calls = self.run_cleanup(f"used:{encoded}")
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("todavía tiene 1 uso(s)", result.stderr)
-                self.assertNotIn(
-                    f"--method DELETE repos/pl0n3r/ControlBot/labels/{encoded}",
-                    calls,
-                )
+                self.assertNotIn(f"--method DELETE repos/pl0n3r/ControlBot/labels/{encoded}", calls)
 
     def test_legacy_cleanup_is_idempotent_for_absent_or_orphaned_labels(self):
         absent, absent_calls = self.run_cleanup("aliases-absent")
         results, call_batches = self.run_cleanup("unused", repeats=2)
         first, second = results
         first_calls, second_calls = call_batches
-
         self.assertEqual(absent.returncode, 0, absent.stderr)
         self.assertNotIn("--method DELETE", absent_calls)
         self.assertNotIn("/issues?state=all&labels=", absent_calls)
-
         self.assertEqual(first.returncode, 0, first.stderr)
         self.assertEqual(first_calls.count("--method DELETE"), len(ALIASES))
         self.assertEqual(second.returncode, 0, second.stderr)
@@ -203,7 +188,6 @@ class LabelsWorkflowTests(unittest.TestCase):
         validate_at = workflow.index("  validar-issue:")
         cleanup = workflow[cleanup_at:sync_at]
         sync = workflow[sync_at:validate_at]
-
         self.assertIn("run: bash scripts/cleanup-legacy-label.sh", cleanup)
         self.assertIn("needs: limpiar_etiqueta_legacy", sync)
         self.assertIn("needs.limpiar_etiqueta_legacy.result == 'success'", sync)
@@ -211,10 +195,7 @@ class LabelsWorkflowTests(unittest.TestCase):
 
     def test_candidate_check_runs_on_synchronize(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn(
-            "types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]",
-            workflow,
-        )
+        self.assertIn("types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]", workflow)
         candidate_at = workflow.index("  candidate:")
         cleanup_at = workflow.index("  limpiar_etiqueta_legacy:")
         candidate = workflow[candidate_at:cleanup_at]
@@ -223,30 +204,60 @@ class LabelsWorkflowTests(unittest.TestCase):
         self.assertIn("permissions:\n      contents: read\n", candidate)
         self.assertNotIn("issues: write", candidate)
         self.assertNotIn("pull-requests: write", candidate)
-        self.assertIn(
-            "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-            candidate,
-        )
-        self.assertIn(
-            "tests.test_labels_workflow.LabelsWorkflowTests.test_cleanup_covers_exact_factory_legacy_aliases",
-            candidate,
-        )
+        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", candidate)
+        self.assertIn("tests.test_labels_workflow.LabelsWorkflowTests.test_cleanup_covers_exact_factory_legacy_aliases", candidate)
 
     def test_cleanup_job_has_minimum_permissions(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         cleanup_at = workflow.index("  limpiar_etiqueta_legacy:")
         sync_at = workflow.index("  sync:")
         cleanup = workflow[cleanup_at:sync_at]
-
         self.assertTrue(workflow.startswith("name: Etiquetas\n"))
         self.assertIn("permissions:\n  contents: read\n", workflow)
         self.assertIn("permissions:\n      contents: read\n      issues: write\n", cleanup)
         self.assertNotIn("pull-requests: write", cleanup)
         self.assertIn("persist-credentials: false", cleanup)
-        self.assertIn(
-            "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-            cleanup,
-        )
+        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", cleanup)
+
+    def test_pr_validation_has_minimum_write_authority(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        start = workflow.index("  validar-pr:")
+        end = workflow.index("  sweep:")
+        block = workflow[start:end]
+        self.assertIn("permissions:\n      contents: read\n      issues: write\n      pull-requests: write\n", block)
+        self.assertNotIn("actions: write", block)
+        self.assertNotIn("contents: write", block)
+        self.assertNotIn("issues: read", block)
+
+    def test_non_pr_reusable_jobs_remain_pull_request_read_only(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        starts = [
+            (workflow.index("  sync:"), workflow.index("  validar-issue:")),
+            (workflow.index("  validar-issue:"), workflow.index("  validar-pr:")),
+            (workflow.index("  sweep:"), len(workflow)),
+        ]
+        for start, end in starts:
+            block = workflow[start:end]
+            self.assertIn("pull-requests: read", block)
+            self.assertNotIn("pull-requests: write", block)
+
+    def test_candidate_and_cleanup_keep_minimum_permissions(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        candidate = workflow[workflow.index("  candidate:"):workflow.index("  limpiar_etiqueta_legacy:")]
+        cleanup = workflow[workflow.index("  limpiar_etiqueta_legacy:"):workflow.index("  sync:")]
+        self.assertIn("permissions:\n      contents: read\n", candidate)
+        self.assertNotIn("issues: write", candidate)
+        self.assertNotIn("pull-requests:", candidate)
+        self.assertIn("permissions:\n      contents: read\n      issues: write\n", cleanup)
+        self.assertNotIn("pull-requests:", cleanup)
+
+    def test_reusable_permission_distribution_is_exact(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertEqual(workflow.count("pull-requests: write"), 1)
+        self.assertEqual(workflow.count("pull-requests: read"), 3)
+        self.assertEqual(workflow.count("uses: pl0n3r/factory/.github/workflows/etiquetas.yml@v1"), 4)
+        self.assertNotIn("pull-requests: admin", workflow)
+        self.assertNotIn("@main", workflow)
 
 
 if __name__ == "__main__":

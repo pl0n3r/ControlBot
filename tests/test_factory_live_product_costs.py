@@ -47,6 +47,12 @@ class FactoryLiveProductCostsTests(unittest.TestCase):
         self.assertEqual(view["costs"],{"status":"unknown","items":[]})
         self.assertNotIn("amount_minor",view["tool_usage"])
 
+    def test_partial_or_incoherent_usage_is_unknown(self):
+        for name in ("partial_usage","over_limit"):
+            view=json.loads(scenario(name))
+            self.assertEqual(view["tool_usage"]["status"],"unknown")
+            self.assertEqual(view["limits"],{"status":"unknown","items":[]})
+
     def test_ui_is_optional_and_renders_unknown_costs(self):
         html=scenario("ui")
         self.assertIn('data-section="product_analytics_costs"',html)

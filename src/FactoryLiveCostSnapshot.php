@@ -44,6 +44,7 @@ final class FactoryLiveCostSnapshot
         $hasUsage=array_key_exists('used',$toolData)&&array_key_exists('limit',$toolData)
             && is_int($toolData['used'])&&$toolData['used']>=0
             && is_int($toolData['limit'])&&$toolData['limit']>=0
+            && $toolData['used']<=$toolData['limit']
             && $tool['freshness']!=='unknown'
             && $tool['source_ref']!==null
             && $tool['observed_at']!==null;

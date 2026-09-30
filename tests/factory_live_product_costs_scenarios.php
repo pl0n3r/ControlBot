@@ -53,6 +53,17 @@ if($scenario==='missing'){
 if($scenario==='zero'){
     echo json_encode(built(0,10000),JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
 }
+if($scenario==='partial_usage'){
+    $raw=['tool_usage'=>[
+        'id'=>'tool:remote-desktop','authority'=>'tool_usage','state'=>'degraded',
+        'source_ref'=>'controlbot:tools/remote-desktop','observed_at'=>2990,
+        'freshness'=>'current','data'=>['used'=>0],
+    ]];
+    echo json_encode(FactoryLiveCostSnapshot::build(FactoryLiveSnapshot::build($raw,3000)),JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+}
+if($scenario==='over_limit'){
+    echo json_encode(built(10001,10000,false),JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+}
 if($scenario==='secret'){
     $snapshot=baseSnapshot();
     $snapshot['sections']['work'][0]['data']['api_key']='forbidden';

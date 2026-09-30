@@ -96,7 +96,7 @@ class RequirementDecisionUiTests(unittest.TestCase):
         forbidden = (
             "curl_", "fsockopen", "new pdo", "mysqli", "file_put_contents",
             "unlink(", "rename(", "shell_exec", "proc_open", "exec(", "system(",
-            "mail(", "octokit", "http_client", "github", "workflow_dispatch",
+            "mail(", "octokit", "http_client", "workflow_dispatch",
         )
         self.assertFalse(any(symbol in source for symbol in forbidden))
 

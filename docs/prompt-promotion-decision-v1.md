@@ -6,7 +6,7 @@
 
 La entrada incluye el historial completo de `PromptRegistry`, el `template_id`, la versión candidate y una decisión emitida por `PromptEvaluation`.
 
-`PromptRegistry::active()` valida todo el historial antes de que este módulo seleccione el candidate. La evaluación se vuelve a validar por shape, `template_id`, versiones, authority y fingerprint SHA-256.
+`PromptRegistry::active()` valida todo el historial antes de que este módulo seleccione el candidate. La evaluación se vuelve a validar por shape, `template_id`, versiones, authority, fingerprints de evaluation set/resultados y fingerprint SHA-256 canónico.
 
 ## Reglas
 
@@ -18,9 +18,14 @@ Solo puede resultar `eligible_for_human_approval` cuando:
 - template, task_class, provider_scope y variables_schema coinciden;
 - la evaluación liga exactamente `template_id` y ambas versiones;
 - la evaluación conserva `authority=advisory_only`;
+- `current_result_fingerprint` y `candidate_result_fingerprint` están presentes, son válidos y pertenecen al fingerprint canónico de la evaluación;
 - la decisión de evaluación es `candidate_better` y contiene evidencia `candidate_dominates_current`.
 
 Una evaluación válida con `keep_current` produce `hold`. Drift, fingerprint alterado, authority distinta o contrato incoherente fallan cerrado.
+
+## Provenance propagada
+
+La salida conserva `evaluation_fingerprint`, `evaluation_set_fingerprint`, `current_result_fingerprint` y `candidate_result_fingerprint`. El módulo no recalcula métricas ni llama `PromptEvaluation::compare()`; solo valida la evidencia recibida y la propaga para consumidores posteriores.
 
 ## Puerta humana
 

@@ -63,6 +63,8 @@ final class PromptPromotionDecision
             'candidate_version'=>$candidate['version'],
             'evaluation_fingerprint'=>$evaluation['fingerprint'],
             'evaluation_set_fingerprint'=>$evaluation['evaluation_set_fingerprint'],
+            'current_result_fingerprint'=>$evaluation['current_result_fingerprint'],
+            'candidate_result_fingerprint'=>$evaluation['candidate_result_fingerprint'],
             'reasons'=>$reasons,
             'human_gate_required'=>true,
             'authority'=>'human_approval_required',
@@ -89,7 +91,7 @@ final class PromptPromotionDecision
     {
         $expected=[
             'version','decision','template_id','current_version','candidate_version','evaluation_set_fingerprint',
-            'reasons','authority','fingerprint'
+            'current_result_fingerprint','candidate_result_fingerprint','reasons','authority','fingerprint'
         ];
         $actual=array_keys($raw); sort($actual,SORT_STRING); sort($expected,SORT_STRING);
         if($actual!==$expected) throw new InvalidArgumentException('Evaluation decision fields invalid.');
@@ -99,9 +101,10 @@ final class PromptPromotionDecision
         if(!is_int($raw['current_version'])||$raw['current_version']<1
             ||!is_int($raw['candidate_version'])||$raw['candidate_version']<1)
             throw new InvalidArgumentException('Evaluation versions invalid.');
-        if(!is_string($raw['evaluation_set_fingerprint'])
-            ||preg_match('/^[a-f0-9]{64}$/D',$raw['evaluation_set_fingerprint'])!==1)
-            throw new InvalidArgumentException('Evaluation set fingerprint invalid.');
+        foreach(['evaluation_set_fingerprint','current_result_fingerprint','candidate_result_fingerprint'] as $field){
+            if(!is_string($raw[$field])||preg_match('/^[a-f0-9]{64}$/D',$raw[$field])!==1)
+                throw new InvalidArgumentException('Evaluation provenance fingerprint invalid.');
+        }
         if($raw['authority']!=='advisory_only') throw new InvalidArgumentException('Evaluation authority invalid.');
         if(!is_array($raw['reasons'])||!array_is_list($raw['reasons'])||$raw['reasons']===[])
             throw new InvalidArgumentException('Evaluation reasons invalid.');
@@ -119,6 +122,8 @@ final class PromptPromotionDecision
             'current_version'=>$raw['current_version'],
             'candidate_version'=>$raw['candidate_version'],
             'evaluation_set_fingerprint'=>$raw['evaluation_set_fingerprint'],
+            'current_result_fingerprint'=>$raw['current_result_fingerprint'],
+            'candidate_result_fingerprint'=>$raw['candidate_result_fingerprint'],
             'reasons'=>$reasons,
             'authority'=>'advisory_only',
         ];

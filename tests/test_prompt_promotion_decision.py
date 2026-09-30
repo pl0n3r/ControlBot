@@ -45,6 +45,36 @@ class PromptPromotionDecisionTests(unittest.TestCase):
         self.assertTrue(data["fingerprint_same"])
         self.assertEqual(data["one"]["reasons"], ["evaluation_supports_candidate"])
 
+    def test_decision_propagates_and_validates_result_fingerprints(self):
+        data = scenario("provenance")
+        self.assertEqual(
+            data["out"]["current_result_fingerprint"],
+            data["evaluation"]["current_result_fingerprint"],
+        )
+        self.assertEqual(
+            data["out"]["candidate_result_fingerprint"],
+            data["evaluation"]["candidate_result_fingerprint"],
+        )
+        self.assertTrue(data["tampered_current"])
+        self.assertTrue(data["tampered_candidate"])
+
+    def test_result_provenance_preserves_human_gate_and_fail_closed_authority(self):
+        data = scenario("provenance_gate")
+        for key in ("eligible", "hold"):
+            self.assertTrue(data[key]["human_gate_required"])
+            self.assertEqual(data[key]["authority"], "human_approval_required")
+            self.assertEqual(len(data[key]["current_result_fingerprint"]), 64)
+            self.assertEqual(len(data[key]["candidate_result_fingerprint"]), 64)
+        self.assertEqual(data["eligible"]["decision"], "eligible_for_human_approval")
+        self.assertEqual(data["hold"]["decision"], "hold")
+        self.assertTrue(data["same_set"])
+
+    def test_result_fingerprint_format_and_required_keys_fail_closed(self):
+        data = scenario("provenance_format")
+        self.assertEqual(len(data), 8)
+        for key, rejected in data.items():
+            self.assertTrue(rejected, key)
+
     def test_promotion_decision_is_pure_and_cannot_expand_authority(self):
         data = scenario("pure")
         self.assertEqual(data["hits"], [])

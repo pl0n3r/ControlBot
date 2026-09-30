@@ -13,6 +13,17 @@ class PromptUiTests(unittest.TestCase):
         self.assertEqual(pure["hits"],[]); self.assertTrue(json.loads(render("tamper"))["rejected"]); self.assertTrue(json.loads(render("binding"))["rejected"])
         self.assertTrue(json.loads(render("candidate_contract"))["rejected"])
 
+    def test_result_fingerprints_bind_displayed_evidence(self):
+        data=json.loads(render("result_binding"))
+        self.assertTrue(data["current"]); self.assertTrue(data["candidate"]); self.assertTrue(data["rendered"])
+
+    def test_metric_substitution_fails_closed(self):
+        self.assertTrue(json.loads(render("metric_substitution"))["rejected"])
+
+    def test_safety_policy_substitution_fails_closed(self):
+        data=json.loads(render("safety_policy_substitution"))
+        self.assertTrue(data["safety_rejected"]); self.assertTrue(data["policy_rejected"])
+
     def test_version_metrics_and_evaluation_set_render(self):
         html=render("projection")
         for text in ("support-v1 · v1","Sample size: <strong>40</strong>","acceptance_rate","rework_rate","0.8","0.9","evaluation set fingerprint","decision fingerprint"):

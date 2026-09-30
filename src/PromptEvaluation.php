@@ -54,6 +54,11 @@ final class PromptEvaluation
         ];
     }
 
+    public static function resultFingerprint(array $raw): string
+    {
+        return self::fingerprint(self::result($raw));
+    }
+
     public static function compare(array $setRaw,array $currentRaw,array $candidateRaw,int $minimumSample=20): array
     {
         if($minimumSample<1) throw new InvalidArgumentException('minimumSample invalid.');
@@ -96,6 +101,8 @@ final class PromptEvaluation
             'current_version'=>$current['prompt_version'],
             'candidate_version'=>$candidate['prompt_version'],
             'evaluation_set_fingerprint'=>$set['fingerprint'],
+            'current_result_fingerprint'=>self::fingerprint($current),
+            'candidate_result_fingerprint'=>self::fingerprint($candidate),
             'reasons'=>$reasons,
             'authority'=>'advisory_only',
         ];

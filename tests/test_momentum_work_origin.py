@@ -12,7 +12,8 @@ class MomentumWorkOriginTests(unittest.TestCase):
   self.assertEqual(d["status"],"materialized"); self.assertFalse(d["execution"])
   self.assertEqual((w["origin_mode"],w["origin_system"],w["authority_level"]),("automatic","momentum","l2_venture_admin"))
   self.assertEqual(w["work_type"],"marketing_growth"); self.assertEqual(w["producer_ref"],"momentum:work-origin")
-  self.assertEqual(w["policy_ref"],"controlbot:policy/business-os-v1"); self.assertEqual(w["budget_ref"],"budget:"+"1"*32)
+  self.assertEqual(w["required_roles"],["datos-analitica","marketing"])
+  self.assertEqual(w["policy_ref"],"controlbot:policy/business-os-v1"); self.assertEqual(w["budget_ref"],"budget:"+"d"*32)
   required={"work_id","origin_mode","origin_system","group_id","work_type","requested_capabilities","required_roles",
    "authority_level","producer_ref","priority_class","depends_on","claims","policy_ref","evidence_refs","idempotency_key"}
   optional={"venture_id","project_id","repository_ref","severity","budget_ref","approval_ref","observed_at"}
@@ -33,12 +34,23 @@ class MomentumWorkOriginTests(unittest.TestCase):
   self.assertEqual(a["claims"],sorted(a["claims"])); self.assertEqual(a["evidence_refs"],sorted(a["evidence_refs"]))
   self.assertEqual(a["observed_at"],"2026-09-30T03:40:00Z")
 
+ def test_momentum_end_to_end_invokes_public_contracts(self):
+  d=scenario("e2e"); self.assertEqual(d["out"]["status"],"materialized")
+  source=(ROOT/"tests"/"momentum_work_origin_scenarios.php").read_text(encoding="utf-8")
+  for call in ("MomentumCampaign::campaign(","MomentumCreative::variant(","MomentumEmail::audienceState(",
+               "MomentumExperiment::experiment(","MomentumPaidMedia::plan(","MomentumPerformance::project("):
+   self.assertIn(call,source)
+
  def test_momentum_end_to_end_uses_existing_contracts(self):
   d=scenario("e2e"); self.assertEqual(d["out"]["status"],"materialized")
   self.assertIn(d["creative"]["variant_id"],d["campaign"]["creative_variant_refs"])
   self.assertTrue(d["email"]["marketing_eligible"]); self.assertEqual(d["experiment"]["status"],"completed")
-  self.assertEqual(d["paid"]["campaign_id"],d["campaign"]["campaign_id"])
   self.assertEqual(d["performance"]["campaign_ref"],d["campaign"]["campaign_id"])
+  self.assertEqual(d["paid"]["campaign_id"],d["campaign"]["campaign_id"])
+  self.assertEqual(d["paid"]["spend"]["budget_ref"],d["campaign"]["budget_ref"])
+
+ def test_e2e_contract_drift_is_not_hidden_by_copied_snapshots(self):
+  self.assertTrue(scenario("drift")["upstream_rejected"])
 
  def test_no_parallel_scheduler_provider_execution_secrets_or_pii(self):
   d=scenario("unsafe")
@@ -51,5 +63,6 @@ class MomentumWorkOriginTests(unittest.TestCase):
   docs=(ROOT/"docs"/"momentum-work-origin.md").read_text(encoding="utf-8")
   for word in ("MOMENTUM","Factory","FactoryRunner","AEGIS","CAPITAL","readiness","WorkItem"): self.assertIn(word,docs)
   self.assertIn("no crea cola",docs); self.assertIn("server-side",docs)
+  self.assertIn("APIs públicas",docs); self.assertIn("status=completed",docs); self.assertIn("freshness=current",docs)
 
 if __name__=="__main__": unittest.main()

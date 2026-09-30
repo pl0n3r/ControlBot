@@ -11,20 +11,50 @@ require __DIR__ . '/../src/ProductionOperation.php';
 require __DIR__ . '/../src/HostingerExecutor.php';
 require __DIR__ . '/../src/SshConnectionIdentityResolver.php';
 require __DIR__ . '/../src/SshTransportAdapter.php';
+require __DIR__ . '/../src/OpenSshClient.php';
 require __DIR__ . '/../src/HostingerSshRuntime.php';
 
 use ControlBot\Production\CapabilityGrant;
 use ControlBot\Production\ConnectionIdentityBroker;
 use ControlBot\Production\ConnectionProfile;
 use ControlBot\Production\HostingerSshRuntime;
+use ControlBot\Production\OpenSshClient;
 use ControlBot\Production\ProductionOperation;
 use ControlBot\Production\SecretReference;
 use ControlBot\Production\SecretsBroker;
+
 const NOW_539 = 1_799_997_000;
-const SECRET_539 = 'fixture-private-key-material-539';
 const USERNAME_539 = 'deploy_user_539';
 const USER_REF_539 = 'vault:user:brvtal';
 const SECRET_REF_539 = '11111111-2222-4333-8444-555555555555';
+const HOST_KEY_BLOB_539 = 'host-key-fixture-539';
+
+function privateKey539(): string
+{
+    return "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        . str_repeat('A', 80)
+        . "\n-----END OPENSSH PRIVATE KEY-----\n";
+}
+
+function fingerprint539(string $blob = HOST_KEY_BLOB_539): string
+{
+    return 'SHA256:' . rtrim(base64_encode(hash('sha256', $blob, true)), '=');
+}
+
+function process539(
+    int $exitCode = 0,
+    string $stdout = '',
+    bool $timedOut = false,
+    int $durationMs = 5,
+): array {
+    return [
+        'exit_code' => $exitCode,
+        'stdout' => $stdout,
+        'stderr' => '',
+        'duration_ms' => $durationMs,
+        'timed_out' => $timedOut,
+    ];
+}
 
 function secret539(
     string $referenceId = SECRET_REF_539,
@@ -44,12 +74,13 @@ function profile539(
     string $environment = 'production',
     string $usernameRef = USER_REF_539,
     string $secretRef = SECRET_REF_539,
+    ?string $fingerprint = null,
 ): ConnectionProfile {
     return ConnectionProfile::fromServerRecord([
         'version'=>1,'profile_id'=>'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
         'project'=>$project,'environment'=>$environment,'provider'=>'hostinger','transport'=>'ssh',
         'host'=>'example.internal','port'=>22,'username_ref'=>$usernameRef,'secret_ref'=>$secretRef,
-        'host_fingerprint'=>'SHA256:abcdefghijklmnop','status'=>'connected',
+        'host_fingerprint'=>$fingerprint ?? fingerprint539(),'status'=>'connected',
         'verified_at'=>'2027-01-15T07:00:00+00:00','last_health_at'=>'2027-01-15T07:00:00+00:00',
         'revoked_at'=>null,
     ]);
@@ -82,19 +113,19 @@ function grant539(
     ]);
 }
 
-function request539(): array
+function request539(array $replace = []): array
 {
-    return [
+    return array_replace([
         'project'=>'brvtal','environment'=>'production','resource'=>'database:primary',
         'issue'=>'pl0n3r/brvtal#681','run_id'=>'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff',
         'subject'=>'hostinger-executor','idempotency_key'=>'idem:brvtal-681-539','now'=>NOW_539,
-    ];
+    ], $replace);
 }
 
 function secrets539(SecretReference $reference): SecretsBroker
 {
     $broker = new SecretsBroker(['hostinger-executor']);
-    $broker->register($reference, SECRET_539);
+    $broker->register($reference, privateKey539());
     return $broker;
 }
 
@@ -115,27 +146,57 @@ function run539(
     ConnectionIdentityBroker $identities,
     ?array $request = null,
 ): array {
-    $calls=0; $observed=null; $secretSeen=false;
-    $runtime = new HostingerSshRuntime(
+    $runnerCalls=[]; $keyscanCalls=0; $sshCalls=0;
+    $keyscanHost=null; $keyscanPort=null; $sshTarget=null; $keyMaterialSeen=false;
+    $runner=static function(array $argv,int $timeout) use (
+        &$runnerCalls,&$keyscanCalls,&$sshCalls,&$keyscanHost,&$keyscanPort,
+        &$sshTarget,&$keyMaterialSeen,
+    ): array {
+        $runnerCalls[]=$argv;
+        if (($argv[0]??null)==='ssh-keyscan') {
+            $keyscanCalls++;
+            $keyscanHost=$argv[count($argv)-1]??null;
+            $portIndex=array_search('-p',$argv,true);
+            $keyscanPort=$portIndex===false ? null : (int)($argv[$portIndex+1]??0);
+            return process539(
+                0,
+                (string)$keyscanHost.' ssh-ed25519 '.base64_encode(HOST_KEY_BLOB_539)."\n",
+            );
+        }
+        $sshCalls++;
+        $sshTarget=$argv[count($argv)-2]??null;
+        $keyIndex=array_search('-i',$argv,true);
+        $keyPath=$keyIndex===false ? null : ($argv[$keyIndex+1]??null);
+        $keyMaterialSeen=is_string($keyPath)
+            && file_exists($keyPath)
+            && file_get_contents($keyPath)===privateKey539();
+        return process539(0,'',false,20);
+    };
+
+    $runtime=new HostingerSshRuntime(
         $secrets,
         $identities,
-        static function(array $sshRequest, string $secret) use (&$calls,&$observed,&$secretSeen): array {
-            $calls++; $observed=$sshRequest; $secretSeen=$secret===SECRET_539;
-            return [
-                'status'=>'success','code'=>'ssh_readonly_probe_ok',
-                'summary'=>'connected '.USERNAME_539.' secret='.SECRET_539,
-                'artifacts'=>[],'duration_ms'=>25,
-            ];
-        },
+        new OpenSshClient($runner,null,sys_get_temp_dir()),
     );
-    $result = $runtime->execute(
-        ProductionOperation::fromId('ssh.readonly'),
-        $grant,
-        $profile,
-        $reference,
-        $request ?? request539(),
-    );
-    return ['result'=>$result,'client_calls'=>$calls,'request'=>$observed,'secret_seen'=>$secretSeen];
+
+    $threw=false; $result=null;
+    try {
+        $result=$runtime->execute(
+            ProductionOperation::fromId('ssh.readonly'),
+            $grant,
+            $profile,
+            $reference,
+            $request ?? request539(),
+        );
+    } catch (\InvalidArgumentException) {
+        $threw=true;
+    }
+
+    return [
+        'result'=>$result,'threw'=>$threw,'runner_calls'=>count($runnerCalls),
+        'keyscan_calls'=>$keyscanCalls,'ssh_calls'=>$sshCalls,'keyscan_host'=>$keyscanHost,
+        'keyscan_port'=>$keyscanPort,'ssh_target'=>$sshTarget,'key_material_seen'=>$keyMaterialSeen,
+    ];
 }
 
 $name=$argv[1]??'';
@@ -173,25 +234,22 @@ if ($name==='valid') {
 } elseif ($name==='authority') {
     $ref=secret539();
     $valid=run539(grant539(),profile539(),$ref,secrets539($ref),identities539(identity539()));
-    $override=request539();
-    $override['host']='attacker.invalid';
-    $rejected=false; $overrideCalls=0;
-    $runtime=new HostingerSshRuntime(
+    $badFingerprint=run539(
+        grant539(),
+        profile539(fingerprint:fingerprint539('different-host-key')),
+        $ref,
         secrets539($ref),
         identities539(identity539()),
-        static function() use (&$overrideCalls): array {
-            $overrideCalls++;
-            return ['status'=>'success','code'=>'unexpected','summary'=>'unexpected','artifacts'=>[],'duration_ms'=>1];
-        },
     );
-    try {
-        $runtime->execute(ProductionOperation::fromId('ssh.readonly'),grant539(),profile539(),$ref,$override);
-    } catch (\InvalidArgumentException) {
-        $rejected=true;
-    }
-    $out=[
-        'valid'=>$valid,'override_rejected'=>$rejected,'override_client_calls'=>$overrideCalls,
-    ];
+    $override=run539(
+        grant539(),
+        profile539(),
+        $ref,
+        secrets539($ref),
+        identities539(identity539()),
+        request539(['host'=>'attacker.invalid']),
+    );
+    $out=['valid'=>$valid,'bad_fingerprint'=>$badFingerprint,'caller_override'=>$override];
 } else {
     fwrite(STDERR,"scenario inválido\n");
     exit(2);

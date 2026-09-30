@@ -43,6 +43,10 @@ class SshTransportAdapterTests(unittest.TestCase):
         self.assertFalse(data["request_contains_secret"]); self.assertFalse(data["visible_contains_secret"])
         self.assertIn("[REDACTED]",data["result"]["summary"])
         self.assertEqual(data["artifact_result"]["status"],"failed")
+        self.assertEqual(data["artifact_result"]["code"],"ssh_client_result_invalid")
+        self.assertEqual(data["code_result"]["status"],"failed")
+        self.assertEqual(data["code_result"]["code"],"ssh_client_result_invalid")
+        self.assertFalse(data["code_visible_contains_secret"])
 
     def test_client_failures_never_normalize_to_success(self):
         data=scenario("failures")

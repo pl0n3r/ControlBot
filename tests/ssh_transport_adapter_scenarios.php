@@ -76,11 +76,21 @@ if ($name==='valid') {
             'status'=>'success','code'=>'ssh_ok','summary'=>'ok','artifacts'=>[$secret],'duration_ms'=>1,
         ],
     );
+    $codeSecret='secretcode527x';
+    $codeLeak=new SshTransportAdapter(
+        static fn(): string=>'deploy_user',
+        static fn(array $req,string $secret): array=>[
+            'status'=>'success','code'=>$secret,'summary'=>'ok','artifacts'=>[],'duration_ms'=>1,
+        ],
+    );
+    $codeResult=$codeLeak(descriptor(),$codeSecret);
     $out=[
         'result'=>$result,'calls'=>$calls,'secret_separate'=>$seen===SECRET,
         'request_contains_secret'=>str_contains(json_encode($request,JSON_THROW_ON_ERROR),SECRET),
         'visible_contains_secret'=>str_contains(json_encode($result,JSON_THROW_ON_ERROR),SECRET),
         'artifact_result'=>$artifact(descriptor(),SECRET),
+        'code_result'=>$codeResult,
+        'code_visible_contains_secret'=>str_contains(json_encode($codeResult,JSON_THROW_ON_ERROR),$codeSecret),
     ];
 } elseif ($name==='failures') {
     $out=[];

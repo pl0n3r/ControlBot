@@ -61,6 +61,25 @@ class GuardrailInfrastructureClassificationTests(unittest.TestCase):
         self.assertIsNone(self.d["older_recovery"]["canary_work_item"])
         self.assertIsNone(self.d["old_recovery"]["canary_work_item"])
 
+    def test_recovery_cross_repo_canary_uses_project_from_canonical_source(self):
+        canary=self.d["recovery"]["canary_work_item"]
+        self.assertEqual(canary["source_ref"],"pl0n3r/Condor#350")
+        self.assertEqual(canary["project_id"],"condor")
+
+    def test_cross_repo_canary_project_is_deterministic_when_evidence_order_changes(self):
+        normal=self.d["recovery"]["canary_work_item"]
+        reversed_=self.d["recovery_reversed"]["canary_work_item"]
+        self.assertEqual(normal,reversed_)
+        self.assertEqual(reversed_["project_id"],"condor")
+
+    def test_canary_projection_keeps_queue_release_closed_and_has_no_side_effects(self):
+        d=self.d["recovery"]
+        self.assertFalse(d["queue_release_allowed"])
+        self.assertIsNotNone(d["canary_work_item"])
+        source=(ROOT/"src"/"GuardrailInfrastructureClassification.php").read_text(encoding="utf-8").lower()
+        forbidden=("curl_","fsockopen","new pdo","mysqli","file_put_contents","shell_exec","proc_open","exec(","system(","mail(")
+        self.assertFalse(any(x in source for x in forbidden))
+
     def test_handoff_preserves_external_cause_without_sensitive_material(self):
         h=self.d["blocked"]["handoff"]
         self.assertEqual(h["cause"],"blocked_by_infrastructure")

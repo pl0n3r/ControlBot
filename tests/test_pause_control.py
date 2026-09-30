@@ -1,5 +1,6 @@
 import json
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -36,6 +37,20 @@ def scheduler(name):
 
 def resume(name):
     return scenario("pause_resume_plan_scenarios.php", name)
+
+
+def resume_fixture_inputs():
+    source=(ROOT/"tests"/"pause_resume_plan_scenarios.php").read_text(encoding="utf-8")
+    prefix=source.split("$scenario=$argv[1]??'';",1)[0]
+    probe=prefix+"\necho json_encode(['work'=>work(),'order'=>order()],JSON_THROW_ON_ERROR),PHP_EOL;\n"
+    path=None
+    try:
+        with tempfile.NamedTemporaryFile("w",suffix=".php",dir=ROOT/"tests",delete=False,encoding="utf-8") as tmp:
+            tmp.write(probe); path=Path(tmp.name)
+        run=subprocess.run(["php",str(path)],cwd=ROOT,check=True,text=True,capture_output=True,timeout=60)
+        return json.loads(run.stdout)
+    finally:
+        if path is not None: path.unlink(missing_ok=True)
 
 
 class PauseControlTests(unittest.TestCase):
@@ -83,10 +98,12 @@ class PauseControlTests(unittest.TestCase):
         self.assertFalse(plan["create_work_item"])
         self.assertFalse(plan["create_order"])
         self.assertTrue(plan["reuse_current_attempt"])
-        self.assertEqual(plan["work_item_id"], "work-a")
-        self.assertEqual(plan["order_id"], "11111111-1111-4111-8111-111111111111")
-        self.assertEqual(plan["attempt_id"], "22222222-2222-4222-8222-222222222222")
-        self.assertEqual((plan["generation"], plan["attempt"]), (4, 2))
+        inputs=resume_fixture_inputs()
+        for field in ("work_item_id","generation","attempt"):
+            self.assertEqual(plan[field],inputs["work"][field])
+        for field in ("order_id","attempt_id","generation","attempt","runner_id","capability","scope","issued_at","expires_at","instruction_ref"):
+            self.assertEqual(plan[field],inputs["order"][field])
+        self.assertEqual(plan["fingerprint"],resume("valid")["fingerprint"])
         self.assertTrue(all(drift.values()))
         self.assertTrue(deterministic["same"])
         self.assertTrue(deterministic["fingerprint"])

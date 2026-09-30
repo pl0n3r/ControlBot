@@ -29,7 +29,7 @@ function performance429(string $fresh='current'):array{return ['version'=>1,'per
 function raw429(string $fresh='current'):array{return [
  'version'=>1,'group_id'=>'group:pl0n3r','venture_id'=>'venture-condor','project_id'=>'project:condor',
  'repository_ref'=>'pl0n3r/Condor','work_type'=>'marketing_growth',
- 'requested_capabilities'=>['campaign.optimization','growth.analysis'],'required_roles'=>['datos_analitica','marketing'],
+ 'requested_capabilities'=>['campaign.optimization','growth.analysis'],'required_roles'=>['datos-analitica','marketing'],
  'priority_class'=>'high','depends_on'=>[r('work','8')],'claims'=>['campaign/'.r('campaign','1'),'venture/venture-condor'],
  'evidence_refs'=>[r('evidence','c'),r('evidence','b')],'freshness'=>$fresh,'observed_at'=>'2026-09-30T03:40:00Z',
  'idempotency_key'=>'momentum:condor:campaign-1:growth','execution'=>false];}

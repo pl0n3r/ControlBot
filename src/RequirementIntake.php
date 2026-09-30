@@ -320,40 +320,44 @@ final class RequirementIntake
 
     private static function enum(mixed $value,array $allowed,string $label): string
     {
-        if(!is_string($value)||!in_array($value,$allowed,true)) throw new InvalidArgumentException($label.' invalid.');
-        return $value;
+        $index=is_string($value)?array_search($value,$allowed,true):false;
+        if($index===false) throw new InvalidArgumentException($label.' invalid.');
+        return $allowed[$index];
     }
 
     private static function positiveInt(mixed $value,string $label): int
     {
-        if(!is_int($value)||$value<1) throw new InvalidArgumentException($label.' invalid.');
-        return $value;
+        return self::boundedInt($value,$label,1);
     }
 
     private static function nonNegativeInt(mixed $value,string $label): int
     {
-        if(!is_int($value)||$value<0) throw new InvalidArgumentException($label.' invalid.');
+        return self::boundedInt($value,$label,0);
+    }
+
+    private static function boundedInt(mixed $value,string $label,int $minimum): int
+    {
+        if(!is_int($value)||$value<$minimum) throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
 
     private static function hexDigest(mixed $value,string $label): string
     {
-        if(!is_string($value)||preg_match('/^[a-f0-9]{64}$/D',$value)!==1)
+        if(!is_string($value)||strlen($value)!==64||ctype_xdigit($value)===false||strtolower($value)!==$value)
             throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
 
     private static function digest(array $value): string
     {
-        return hash('sha256',json_encode(self::canonical($value),JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
+        return hash('sha256',serialize(self::ordered($value)));
     }
 
-    private static function canonical(mixed $value): mixed
+    private static function ordered(mixed $value): mixed
     {
         if(!is_array($value)) return $value;
-        if(array_is_list($value)) return array_map(self::canonical(...),$value);
-        ksort($value,SORT_STRING);
-        foreach($value as $key=>$item) $value[$key]=self::canonical($item);
+        if(!array_is_list($value)) ksort($value,SORT_STRING);
+        foreach($value as $key=>$item) $value[$key]=self::ordered($item);
         return $value;
     }
 
@@ -361,15 +365,16 @@ final class RequirementIntake
 
     private static function secretFree(mixed $value): void
     {
-        if(is_array($value)){ foreach($value as $item) self::secretFree($item); return; }
-        if(is_string($value)&&preg_match(self::SENSITIVE,$value)===1)
+        $encoded=is_string($value)?$value:json_encode($value,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+        if(preg_match(self::SENSITIVE,$encoded)===1)
             throw new InvalidArgumentException('Requirement contract contains sensitive material.');
     }
 
     private static function fields(mixed $row,array $expected,string $label): void
     {
         if(!is_array($row)||array_is_list($row)) throw new InvalidArgumentException($label.' invalid.');
-        $actual=array_keys($row); sort($actual,SORT_STRING); sort($expected,SORT_STRING);
-        if($actual!==$expected) throw new InvalidArgumentException($label.' fields invalid.');
+        $keys=array_keys($row);
+        if(count($keys)!==count($expected)||array_diff($keys,$expected)!==[]||array_diff($expected,$keys)!==[])
+            throw new InvalidArgumentException($label.' fields invalid.');
     }
 }

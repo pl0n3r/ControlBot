@@ -190,5 +190,14 @@ final class BrvtalMigrationReconcileRunbook
             }
             $seen[$step] = true;
         }
+
+        $order = match ($input['schema_state']) {
+            'clean' => ['migration.status', 'migration.verify', 'health.check', 'smoke.run'],
+            'ambiguous' => ['migration.status'],
+            default => self::STEPS,
+        };
+        if ($input['completed_steps'] !== array_slice($order, 0, count($input['completed_steps']))) {
+            throw new InvalidArgumentException('Runbook completed_steps out of order.');
+        }
     }
 }

@@ -1,0 +1,64 @@
+name: Sonar CI-based
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonar-controlbot-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  sonar:
+    name: Sonar CI / Analizar
+    if: >-
+      vars.SONAR_CI_ENABLED == 'true' &&
+      (
+        github.event_name == 'push' ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.draft == false &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validar configuración CI-based
+        env:
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ -n "$SONAR_ORGANIZATION" ]] || {
+            echo "::error::SONAR_ORGANIZATION no está configurada."
+            exit 1
+          }
+          [[ -n "$SONAR_TOKEN" ]] || {
+            echo "::error::SONAR_TOKEN no está configurado."
+            exit 1
+          }
+
+      - name: Analizar con SonarQube Cloud
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >-
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=pl0n3r_factory-control
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300

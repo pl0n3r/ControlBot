@@ -35,7 +35,10 @@ $scenario=$argv[1]??'';$mode=$argv[2]??'json';$raw=fixture();
 if($scenario==='empty')$raw=['tool_usage'=>null];
 elseif($scenario==='stale')$raw=mutate($raw,'Condor','governance','degraded','stale');
 elseif($scenario==='error')$raw=mutate($raw,'GrindFlow','security','critical','current');
-elseif($scenario==='hostile')foreach($raw['work'] as &$row)if(($row['data']['project']??null)==='Factory'&&($row['data']['department']??null)==='qa_engineering'){$row['data']['title']='<img src=x onerror=alert(1)>';break;}unset($row);
-elseif($scenario!=='full'){fwrite(STDERR,"scenario inválido\n");exit(2);}
+elseif($scenario==='hostile'){
+    foreach($raw['work'] as &$row)
+        if(($row['data']['project']??null)==='Factory'&&($row['data']['department']??null)==='qa_engineering'){$row['data']['title']='<img src=x onerror=alert(1)>';break;}
+    unset($row);
+}elseif($scenario!=='full'){fwrite(STDERR,"scenario inválido\n");exit(2);}
 $snapshot=FactoryLiveSnapshot::build($raw,200);$matrix=FactoryLiveMatrix::build($snapshot);
 echo $mode==='html'?FactoryLiveUi::render($snapshot,$matrix):json_encode($matrix,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE),PHP_EOL;

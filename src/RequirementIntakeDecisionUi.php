@@ -9,12 +9,12 @@ final class RequirementIntakeDecisionUi
     {
         $p=self::proposal($raw);$unknown=[];
         foreach(['problem','user','objectives','out_of_scope','dependencies'] as $f) if($p[$f]['status']==='unknown')$unknown[]=$f;
-        $project=['artifact'=>'project','operation'=>match($p['project_match']['status']){'matched'=>'link_existing','ambiguous'=>'review_matches',default=>'propose_create'},'project_ref'=>$p['project_match']['project_ref'],'match'=>$p['project_match'],'execution'=>false];
+        $project=['artifact'=>'project','operation'=>match($p['project_match']['status']){'matched'=>'link_existing','ambiguous'=>'review_matches',default=>'owner_choice_required'},'project_ref'=>$p['project_match']['project_ref'],'match'=>$p['project_match'],'execution'=>false];
         $epic=['artifact'=>'epic','operation'=>'propose_create','proposal_ref'=>$p['proposal_ref'],'problem'=>$p['problem'],'user'=>$p['user'],'objectives'=>$p['objectives'],'out_of_scope'=>$p['out_of_scope'],'execution'=>false];
         $issues=array_map(static fn(array $s):array=>['artifact'=>'issue','operation'=>'propose_create','slice_key'=>$s['slice_key'],'title'=>$s['title'],'acceptance'=>$s['acceptance'],'execution'=>false],$p['slices']);
         $options=[['code'=>'approve','intent'=>'allow_later_materialization','execution'=>false],['code'=>'revise','intent'=>'request_changes','execution'=>false],['code'=>'reject','intent'=>'decline_proposal','execution'=>false]];
         $sections=['summary','impacts','materialization_diff','decision'];
-        $surface=['sections'=>$sections,'controls'=>['approve','revise','reject'],'keyboard'=>true,'gesture_only'=>false];
+        $surface=['sections'=>$sections,'controls'=>['approve','revise','reject'],'semantic_element'=>'button','group_role'=>'group','aria_label'=>'Decisión sobre requerimiento','min_target_px'=>52,'keyboard'=>true,'keyboard_keys'=>['Enter','Space'],'focus_visible'=>true,'gesture_only'=>false];
         $base=['proposal_ref'=>$p['proposal_ref'],'proposal_fingerprint'=>$p['fingerprint'],'provenance'=>['draft_ref'=>$p['draft_ref']],
             'summary'=>['problem'=>$p['problem'],'user'=>$p['user'],'objectives'=>$p['objectives'],'out_of_scope'=>$p['out_of_scope'],'unknown_fields'=>$unknown],
             'impacts'=>['risks'=>$p['risks'],'dependencies'=>$p['dependencies'],'questions'=>$p['questions'],'project_match'=>$p['project_match']],

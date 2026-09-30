@@ -188,7 +188,7 @@ final class FactoryLiveUi
             $limits.='<article class="learning-card"><span>Uso / límite</span><strong>'.self::e((string)$row['used']).' / '.self::e((string)$row['limit']).'</strong><small class="matrix-meta">'
                 .self::e(self::text($row['source_ref'])).' · '.self::e((string)$row['observed_at']).' · '.self::e(self::text($row['freshness'])).'</small></article>';
         }
-        if($limitStatus==='unknown'&&$view['limits']['items']!==[])
+        if(($limitStatus==='unknown')!==($view['limits']['items']===[]))
             throw new InvalidArgumentException('Limit status incoherent.');
         if($limits==='')$limits='<article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin fuente canónica medida</small></article>';
 

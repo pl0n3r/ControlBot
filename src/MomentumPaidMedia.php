@@ -20,6 +20,7 @@ final class MomentumPaidMedia
         'reallocate'=>'L2_VENTURE_ADMIN',
     ];
     private const FRESHNESS=['current','stale','unknown'];
+    private const BLAST_RADIUS=['low','medium','high'];
     private const SENSITIVE='/(?:bearer\s+|password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn|(?:ghp_|gho_|github_pat_)[A-Za-z0-9_]{8,})/i';
 
     public static function plan(
@@ -153,7 +154,7 @@ final class MomentumPaidMedia
     private static function spend(mixed $raw): array
     {
         self::fields($raw,[
-            'spend_ref','amount_minor','currency','budget_ref','evidence_refs','blast_radius_ref',
+            'spend_ref','amount_minor','currency','budget_ref','evidence_refs','blast_radius',
         ],'Spend');
         return [
             'spend_ref'=>self::opaque($raw['spend_ref'],'spend_ref','spend'),
@@ -161,7 +162,7 @@ final class MomentumPaidMedia
             'currency'=>self::currency($raw['currency']),
             'budget_ref'=>self::opaque($raw['budget_ref'],'budget_ref','budget'),
             'evidence_refs'=>self::refs($raw['evidence_refs'],'evidence',32),
-            'blast_radius_ref'=>self::opaque($raw['blast_radius_ref'],'blast_radius_ref','blast-radius'),
+            'blast_radius'=>self::choice($raw['blast_radius'],self::BLAST_RADIUS,'blast_radius'),
         ];
     }
 

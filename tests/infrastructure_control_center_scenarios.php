@@ -21,6 +21,7 @@ use ControlBot\Infrastructure\InfrastructureActionProjection;
 use ControlBot\Infrastructure\InfrastructureCenterUi;
 use ControlBot\Infrastructure\InfrastructureImpact;
 use ControlBot\Infrastructure\InfrastructureIntent;
+use ControlBot\Infrastructure\InfrastructureProvider;
 use ControlBot\Runner\RunnerGateway;
 use ControlBot\Security\OwnerSessionService;
 use ControlBot\Security\TokenVault;
@@ -42,27 +43,59 @@ function rejected191(callable $fn): bool
     try { $fn(); return false; } catch (InvalidArgumentException) { return true; }
 }
 
+function inventory191(): array
+{
+    return InfrastructureProvider::normalizeInventory([[
+        'version'=>1,'provider_id'=>'provider-primary','kind'=>'hosting','vendor'=>'vendor-one',
+        'adapter_ref'=>'controlbot:adapter/provider-primary',
+        'capabilities'=>[
+            ['capability'=>'inventory.read','scopes'=>['provider','project']],
+            ['capability'=>'health.read','scopes'=>['environment','resource']],
+        ],
+        'source_ref'=>'controlbot:provider/provider-primary','observed_at'=>2000,
+    ]],[[
+        'version'=>1,'account_id'=>'account-primary','provider_id'=>'provider-primary',
+        'alias'=>'account-primary','source_ref'=>'controlbot:account/account-primary','observed_at'=>2000,
+    ]]);
+}
+
 function resource191(string $id, string $kind, array $overrides = []): array
 {
     return array_replace([
-        'version'=>1, 'resource_id'=>$id, 'kind'=>$kind,
-        'provider_id'=>'provider-primary', 'account_id'=>'account-primary',
+        'version'=>1,'resource_id'=>$id,'kind'=>$kind,
+        'provider_id'=>'provider-primary','account_id'=>'account-primary',
         'project_ref'=>'controlbot:project/project-controlbot',
         'venture_ref'=>'controlbot:venture/venture-platform',
         'environment_ref'=>'controlbot:environment/controlbot-prod',
-        'service_ref'=>null, 'parent_ref'=>null, 'release_evidence'=>null,
-        'cost_ref'=>'controlbot:cost/project-controlbot', 'backup_refs'=>[],
-        'source_ref'=>'controlbot:resource/'.$id, 'observed_at'=>2000,
+        'service_ref'=>null,'parent_ref'=>null,'release_evidence'=>null,
+        'cost_ref'=>'controlbot:cost/project-controlbot','backup_refs'=>[],
+        'source_ref'=>'controlbot:resource/'.$id,'observed_at'=>2000,
     ], $overrides);
+}
+
+function inventoryOwns191(array $inventory, array $resources): bool
+{
+    $providers=array_column($inventory['providers'],'provider_id');
+    $accounts=[];
+    foreach ($inventory['accounts'] as $account) {
+        $accounts[$account['account_id']]=$account['provider_id'];
+    }
+    foreach ($resources as $resource) {
+        if (!in_array($resource['provider_id'],$providers,true)
+            || ($accounts[$resource['account_id']] ?? null) !== $resource['provider_id']) {
+            return false;
+        }
+    }
+    return true;
 }
 
 function observation191(string $freshness = 'fresh'): array
 {
     $unknown=['state'=>'unknown','source_ref'=>null,'observed_at'=>null];
     return [
-        'version'=>1, 'resource_id'=>'service-web', 'state'=>'online',
-        'source_ref'=>'controlbot:observation/service-web', 'observed_at'=>2000,
-        'freshness'=>$freshness, 'backup_freshness'=>$unknown,
+        'version'=>1,'resource_id'=>'service-web','state'=>'online',
+        'source_ref'=>'controlbot:observation/service-web','observed_at'=>2000,
+        'freshness'=>$freshness,'backup_freshness'=>$unknown,
         'restore_verification'=>$unknown,
         'cost_attribution'=>$unknown+['cost_ref'=>null],
         'release_drift'=>$unknown+['expected_sha'=>null,'observed_sha'=>null],
@@ -73,26 +106,25 @@ function observation191(string $freshness = 'fresh'): array
 function intent191(array $overrides = []): array
 {
     return array_replace([
-        'version'=>1, 'intent_id'=>'intent-191', 'origin_mode'=>'directed',
-        'group_id'=>'pl0n3r', 'venture_id'=>'platform', 'project_id'=>'controlbot',
-        'repository_ref'=>'pl0n3r/ControlBot', 'intent_type'=>'read',
-        'priority'=>'high', 'scope'=>'project:controlbot', 'blast_radius'=>'low',
-        'capability'=>'hostinger.read', 'depends_on'=>['pl0n3r/ControlBot#191'],
-        'claims'=>['infra:controlbot-main'], 'policy_ref'=>'controlbot:policy/infrastructure-v1',
-        'evidence_refs'=>['pl0n3r/ControlBot#191'], 'idempotency_key'=>'infra-e2e-191',
-        'authority_level'=>'l2_venture_admin', 'budget_ref'=>null, 'approval_ref'=>null,
-        'instruction_ref'=>'controlbot:infrastructure/e2e-191', 'cost_applicable'=>false,
-        'cost_ref'=>null, 'evidence'=>[
-            'plan_ref'=>null, 'impact_ref'=>null, 'rollback_ref'=>null,
-            'safe_point_ref'=>null, 'verify_ref'=>null, 'irreversible'=>false,
+        'version'=>1,'intent_id'=>'intent-191','origin_mode'=>'directed',
+        'group_id'=>'pl0n3r','venture_id'=>'platform','project_id'=>'controlbot',
+        'repository_ref'=>'pl0n3r/ControlBot','intent_type'=>'read',
+        'priority'=>'high','scope'=>'project:controlbot','blast_radius'=>'low',
+        'capability'=>'hostinger.read','depends_on'=>['pl0n3r/ControlBot#191'],
+        'claims'=>['infra:controlbot-main'],'policy_ref'=>'controlbot:policy/infrastructure-v1',
+        'evidence_refs'=>['pl0n3r/ControlBot#191'],'idempotency_key'=>'infra-e2e-191',
+        'authority_level'=>'l2_venture_admin','budget_ref'=>null,'approval_ref'=>null,
+        'instruction_ref'=>'controlbot:infrastructure/e2e-191','cost_applicable'=>false,
+        'cost_ref'=>null,'evidence'=>[
+            'plan_ref'=>null,'impact_ref'=>null,'rollback_ref'=>null,
+            'safe_point_ref'=>null,'verify_ref'=>null,'irreversible'=>false,
         ],
     ], $overrides);
 }
 
 function authority191(string $decision = 'allow'): object
 {
-    $scope='project:controlbot';
-    $action='hostinger.read';
+    $scope='project:controlbot'; $action='hostinger.read';
     $grantCapability=$decision==='deny' ? 'venture.read' : $action;
     $level=$decision==='owner_decision_required' ? 'L1_OPERATOR' : 'L2_VENTURE_ADMIN';
     $source=new E2eAuthoritySource191([
@@ -126,40 +158,43 @@ function authority191(string $decision = 'allow'): object
     } finally { @unlink($path); }
 }
 
-$resources=[
-    resource191('env-prod','environment',[
-        'environment_ref'=>null,'source_ref'=>'controlbot:environment/controlbot-prod',
-    ]),
-    resource191('service-web','service',['parent_ref'=>'controlbot:resource/env-prod']),
-];
-$bindings=[[
-    'capability_ref'=>'controlbot:capability/commerce',
-    'project_ref'=>'controlbot:project/project-controlbot',
-    'venture_ref'=>'controlbot:venture/venture-platform',
-    'source_ref'=>'controlbot:binding/commerce','observed_at'=>2000,
-]];
-$freshUi=InfrastructureCenterUi::project($resources,[observation191()],$bindings);
-$impact=InfrastructureImpact::impactForResource($resources,$bindings,'service-web');
-$plan=InfrastructureIntent::plan(intent191(),authority191(),null,NOW191);
-$action=InfrastructureActionProjection::project(
-    intent191(['intent_id'=>'intent-action-191']),authority191(),null,NOW191,
-);
+function runnerHealth191(int $active): array
+{
+    $runnerId='33333333-3333-7333-8333-333333333333';
+    return RunnerGateway::health([
+        'version'=>1,'runner_id'=>$runnerId,'protocol_version'=>1,'runtime'=>'factoryrunner',
+        'runtime_version'=>'1.0.0','platform'=>'linux','placement'=>'shared',
+        'capabilities'=>['hostinger.read'],'max_parallel'=>2,
+    ],[
+        'version'=>1,'runner_id'=>$runnerId,'sequence'=>1,'observed_at'=>NOW191,
+        'status'=>'ready','capacity'=>['max'=>2,'active'=>$active],'active_sessions'=>[],
+    ],NOW191,60);
+}
 
-$runnerId='33333333-3333-7333-8333-333333333333';
-$health=RunnerGateway::health([
-    'version'=>1,'runner_id'=>$runnerId,'protocol_version'=>1,'runtime'=>'factoryrunner',
-    'runtime_version'=>'1.0.0','platform'=>'linux','placement'=>'shared',
-    'capabilities'=>['hostinger.read'],'max_parallel'=>2,
-],[
-    'version'=>1,'runner_id'=>$runnerId,'sequence'=>1,'observed_at'=>NOW191,
-    'status'=>'ready','capacity'=>['max'=>2,'active'=>0],'active_sessions'=>[],
-],NOW191,60);
-
-$order=InfrastructureIntent::toRunnerOrder($plan['runner_request'],[
-    'order_id'=>'11111111-1111-7111-8111-111111111111',
-    'attempt_id'=>'22222222-2222-7222-8222-222222222222',
-    'generation'=>1,'runner_id'=>$runnerId,'attempt'=>1,'expires_at'=>NOW191+300,
-],NOW191);
+function route191(string $effectiveState, array $health, string $intentId): array
+{
+    if ($effectiveState !== 'online') {
+        return ['authority_used'=>false,'plan'=>null,'runner_request'=>null,'order'=>null];
+    }
+    $plan=InfrastructureIntent::plan(
+        intent191(['intent_id'=>$intentId]),authority191(),null,NOW191,
+    );
+    $order=null;
+    if ($plan['status']==='planned'
+        && is_array($plan['runner_request'])
+        && ($health['eligible'] ?? false) === true) {
+        $order=InfrastructureIntent::toRunnerOrder($plan['runner_request'],[
+            'order_id'=>'11111111-1111-7111-8111-111111111111',
+            'attempt_id'=>'22222222-2222-7222-8222-222222222222',
+            'generation'=>1,'runner_id'=>$health['runner_id'],'attempt'=>1,
+            'expires_at'=>NOW191+300,
+        ],NOW191);
+    }
+    return [
+        'authority_used'=>true,'plan'=>$plan,
+        'runner_request'=>$plan['runner_request'],'order'=>$order,
+    ];
+}
 
 function event191(array $order, int $sequence, string $state, string $code): array
 {
@@ -174,6 +209,30 @@ function event191(array $order, int $sequence, string $state, string $code): arr
         ],
     ]);
 }
+
+$inventory=inventory191();
+$resources=[
+    resource191('env-prod','environment',[
+        'environment_ref'=>null,'source_ref'=>'controlbot:environment/controlbot-prod',
+    ]),
+    resource191('service-web','service',['parent_ref'=>'controlbot:resource/env-prod']),
+];
+$bindings=[[
+    'capability_ref'=>'controlbot:capability/commerce',
+    'project_ref'=>'controlbot:project/project-controlbot',
+    'venture_ref'=>'controlbot:venture/venture-platform',
+    'source_ref'=>'controlbot:binding/commerce','observed_at'=>2000,
+]];
+$freshUi=InfrastructureCenterUi::project($resources,[observation191()],$bindings);
+$freshEffective=$freshUi['resources'][1]['state']['effective_state'];
+$impact=InfrastructureImpact::impactForResource($resources,$bindings,'service-web');
+$health=runnerHealth191(0);
+$route=route191($freshEffective,$health,'intent-191');
+$plan=$route['plan']; $order=$route['order'];
+$action=InfrastructureActionProjection::project(
+    intent191(['intent_id'=>'intent-action-191']),authority191(),null,NOW191,
+);
+
 $accepted=event191($order,1,'accepted','accepted');
 $started=event191($order,2,'started','started');
 $completed=event191($order,3,'completed','verified');
@@ -197,14 +256,16 @@ $budgetDenied=InfrastructureIntent::plan(
 );
 $staleUi=InfrastructureCenterUi::project($resources,[observation191('stale')],$bindings);
 $staleEffective=$staleUi['resources'][1]['state']['effective_state'];
+$staleRoute=route191($staleEffective,$health,'intent-stale-191');
+$ineligibleRoute=route191($freshEffective,runnerHealth191(2),'intent-runner-busy-191');
 
 $out=[
-    'fresh_effective'=>$freshUi['resources'][1]['state']['effective_state'],
-    'impact'=>$impact,'plan'=>$plan,'action'=>$action,'runner_health'=>$health,
-    'order'=>$order,'completed'=>$completed,'owner'=>$owner,
+    'inventory'=>$inventory,'inventory_owns_resources'=>inventoryOwns191($inventory,$resources),
+    'fresh_effective'=>$freshEffective,'impact'=>$impact,'plan'=>$plan,'action'=>$action,
+    'runner_health'=>$health,'order'=>$order,'completed'=>$completed,'owner'=>$owner,
     'authority_denied'=>$authorityDenied,'budget_denied'=>$budgetDenied,
-    'stale_effective'=>$staleEffective,
-    'stale_order'=>$staleEffective==='unknown'?null:'unexpected',
+    'stale_effective'=>$staleEffective,'stale_route'=>$staleRoute,
+    'ineligible_order'=>$ineligibleRoute['order'],
     'secret_instruction_rejected'=>rejected191(fn()=>InfrastructureIntent::plan(
         intent191(['intent_id'=>'intent-secret-191','instruction_ref'=>'controlbot:token:supersecret']),
         authority191(),null,NOW191,

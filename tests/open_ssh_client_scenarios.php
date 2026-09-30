@@ -15,31 +15,38 @@ function request(array $x=[]): array { return array_replace([
 function processResult(int $code=0,string $out='',bool $timed=false,int $ms=5): array {
     return ['exit_code'=>$code,'stdout'=>$out,'stderr'=>'sensitive stderr','duration_ms'=>$ms,'timed_out'=>$timed];
 }
-function invoke(string $mode,array $req=[]): array {
-    $calls=[]; $paths=[]; $modes=[];
-    $runner=static function(array $argv,int $timeout) use (&$calls,&$paths,&$modes,$mode): array {
+function invoke(string $mode,array $req=[],?string $privateKey=null): array {
+    $calls=[]; $paths=[]; $modes=[]; $keyFinalNewline=null; $knownLine=null;
+    $runner=static function(array $argv,int $timeout) use (&$calls,&$paths,&$modes,&$keyFinalNewline,&$knownLine,$mode): array {
         $calls[]=$argv;
         if ($argv[0]==='ssh-keyscan') {
             if ($mode==='scan_timeout') return processResult(1,'',true);
             if ($mode==='scan_fail') return processResult(1);
             $blob=$mode==='mismatch' ? 'other-host-key' : BLOB;
-            return processResult(0,HOST.' ssh-ed25519 '.base64_encode($blob)."\n");
+            $host=(string)$argv[array_key_last($argv)]; $portIndex=array_search('-p',$argv,true);
+            $port=is_int($portIndex) ? (int)($argv[$portIndex+1]??22) : 22;
+            $target=$port===22 ? $host : '['.$host.']:'.$port;
+            return processResult(0,$target.' ssh-ed25519 '.base64_encode($blob)."\n");
         }
         $key=$argv[array_search('-i',$argv,true)+1]; $known=null;
         foreach ($argv as $arg) if (str_starts_with($arg,'UserKnownHostsFile=')) $known=substr($arg,19);
         $paths=[$key,$known]; $modes=[fileperms($key)&0777,fileperms($known)&0777];
+        $keyFinalNewline=str_ends_with((string)file_get_contents($key),"\n");
+        $knownLine=trim((string)file_get_contents($known));
         if ($mode==='ssh_timeout') return processResult(1,'leak='.secret(),true,20);
         if ($mode==='ssh_fail') return processResult(255,'leak='.secret(),false,20);
         return processResult(0,'leak='.secret(),false,20);
     };
     $unlinker=$mode==='cleanup_fail' ? static function(string $path): bool { @unlink($path); return false; } : null;
     $client=new OpenSshClient($runner,$unlinker,sys_get_temp_dir());
-    $result=$client(request($req),secret());
-    return ['result'=>$result,'calls'=>$calls,'paths'=>$paths,'modes'=>$modes,'paths_exist'=>array_map('file_exists',$paths)];
+    $result=$client(request($req),$privateKey??secret());
+    return ['result'=>$result,'calls'=>$calls,'paths'=>$paths,'modes'=>$modes,'paths_exist'=>array_map('file_exists',$paths),
+        'key_final_newline'=>$keyFinalNewline,'known_line'=>$knownLine];
 }
 
 $name=$argv[1]??'';
 if ($name==='success') $out=invoke('success');
+elseif ($name==='review_regressions') $out=['ipv6'=>invoke('success',['host'=>'::1']),'no_newline'=>invoke('success',[],rtrim(secret(),"\n"))];
 elseif ($name==='host_failures') $out=['mismatch'=>invoke('mismatch'),'unavailable'=>invoke('scan_fail'),'timeout'=>invoke('scan_timeout')];
 elseif ($name==='invalid') {
     $cases=['extra'=>request()+['command'=>'id'],'operation'=>request(['operation_id'=>'ssh.command']),

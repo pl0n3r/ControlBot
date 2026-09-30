@@ -1,8 +1,12 @@
+import re
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = (ROOT / "scripts" / "external-monitor.php").read_text(encoding="utf-8")
+PROTOCOL_OPTION = "CURLOPT_PROTOCOLS"
+REDIRECT_PROTOCOL_OPTION = "CURLOPT_REDIR_PROTOCOLS"
+HTTPS_PROTOCOL = "CURLPROTO_HTTPS"
 
 
 def closure(name: str, next_name: str | None = None) -> str:
@@ -11,22 +15,27 @@ def closure(name: str, next_name: str | None = None) -> str:
     return RUNNER[start:end]
 
 
+def option_values(section: str, option: str) -> list[str]:
+    return re.findall(rf"{re.escape(option)}=>([^,\]\s]+)", section)
+
+
 class ExternalMonitorTransportSecurityTests(unittest.TestCase):
     def test_probe_restricts_initial_and_redirect_protocols_to_https(self):
         probe = closure("http", "alert")
-        self.assertIn("CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS", probe)
-        self.assertIn("CURLOPT_REDIR_PROTOCOLS=>CURLPROTO_HTTPS", probe)
+        self.assertEqual(option_values(probe, PROTOCOL_OPTION), [HTTPS_PROTOCOL])
+        self.assertEqual(option_values(probe, REDIRECT_PROTOCOL_OPTION), [HTTPS_PROTOCOL])
         self.assertIn("CURLOPT_FOLLOWLOCATION=>$d['max_redirects']>0", probe)
 
     def test_webhook_transport_is_https_only_without_redirects(self):
         webhook = closure("alert")
-        self.assertIn("CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS", webhook)
-        self.assertIn("CURLOPT_REDIR_PROTOCOLS=>CURLPROTO_HTTPS", webhook)
+        self.assertEqual(option_values(webhook, PROTOCOL_OPTION), [HTTPS_PROTOCOL])
+        self.assertEqual(option_values(webhook, REDIRECT_PROTOCOL_OPTION), [HTTPS_PROTOCOL])
         self.assertIn("CURLOPT_FOLLOWLOCATION=>false", webhook)
 
     def test_protocol_guard_is_exact_and_regression_safe(self):
-        self.assertEqual(RUNNER.count("CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS"), 2)
-        self.assertEqual(RUNNER.count("CURLOPT_REDIR_PROTOCOLS=>CURLPROTO_HTTPS"), 2)
+        for section in (closure("http", "alert"), closure("alert")):
+            self.assertEqual(option_values(section, PROTOCOL_OPTION), [HTTPS_PROTOCOL])
+            self.assertEqual(option_values(section, REDIRECT_PROTOCOL_OPTION), [HTTPS_PROTOCOL])
         self.assertNotRegex(RUNNER, r"CURLPROTO_(?:HTTP|FTP|FTPS|FILE|ALL)\b")
 
     def test_streaming_bounds_and_returntransfer_guard_remain_intact(self):

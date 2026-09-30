@@ -57,6 +57,15 @@ class SonarCiAnalysisWorkflowTests(unittest.TestCase):
         self.assertIn("github.actor != 'dependabot[bot]'", text)
         self.assertNotIn("pull_request_target:", text)
 
+    def test_analysis_method_check_is_derived_from_successful_ci_scanner(self):
+        text = self.text
+        self.assertIn("analysis-method:", text)
+        self.assertIn("name: SonarQube Cloud Analysis Method = CI-based", text)
+        self.assertIn("needs: sonar", text)
+        self.assertIn("SONAR_RESULT: ${{ needs.sonar.result }}", text)
+        self.assertIn('[[ "$SONAR_RESULT" == "success" ]]', text)
+        self.assertNotIn("api/autoscan/activation", text)
+
     def test_workflow_has_no_legacy_rerequest_or_quality_gate_bypass(self):
         text = self.text
         self.assertNotIn("check-suites", text)

@@ -62,3 +62,32 @@ jobs:
             -Dsonar.projectKey=pl0n3r_factory-control
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
+
+  analysis-method:
+    name: SonarQube Cloud Analysis Method = CI-based
+    needs: sonar
+    if: >-
+      vars.SONAR_CI_ENABLED == 'true' &&
+      always() &&
+      (
+        github.event_name == 'push' ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.draft == false &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirmar CI-based por scanner aceptado
+        env:
+          SONAR_RESULT: ${{ needs.sonar.result }}
+        run: |
+          set -euo pipefail
+          [[ "$SONAR_RESULT" == "success" ]] || {
+            echo "::error::El scanner CI no terminó success; Automatic Analysis puede seguir activo o la configuración CI-based es inválida."
+            exit 1
+          }
+          echo "Scanner CI aceptado por SonarQube Cloud; la ejecución no fue rechazada por Automatic Analysis."

@@ -162,7 +162,9 @@ final class SecurityEventRetention
         if ($acknowledge['event_id'] !== $expectedId
             || $acknowledge['account_scope'] !== $event['account_scope']
             || $acknowledge['severity'] !== $event['severity']
-            || $acknowledge['confidence'] !== $event['confidence']) {
+            || $acknowledge['confidence'] !== $event['confidence']
+            || $acknowledge['observed_at'] < $event['observed_at']
+            || $acknowledge['occurred_at'] !== $acknowledge['observed_at']) {
             throw new InvalidArgumentException('acknowledge does not belong to event.');
         }
     }

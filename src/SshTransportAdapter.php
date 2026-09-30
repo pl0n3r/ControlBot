@@ -5,6 +5,7 @@ namespace ControlBot\Production;
 
 use Closure;
 use InvalidArgumentException;
+use ReflectionFunction;
 use Throwable;
 
 final class SshTransportAdapter
@@ -17,11 +18,13 @@ final class SshTransportAdapter
 
     private readonly Closure $usernameResolver;
     private readonly Closure $client;
+    private readonly bool $scopedResolver;
 
     public function __construct(callable $usernameResolver, callable $client)
     {
         $this->usernameResolver = Closure::fromCallable($usernameResolver);
         $this->client = Closure::fromCallable($client);
+        $this->scopedResolver = (new ReflectionFunction($this->usernameResolver))->getNumberOfParameters() >= 2;
     }
 
     public function __invoke(array $descriptor, string $secret): array
@@ -33,25 +36,62 @@ final class SshTransportAdapter
 
         try {
             $request = $this->request($descriptor);
-            $username = ($this->usernameResolver)($descriptor['username_ref']);
-            if (!is_string($username)
-                || preg_match('/^[A-Za-z_][A-Za-z0-9._-]{0,63}$/D', $username) !== 1) {
-                return self::result('failed', 'ssh_username_unavailable', 'SSH username unavailable.');
-            }
-            $request['username'] = $username;
         } catch (InvalidArgumentException) {
             return self::result('failed', 'ssh_descriptor_invalid', 'SSH descriptor invalid.');
+        }
+
+        if ($this->scopedResolver) {
+            try {
+                $raw = ($this->usernameResolver)(
+                    [
+                        'username_ref' => $descriptor['username_ref'],
+                        'provider' => 'hostinger',
+                        'project' => $descriptor['project'],
+                        'environment' => $descriptor['environment'],
+                    ],
+                    function (string $username) use ($request, $secret): array {
+                        return $this->invokeClient($request, $secret, $username);
+                    },
+                );
+            } catch (Throwable) {
+                return self::result('failed', 'ssh_username_unavailable', 'SSH username unavailable.');
+            }
+            return $this->normalize($raw, $request['timeout_ms'], $secret);
+        }
+
+        try {
+            $username = ($this->usernameResolver)($descriptor['username_ref']);
+            if (!self::validUsername($username)) {
+                return self::result('failed', 'ssh_username_unavailable', 'SSH username unavailable.');
+            }
         } catch (Throwable) {
             return self::result('failed', 'ssh_username_unavailable', 'SSH username unavailable.');
         }
 
+        return $this->normalize(
+            $this->invokeClient($request, $secret, $username),
+            $request['timeout_ms'],
+            $secret,
+        );
+    }
+
+    private function invokeClient(array $request, string $secret, string $username): array
+    {
+        if (!self::validUsername($username)) {
+            throw new InvalidArgumentException('username');
+        }
+        $request['username'] = $username;
         try {
-            $raw = ($this->client)($request, $secret);
+            return ($this->client)($request, $secret);
         } catch (Throwable) {
             return self::result('failed', 'ssh_client_error', 'SSH client failed.');
         }
+    }
 
-        return $this->normalize($raw, $request['timeout_ms'], $secret);
+    private static function validUsername(mixed $username): bool
+    {
+        return is_string($username)
+            && preg_match('/^[A-Za-z_][A-Za-z0-9._-]{0,63}$/D', $username) === 1;
     }
 
     private function request(array $d): array

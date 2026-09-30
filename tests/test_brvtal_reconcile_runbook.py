@@ -70,6 +70,10 @@ class BrvtalReconcileRunbookTests(unittest.TestCase):
         self.assertEqual(out["next_intent"]["operation"], "migration.status")
 
     def test_no_write_occurs_before_ready_backup(self):
+        backup = project(completed_steps=["migration.status"])
+        self.assertEqual(backup["next_intent"]["operation"], "database.backup")
+        self.assertNotEqual(backup["next_intent"]["effect"], "write")
+
         out = project(
             completed_steps=["migration.status", "database.backup"],
             backup_receipt=None,

@@ -135,7 +135,7 @@ def write_php_clover(coverage: dict[Path, dict[int, int]]) -> None:
         )
         if not executable:
             continue
-        file_node = ET.SubElement(package, "file", {"name": str(path)})
+        file_node = ET.SubElement(package, "file", {"name": str(path.relative_to(ROOT))})
         file_covered = 0
         for line, state in executable:
             count = 1 if state > 0 else 0

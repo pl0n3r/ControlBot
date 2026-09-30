@@ -18,6 +18,9 @@ class FactoryLiveMatrixTests(unittest.TestCase):
    self.assertIn(h[key]["status"],STATUS);self.assertGreater(h[key]["count"],0);s=h[key]["signal"]
    for field in ("source_ref","observed_at","freshness","age_seconds","evidence_href"):self.assertIn(field,s)
    self.assertTrue(s["source_ref"]);self.assertIsInstance(s["age_seconds"],int)
+  recent=matrix("recent")["header"]["batches"]["signal"]
+  self.assertEqual(recent["id"],"batch:tanda-3")
+  self.assertEqual(recent["age_seconds"],10)
  def test_matrix_covers_seven_projects_and_operational_departments(self):
   m=matrix("full");self.assertEqual(m["projects"],PROJECTS);self.assertEqual(m["departments"],DEPS)
   for project in PROJECTS:

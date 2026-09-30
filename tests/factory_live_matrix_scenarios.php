@@ -35,6 +35,10 @@ $scenario=$argv[1]??'';$mode=$argv[2]??'json';$raw=fixture();
 if($scenario==='empty')$raw=['tool_usage'=>null];
 elseif($scenario==='stale')$raw=mutate($raw,'Condor','governance','degraded','stale');
 elseif($scenario==='error')$raw=mutate($raw,'GrindFlow','security','critical','current');
+elseif($scenario==='recent')$raw['batches']=[
+    sig('batch:tanda-1','factory_plan','healthy','current',['title'=>'Tanda 1'],100),
+    sig('batch:tanda-3','factory_plan','healthy','current',['title'=>'Tanda 3'],190),
+];
 elseif($scenario==='hostile'){
     foreach($raw['work'] as &$row)
         if(($row['data']['project']??null)==='Factory'&&($row['data']['department']??null)==='qa_engineering'){$row['data']['title']='<img src=x onerror=alert(1)>';break;}

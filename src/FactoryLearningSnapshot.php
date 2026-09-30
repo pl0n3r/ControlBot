@@ -42,8 +42,11 @@ final class FactoryLearningSnapshot
 
                 if(array_key_exists('layer',$data)){
                     $layer=self::choice($data['layer'],self::LAYERS,'layer');
+                    $firstSignal=$layers[$layer]['signals']===[];
                     $layers[$layer]['signals'][]=$signal;
-                    $layers[$layer]['status']=self::worse($layers[$layer]['status'],$signal['status']);
+                    $layers[$layer]['status']=$firstSignal
+                        ?$signal['status']
+                        :self::worse($layers[$layer]['status'],$signal['status']);
                 }
 
                 if($section==='learning'&&array_key_exists('metric',$data)){

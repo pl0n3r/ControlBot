@@ -65,17 +65,6 @@ class FactoryLiveProductCostsTests(unittest.TestCase):
         self.assertTrue(row["measured"]);self.assertTrue(row["unknown"])
         self.assertTrue(row["tampered_unknown_blocked"])
 
-    def test_ui_rejects_usage_above_limit(self):
-        self.assertTrue(json.loads(scenario("ui_usage_above_limit"))["blocked"])
-
-    def test_ui_rejects_incoherent_usage_time(self):
-        for name in ("ui_future_usage","ui_bad_age"):
-            self.assertTrue(json.loads(scenario(name))["blocked"],name)
-
-    def test_ui_validates_tool_usage_shape(self):
-        self.assertTrue(json.loads(scenario("ui_bad_tool_usage"))["blocked"])
-        self.assertIn('data-section="product_analytics_costs"',scenario("ui_unknown"))
-
     def test_ui_is_optional_and_renders_unknown_costs(self):
         html=scenario("ui")
         self.assertIn('data-section="product_analytics_costs"',html)

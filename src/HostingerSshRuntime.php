@@ -10,7 +10,7 @@ final class HostingerSshRuntime
     public function __construct(
         SecretsBroker $secretsBroker,
         ConnectionIdentityBroker $identityBroker,
-        ?OpenSshClient $sshClient = null,
+        ?callable $sshClient = null,
     ) {
         $identityResolver = new SshConnectionIdentityResolver(
             $identityBroker,

@@ -10,11 +10,21 @@ final class HostingerSshRuntime
     public function __construct(
         SecretsBroker $secretsBroker,
         ConnectionIdentityBroker $identityBroker,
-        callable $sshClient,
+        ?OpenSshClient $sshClient = null,
     ) {
-        $identityResolver = new SshConnectionIdentityResolver($identityBroker);
-        $transport = new SshTransportAdapter($identityResolver, $sshClient);
-        $this->executor = new HostingerExecutor($secretsBroker, $transport);
+        $identityResolver = new SshConnectionIdentityResolver(
+            $identityBroker,
+            'hostinger-executor',
+        );
+        $transport = new SshTransportAdapter(
+            $identityResolver,
+            $sshClient ?? new OpenSshClient(),
+        );
+        $this->executor = new HostingerExecutor(
+            $secretsBroker,
+            $transport,
+            'hostinger-executor',
+        );
     }
 
     public function execute(

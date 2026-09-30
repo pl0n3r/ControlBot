@@ -47,6 +47,7 @@ final class ObservabilityIncident
             }
 
             $incident=&$incidents[$i];
+            if($incident['status']==='monitoring')$incident['status']='open';
             $duplicate=in_array($event['fingerprint'],$incident['event_fingerprints'],true);
             $incident['occurrence_count']++;
             $incident['first_seen_at']=min($incident['first_seen_at'],$event['occurred_at']);

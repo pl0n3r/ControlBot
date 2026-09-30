@@ -1,16 +1,15 @@
 # Owner Briefing Delivery v1
 
-`OwnerBriefingDelivery` completa #108 sin crear scheduler ni transporte paralelo. Recibe tick explícito, el snapshot de `OwnerBriefing::build()`, policy de canal y, opcionalmente, evidencia de una entrega anterior.
+`OwnerBriefingDelivery` completa #108 sin crear scheduler ni transporte paralelo. Consume un tick explícito de Scheduler, el snapshot de `OwnerBriefing::build()`, una policy de canal y evidencia opcional de una entrega anterior.
 
 ## Contrato
-La identidad depende únicamente de `day + briefing_fingerprint`. El mismo briefing del mismo día conserva `delivery_ref` y `dedupe_key` aunque cambie el canal. Un receipt válido `delivered` para esa identidad hace que el retry devuelva `decision=suppress` con razón `duplicate`.
 
-El planner nunca declara una entrega ocurrida: si es elegible devuelve `delivery_status=pending` y una `delivery_intent`; el transporte autorizado deberá producir después la evidencia `delivered`.
+La identidad depende solo de `day + briefing_fingerprint`. El mismo briefing del mismo día conserva `delivery_ref` y `dedupe_key` aunque cambie el canal. Un receipt válido `delivered` para esa identidad suprime el retry como `duplicate`.
 
-## Fail-closed
-No se produce intención con tick `stale|unknown`, policy deshabilitada, canal no disponible, evidencia previa de la misma identidad o inputs/snapshot inválidos. El canal es abstracto (`email|push`), sin SMTP, push providers ni credenciales.
+El planner nunca afirma que el transporte ocurrió: un caso elegible queda `delivery_status=pending` con una única `delivery_intent`; los demás quedan `suppressed`.
 
-## Fronteras
-No hay DB, red, filesystem write, provider calls, cron, polling, scheduler mutation ni clock global. Día y freshness llegan inyectados por el caller.
+## Fail-closed y fronteras
 
-Observability y Scheduler siguen siendo autoridades externas. Este componente solo materializa una intención idempotente y verificable para una capa de ejecución autorizada.
+Tick `stale|unknown`, policy deshabilitada, canal no disponible, duplicado, snapshot inválido o provenance inválida no producen intención. El canal `email|push` es abstracto.
+
+No hay DB, red, filesystem write, provider calls, cron, polling, scheduler mutation ni clock global. Scheduler/Observability siguen siendo autoridades externas y la evidencia `delivered` solo puede llegar después desde una capa de ejecución autorizada.

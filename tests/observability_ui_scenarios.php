@@ -35,6 +35,7 @@ function unknownMonitor(): array {
 $case=$argv[1]??'';
 if($case==='complete'){echo ObservabilityUi::render(monitor(),backupRow(),restoreRow()),PHP_EOL;exit;}
 if($case==='missing'){echo ObservabilityUi::render(null,null,null),PHP_EOL;exit;}
+if($case==='orphan_restore'){echo ObservabilityUi::render(monitor(),null,restoreRow()),PHP_EOL;exit;}
 if($case==='unknown_probe'){echo ObservabilityUi::render(unknownMonitor(),null,null),PHP_EOL;exit;}
 if($case==='no_restore'){echo ObservabilityUi::render(monitor(),backupRow(),null),PHP_EOL;exit;}
 if($case==='invalid_restore'){

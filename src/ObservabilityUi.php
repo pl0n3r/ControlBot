@@ -19,7 +19,6 @@ final class ObservabilityUi
     {
         $monitor=self::monitor($monitorRaw);
         $backup=$backupRaw===null?null:ControlBotBackup::backupReceipt($backupRaw);
-        if($backup===null&&$restoreRaw!==null) throw new InvalidArgumentException('Restore without backup invalid.');
         $restorable=$backupRaw===null
             ? ['restorable'=>false,'reason'=>'backup_evidence_missing']
             : ControlBotBackup::restorable($backupRaw,$restoreRaw);

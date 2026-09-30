@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "project_ref": "controlbot:project/project-controlbot",
+  "manifest_ref": "controlbot:recovery-manifest/project-controlbot-v1",
+  "targets": {
+    "rpo_minutes": 15,
+    "rto_minutes": 60
+  },
+  "retention": {
+    "hourly": 24,
+    "daily": 7,
+    "weekly": 8,
+    "monthly": 12
+  },
+  "sources": {
+    "database": "required",
+    "media": "not_applicable",
+    "repository": "required",
+    "configuration": "required"
+  },
+  "strategy": {
+    "copies_required": 3,
+    "media_types_required": 2,
+    "offsite_required": true,
+    "immutable_required": true,
+    "undetected_restore_failures_target": 0
+  },
+  "encryption_required": true,
+  "restore_drill_cadence_hours": 168,
+  "source_ref": "https://github.com/pl0n3r/ControlBot/issues/457",
+  "observed_at": 1790743323,
+  "freshness": "fresh"
+}

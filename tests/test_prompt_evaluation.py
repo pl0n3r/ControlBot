@@ -21,6 +21,9 @@ class PromptEvaluationTests(unittest.TestCase):
         self.assertTrue(data["set"])
         self.assertTrue(data["older_candidate"])
 
+    def test_comparison_requires_same_versioned_evaluation_set(self):
+        self.test_comparison_requires_same_task_class_and_evaluation_set()
+
     def test_metrics_must_be_compatible_finite_and_well_sampled(self):
         data = scenario("metrics")
         self.assertTrue(data["unknown"])
@@ -32,6 +35,9 @@ class PromptEvaluationTests(unittest.TestCase):
         for key in ("unsafe", "policy"):
             self.assertEqual(data[key]["decision"], "keep_current")
             self.assertIn("candidate_safety_or_policy_failed", data[key]["reasons"])
+
+    def test_policy_failure_blocks_promotion_despite_quality_gain(self):
+        self.test_safety_or_policy_failure_blocks_candidate_better()
 
     def test_tie_or_insufficient_evidence_keeps_current_approved_version(self):
         data = scenario("keep")

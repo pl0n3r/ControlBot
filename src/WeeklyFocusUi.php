@@ -150,6 +150,9 @@ final class WeeklyFocusUi
 
     private static function states(array $refs, array $raw): array
     {
+        if ($refs === [] && $raw === []) {
+            return [];
+        }
         if (array_is_list($raw)) {
             throw new InvalidArgumentException('WeeklyFocus UI states invalid.');
         }

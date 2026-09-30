@@ -11,6 +11,7 @@ class PromptUiTests(unittest.TestCase):
         html=render("projection"); pure=json.loads(render("pure"))
         self.assertIn("support-agent",html); self.assertIn("v3 · approved",html); self.assertIn("v4 · candidate",html)
         self.assertEqual(pure["hits"],[]); self.assertTrue(json.loads(render("tamper"))["rejected"]); self.assertTrue(json.loads(render("binding"))["rejected"])
+        self.assertTrue(json.loads(render("candidate_contract"))["rejected"])
 
     def test_version_metrics_and_evaluation_set_render(self):
         html=render("projection")

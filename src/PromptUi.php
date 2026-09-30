@@ -60,7 +60,12 @@ final class PromptUi
             $versions[]=$row;
             if(($row['version']??null)===$promotion['candidate_version']) $candidateRow=$row;
         }
-        if(!is_array($candidateRow)||($candidateRow['status']??null)!=='candidate') throw new InvalidArgumentException('Prompt UI candidate mismatch.');
+        if(!is_array($candidateRow)||($candidateRow['status']??null)!=='candidate'
+            ||($candidateRow['supersedes']??null)!==$active['version']
+            ||($candidateRow['task_class']??null)!==$active['task_class']
+            ||($candidateRow['provider_scope']??null)!==$active['provider_scope']
+            ||($candidateRow['variables_schema']??null)!==$active['variables_schema'])
+            throw new InvalidArgumentException('Prompt UI candidate mismatch.');
         foreach([$current,$candidate] as $result){
             if($result['template_id']!==$promotion['template_id']||$result['task_class']!==$active['task_class']
                 ||$result['evaluation_set_id']!==$set['evaluation_set_id']||$result['evaluation_set_version']!==$set['version']

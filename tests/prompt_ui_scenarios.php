@@ -40,6 +40,10 @@ if($case==='tamper'){
     $b=bundle();$b['promotion']['evaluation_set_fingerprint']=str_repeat('a',64);
     echo json_encode(['rejected'=>rejected(fn()=>PromptUi::render($b['history'],$b['set'],$b['current'],$b['candidate'],$b['promotion']))],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
+if($case==='candidate_contract'){
+    $b=bundle();$b['history'][3]['supersedes']=2;
+    echo json_encode(['rejected'=>rejected(fn()=>PromptUi::render($b['history'],$b['set'],$b['current'],$b['candidate'],$b['promotion']))],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
 if($case==='binding'){
     $b=bundle();$b['candidate']['evaluation_set_version']=2;
     echo json_encode(['rejected'=>rejected(fn()=>PromptUi::render($b['history'],$b['set'],$b['current'],$b['candidate'],$b['promotion']))],JSON_THROW_ON_ERROR),PHP_EOL;exit;

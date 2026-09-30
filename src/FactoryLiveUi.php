@@ -22,12 +22,12 @@ final class FactoryLiveUi
     private const MATRIX_STATUS=['GREEN','AMBER','RED','UNKNOWN','STALE'];
     private const SENSITIVE='/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|dsn)/i';
 
-    public static function render(array $snapshot,?array $matrix=null): string
+    public static function render(array $snapshot,?array $matrix=null,?array $learning=null): string
     {
         self::fields($snapshot,['version','observed_at','sections','tool_usage','fingerprint'],'snapshot');
         if($snapshot['version']!==1||!is_int($snapshot['observed_at'])||!is_array($snapshot['sections']))
             throw new InvalidArgumentException('Factory live UI snapshot invalid.');
-        self::safe($snapshot); if($matrix!==null)self::safe($matrix);
+        self::safe($snapshot); if($matrix!==null)self::safe($matrix); if($learning!==null)self::safe($learning);
         $body='';
         foreach(self::SECTIONS as $key=>$label){
             $rows=$snapshot['sections'][$key]??null;
@@ -37,7 +37,8 @@ final class FactoryLiveUi
         }
         $tool=self::card($snapshot['tool_usage'],'tool_usage');
         $matrixHtml=$matrix===null?'':self::matrix($matrix);
-        return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ControlBot · Fábrica viva</title><style>'.self::styles().'</style></head><body><main class="shell" aria-labelledby="factory-live-title"><header class="top"><p class="eyebrow"><span>CONTROLBOT</span> / FÁBRICA VIVA</p><h1 id="factory-live-title">Fábrica viva</h1><p>Solo lectura · evidencia, freshness y antigüedad visibles.</p></header>'.$matrixHtml.$body.'<section class="panel section" data-section="tool_usage"><p class="eyebrow">HERRAMIENTAS</p><h2>Uso y costes</h2><div class="signal-grid">'.$tool.'</div></section></main></body></html>';
+        $learningHtml=$learning===null?'':self::learning($learning);
+        return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ControlBot · Fábrica viva</title><style>'.self::styles().'</style></head><body><main class="shell" aria-labelledby="factory-live-title"><header class="top"><p class="eyebrow"><span>CONTROLBOT</span> / FÁBRICA VIVA</p><h1 id="factory-live-title">Fábrica viva</h1><p>Solo lectura · evidencia, freshness y antigüedad visibles.</p></header>'.$matrixHtml.$learningHtml.$body.'<section class="panel section" data-section="tool_usage"><p class="eyebrow">HERRAMIENTAS</p><h2>Uso y costes</h2><div class="signal-grid">'.$tool.'</div></section></main></body></html>';
     }
 
     private static function matrix(array $matrix): string
@@ -81,6 +82,63 @@ final class FactoryLiveUi
             $link='<a class="issue-link" href="'.self::e($href).'">Evidencia</a>';
         }
         return '<small class="matrix-meta">'.self::e(self::text($signal['label'])).' · '.self::e($source).' · '.self::e($age).' · '.self::e($status).'</small>'.$link;
+    }
+
+
+    private static function learning(array $learning): string
+    {
+        self::fields($learning,['version','observed_at','layers','metrics','recurrence','incidents'],'learning');
+        if($learning['version']!==1||!is_int($learning['observed_at'])||!is_array($learning['layers'])
+            ||!is_array($learning['metrics'])||!is_array($learning['incidents']))
+            throw new InvalidArgumentException('Factory learning UI invalid.');
+        $layers='';foreach($learning['layers'] as $key=>$layer){
+            self::fields($layer,['status','signals'],'learning.layer');
+            $status=self::one($layer['status'],self::MATRIX_STATUS,'learning.layer.status');
+            if(!is_array($layer['signals'])||!array_is_list($layer['signals']))throw new InvalidArgumentException('Learning signals invalid.');
+            $items='';foreach($layer['signals'] as $signal)$items.=self::learningSignal($signal);
+            if($items==='')$items='<small class="matrix-meta">Sin evidencia · UNKNOWN</small>';
+            $layers.='<article class="learning-card status-'.strtolower($status).'"><h3>'.self::e($key).'</h3><strong>'.self::e($status).'</strong>'.$items.'</article>';
+        }
+        $metrics='';foreach($learning['metrics'] as $key=>$metric)$metrics.=self::learningMetric($key,$metric);
+        self::fields($learning['incidents'],['real','auto_notices'],'learning.incidents');
+        $real=self::incidentList($learning['incidents']['real'],'Fallos reales');
+        $auto=self::incidentList($learning['incidents']['auto_notices'],'Avisos [AUTO]');
+        $recurrence=self::learningMetric('recurrence',$learning['recurrence']);
+        return '<section class="panel learning-section" data-section="learning_layers"><p class="eyebrow">CAPAS / DRILL-DOWN</p><h2>Aprendizaje de la fábrica</h2>'
+            .'<div class="learning-grid">'.$layers.'</div><h3>Métricas de aprendizaje</h3><div class="learning-grid">'.$metrics.$recurrence.'</div>'
+            .'<div class="incident-split">'.$real.$auto.'</div></section>';
+    }
+
+    private static function learningSignal(mixed $signal): string
+    {
+        self::fields($signal,['id','label','status','source_ref','observed_at','freshness','age_seconds','evidence_href'],'learning.signal');
+        $status=self::one($signal['status'],self::MATRIX_STATUS,'learning.signal.status');
+        $source=$signal['source_ref']===null?'UNKNOWN':self::text($signal['source_ref']);
+        $age=$signal['age_seconds']===null?'UNKNOWN':self::scalar($signal['age_seconds']).'s';
+        $link=$signal['evidence_href']===null?'':'<a class="issue-link" href="'.self::e(self::matrixHref($signal['evidence_href'])).'">Evidencia</a>';
+        return '<div class="learning-signal"><b>'.self::e(self::text($signal['label'])).'</b><small class="matrix-meta">'
+            .self::e($source).' · '.self::e($age).' · '.self::e($status).'</small>'.$link.'</div>';
+    }
+
+    private static function learningMetric(string $name,mixed $metric): string
+    {
+        self::fields($metric,['status','value','source_ref','observed_at','freshness','age_seconds','evidence_href'],'learning.metric');
+        $status=self::one($metric['status'],self::MATRIX_STATUS,'learning.metric.status');
+        $value=$metric['value']===null?'UNKNOWN':self::value($metric['value']);
+        $source=$metric['source_ref']===null?'UNKNOWN':self::text($metric['source_ref']);
+        $age=$metric['age_seconds']===null?'UNKNOWN':self::scalar($metric['age_seconds']).'s';
+        $link=$metric['evidence_href']===null?'':'<a class="issue-link" href="'.self::e(self::matrixHref($metric['evidence_href'])).'">Evidencia</a>';
+        return '<article class="learning-card status-'.strtolower($status).'"><span>'.self::e($name).'</span><strong>'
+            .self::e($value).'</strong><small class="matrix-meta">'.self::e($source).' · '.self::e($age).' · '.self::e($status).'</small>'.$link.'</article>';
+    }
+
+    private static function incidentList(mixed $items,string $label): string
+    {
+        if(!is_array($items)||!array_is_list($items))throw new InvalidArgumentException('Learning incidents invalid.');
+        $body='';foreach($items as $item){if(!is_array($item)||!isset($item['title']))throw new InvalidArgumentException('Learning incident invalid.');
+            $body.='<li>'.self::e(self::text($item['title'])).self::learningSignal(array_diff_key($item,['title'=>true])).'</li>';}
+        if($body==='')$body='<li>UNKNOWN</li>';
+        return '<section class="incident-list"><h3>'.self::e($label).'</h3><ul>'.$body.'</ul></section>';
     }
 
     private static function card(mixed $row,string $section): string
@@ -131,7 +189,7 @@ final class FactoryLiveUi
     private static function styles(): string
     {
         return UiTheme::tokensCss().<<<'CSS'
-*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;color:var(--text);background:var(--bg);font-family:Inter,system-ui,sans-serif}.shell{width:min(100%,1180px);margin:auto;padding:24px 16px 48px}.top{padding:8px 0 20px;border-bottom:1px solid var(--line)}.top p{color:var(--muted);line-height:1.5}.eyebrow{color:var(--muted);font:700 .72rem/1.2 "JetBrains Mono",monospace;letter-spacing:.08em}.eyebrow span{color:var(--cyan)}h1{font-size:clamp(2rem,10vw,3.4rem);margin:.25rem 0}h2{margin:.4rem 0 1rem}.section,.matrix-section{margin-top:16px}.panel{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:18px}.signal-grid,.ops-header{display:grid;grid-template-columns:1fr;gap:12px}.signal,.matrix-summary{min-width:0;border:1px solid var(--line);border-left:4px solid var(--muted);padding:14px;background:var(--panel-raised);overflow-wrap:anywhere}.matrix-summary{display:grid;gap:5px}.matrix-meta{display:block;color:var(--muted);margin-top:6px;overflow-wrap:anywhere}.matrix-scroll{margin-top:14px;overflow-x:auto;border:1px solid var(--line);border-radius:8px}.matrix-scroll:focus-visible,.issue-link:focus-visible{outline:3px solid var(--amber);outline-offset:3px}table{width:100%;min-width:900px;border-collapse:collapse}th,td{padding:12px;border:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--panel-raised)}.matrix-cell{min-width:115px}.status-green{border-left-color:var(--green)}.status-red{border-left-color:var(--red)}.status-amber,.status-stale{border-left-color:var(--amber)}.status-unknown{border-left-color:var(--muted)}.signal-head{display:flex;justify-content:space-between;gap:10px;font:700 .72rem/1.2 "JetBrains Mono",monospace;text-transform:uppercase}.state-healthy.fresh-current{border-left-color:var(--green)}.state-critical{border-left-color:var(--red)}.state-degraded,.state-blocked,.fresh-stale{border-left-color:var(--amber)}.fresh-unknown,.state-unknown{border-left-color:var(--muted)}dl{margin:12px 0 0}dl div{display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;border-top:1px solid var(--line);padding:8px 0}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}.issue-link{display:inline-block;min-height:44px;margin-top:8px;color:var(--cyan);padding:10px 0}@media(min-width:760px){.shell{padding:36px 28px 64px}.signal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ops-header{grid-template-columns:repeat(5,minmax(0,1fr))}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;color:var(--text);background:var(--bg);font-family:Inter,system-ui,sans-serif}.shell{width:min(100%,1180px);margin:auto;padding:24px 16px 48px}.top{padding:8px 0 20px;border-bottom:1px solid var(--line)}.top p{color:var(--muted);line-height:1.5}.eyebrow{color:var(--muted);font:700 .72rem/1.2 "JetBrains Mono",monospace;letter-spacing:.08em}.eyebrow span{color:var(--cyan)}h1{font-size:clamp(2rem,10vw,3.4rem);margin:.25rem 0}h2{margin:.4rem 0 1rem}.section,.matrix-section,.learning-section{margin-top:16px}.panel{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:18px}.signal-grid,.ops-header,.learning-grid,.incident-split{display:grid;grid-template-columns:1fr;gap:12px}.signal,.matrix-summary,.learning-card{min-width:0;border:1px solid var(--line);border-left:4px solid var(--muted);padding:14px;background:var(--panel-raised);overflow-wrap:anywhere}.matrix-summary,.learning-card{display:grid;gap:5px}.learning-signal{margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}.incident-list ul{padding-left:20px}.matrix-meta{display:block;color:var(--muted);margin-top:6px;overflow-wrap:anywhere}.matrix-scroll{margin-top:14px;overflow-x:auto;border:1px solid var(--line);border-radius:8px}.matrix-scroll:focus-visible,.issue-link:focus-visible{outline:3px solid var(--amber);outline-offset:3px}table{width:100%;min-width:900px;border-collapse:collapse}th,td{padding:12px;border:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--panel-raised)}.matrix-cell{min-width:115px}.status-green{border-left-color:var(--green)}.status-red{border-left-color:var(--red)}.status-amber,.status-stale{border-left-color:var(--amber)}.status-unknown{border-left-color:var(--muted)}.signal-head{display:flex;justify-content:space-between;gap:10px;font:700 .72rem/1.2 "JetBrains Mono",monospace;text-transform:uppercase}.state-healthy.fresh-current{border-left-color:var(--green)}.state-critical{border-left-color:var(--red)}.state-degraded,.state-blocked,.fresh-stale{border-left-color:var(--amber)}.fresh-unknown,.state-unknown{border-left-color:var(--muted)}dl{margin:12px 0 0}dl div{display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;border-top:1px solid var(--line);padding:8px 0}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}.issue-link{display:inline-block;min-height:44px;margin-top:8px;color:var(--cyan);padding:10px 0}@media(min-width:760px){.shell{padding:36px 28px 64px}.signal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ops-header{grid-template-columns:repeat(5,minmax(0,1fr))}.learning-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.incident-split{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 CSS;
     }
 }

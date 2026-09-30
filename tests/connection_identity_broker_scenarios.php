@@ -66,7 +66,16 @@ if ($name === 'authorized') {
     $seen=null;
     $resolved=$broker->execute(context(['username_ref'=>$newRef,'generation'=>2]),
         static function(string $username) use (&$seen): string { $seen=$username; return 'resolved'; });
-    $out=['new'=>$new,'old'=>$old,'resolved'=>$resolved,'resolved_username'=>$seen,
+    $temporal=[];
+    foreach ([
+        'invalid_date'=>static fn()=>broker()->register(identity(['issued_at'=>'2027-02-30T07:00:00Z']),USERNAME),
+        'revoke_before'=>static fn()=>broker()->revoke(REF,'2027-01-15T06:59:59Z'),
+        'rotate_before'=>static fn()=>broker()->rotate(REF,'vault:user:before','2027-01-15T06:59:59Z','deploy_before'),
+        'rotate_equal'=>static fn()=>broker()->rotate(REF,'vault:user:equal','2027-01-15T07:00:00Z','deploy_equal'),
+    ] as $key=>$operation) {
+        try { $operation(); $temporal[$key]=false; } catch (InvalidArgumentException) { $temporal[$key]=true; }
+    }
+    $out=['new'=>$new,'old'=>$old,'resolved'=>$resolved,'resolved_username'=>$seen,'temporal'=>$temporal,
         'scope_preserved'=>$new['provider']==='hostinger'&&$new['project']==='brvtal'&&$new['environment']==='production'];
 } elseif ($name === 'redaction') {
     $broker=broker();

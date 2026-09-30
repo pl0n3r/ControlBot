@@ -13,7 +13,7 @@ final class SshConnectionIdentityResolver
 
     public function __construct(
         private readonly ConnectionIdentityBroker $broker,
-        private readonly string $executorId = 'ssh-transport-adapter',
+        private readonly string $executorId = 'hostinger-executor',
     ) {
         if (preg_match('/^[a-z][a-z0-9-]{1,79}$/D', $this->executorId) !== 1) {
             throw new InvalidArgumentException('Executor id inválido.');

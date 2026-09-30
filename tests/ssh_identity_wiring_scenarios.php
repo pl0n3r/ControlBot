@@ -36,7 +36,7 @@ function descriptor535(array $replace = []): array
 
 function broker535(array $identity = null): ConnectionIdentityBroker
 {
-    $broker = new ConnectionIdentityBroker(['ssh-transport-adapter']);
+    $broker = new ConnectionIdentityBroker(['hostinger-executor']);
     $broker->register($identity ?? identity535(), USERNAME_535);
     return $broker;
 }

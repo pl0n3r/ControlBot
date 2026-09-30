@@ -254,9 +254,12 @@ $budgetDenied=InfrastructureIntent::plan(
     ]),
     authority191(),null,NOW191,
 );
-$staleUi=InfrastructureCenterUi::project($resources,[observation191('stale')],$bindings);
-$staleEffective=$staleUi['resources'][1]['state']['effective_state'];
-$staleRoute=route191($staleEffective,$health,'intent-stale-191');
+$nonFresh=[];
+foreach (['stale','unknown'] as $freshness) {
+    $ui=InfrastructureCenterUi::project($resources,[observation191($freshness)],$bindings);
+    $effective=$ui['resources'][1]['state']['effective_state'];
+    $nonFresh[$freshness]=['effective'=>$effective,'route'=>route191($effective,$health,'intent-'.$freshness.'-191')];
+}
 $ineligibleRoute=route191($freshEffective,runnerHealth191(2),'intent-runner-busy-191');
 
 $out=[
@@ -264,8 +267,7 @@ $out=[
     'fresh_effective'=>$freshEffective,'impact'=>$impact,'plan'=>$plan,'action'=>$action,
     'runner_health'=>$health,'order'=>$order,'completed'=>$completed,'owner'=>$owner,
     'authority_denied'=>$authorityDenied,'budget_denied'=>$budgetDenied,
-    'stale_effective'=>$staleEffective,'stale_route'=>$staleRoute,
-    'ineligible_order'=>$ineligibleRoute['order'],
+    'non_fresh'=>$nonFresh,'ineligible_order'=>$ineligibleRoute['order'],
     'secret_instruction_rejected'=>rejected191(fn()=>InfrastructureIntent::plan(
         intent191(['intent_id'=>'intent-secret-191','instruction_ref'=>'controlbot:token:supersecret']),
         authority191(),null,NOW191,

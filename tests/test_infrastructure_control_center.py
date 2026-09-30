@@ -23,6 +23,9 @@ def scenario():
 class InfrastructureControlCenterTests(unittest.TestCase):
     def test_end_to_end_intent_to_verified_evidence_uses_existing_control_planes(self):
         data = scenario()
+        self.assertEqual(data["inventory"]["providers"][0]["provider_id"], "provider-primary")
+        self.assertEqual(data["inventory"]["accounts"][0]["account_id"], "account-primary")
+        self.assertTrue(data["inventory_owns_resources"])
         self.assertEqual(data["fresh_effective"], "online")
         self.assertIn("controlbot:capability/commerce", data["impact"]["capability_refs"])
         self.assertEqual(data["plan"]["status"], "planned")
@@ -45,7 +48,11 @@ class InfrastructureControlCenterTests(unittest.TestCase):
         self.assertEqual(data["budget_denied"]["status"], "denied")
         self.assertIn("financial_evidence_unknown", data["budget_denied"]["reasons"])
         self.assertEqual(data["stale_effective"], "unknown")
-        self.assertIsNone(data["stale_order"])
+        self.assertFalse(data["stale_route"]["authority_used"])
+        self.assertIsNone(data["stale_route"]["plan"])
+        self.assertIsNone(data["stale_route"]["runner_request"])
+        self.assertIsNone(data["stale_route"]["order"])
+        self.assertIsNone(data["ineligible_order"])
 
     def test_no_parallel_queue_direct_provider_path_or_secret_payload(self):
         data = scenario()

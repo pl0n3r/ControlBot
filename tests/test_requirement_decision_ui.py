@@ -40,6 +40,7 @@ class RequirementDecisionUiTests(unittest.TestCase):
         self.assertEqual(diff["project"]["artifact"], "project")
         self.assertEqual(diff["project"]["operation"], "link_existing")
         self.assertEqual(diff["project"]["project_ref"], "controlbot:project/controlbot")
+        self.assertEqual(self.d["unknown_view"]["materialization_diff"]["project"]["operation"], "owner_choice_required")
         self.assertEqual(diff["epic"]["artifact"], "epic")
         self.assertEqual(diff["epic"]["operation"], "propose_create")
         self.assertEqual(len(diff["issues"]), len(self.d["proposal"]["slices"]))
@@ -81,7 +82,12 @@ class RequirementDecisionUiTests(unittest.TestCase):
         self.assertEqual(set(surfaces), {"desktop", "mobile"})
         for surface in surfaces.values():
             self.assertEqual(surface["controls"], ["approve", "revise", "reject"])
+            self.assertEqual(surface["semantic_element"], "button")
+            self.assertEqual(surface["group_role"], "group")
+            self.assertGreaterEqual(surface["min_target_px"], 52)
             self.assertTrue(surface["keyboard"])
+            self.assertEqual(surface["keyboard_keys"], ["Enter", "Space"])
+            self.assertTrue(surface["focus_visible"])
             self.assertFalse(surface["gesture_only"])
             self.assertEqual(surface["sections"], ["summary", "impacts", "materialization_diff", "decision"])
 

@@ -13,6 +13,37 @@ final class ExecutiveCockpitUi
     private const HEALTH=['healthy','degraded','critical','unknown'];
     private const FRESH=['current','stale','unknown'];
     private const CLASSES=['fyi','watch','decision','critical'];
+    private const FIELD_FRESHNESS='freshness';
+    private const FIELD_SOURCE_REF='source_ref';
+    private const FIELD_OBSERVED_AT='observed_at';
+    private const OPTIONAL_PROJECTIONS = [
+        'finance' => [
+            'finance',
+            [
+                'period', 'currency', 'net_revenue', 'gross_profit', 'operating_result',
+                'cash_in', 'cash_out', 'customers', 'transactions', self::FIELD_FRESHNESS,
+                'confidence', self::FIELD_SOURCE_REF, self::FIELD_OBSERVED_AT,
+            ],
+        ],
+        'product_health' => [
+            'product health',
+            ['product_id', 'surface', 'period', self::FIELD_FRESHNESS, 'reasons', 'dimension_count'],
+        ],
+        'infrastructure' => [
+            'infrastructure',
+            [
+                'resource_id', 'kind', 'state', self::FIELD_FRESHNESS,
+                self::FIELD_SOURCE_REF, self::FIELD_OBSERVED_AT, 'incident_count',
+            ],
+        ],
+        'runtime' => [
+            'runtime',
+            [
+                'source', 'provider_id', 'state', self::FIELD_OBSERVED_AT, 'heartbeat_at',
+                'total_capacity', 'occupied_capacity', 'assignment_ref',
+            ],
+        ],
+    ];
     private const SENSITIVE='/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|dsn)/i';
     private const PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?(?=(?:[0-9(). -]*[0-9]){10})[0-9][0-9(). -]{7,}[0-9])/i';
 
@@ -28,6 +59,7 @@ final class ExecutiveCockpitUi
         foreach($cockpit['ventures'] as $row){
             self::fields($row,['venture','business_health','technical_health','finance','product_health','infrastructure','runtime','owner_inbox_counts'],'venture row');
             self::fields($row['venture'],['venture_id','group_id','title','state','strategy_role','responsible'],'venture');
+            self::projectionFields($row);
             $id=self::ventureId($row['venture']['venture_id']);
             if(isset($seen[$id])||$row['venture']['group_id']!==$cockpit['group_id']) throw new InvalidArgumentException('Venture scope invalid.');
             $seen[$id]=true; self::health($row['business_health']); self::health($row['technical_health']); $ventures[]=$row;
@@ -129,6 +161,26 @@ final class ExecutiveCockpitUi
             throw new InvalidArgumentException('Health UI input invalid.');
     }
 
+    private static function projectionFields(array $row): void
+    {
+        self::fields(
+            $row['venture']['responsible'],
+            ['identity_id', 'kind', 'state', self::FIELD_SOURCE_REF, self::FIELD_OBSERVED_AT],
+            'venture responsible',
+        );
+        self::fields($row['owner_inbox_counts'], self::CLASSES, 'owner inbox counts');
+        foreach (self::OPTIONAL_PROJECTIONS as $key => [$label, $expected]) {
+            self::optionalFields($row[$key], $expected, $label);
+        }
+        if ($row['product_health'] !== null) {
+            self::fields(
+                $row['product_health']['period'],
+                ['start_at', 'end_at'],
+                'product health period',
+            );
+        }
+    }
+
     private static function ventureId(mixed $v): string
     {if(is_string($v)&&preg_match('/^venture-[a-z0-9][a-z0-9-]{1,79}$/D',$v)===1)return $v;throw new InvalidArgumentException('venture_id invalid.');}
     private static function anchor(string $id): string{return 'venture-'.$id;}
@@ -138,6 +190,12 @@ final class ExecutiveCockpitUi
     {if(is_array($v)){foreach($v as $x)self::safe($x);return;}if(is_string($v)&&(preg_match(self::SENSITIVE,$v)===1||preg_match(self::PII,$v)===1))throw new InvalidArgumentException('Sensitive UI input.');}
     private static function fields(mixed $row,array $expected,string $label): void
     {if(!is_array($row)||array_is_list($row))throw new InvalidArgumentException($label.' invalid.');$a=array_keys($row);sort($a);sort($expected);if($a!==$expected)throw new InvalidArgumentException($label.' fields invalid.');}
+    private static function optionalFields(mixed $row, array $expected, string $label): void
+    {
+        if ($row !== null) {
+            self::fields($row, $expected, $label);
+        }
+    }
 
     private static function styles(): string
     {

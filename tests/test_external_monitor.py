@@ -72,4 +72,42 @@ class ExternalMonitorCoreTests(unittest.TestCase):
         for forbidden in ("curl_","file_get_contents(","fopen(","file_put_contents(","new pdo","mysqli","shell_exec(","exec(","proc_open(","passthru(","cron"):
             self.assertNotIn(forbidden,source)
 
+
+class ExternalMonitorTests(unittest.TestCase):
+    """Bridge ejecutable del contrato agregado del parent #16."""
+
+    def test_simulated_outage_alerts_without_private_actions(self):
+        """Una caída externa alerta aunque no exista workflow privado."""
+        outage=scenario("alert")["outage"]
+        self.assertEqual(outage["application_state"],"down")
+        self.assertEqual(outage["private_workflow_state"],"unknown")
+        self.assertTrue(outage["alert_intent"]["required"])
+        self.assertTrue(outage["alert_intent"]["external_channel_required"])
+        self.assertEqual(outage["alert_intent"]["code"],"application_down")
+
+    def test_missing_probe_is_fail_closed_by_ttl(self):
+        """Probe ausente o vencido nunca se interpreta como healthy."""
+        d=scenario("freshness")
+        self.assertEqual(d["missing"]["application_state"],"unknown")
+        self.assertEqual(d["expired"]["application_state"],"degraded")
+        self.assertNotIn("healthy",[d["missing"]["application_state"],d["expired"]["application_state"]])
+
+    def test_incident_78_distinguishes_runner_capacity_from_application_outage(self):
+        """El fixture #78 separa falta de capacidad de caída de aplicación."""
+        d=scenario("incident78")
+        self.assertEqual(d["application_state"],"unknown")
+        self.assertEqual(d["private_workflow_state"],"blocked")
+        self.assertEqual(d["owner_capacity_state"],"exhausted")
+        self.assertIn("private_startup_failure_without_runner",d["reasons"])
+        self.assertIn("capacity_evidence_converges",d["reasons"])
+        self.assertNotIn("yaml",json.dumps(d).lower())
+
+    def test_budget_correlation_preserves_unknown_when_billing_is_unavailable(self):
+        """Capacidad conocida no inventa evidencia del mecanismo de billing."""
+        d=scenario("alert")["capacity"]
+        self.assertEqual(d["owner_capacity_state"],"exhausted")
+        self.assertEqual(d["billing_mechanism_state"],"unknown")
+        self.assertIn("owner_capacity_exhausted",d["reasons"])
+        self.assertIn("billing_mechanism_unknown",d["reasons"])
+
 if __name__=="__main__": unittest.main()

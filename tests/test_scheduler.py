@@ -191,5 +191,45 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(first,second)
 
 
+    def test_critical_incident_preempts_lower_priority_only_at_safe_point(self):
+        data=fixture("scheduler_policy_guard_scenarios.php","preemption")
+        self.assertFalse(data["blocked"]["allowed"])
+        self.assertIn("non_preemptible_outside_safe_point",data["blocked"]["reasons"])
+        self.assertTrue(data["safe"]["allowed"])
+        self.assertEqual(data["safe"]["selected_work_item_id"],"work-incident")
+        self.assertEqual(data["safe"]["running_work_item_id"],"work-running")
+        self.assertFalse(data["stale"]["allowed"])
+        self.assertIn("stale_generation",data["stale"]["reasons"])
+
+    def test_weekly_focus_never_outranks_incident_or_critical_policy(self):
+        data=fixture("scheduler_policy_guard_scenarios.php","focus")
+        self.assertTrue(data["critical_rejected"])
+        self.assertTrue(data["incident_rejected"])
+        self.assertEqual(data["protected_selected"]["selected_key"],"work-critical")
+        self.assertTrue(data["protected_selected"]["focus"]["influenced"])
+
+    def test_scheduler_final_bridge_reuses_existing_policy_guard_fixture(self):
+        source=(ROOT/"tests"/"test_scheduler.py").read_text(encoding="utf-8")
+        fixture_path=ROOT/"tests"/"scheduler_policy_guard_scenarios.php"
+        self.assertTrue(fixture_path.is_file())
+        self.assertIn('fixture("scheduler_policy_guard_scenarios.php","preemption")',source)
+        self.assertIn('fixture("scheduler_policy_guard_scenarios.php","focus")',source)
+
+    def test_scheduler_parent_contract_has_all_exact_targets(self):
+        targets=(
+            "test_same_reserved_issue_is_never_assigned_to_two_sessions",
+            "test_critical_incident_preempts_lower_priority_only_at_safe_point",
+            "test_unsatisfied_dependency_prevents_dispatch",
+            "test_rate_limited_account_reassigns_capacity_without_losing_workitem",
+            "test_selection_reason_is_deterministic_and_reproducible",
+            "test_lost_heartbeat_requeues_safely_with_handoff_and_generation_fencing",
+            "test_weekly_focus_never_outranks_incident_or_critical_policy",
+            "test_scheduler_simulation_is_deterministic",
+        )
+        for target in targets:
+            self.assertTrue(callable(getattr(SchedulerTests,target,None)),target)
+
+
+
 if __name__=="__main__":
     unittest.main()

@@ -15,7 +15,7 @@ function obs(string $source,string $type,string $severity,array $payload,int $at
 }
 function health(string $status,int $at,int $received,array $keys,string $severity='warning',array $extra=[]): array
 { return obs('health','health_probe',$severity,array_merge(['status'=>$status],$extra),$at,$received,$keys); }
-function correlate(array $events,int $now=140,array $ttl=null): array
+function correlate(array $events,int $now=140,?array $ttl=null): array
 { return ObservabilityIncident::correlate($events,$now,$ttl??['health'=>300,'ci'=>300,'deploy'=>300,'agent'=>300],300,900); }
 
 $case=$argv[1]??'';
@@ -54,10 +54,13 @@ if($case==='recovery'){
 
     $stale=correlate([$failure,$healthy],500,['health'=>60,'ci'=>300,'deploy'=>300,'agent'=>300]);
     $unknown=correlate([$failure,$healthy],130,['ci'=>300,'deploy'=>300,'agent'=>300]);
+    $again=health('down',115,116,['project:controlbot','issue:78'],'critical');
+    $reopened=correlate([$failure,$monitor,$again],130);
     echo json_encode([
         'resolved'=>$resolved,'timeline'=>$validated,
         'stale_status'=>$stale['incidents'][0]['status'],
         'unknown_status'=>$unknown['incidents'][0]['status'],
+        'reopened_status'=>$reopened['incidents'][0]['status'],
     ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
 }
 if($case==='separate'){

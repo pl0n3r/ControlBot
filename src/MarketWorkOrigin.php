@@ -70,7 +70,7 @@ final class MarketWorkOrigin
 
     private static function context(array $raw): array
     {
-        return ['group_id'=>self::ref($raw['group_id'],'group_id'),'authority_level'=>self::slug($raw['authority_level'],'authority_level'),'policy_ref'=>self::ref($raw['policy_ref'],'policy_ref'),'priority_class'=>self::choice($raw['priority_class'],self::PRIORITIES,'priority_class'),'depends_on'=>self::items($raw['depends_on'],'depends_on',true),'evidence_refs'=>self::items($raw['evidence_refs'],'evidence_refs',true),'project_id'=>$raw['project_id']===null?null:self::ref($raw['project_id'],'project_id'),'repository_ref'=>$raw['repository_ref']===null?null:self::repository($raw['repository_ref']),'approval_ref'=>$raw['approval_ref']===null?null:self::ref($raw['approval_ref'],'approval_ref'),'budget_ref'=>$raw['budget_ref']===null?null:self::ref($raw['budget_ref'],'budget_ref')];
+        return ['group_id'=>self::ref($raw['group_id'],'group_id'),'authority_level'=>self::slug($raw['authority_level'],'authority_level'),'policy_ref'=>self::ref($raw['policy_ref'],'policy_ref'),'priority_class'=>self::choice($raw['priority_class'],self::PRIORITIES,'priority_class'),'depends_on'=>self::items($raw['depends_on'],'depends_on',true),'evidence_refs'=>self::evidenceRefs($raw['evidence_refs']),'project_id'=>$raw['project_id']===null?null:self::ref($raw['project_id'],'project_id'),'repository_ref'=>$raw['repository_ref']===null?null:self::repository($raw['repository_ref']),'approval_ref'=>$raw['approval_ref']===null?null:self::ref($raw['approval_ref'],'approval_ref'),'budget_ref'=>$raw['budget_ref']===null?null:self::ref($raw['budget_ref'],'budget_ref')];
     }
 
     private static function item(string $venture,string $market,string $country,array $gate,array $profile,array $base): array
@@ -84,6 +84,8 @@ final class MarketWorkOrigin
 
     private static function result(string $status,array $reasons,array $items,array $unresolved,string $venture,string $market,string $country): array
     {sort($unresolved,SORT_STRING);return ['version'=>1,'status'=>$status,'reasons'=>$reasons,'venture_id'=>$venture,'market_id'=>$market,'country'=>$country,'work_items'=>$items,'unresolved_domains'=>$unresolved,'execution'=>false];}
+    private static function evidenceRefs(mixed $v):array
+    {if(!is_array($v)||!array_is_list($v)||count($v)>16)throw new InvalidArgumentException('evidence_refs invalid.');$o=[];foreach($v as $x){if(!is_string($x)||preg_match('#^controlbot:[a-z][a-z0-9-]{1,31}/[a-f0-9]{32}$#D',$x)!==1||isset($o[$x]))throw new InvalidArgumentException('evidence_refs invalid.');$o[$x]=true;}$o=array_keys($o);sort($o,SORT_STRING);return $o;}
     private static function items(mixed $v,string $label,bool $empty,int $max=50):array
     {if(!is_array($v)||!array_is_list($v)||count($v)>$max||(!$empty&&$v===[]))throw new InvalidArgumentException($label.' invalid.');$o=[];foreach($v as $x)$o[self::ref($x,$label)]=true;$o=array_keys($o);sort($o,SORT_STRING);return $o;}
     private static function slugs(mixed $v,string $label,?array $catalog=null):array

@@ -13,6 +13,7 @@ def scenario(script, name):
         check=True,
         text=True,
         capture_output=True,
+        timeout=60,
     )
     return json.loads(run.stdout)
 
@@ -72,6 +73,8 @@ class PauseControlTests(unittest.TestCase):
         fencing = scheduler("fencing")
         plan = resume("valid")
         replay = resume("replay")
+        drift = resume("drift")
+        deterministic = resume("deterministic")
         self.assertTrue(release["idempotent"])
         self.assertFalse(release["effective"]["blocked"])
         self.assertTrue(fencing["ready"]["ready"])
@@ -84,6 +87,10 @@ class PauseControlTests(unittest.TestCase):
         self.assertEqual(plan["order_id"], "11111111-1111-4111-8111-111111111111")
         self.assertEqual(plan["attempt_id"], "22222222-2222-4222-8222-222222222222")
         self.assertEqual((plan["generation"], plan["attempt"]), (4, 2))
+        self.assertTrue(all(drift.values()))
+        self.assertTrue(deterministic["same"])
+        self.assertTrue(deterministic["fingerprint"])
+        self.assertEqual(deterministic["hits"], [])
         self.assertTrue(replay["exact"])
         self.assertTrue(replay["conflict"])
 

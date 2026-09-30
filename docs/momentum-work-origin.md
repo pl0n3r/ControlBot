@@ -4,7 +4,9 @@
 
 ## Fronteras
 
-MOMENTUM entrega intención tipada a partir de snapshots ya normalizados de Campaign, CreativeVariant, Email, Experiment, Paid Media y Performance del mismo Venture/Campaign. Creative debe estar aprobado, Email elegible, Experiment completado con evidencia current y Performance current.
+MOMENTUM entrega intención tipada a partir de snapshots normalizados de Campaign, CreativeVariant, Email, Experiment, Paid Media y Performance del mismo Venture/Campaign. Creative debe estar aprobado, Email elegible, Experiment debe tener `status=completed` con resultado conocido y `freshness=current`, y Performance debe permanecer current.
+
+La evidencia E2E de este contrato se construye pasando por las **APIs públicas** canónicas de Campaign, Creative, Email, Experiment, Paid Media y Performance. No se copian arrays con shape supuesto: un drift incompatible upstream debe romper el escenario antes del handoff.
 
 Paid Media conserva la decisión canónica de authority y **CAPITAL**. `deny`, `owner_decision_required`, unknown o stale producen `status=blocked`, `work_item=null` y un gate referenciable; nunca se convierten en permiso implícito.
 
@@ -22,4 +24,4 @@ Los campos opcionales de Factory siguen opcionales; trabajo no-code no necesita 
 
 La señal rechaza campos extra, PII y material con forma de secreto, incluso si llegan desde evidencia upstream. No existe provider execution, envío, persistencia, scheduler/queue paralelo ni credenciales. Toda salida mantiene `execution=false`.
 
-Reversión: retirar estas cuatro rutas; no existe estado externo ni migración.
+Reversión: retirar el hardening test/docs de #441; no existe estado externo ni migración.

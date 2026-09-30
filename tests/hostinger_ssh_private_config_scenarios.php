@@ -90,11 +90,10 @@ function request543(): array
         'subject'=>'hostinger-executor','idempotency_key'=>'idem:543:readonly','now'=>NOW_543,
     ];
 }
-function client543(int &$calls): OpenSshClient
+function client543(object $trace): OpenSshClient
 {
-    $calls=0;
-    $runner=static function(array $argv,int $timeout) use (&$calls): array {
-        $calls++;
+    $runner=static function(array $argv,int $timeout) use ($trace): array {
+        $trace->calls++;
         if (($argv[0]??null)==='ssh-keyscan') {
             $host=$argv[count($argv)-1];
             return ['exit_code'=>0,'stdout'=>$host.' ssh-ed25519 '.base64_encode(HOST_BLOB_543)."\n",
@@ -106,10 +105,15 @@ function client543(int &$calls): OpenSshClient
 }
 function build543(array $config): array
 {
-    $calls=0; $error=null; $ctx=null;
-    try { $ctx=HostingerSshPrivateConfig::fromRecord($config,client543($calls)); }
+    $trace=(object)['calls'=>0]; $error=null; $ctx=null;
+    try { $ctx=HostingerSshPrivateConfig::fromRecord($config,client543($trace)); }
     catch (Throwable $e) { $error=$e->getMessage(); }
-    return ['context'=>$ctx,'runner_calls'=>$calls,'error'=>$error];
+    return ['context'=>$ctx,'trace'=>$trace,'error'=>$error];
+}
+function failed543(array $config): array
+{
+    $built=build543($config);
+    return ['built'=>$built['context']!==null,'runner_calls'=>$built['trace']->calls,'error'=>$built['error']];
 }
 
 $name=$argv[1]??'';
@@ -118,7 +122,7 @@ if ($name==='valid') {
     $first=$built['context']->execute(ProductionOperation::fromId('ssh.readonly'),grant543(),request543());
     $second=$built['context']->execute(ProductionOperation::fromId('ssh.readonly'),grant543(),request543());
     $out=['first'=>$first,'second'=>$second,'snapshot'=>$built['context']->safeSnapshot(),
-        'runner_calls'=>$built['runner_calls'],'error'=>$built['error']];
+        'runner_calls'=>$built['trace']->calls,'error'=>$built['error']];
 } elseif ($name==='scope') {
     $cases=[
         'profile_project'=>config543(['profile'=>profile543(['project'=>'other'])]),
@@ -131,20 +135,20 @@ if ($name==='valid') {
         'identity_provider'=>config543(['identity'=>identity543(['provider'=>'other'])]),
         'identity_ref'=>config543(['identity'=>identity543(['username_ref'=>'vault:user:other'])]),
     ];
-    $out=[]; foreach($cases as $k=>$v) $out[$k]=build543($v);
+    $out=[]; foreach($cases as $k=>$v) $out[$k]=failed543($v);
 } elseif ($name==='unsupported') {
     $out=[
-        'capability'=>build543(config543(['secret_reference'=>secret543(['capability'=>'health.check'])])),
-        'kind'=>build543(config543(['secret_reference'=>secret543(['secret_kind'=>'api_token'])])),
+        'capability'=>failed543(config543(['secret_reference'=>secret543(['capability'=>'health.check'])])),
+        'kind'=>failed543(config543(['secret_reference'=>secret543(['secret_kind'=>'api_token'])])),
     ];
 } elseif ($name==='invalid') {
     $extra=config543()+['token'=>'forbidden'];
     $missing=config543(); unset($missing['username']);
     $out=[
-        'extra'=>build543($extra),'missing'=>build543($missing),
-        'empty_key'=>build543(config543(['private_key'=>''])),
-        'control_key'=>build543(config543(['private_key'=>"abcdefghijkl\x01mnop"])),
-        'bad_username'=>build543(config543(['username'=>'bad user'])),
+        'extra'=>failed543($extra),'missing'=>failed543($missing),
+        'empty_key'=>failed543(config543(['private_key'=>''])),
+        'control_key'=>failed543(config543(['private_key'=>"abcdefghijkl\x01mnop"])),
+        'bad_username'=>failed543(config543(['username'=>'bad user'])),
     ];
 } elseif ($name==='surface') {
     $built=build543(config543());

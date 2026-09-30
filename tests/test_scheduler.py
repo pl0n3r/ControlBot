@@ -9,7 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def fixture(script, name):
     run=subprocess.run(
         ["php",str(ROOT/"tests"/script),name],
-        cwd=ROOT,check=True,text=True,capture_output=True,
+        cwd=ROOT,check=True,text=True,capture_output=True,timeout=60,
     )
     return json.loads(run.stdout)
 

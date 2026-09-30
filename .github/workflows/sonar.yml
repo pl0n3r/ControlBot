@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,6 +21,7 @@ jobs:
     if: >-
       vars.SONAR_CI_ENABLED == 'true' &&
       (
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
         github.event_name == 'push' ||
         (
           github.event_name == 'pull_request' &&
@@ -70,6 +72,7 @@ jobs:
       vars.SONAR_CI_ENABLED == 'true' &&
       always() &&
       (
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
         github.event_name == 'push' ||
         (
           github.event_name == 'pull_request' &&

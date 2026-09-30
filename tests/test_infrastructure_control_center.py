@@ -47,11 +47,9 @@ class InfrastructureControlCenterTests(unittest.TestCase):
         self.assertIsNone(data["authority_denied"]["runner_request"])
         self.assertEqual(data["budget_denied"]["status"], "denied")
         self.assertIn("financial_evidence_unknown", data["budget_denied"]["reasons"])
-        self.assertEqual(data["stale_effective"], "unknown")
-        self.assertFalse(data["stale_route"]["authority_used"])
-        self.assertIsNone(data["stale_route"]["plan"])
-        self.assertIsNone(data["stale_route"]["runner_request"])
-        self.assertIsNone(data["stale_route"]["order"])
+        closed = {"authority_used": False, "plan": None, "runner_request": None, "order": None}
+        for freshness in ("stale", "unknown"):
+            self.assertEqual(data["non_fresh"][freshness], {"effective": "unknown", "route": closed})
         self.assertIsNone(data["ineligible_order"])
 
     def test_no_parallel_queue_direct_provider_path_or_secret_payload(self):

@@ -20,8 +20,6 @@ use ControlBot\Production\HostingerSshRuntime;
 use ControlBot\Production\ProductionOperation;
 use ControlBot\Production\SecretReference;
 use ControlBot\Production\SecretsBroker;
-use InvalidArgumentException;
-
 const NOW_539 = 1_799_997_000;
 const SECRET_539 = 'fixture-private-key-material-539';
 const USERNAME_539 = 'deploy_user_539';
@@ -188,7 +186,7 @@ if ($name==='valid') {
     );
     try {
         $runtime->execute(ProductionOperation::fromId('ssh.readonly'),grant539(),profile539(),$ref,$override);
-    } catch (InvalidArgumentException) {
+    } catch (\InvalidArgumentException) {
         $rejected=true;
     }
     $out=[

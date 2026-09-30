@@ -65,6 +65,10 @@ class FactoryLiveProductCostsTests(unittest.TestCase):
         self.assertTrue(row["measured"]);self.assertTrue(row["unknown"])
         self.assertTrue(row["tampered_unknown_blocked"])
 
+    def test_ui_rejects_tampered_product_metric(self):
+        row=json.loads(scenario("ui_product_metric_shape"))
+        self.assertEqual(row,{"department":True,"freshness":True,"future":True,"age":True})
+
     def test_ui_is_optional_and_renders_unknown_costs(self):
         html=scenario("ui")
         self.assertIn('data-section="product_analytics_costs"',html)

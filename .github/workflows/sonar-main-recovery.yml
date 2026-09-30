@@ -1,4 +1,4 @@
-name: Sonar main recovery
+name: Sonar exact-main recovery
 
 on:
   push:
@@ -16,86 +16,107 @@ jobs:
   recover:
     name: Recover Sonar exact-main
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      SHA: ${{ github.sha }}
+      SONAR_APP_ID: "12526"
+      WAIT_ATTEMPTS: "40"
+      WAIT_SECONDS: "15"
     steps:
       - name: Wait for Sonar and rerequest once if needed
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          SONAR_APP_ID: '12526'
         run: |
           set -euo pipefail
 
-          get_suite() {
-            gh api "repos/$REPOSITORY/commits/$SHA/check-suites?per_page=100" \
-              --jq ".check_suites | map(select(.app.id == ${SONAR_APP_ID})) | sort_by(.id) | last // {}"
+          api="${GITHUB_API_URL}/repos/${REPOSITORY}"
+          auth_header="Authorization: Bearer ${GITHUB_TOKEN}"
+          accept_header="Accept: application/vnd.github+json"
+          version_header="X-GitHub-Api-Version: 2022-11-28"
+
+          api_get() {
+            curl --fail-with-body --silent --show-error \
+              -H "$auth_header" \
+              -H "$accept_header" \
+              -H "$version_header" \
+              "$1"
           }
 
-          deadline=$((SECONDS + 180))
+          select_suite() {
+            jq -cer --arg sha "$SHA" --argjson app_id "$SONAR_APP_ID" '
+              [.check_suites[] | select(.head_sha == $sha and .app.id == $app_id)]
+              | sort_by(.id)
+              | last
+            '
+          }
+
           suite_id=""
-          status=""
-          conclusion=""
-
-          while (( SECONDS < deadline )); do
-            suite="$(get_suite)"
-            suite_id="$(jq -r '.id // empty' <<<"$suite")"
-            if [[ -z "$suite_id" ]]; then
-              sleep 10
-              continue
-            fi
-
-            status="$(jq -r '.status // empty' <<<"$suite")"
-            conclusion="$(jq -r '.conclusion // empty' <<<"$suite")"
-            if [[ "$status" == "completed" ]]; then
-              if [[ "$conclusion" == "success" ]]; then
-                echo "Sonar already succeeded for $SHA."
-                exit 0
+          initial_conclusion=""
+          for _ in $(seq 1 "$WAIT_ATTEMPTS"); do
+            selected="$(api_get "${api}/commits/${SHA}/check-suites?app_id=${SONAR_APP_ID}&per_page=100" | select_suite || true)"
+            if [[ -n "$selected" && "$selected" != "null" ]]; then
+              suite_id="$(jq -r '.id' <<<"$selected")"
+              status="$(jq -r '.status' <<<"$selected")"
+              conclusion="$(jq -r '.conclusion // ""' <<<"$selected")"
+              if [[ "$status" == "completed" ]]; then
+                initial_conclusion="$conclusion"
+                break
               fi
-              break
             fi
-            sleep 10
+            sleep "$WAIT_SECONDS"
           done
 
-          if [[ -z "$suite_id" ]]; then
-            echo "::error::SonarQubeCloud check suite did not appear for $SHA."
-            exit 1
-          fi
-          if [[ "$status" != "completed" ]]; then
-            echo "::error::SonarQubeCloud check suite did not reach a terminal state."
+          if [[ -z "$suite_id" || -z "$initial_conclusion" ]]; then
+            echo "::error::SonarQubeCloud suite did not reach a terminal state for ${SHA}."
             exit 1
           fi
 
-          echo "Sonar ended as $conclusion; requesting one retry for suite $suite_id."
-          gh api --method POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "repos/$REPOSITORY/check-suites/$suite_id/rerequest" \
-            --silent
+          if [[ "$initial_conclusion" == "success" ]]; then
+            echo "SonarQubeCloud already succeeded for ${SHA}; no rerequest needed."
+            exit 0
+          fi
 
-          deadline=$((SECONDS + 300))
-          observed_reset=false
-          while (( SECONDS < deadline )); do
-            suite="$(gh api "repos/$REPOSITORY/check-suites/$suite_id")"
-            status="$(jq -r '.status // empty' <<<"$suite")"
-            conclusion="$(jq -r '.conclusion // empty' <<<"$suite")"
+          before_check_id="$(
+            api_get "${api}/check-suites/${suite_id}/check-runs?filter=latest&per_page=100" \
+              | jq -r '[.check_runs[].id] | max // 0'
+          )"
 
-            if [[ "$status" != "completed" ]]; then
-              observed_reset=true
-              sleep 10
-              continue
-            fi
-            if [[ "$conclusion" == "success" ]]; then
-              echo "Sonar rerequest succeeded for $SHA."
-              exit 0
-            fi
-            if [[ "$observed_reset" == "true" ]]; then
-              echo "::error::Sonar rerequest finished as $conclusion."
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "$auth_header" \
+            -H "$accept_header" \
+            -H "$version_header" \
+            "${api}/check-suites/${suite_id}/rerequest" \
+            >/dev/null
+
+          rerequest_conclusion=""
+          for _ in $(seq 1 "$WAIT_ATTEMPTS"); do
+            suite="$(api_get "${api}/check-suites/${suite_id}")"
+            suite_sha="$(jq -r '.head_sha' <<<"$suite")"
+            suite_app_id="$(jq -r '.app.id' <<<"$suite")"
+            if [[ "$suite_sha" != "$SHA" || "$suite_app_id" != "$SONAR_APP_ID" ]]; then
+              echo "::error::SonarQubeCloud suite identity changed; refusing to continue."
               exit 1
             fi
-            sleep 10
+
+            latest_check_id="$(
+              api_get "${api}/check-suites/${suite_id}/check-runs?filter=latest&per_page=100" \
+                | jq -r '[.check_runs[].id] | max // 0'
+            )"
+            status="$(jq -r '.status' <<<"$suite")"
+            conclusion="$(jq -r '.conclusion // ""' <<<"$suite")"
+
+            if (( latest_check_id > before_check_id )) && [[ "$status" == "completed" ]]; then
+              rerequest_conclusion="$conclusion"
+              break
+            fi
+            sleep "$WAIT_SECONDS"
           done
 
-          echo "::error::Sonar rerequest did not complete successfully within the bounded wait."
-          exit 1
+          if [[ "$rerequest_conclusion" != "success" ]]; then
+            echo "::error::SonarQubeCloud rerequest did not finish successfully for ${SHA}."
+            exit 1
+          fi
+
+          echo "SonarQubeCloud rerequest succeeded for ${SHA}."

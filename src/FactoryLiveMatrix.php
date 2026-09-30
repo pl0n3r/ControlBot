@@ -71,7 +71,7 @@ final class FactoryLiveMatrix
         foreach($rows as $row){
             $signal=self::signal($row);
             if($signal['source_ref']!==null)$count++;
-            if($best===null||self::better($signal,$best))$best=$signal;
+            if($best===null||self::betterHeader($signal,$best))$best=$signal;
         }
         return ['status'=>$best['status']??'UNKNOWN','count'=>$count,'signal'=>$best];
     }
@@ -111,6 +111,18 @@ final class FactoryLiveMatrix
         $rank=['GREEN'=>1,'AMBER'=>2,'UNKNOWN'=>3,'STALE'=>4,'RED'=>5];
         $a=$rank[$candidate['status']]??0;$b=$rank[$current['status']]??0;
         return $a>$b||($a===$b&&$candidate['id']<$current['id']);
+    }
+
+    private static function betterHeader(array $candidate,array $current): bool
+    {
+        $rank=['GREEN'=>1,'AMBER'=>2,'UNKNOWN'=>3,'STALE'=>4,'RED'=>5];
+        $a=$rank[$candidate['status']]??0;$b=$rank[$current['status']]??0;
+        if($a!==$b)return $a>$b;
+        $candidateAge=$candidate['age_seconds'];$currentAge=$current['age_seconds'];
+        if(is_int($candidateAge)&&is_int($currentAge)&&$candidateAge!==$currentAge)
+            return $candidateAge<$currentAge;
+        if(is_int($candidateAge)!==is_int($currentAge))return is_int($candidateAge);
+        return $candidate['id']<$current['id'];
     }
 
     private static function project(mixed $value): ?string

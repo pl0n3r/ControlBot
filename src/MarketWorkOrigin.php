@@ -85,18 +85,21 @@ final class MarketWorkOrigin
     private static function result(string $status,array $reasons,array $items,array $unresolved,string $venture,string $market,string $country): array
     {sort($unresolved,SORT_STRING);return ['version'=>1,'status'=>$status,'reasons'=>$reasons,'venture_id'=>$venture,'market_id'=>$market,'country'=>$country,'work_items'=>$items,'unresolved_domains'=>$unresolved,'execution'=>false];}
 
-    private static function evidenceRefs(mixed $values):array
+    private static function evidenceRefs(mixed $refs):array
     {
-        if(!is_array($values)||!array_is_list($values)||count($values)>50)
+        if(!is_array($refs)||!array_is_list($refs)||count($refs)>50){
             throw new InvalidArgumentException('evidence_refs invalid.');
-        $out=[];
-        foreach($values as $value){
-            if(!is_string($value)||preg_match('#^controlbot:[a-z][a-z0-9-]{1,31}/[a-f0-9]{32}$#D',$value)!==1)
-                throw new InvalidArgumentException('evidence_ref invalid.');
-            if(in_array($value,$out,true)) throw new InvalidArgumentException('evidence_ref duplicated.');
-            $out[]=$value;
         }
-        sort($out,SORT_STRING); return $out;
+        $valid=array_filter(
+            $refs,
+            static fn($ref):bool=>is_string($ref)
+                &&preg_match('#^controlbot:[a-z][a-z0-9-]{1,31}/[a-f0-9]{32}$#D',$ref)===1
+        );
+        if(count($valid)!==count($refs)||count(array_unique($refs))!==count($refs)){
+            throw new InvalidArgumentException('evidence_refs invalid.');
+        }
+        sort($refs,SORT_STRING);
+        return $refs;
     }
 
     private static function items(mixed $v,string $label,bool $empty,int $max=50):array

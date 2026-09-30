@@ -134,6 +134,14 @@ if($scenario==='no_evidence'){
         'metric'=>$learning['metrics']['lessons_per_week_project']['by_project']['BRVTAL']??null,
     ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
 }
+if($scenario==='metric_competition'){
+    $raw=learningFixture();
+    $raw['learning'][]=lsig('learning:invalid-newer','incident_lesson','healthy','current',[
+        'title'=>'Invalid newer metric','metric'=>'lessons_per_week_project','metric_value'=>99,'project'=>'ControlBot'
+    ],199);
+    [, $learning]=learningBuilt($raw);
+    echo json_encode($learning['metrics']['lessons_per_week_project']['by_project']['ControlBot'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+}
 if($scenario==='valid_evidence'){
     $raw=learningFixture();
     $raw['learning'][]=lsig('learning:valid-evidence','incident_lesson','degraded','current',[

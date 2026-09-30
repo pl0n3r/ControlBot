@@ -147,12 +147,11 @@ final class FactoryLearningSnapshot
 
     private static function metric(array $signal,mixed $value): array
     {
-        $evidenced=$signal['evidence_href']!==null;
+        if($signal['evidence_href']===null)return self::unknownMetric();
         return [
-            'status'=>$evidenced?$signal['status']:'UNKNOWN','value'=>$evidenced?$value:null,
-            'source_ref'=>$signal['source_ref'],'observed_at'=>$signal['observed_at'],
-            'freshness'=>$signal['freshness'],'age_seconds'=>$signal['age_seconds'],
-            'evidence_href'=>$signal['evidence_href'],
+            'status'=>$signal['status'],'value'=>$value,'source_ref'=>$signal['source_ref'],
+            'observed_at'=>$signal['observed_at'],'freshness'=>$signal['freshness'],
+            'age_seconds'=>$signal['age_seconds'],'evidence_href'=>$signal['evidence_href'],
         ];
     }
 

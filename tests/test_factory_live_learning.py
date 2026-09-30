@@ -109,8 +109,12 @@ class FactoryLiveLearningTests(unittest.TestCase):
 
     def test_metric_without_resolvable_evidence_fails_closed(self):
         row=json.loads(scenario("no_evidence"))["metric"]
-        self.assertEqual(row["status"],"UNKNOWN");self.assertIsNone(row["value"])
-        self.assertIsNone(row["evidence_href"]);self.assertIsInstance(row["source_ref"],str)
+        self.assertIsNone(row)
+
+    def test_unlinked_newer_metric_cannot_displace_evidenced_metric(self):
+        row=json.loads(scenario("metric_competition"))
+        self.assertEqual(row["status"],"GREEN");self.assertEqual(row["value"],7)
+        self.assertTrue(row["evidence_href"].startswith("https://github.com/"))
 
     def test_resolvable_evidence_preserves_status(self):
         row=json.loads(scenario("valid_evidence"))

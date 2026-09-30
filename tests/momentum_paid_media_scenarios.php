@@ -79,7 +79,7 @@ function plan(string $operation='launch',string $fresh='current',int $observed=1
   'spend_ref'=>'spend:cccccccccccccccccccccccccccccccc','amount_minor'=>2000000,'currency'=>'COP',
   'budget_ref'=>'budget:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   'evidence_refs'=>['evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','evidence:dddddddddddddddddddddddddddddddd'],
-  'blast_radius_ref'=>'blast-radius:ffffffffffffffffffffffffffffffff'],'secret_scope_ref'=>'scope:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  'blast_radius'=>'medium'],'secret_scope_ref'=>'scope:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
   'freshness'=>$fresh,'observed_at'=>$observed,'reallocation'=>$reallocation,'execution'=>false];}
 function run(array $p,mixed $ctx=null,?array $cap=null):array{
  return MomentumPaidMedia::plan($p,brand(),$ctx??verified(),$cap??capital(),NOW);

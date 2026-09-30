@@ -41,6 +41,8 @@ class SonarCoverageContractTests(unittest.TestCase):
         self.assertIn("CONTROLBOT_REAL_PHP", self.generator)
         self.assertIn("CONTROLBOT_PHP_COVERAGE_DIR", combined)
         self.assertIn('{"tests", "vendor", "build"}', self.generator)
+        self.assertIn("str(path.relative_to(ROOT))", self.generator)
+        self.assertNotIn('{"name": str(path)}', self.generator)
         for forbidden in (
             "SONAR_TOKEN",
             "password=",

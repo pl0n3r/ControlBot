@@ -113,6 +113,7 @@ final class SecurityEventInbox
                     'enabled' => $state === 'unread',
                     'label' => 'Acknowledge security event',
                     'keyboard_focusable' => true,
+                    'focus_visible' => true,
                     'surfaces' => ['mobile', 'desktop'],
                     'requires_hover' => false,
                     'requires_drag' => false,

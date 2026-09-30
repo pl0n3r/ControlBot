@@ -14,6 +14,7 @@ if(!preg_match('#^https://[^\s@]+$#D',$url)||!preg_match('#^https://[^\s@]+$#D',
 $http=static function(array $d): array {
     $ch=curl_init($d['url']);$started=microtime(true);$body='';$overflow=false;
     curl_setopt_array($ch,[CURLOPT_FOLLOWLOCATION=>$d['max_redirects']>0,CURLOPT_MAXREDIRS=>$d['max_redirects'],
+        CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS,CURLOPT_REDIR_PROTOCOLS=>CURLPROTO_HTTPS,
         CURLOPT_TIMEOUT_MS=>$d['timeout_ms'],CURLOPT_CONNECTTIMEOUT_MS=>min(3000,$d['timeout_ms']),
         CURLOPT_USERAGENT=>'ControlBot-ExternalMonitor/1',CURLOPT_HTTPHEADER=>['Accept: application/json,text/html;q=0.5']]);
     curl_setopt($ch,CURLOPT_WRITEFUNCTION,static function($handle,string $chunk) use (&$body,&$overflow,$d): int {
@@ -30,7 +31,8 @@ $http=static function(array $d): array {
 };
 $alert=static function(array $payload) use($webhook): array {
     $body=json_encode($payload,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);$ch=curl_init($webhook);
-    curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$body,CURLOPT_TIMEOUT_MS=>5000,
+    curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$body,CURLOPT_FOLLOWLOCATION=>false,
+        CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS,CURLOPT_REDIR_PROTOCOLS=>CURLPROTO_HTTPS,CURLOPT_TIMEOUT_MS=>5000,
         CURLOPT_CONNECTTIMEOUT_MS=>3000,CURLOPT_HTTPHEADER=>['Content-Type: application/json','User-Agent: ControlBot-ExternalMonitor/1']]);
     curl_setopt($ch,CURLOPT_WRITEFUNCTION,static fn($handle,string $chunk): int=>strlen($chunk));
     $ok=curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);$errno=curl_errno($ch);curl_close($ch);

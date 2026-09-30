@@ -43,6 +43,10 @@ final class SecurityEventInbox
         }
 
         usort($cards, self::compare(...));
+        foreach ($cards as &$card) {
+            unset($card['_sort_at']);
+        }
+        unset($card);
         return ['version' => 1, 'cards' => $cards];
     }
 
@@ -109,6 +113,7 @@ final class SecurityEventInbox
                     'enabled' => $state === 'unread',
                     'label' => 'Acknowledge security event',
                     'keyboard_focusable' => true,
+                    'surfaces' => ['mobile', 'desktop'],
                     'requires_hover' => false,
                     'requires_drag' => false,
                 ],

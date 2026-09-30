@@ -307,15 +307,8 @@ final class ExecutiveCockpitUi
         return 'venture-' . $id;
     }
 
-    private static function value(mixed $v): string
-    {
-        return $v === null ? 'unknown' : (is_bool($v) ? ($v ? 'true' : 'false') : (string) $v);
-    }
-
-    private static function e(string $v): string
-    {
-        return htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    }
+    private static function value(mixed $v): string{return $v===null?'unknown':(is_bool($v)?($v?'true':'false'):(string)$v);}
+    private static function e(string $v): string{return htmlspecialchars($v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');}
 
     private static function safe(mixed $v): void
     {

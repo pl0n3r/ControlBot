@@ -6,10 +6,10 @@ use ControlBot\Momentum\MomentumPerformance;
 use InvalidArgumentException;
 
 function ref(string $n,string $c):string{return $n.':'.str_repeat($c,32);}
-function pipeline(string $v='venture-condor',string $c='5'):array{return [
+function pipeline(string $v='venture-condor',string $c='5',string $fresh='current'):array{return [
  'version'=>1,'pipeline_id'=>ref('pipeline','1'),'venture_id'=>$v,'lead_ref'=>ref('lead','2'),'opportunity_ref'=>ref('opportunity','3'),
  'source_ref'=>ref('source','4'),'campaign_ref'=>ref('campaign',$c),'creative_ref'=>ref('creative','6'),'owner_ref'=>ref('owner','7'),
- 'stage'=>'won','qualification'=>'qualified','next_action_ref'=>null,'observed_at'=>1200,'freshness'=>'current',
+ 'stage'=>'won','qualification'=>'qualified','next_action_ref'=>null,'observed_at'=>1200,'freshness'=>$fresh,
  'customer_success_handoff_ref'=>ref('customer-success','9')];}
 function attribution(string $k='observed',string $cur='COP'):array{return [
  'version'=>1,'attribution_id'=>ref('attribution','a'),'venture_id'=>'venture-condor','opportunity_ref'=>ref('opportunity','3'),
@@ -52,7 +52,7 @@ if($case==='scope'){
  $dup=raw();$dup['evidence_refs']=[ref('evidence','5'),ref('evidence','5')];
  $missing=raw();$missing['spend']['evidence_refs']=[];$outside=raw();$outside['spend']['observed_at']=999;
  $wrong=raw();$wrong['spend']['governed_spend_ref']=ref('spend','9');$stale=raw('stale');
- echo json_encode(['stale'=>run($stale),'paid_stale'=>bad(fn()=>run(null,paid(fresh:'stale'))),
+ echo json_encode(['stale'=>run($stale),'pipeline_stale'=>run(pipe:pipeline(fresh:'stale')),'paid_stale'=>bad(fn()=>run(null,paid(fresh:'stale'))),
   'currency'=>bad(fn()=>run(null,null,null,attribution(cur:'USD'))),'duplicate'=>bad(fn()=>run($dup)),
   'missing'=>bad(fn()=>run($missing)),'outside'=>bad(fn()=>run($outside)),'spend_ref'=>bad(fn()=>run($wrong))],JSON_THROW_ON_ERROR);
 }elseif($case==='pure'){

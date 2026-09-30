@@ -79,6 +79,7 @@ final class VentureAccessRuntime
         if (isset($used[$verifiedContext])) {
             throw new InvalidArgumentException('Verified access context replay invalid.');
         }
+        $used[$verifiedContext] = true;
         $context = $verifiedContext->decisionContext();
         $grant = $verifiedContext->grant();
         if (!array_is_list($policyRestrictions) || count($policyRestrictions) > 8) {
@@ -108,8 +109,6 @@ final class VentureAccessRuntime
             $decision = 'allow';
             $reason = 'authorized';
         }
-        $used[$verifiedContext] = true;
-
         $projection = new \stdClass();
         $evidence = hash('sha256', json_encode([
             $context['scope'], $capability, $requiredAuthorityLevel, $decision, $reason,

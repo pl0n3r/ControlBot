@@ -64,7 +64,8 @@ class InfrastructureControlCenterTests(unittest.TestCase):
             self.assertNotIn(direct, source)
 
     def test_docs_define_authority_execution_and_cost_boundaries(self):
-        docs = (ROOT / "docs/infrastructure-control-center.md").read_text().lower()
+        raw_docs = (ROOT / "docs/infrastructure-control-center.md").read_text().lower()
+        docs = " ".join(raw_docs.split())
         for term in ("controlbot", "factory", "factoryrunner", "aegis", "capital"):
             self.assertIn(term, docs)
         self.assertIn("cola única", docs)

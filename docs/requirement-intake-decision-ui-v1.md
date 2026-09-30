@@ -10,12 +10,12 @@
 - `impacts`: riesgos, dependencias, dudas y `project_match` del proposal original;
 - `materialization_diff`: previsualización tipada de Project, Epic e Issues, todos con `execution=false`;
 - `decision_options`: `approve | revise | reject` como intenciones tipadas, nunca como acciones ejecutadas;
-- `surfaces`: contrato equivalente desktop/mobile con controles accesibles por teclado y sin dependencia exclusiva de gestos;
+- `surfaces`: contrato equivalente desktop/mobile con botones semánticos, foco visible, objetivo táctil mínimo de 52 px, teclado y sin dependencia exclusiva de gestos;
 - `view_ref` y `fingerprint` deterministas para el mismo proposal.
 
 ## Diff de materialización
 
-La previsualización no inventa contenido. Un Project ya matched se representa como `link_existing`; un match ambiguo como `review_matches`; la ausencia de match como `propose_create`. Epic e Issues se derivan únicamente de los campos y slices ya presentes en el `EpicProposal`.
+La previsualización no inventa contenido. Un Project ya matched se representa como `link_existing`; un match ambiguo como `review_matches`; la ausencia de match como `owner_choice_required`, porque #509 todavía no define un Project nuevo concreto. Epic e Issues se derivan únicamente de los campos y slices ya presentes en el `EpicProposal`.
 
 Ningún elemento del diff ejecuta una mutación. La materialización idempotente pertenece a un slice posterior y requiere una decisión aprobada explícita.
 

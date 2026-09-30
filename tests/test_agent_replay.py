@@ -17,6 +17,17 @@ def scenario(script, name):
     return json.loads(run.stdout)
 
 
+def html_scenario(name, active="all"):
+    run = subprocess.run(
+        ["php", str(ROOT / "tests" / "replay_ui_scenarios.php"), name, active],
+        cwd=ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    return run.stdout
+
+
 class AgentReplayTests(unittest.TestCase):
     def test_pr_replay_reconstructs_verified_lifecycle(self):
         data = scenario("agent_replay_lifecycle_scenarios.php", "complete")
@@ -84,6 +95,18 @@ class AgentReplayTests(unittest.TestCase):
         self.assertEqual(conflict["state"], "unknown")
         self.assertEqual(conflict["reason"], "conflicting_evidence")
         self.assertEqual(conflict["variant_count"], 2)
+
+    def test_replay_filters_and_evidence_links_render(self):
+        html = html_scenario("filters", "ci")
+        for category in ("all", "code", "ci", "coordination", "decisions", "production", "security"):
+            self.assertIn(f"?category={category}", html)
+        self.assertIn("CI check evidence", html)
+        self.assertNotIn("Code commit evidence", html)
+        self.assertNotIn("Production deploy evidence", html)
+        self.assertIn(
+            'href="https://github.com/pl0n3r/ControlBot/actions/runs/123"',
+            html,
+        )
 
     def test_incident_78_fixture_preserves_success_startup_failure_and_skipped(self):
         incident = scenario("agent_replay_lifecycle_scenarios.php", "incident78")

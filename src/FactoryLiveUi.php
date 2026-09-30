@@ -160,37 +160,39 @@ final class FactoryLiveUi
         self::fields($view,['version','observed_at','product_analytics','costs','limits','tool_usage'],'product_costs');
         if($view['version']!==1||!is_int($view['observed_at'])||!is_array($view['product_analytics']))
             throw new InvalidArgumentException('Product costs view invalid.');
+
         $products='';
         foreach($view['product_analytics'] as $row){
-            self::fields($row,['metric_id','venture_id','product_id','surface','category','status','value','unit','sample_size','source_ref','evidence_ref','observed_at','freshness','confidence','nature'],'product_metric');
-            $status=self::one($row['status'],['measured','unknown','insufficient_data'],'product metric status');
-            $fresh=self::one($row['freshness'],['fresh','stale','unknown'],'product metric freshness');
-            $value=$row['value']===null?'UNKNOWN':self::value($row['value']).' '.self::text($row['unit']);
-            $products.='<article class="learning-card"><span>'.self::e(self::text($row['category'])).'</span><strong>'.self::e($value).'</strong><small class="matrix-meta">'
-                .self::e(self::text($row['source_ref'])).' · '.self::e((string)$row['observed_at']).' · '.self::e($fresh).' · '.self::e($status).'</small></article>';
+            self::fields($row,['department','project','metric','value','status','source_ref','observed_at','freshness','age_seconds'],'product_metric');
+            $status=self::one($row['status'],['measured','unknown'],'product metric status');
+            $fresh=self::one($row['freshness'],['current','stale','unknown'],'product metric freshness');
+            $value=$row['value']===null?'UNKNOWN':self::value($row['value']);
+            $products.='<article class="learning-card"><span>'.self::e(self::text($row['department'])).' · '.self::e(self::text($row['project'])).'</span><strong>'.self::e($value).'</strong><small class="matrix-meta">'
+                .self::e(self::text($row['metric'])).' · '.self::e(self::text($row['source_ref'])).' · '.self::e((string)$row['observed_at']).' · '.self::e($fresh).' · '.self::e($status).'</small></article>';
         }
-        if($products==='')$products='<article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin métricas medidas</small></article>';
+        if($products==='')$products='<article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin métricas canónicas medidas</small></article>';
 
         self::fields($view['costs'],['status','items'],'costs');
-        $costStatus=self::one($view['costs']['status'],['measured','unknown'],'cost status');
-        if(!is_array($view['costs']['items'])||!array_is_list($view['costs']['items']))
-            throw new InvalidArgumentException('Cost items invalid.');
-        if(($costStatus==='unknown')!==($view['costs']['items']===[]))
-            throw new InvalidArgumentException('Cost status incoherent.');
-        $costs='';
-        foreach($view['costs']['items'] as $row){
-            self::fields($row,['status','version','attribution_id','target_kind','target_id','target_scope','currency','amount_minor','provenance_ref','source_ref','observed_at','freshness'],'cost');
-            if(self::one($row['status'],['measured'],'cost item status')!=='measured'||!is_int($row['amount_minor'])||$row['amount_minor']<0)
-                throw new InvalidArgumentException('Cost item invalid.');
-            $costs.='<article class="learning-card"><span>'.self::e(self::text($row['target_scope'])).'</span><strong>'.self::e((string)$row['amount_minor'].' '.self::text($row['currency'])).'</strong><small class="matrix-meta">'
-                .self::e(self::text($row['source_ref'])).' · '.self::e(self::text($row['observed_at'])).' · '.self::e(self::text($row['freshness'])).'</small></article>';
-        }
-        if($costs==='')$costs='<article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin coste medido</small></article>';
+        if($view['costs']!==['status'=>'unknown','items'=>[]])
+            throw new InvalidArgumentException('Measured cost authority unavailable.');
 
         self::fields($view['limits'],['status','items'],'limits');
-        if($view['limits']!==['status'=>'unknown','items'=>[]])
-            throw new InvalidArgumentException('Measured limit authority unavailable.');
-        return '<section class="panel section" data-section="product_analytics_costs"><p class="eyebrow">PRODUCTO / DATOS / COSTES</p><h2>Producto y analítica</h2><div class="learning-grid">'.$products.'</div><h3>Costes medidos</h3><div class="learning-grid">'.$costs.'</div><h3>Límites</h3><div class="learning-grid"><article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin fuente canónica medida</small></article></div></section>';
+        $limitStatus=self::one($view['limits']['status'],['measured','unknown'],'limit status');
+        if(!is_array($view['limits']['items'])||!array_is_list($view['limits']['items']))
+            throw new InvalidArgumentException('Limit items invalid.');
+        $limits='';
+        foreach($view['limits']['items'] as $row){
+            self::fields($row,['used','limit','source_ref','observed_at','freshness','age_seconds'],'limit');
+            if(!is_int($row['used'])||$row['used']<0||!is_int($row['limit'])||$row['limit']<0)
+                throw new InvalidArgumentException('Limit item invalid.');
+            $limits.='<article class="learning-card"><span>Uso / límite</span><strong>'.self::e((string)$row['used']).' / '.self::e((string)$row['limit']).'</strong><small class="matrix-meta">'
+                .self::e(self::text($row['source_ref'])).' · '.self::e((string)$row['observed_at']).' · '.self::e(self::text($row['freshness'])).'</small></article>';
+        }
+        if($limitStatus==='unknown'&&$view['limits']['items']!==[])
+            throw new InvalidArgumentException('Limit status incoherent.');
+        if($limits==='')$limits='<article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin fuente canónica medida</small></article>';
+
+        return '<section class="panel section" data-section="product_analytics_costs"><p class="eyebrow">PRODUCTO / DATOS / COSTES</p><h2>Producto y analítica</h2><div class="learning-grid">'.$products.'</div><h3>Costes medidos</h3><div class="learning-grid"><article class="learning-card"><strong>UNKNOWN</strong><small class="matrix-meta">Sin medición monetaria canónica</small></article></div><h3>Límites</h3><div class="learning-grid">'.$limits.'</div></section>';
     }
 
     private static function incidentList(mixed $items,string $label): string

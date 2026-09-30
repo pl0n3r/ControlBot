@@ -388,6 +388,10 @@ if ($name === 'safe') {
         null,
         NOW,
     );
+    $invalidContext = verifiedContext('project:controlbot','hostinger.read','L2_VENTURE_ADMIN');
+    $invalidRestrictionRejected = rejected(fn() => VentureAccessRuntime::projectInfrastructureAuthority(
+        $invalidContext, 'hostinger.read', 'L2_VENTURE_ADMIN', NOW, [123]
+    ));
     $out = [
         'fabricated_array_rejected' => rejected(
             fn() => InfrastructureIntent::plan(intent(), $fabricated, null, NOW)
@@ -405,6 +409,10 @@ if ($name === 'safe') {
         )),
         'context_replay_rejected' => rejected(fn() => VentureAccessRuntime::projectInfrastructureAuthority(
             $context, 'hostinger.read', 'L2_VENTURE_ADMIN', NOW
+        )),
+        'invalid_restriction_rejected' => $invalidRestrictionRejected,
+        'invalid_context_replay_rejected' => rejected(fn() => VentureAccessRuntime::projectInfrastructureAuthority(
+            $invalidContext, 'hostinger.read', 'L2_VENTURE_ADMIN', NOW
         )),
         'cross_capability_rejected' => rejected(
             fn() => InfrastructureIntent::plan($crossCapability, authority(), null, NOW)

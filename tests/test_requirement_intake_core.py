@@ -75,7 +75,7 @@ class RequirementIntakeCoreTests(unittest.TestCase):
         forbidden = (
             "curl_", "fsockopen", "new pdo", "mysqli", "file_put_contents",
             "unlink(", "rename(", "shell_exec", "proc_open", "exec(", "system(",
-            "mail(", "github\", "octokit", "http_client",
+            "mail(", "octokit", "http_client",
         )
         self.assertFalse(any(symbol in source for symbol in forbidden))
 

@@ -13,9 +13,6 @@ final class MarketWorkOrigin
     private const WORK_TYPES=['engineering','security','infrastructure','operations','data_analytics','product','content','marketing_growth','sales_support','finance_analysis','compliance_review','knowledge_documentation'];
     private const PRIORITIES=['critical','high','medium'];
     private const ROLES=['arquitectura','contenido','datos-analitica','dba','diseno-visual','frontend','infraestructura','ingenieria-software','legal-privacidad','marketing','producto','qa','seguridad','seo','sre','ux'];
-    private const MAX_CONTEXT_EVIDENCE_REFS=50;
-    private const OPAQUE_EVIDENCE_PATTERN='#^controlbot:[a-z][a-z0-9-]{1,31}/[a-f0-9]{32}$#D';
-    private const INVALID_EVIDENCE_REFS='evidence_refs invalid.';
 
     public static function materialize(array $readiness,array $context): array
     {
@@ -79,7 +76,7 @@ final class MarketWorkOrigin
     private static function item(string $venture,string $market,string $country,array $gate,array $profile,array $base): array
     {
         $domain=$gate['domain']; $hash=hash('sha256',$venture.'|'.$market.'|'.$country.'|'.$domain.'|'.$base['group_id'].'|'.$profile['work_type']);
-        $evidence=array_values(array_unique(array_merge($gate['evidence_refs'],$base['evidence_refs']))); sort($evidence,SORT_STRING); if(count($evidence)>50) throw new InvalidArgumentException(self::INVALID_EVIDENCE_REFS);
+        $evidence=array_values(array_unique(array_merge($gate['evidence_refs'],$base['evidence_refs']))); sort($evidence,SORT_STRING); if(count($evidence)>50) throw new InvalidArgumentException('evidence_refs invalid.');
         $claims=['controlbot:market/'.$market,'controlbot:market-gap/'.$market.'/'.$country.'/'.$domain]; sort($claims,SORT_STRING);
         $item=['work_id'=>'controlbot:market-gap/'.substr($hash,0,40),'origin_mode'=>'automatic','origin_system'=>'controlbot','producer_ref'=>'controlbot:market-work-origin','group_id'=>$base['group_id'],'venture_id'=>$venture,'work_type'=>$profile['work_type'],'requested_capabilities'=>$profile['requested_capabilities'],'required_roles'=>$profile['required_roles'],'authority_level'=>$base['authority_level'],'priority_class'=>$base['priority_class'],'depends_on'=>$base['depends_on'],'claims'=>$claims,'policy_ref'=>$base['policy_ref'],'evidence_refs'=>$evidence,'observed_at'=>gmdate('Y-m-d\TH:i:s\Z',$gate['observed_at']),'idempotency_key'=>'controlbot:market-gap:'.$hash];
         foreach(['project_id','repository_ref','approval_ref','budget_ref'] as $key) if($base[$key]!==null) $item[$key]=$base[$key]; return $item;
@@ -88,26 +85,18 @@ final class MarketWorkOrigin
     private static function result(string $status,array $reasons,array $items,array $unresolved,string $venture,string $market,string $country): array
     {sort($unresolved,SORT_STRING);return ['version'=>1,'status'=>$status,'reasons'=>$reasons,'venture_id'=>$venture,'market_id'=>$market,'country'=>$country,'work_items'=>$items,'unresolved_domains'=>$unresolved,'execution'=>false];}
 
-    private static function evidenceRefs(mixed $refs):array
+    private static function evidenceRefs(mixed $values):array
     {
-        if(!is_array($refs)||!array_is_list($refs)||count($refs)>self::MAX_CONTEXT_EVIDENCE_REFS){
-            throw new InvalidArgumentException(self::INVALID_EVIDENCE_REFS);
+        if(!is_array($values)||!array_is_list($values)||count($values)>50)
+            throw new InvalidArgumentException('evidence_refs invalid.');
+        $out=[];
+        foreach($values as $value){
+            if(!is_string($value)||preg_match('#^controlbot:[a-z][a-z0-9-]{1,31}/[a-f0-9]{32}$#D',$value)!==1)
+                throw new InvalidArgumentException('evidence_ref invalid.');
+            if(in_array($value,$out,true)) throw new InvalidArgumentException('evidence_ref duplicated.');
+            $out[]=$value;
         }
-        $unique=[];
-        foreach($refs as $ref){
-            if(!self::isOpaqueEvidenceRef($ref)||isset($unique[$ref])){
-                throw new InvalidArgumentException(self::INVALID_EVIDENCE_REFS);
-            }
-            $unique[$ref]=true;
-        }
-        $refs=array_keys($unique);
-        sort($refs,SORT_STRING);
-        return $refs;
-    }
-
-    private static function isOpaqueEvidenceRef(mixed $ref):bool
-    {
-        return is_string($ref)&&preg_match(self::OPAQUE_EVIDENCE_PATTERN,$ref)===1;
+        sort($out,SORT_STRING); return $out;
     }
 
     private static function items(mixed $v,string $label,bool $empty,int $max=50):array

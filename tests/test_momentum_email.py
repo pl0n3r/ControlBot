@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -43,8 +44,24 @@ class MomentumEmailTests(unittest.TestCase):
         self.assertFalse(data["state"]["execution"])
         self.assertEqual(sorted(data["methods"]),["audienceState","program"])
         source=(ROOT/"src"/"MomentumEmail.php").read_text(encoding="utf-8").lower()
-        for forbidden in ("curl_","http://","https://","factoryrunner","scheduler","mysqli","pdo(","mail(","->send"):
+        for forbidden in ("curl_","http://","https://","factoryrunner","scheduler","mysqli","mail("):
             self.assertNotIn(forbidden,source)
+        side_effect_patterns=(r"\bnew\s+\\?pdo\s*\(",r"(?:->|::)\s*send\s*\(")
+        for sample in (
+            "new PDO(",
+            r"new \PDO (",
+            r"new   \PDO   (",
+            "$mailer->send(",
+            "$mailer -> send (",
+            "Mailer::send(",
+            "Mailer :: send (",
+        ):
+            self.assertTrue(
+                any(re.search(pattern,sample.lower()) for pattern in side_effect_patterns),
+                sample,
+            )
+        for pattern in side_effect_patterns:
+            self.assertIsNone(re.search(pattern,source),pattern)
 
 
 if __name__=="__main__":

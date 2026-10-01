@@ -2,6 +2,7 @@ import importlib.util
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 
@@ -58,6 +59,75 @@ class GenerateCoverageTests(unittest.TestCase):
             ],
             [("1", "true"), ("2", "false")],
         )
+
+    def test_php_generic_rejects_empty_executable_coverage(self):
+        source = (ROOT / "scripts" / "php_coverage_bootstrap.php").resolve()
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Cobertura PHP genérica quedó sin líneas ejecutables",
+        ):
+            GENERATE_COVERAGE.write_php_generic({source: {1: 0}})
+
+    def test_main_writes_expected_reports(self):
+        temp = Path(self.tempdir.name)
+        python_xml = temp / "python.xml"
+        php_generic = temp / "php-generic.xml"
+        build = temp / "build"
+        source = (ROOT / "scripts" / "php_coverage_bootstrap.php").resolve()
+
+        def fake_run(command, *, env=None):
+            if "xml" in command:
+                python_xml.write_text("<coverage/>\n", encoding="utf-8")
+
+        with (
+            patch.object(GENERATE_COVERAGE, "BUILD", build),
+            patch.object(GENERATE_COVERAGE, "PYTHON_XML", python_xml),
+            patch.object(GENERATE_COVERAGE, "PHP_GENERIC", php_generic),
+            patch.object(GENERATE_COVERAGE, "run", side_effect=fake_run),
+            patch.object(
+                GENERATE_COVERAGE,
+                "coverage_environment",
+                return_value={},
+            ),
+            patch.object(
+                GENERATE_COVERAGE,
+                "aggregate_php",
+                return_value={source: {1: 1, 2: -1}},
+            ),
+        ):
+            self.assertEqual(GENERATE_COVERAGE.main(), 0)
+
+        self.assertTrue(python_xml.is_file())
+        self.assertTrue(php_generic.is_file())
+
+    def test_main_fails_closed_when_generic_report_is_missing(self):
+        temp = Path(self.tempdir.name)
+        python_xml = temp / "python.xml"
+        php_generic = temp / "php-generic.xml"
+        build = temp / "build"
+
+        def fake_run(command, *, env=None):
+            if "xml" in command:
+                python_xml.write_text("<coverage/>\n", encoding="utf-8")
+
+        with (
+            patch.object(GENERATE_COVERAGE, "BUILD", build),
+            patch.object(GENERATE_COVERAGE, "PYTHON_XML", python_xml),
+            patch.object(GENERATE_COVERAGE, "PHP_GENERIC", php_generic),
+            patch.object(GENERATE_COVERAGE, "run", side_effect=fake_run),
+            patch.object(
+                GENERATE_COVERAGE,
+                "coverage_environment",
+                return_value={},
+            ),
+            patch.object(GENERATE_COVERAGE, "aggregate_php", return_value={}),
+            patch.object(GENERATE_COVERAGE, "write_php_generic"),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Faltan reportes de cobertura esperados",
+            ):
+                GENERATE_COVERAGE.main()
 
 
 if __name__ == "__main__":

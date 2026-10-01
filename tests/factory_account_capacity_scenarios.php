@@ -68,15 +68,22 @@ if($scenario==='ui_tamper'){
 }
 if($scenario==='ui_recomputed_tamper'){
     $out=[];
-    foreach(['alias','source','alias_ws','source_ws','duplicate','reverse'] as $kind){
-        $rows=in_array($kind,['duplicate','reverse'],true)?[cap('alpha'),cap('beta')]:[cap('primary')];
+    foreach(['alias','source','alias_ws','source_ws','duplicate','reverse','cardinality'] as $kind){
+        if($kind==='cardinality'){
+            $rows=[];for($i=0;$i<50;$i++)$rows[]=cap(sprintf('acct%02d',$i));
+        }else{
+            $rows=in_array($kind,['duplicate','reverse'],true)?[cap('alpha'),cap('beta')]:[cap('primary')];
+        }
         $capacity=FactoryAccountCapacitySnapshot::build($rows,3000);
         if($kind==='alias')$capacity['accounts'][0]['accountAlias']='person@example.com';
         elseif($kind==='source')$capacity['accounts'][0]['source_ref']='not a canonical source with spaces';
         elseif($kind==='alias_ws')$capacity['accounts'][0]['accountAlias']=' primary ';
         elseif($kind==='source_ws')$capacity['accounts'][0]['source_ref']=' github:pl0n3r/Factory#584 ';
         elseif($kind==='duplicate')$capacity['accounts'][1]['accountAlias']=$capacity['accounts'][0]['accountAlias'];
-        else $capacity['accounts']=array_reverse($capacity['accounts']);
+        elseif($kind==='reverse')$capacity['accounts']=array_reverse($capacity['accounts']);
+        else{
+            $extra=$capacity['accounts'][49];$extra['accountAlias']='acct50';$capacity['accounts'][]=$extra;
+        }
         $canonical=$capacity;unset($canonical['fingerprint']);
         $capacity['fingerprint']=hash('sha256',json_encode($canonical,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
         $blocked=false;try{FactoryLiveUi::render(live(),null,null,null,$capacity);}catch(Throwable){$blocked=true;}

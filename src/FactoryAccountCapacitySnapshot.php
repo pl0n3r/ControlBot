@@ -56,6 +56,7 @@ final class FactoryAccountCapacitySnapshot
         self::fields($view,['version','observed_at','status','accounts','fingerprint'],'view');
         if($now<1||$view['version']!==1||$view['observed_at']!==$now
             ||!is_array($view['accounts'])||!array_is_list($view['accounts'])
+            ||count($view['accounts'])>self::MAX_ACCOUNTS
             ||!is_string($view['fingerprint'])||preg_match('/^[a-f0-9]{64}$/D',$view['fingerprint'])!==1)
             throw new InvalidArgumentException('Account capacity view invalid.');
         $canonical=$view;unset($canonical['fingerprint']);

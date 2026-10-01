@@ -111,12 +111,12 @@ final class FactoryAccountCapacitySnapshot
         $source=self::ref($row['source_ref']);
         $observed=self::time($row['observed_at'],$now);
         $budget=self::budget($row['budget']);
-        $sent=self::nonnegative($row['sent'],'sent');
-        $events=self::nonnegative($row['limit_events'],'limit_events');
+        $sent=self::integer($row['sent'],'sent',0);
+        $events=self::integer($row['limit_events'],'limit_events',0);
         if($sent>$budget['limit'])throw new InvalidArgumentException('sent exceeds budget.');
 
         if($status==='FRESH'){
-            $remaining=self::nonnegative($row['remaining'],'remaining');
+            $remaining=self::integer($row['remaining'],'remaining',0);
             if($remaining!==$budget['limit']-$sent)
                 throw new InvalidArgumentException('remaining mismatch.');
         }else{
@@ -147,9 +147,9 @@ final class FactoryAccountCapacitySnapshot
     private static function budget(mixed $value): array
     {
         self::fields($value,self::BUDGET_FIELDS,'budget');
-        $limit=self::nonnegative($value['limit'],'budget.limit');
-        $window=self::positive($value['windowMs'],'budget.windowMs');
-        $interval=self::positive($value['minIntervalMs'],'budget.minIntervalMs');
+        $limit=self::integer($value['limit'],'budget.limit',0);
+        $window=self::integer($value['windowMs'],'budget.windowMs',1);
+        $interval=self::integer($value['minIntervalMs'],'budget.minIntervalMs',1);
         return ['limit'=>$limit,'windowMs'=>$window,'minIntervalMs'=>$interval];
     }
 
@@ -175,46 +175,32 @@ final class FactoryAccountCapacitySnapshot
         return $value;
     }
 
-    private static function nonnegative(mixed $value, string $label): int
+    private static function integer(mixed $value,string $label,int $minimum): int
     {
-        return self::integerAtLeast($value, 0, $label);
-    }
-
-    private static function positive(mixed $value, string $label): int
-    {
-        return self::integerAtLeast($value, 1, $label);
-    }
-
-    private static function integerAtLeast(mixed $value, int $minimum, string $label): int
-    {
-        if (!is_int($value) || $value < $minimum) {
+        if(gettype($value)!=='integer'||$value<$minimum)
             throw new InvalidArgumentException($label.' invalid.');
-        }
-
         return $value;
     }
 
-    private static function choice(mixed $value, array $allowed, string $label): string
+    private static function choice(mixed $value,array $allowed,string $label): string
     {
-        $allowedSet = array_fill_keys($allowed, true);
-        if (!is_string($value) || !array_key_exists($value, $allowedSet)) {
-            throw new InvalidArgumentException($label.' invalid.');
+        if(is_string($value)){
+            foreach($allowed as $candidate){
+                if($value===$candidate)return $value;
+            }
         }
-
-        return $value;
+        throw new InvalidArgumentException($label.' invalid.');
     }
 
-    private static function fields(mixed $row, array $expected, string $label): void
+    private static function fields(mixed $row,array $expected,string $label): void
     {
-        if (!is_array($row) || array_is_list($row)) {
+        if(!is_array($row)||array_is_list($row))
             throw new InvalidArgumentException($label.' invalid.');
-        }
-
-        $actual = array_keys($row);
-        $missing = array_diff($expected, $actual);
-        $unexpected = array_diff($actual, $expected);
-        if (count($actual) !== count($expected) || $missing !== [] || $unexpected !== []) {
+        $actual=array_keys($row);
+        if(count($actual)!==count($expected)
+            ||array_diff($actual,$expected)!==[]
+            ||array_diff($expected,$actual)!==[])
             throw new InvalidArgumentException($label.' fields invalid.');
-        }
     }
+
 }

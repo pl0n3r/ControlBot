@@ -73,13 +73,15 @@ class GenerateCoverageTests(unittest.TestCase):
         python_xml = temp / "python.xml"
         php_generic = temp / "php-generic.xml"
         build = temp / "build"
-        source = (ROOT / "scripts" / "php_coverage_bootstrap.php").resolve()
+        source = temp / "source.php"
+        source.write_text("<?php\n", encoding="utf-8")
 
         def fake_run(command, *, env=None):
             if "xml" in command:
                 python_xml.write_text("<coverage/>\n", encoding="utf-8")
 
         with (
+            patch.object(GENERATE_COVERAGE, "ROOT", temp),
             patch.object(GENERATE_COVERAGE, "BUILD", build),
             patch.object(GENERATE_COVERAGE, "PYTHON_XML", python_xml),
             patch.object(GENERATE_COVERAGE, "PHP_GENERIC", php_generic),
@@ -111,6 +113,7 @@ class GenerateCoverageTests(unittest.TestCase):
                 python_xml.write_text("<coverage/>\n", encoding="utf-8")
 
         with (
+            patch.object(GENERATE_COVERAGE, "ROOT", temp),
             patch.object(GENERATE_COVERAGE, "BUILD", build),
             patch.object(GENERATE_COVERAGE, "PYTHON_XML", python_xml),
             patch.object(GENERATE_COVERAGE, "PHP_GENERIC", php_generic),

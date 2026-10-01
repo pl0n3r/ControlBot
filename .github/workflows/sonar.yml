@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      php_coverage_path: ${{ steps.php-coverage-evidence.outputs.path }}
+      php_lines_to_cover: ${{ steps.php-coverage-evidence.outputs.lines_to_cover }}
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -76,14 +76,19 @@ jobs:
           import xml.etree.ElementTree as ET
 
           root = ET.parse("build/coverage/php-generic.xml").getroot()
-          file_node = root.find("./file")
-          if file_node is None:
+          files = root.findall("./file")
+          if not files:
               raise SystemExit("::error::Reporte PHP genérico sin archivos.")
-          path = file_node.attrib.get("path", "")
-          if not path or path.startswith("/") or ".." in path.split("/"):
-              raise SystemExit("::error::Path PHP de cobertura inválido.")
+          lines_to_cover = 0
+          for file_node in files:
+              path = file_node.attrib.get("path", "")
+              if not path or path.startswith("/") or ".." in path.split("/"):
+                  raise SystemExit("::error::Path PHP de cobertura inválido.")
+              lines_to_cover += len(file_node.findall("./lineToCover"))
+          if lines_to_cover <= 0:
+              raise SystemExit("::error::Reporte PHP genérico sin líneas cubribles.")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"path={path}\n")
+              output.write(f"lines_to_cover={lines_to_cover}\n")
           PY
 
       - name: Analizar con SonarQube Cloud
@@ -123,7 +128,7 @@ jobs:
       - name: Confirmar cobertura PHP publicada
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PHP_PATH: ${{ needs.sonar.outputs.php_coverage_path }}
+          SONAR_PHP_LINES: ${{ needs.sonar.outputs.php_lines_to_cover }}
           SONAR_PULL_REQUEST: ${{ github.event.pull_request.number || '' }}
         run: |
           python3 - <<'PY'
@@ -134,23 +139,27 @@ jobs:
           from urllib.request import Request, urlopen
 
           token = os.environ.get("SONAR_TOKEN", "")
-          php_path = os.environ.get("SONAR_PHP_PATH", "")
+          php_lines_raw = os.environ.get("SONAR_PHP_LINES", "")
           pull_request = os.environ.get("SONAR_PULL_REQUEST", "")
-          if not token or not php_path:
+          if not token or not php_lines_raw:
               raise SystemExit("::error::Falta evidencia o credencial Sonar.")
+          try:
+              php_lines = int(php_lines_raw)
+          except ValueError as exc:
+              raise SystemExit("::error::Conteo PHP local inválido.") from exc
+          if php_lines <= 0:
+              raise SystemExit("::error::Reporte PHP local sin líneas cubribles.")
 
           params = {
               "component": "pl0n3r_factory-control",
               "metricKeys": "coverage,lines_to_cover,uncovered_lines",
-              "qualifiers": "FIL",
-              "ps": "500",
           }
           if pull_request:
               params["pullRequest"] = pull_request
           else:
               params["branch"] = "main"
 
-          url = "https://sonarcloud.io/api/measures/component_tree?" + urlencode(params)
+          url = "https://sonarcloud.io/api/measures/component?" + urlencode(params)
           request = Request(
               url,
               headers={
@@ -165,18 +174,9 @@ jobs:
           except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
               raise SystemExit("::error::No fue posible verificar cobertura en Sonar.") from exc
 
-          components = payload.get("components")
-          if not isinstance(components, list):
-              raise SystemExit("::error::Respuesta Sonar sin components.")
-
-          component = next(
-              (row for row in components if row.get("path") == php_path),
-              None,
-          )
-          if component is None:
-              raise SystemExit(
-                  f"::error::Sonar no publicó el archivo PHP cubierto: {php_path}"
-              )
+          component = payload.get("component")
+          if not isinstance(component, dict):
+              raise SystemExit("::error::Respuesta Sonar sin component.")
 
           measures = {
               row.get("metric"): row.get("value")
@@ -184,20 +184,22 @@ jobs:
               if isinstance(row, dict)
           }
           if "coverage" not in measures or "lines_to_cover" not in measures:
-              raise SystemExit(
-                  f"::error::Sonar no publicó métricas de cobertura PHP para {php_path}"
-              )
+              raise SystemExit("::error::Sonar no publicó métricas de cobertura.")
           try:
-              lines_to_cover = float(measures["lines_to_cover"])
+              lines_to_cover = int(float(measures["lines_to_cover"]))
           except (TypeError, ValueError) as exc:
               raise SystemExit("::error::lines_to_cover inválido en Sonar.") from exc
-          if lines_to_cover <= 0:
-              raise SystemExit("::error::Sonar publicó cero líneas cubribles para PHP.")
+          if lines_to_cover < php_lines:
+              raise SystemExit(
+                  "::error::Sonar publicó menos líneas cubribles que el reporte PHP "
+                  f"({lines_to_cover} < {php_lines})."
+              )
 
           print(
-              f"Cobertura PHP publicada para {php_path}: "
+              "Cobertura publicada por Sonar: "
               f"coverage={measures['coverage']}, "
-              f"lines_to_cover={measures['lines_to_cover']}"
+              f"lines_to_cover={lines_to_cover}, "
+              f"php_report_lines={php_lines}"
           )
           PY
 

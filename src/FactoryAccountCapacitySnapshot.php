@@ -175,29 +175,46 @@ final class FactoryAccountCapacitySnapshot
         return $value;
     }
 
-    private static function nonnegative(mixed $value,string $label): int
+    private static function nonnegative(mixed $value, string $label): int
     {
-        if(!is_int($value)||$value<0)throw new InvalidArgumentException($label.' invalid.');
-        return $value;
+        return self::integerAtLeast($value, 0, $label);
     }
 
-    private static function positive(mixed $value,string $label): int
+    private static function positive(mixed $value, string $label): int
     {
-        if(!is_int($value)||$value<1)throw new InvalidArgumentException($label.' invalid.');
-        return $value;
+        return self::integerAtLeast($value, 1, $label);
     }
 
-    private static function choice(mixed $value,array $allowed,string $label): string
+    private static function integerAtLeast(mixed $value, int $minimum, string $label): int
     {
-        if(!is_string($value)||!in_array($value,$allowed,true))
+        if (!is_int($value) || $value < $minimum) {
             throw new InvalidArgumentException($label.' invalid.');
+        }
+
         return $value;
     }
 
-    private static function fields(mixed $row,array $expected,string $label): void
+    private static function choice(mixed $value, array $allowed, string $label): string
     {
-        if(!is_array($row)||array_is_list($row))throw new InvalidArgumentException($label.' invalid.');
-        $actual=array_keys($row);sort($actual,SORT_STRING);sort($expected,SORT_STRING);
-        if($actual!==$expected)throw new InvalidArgumentException($label.' fields invalid.');
+        $allowedSet = array_fill_keys($allowed, true);
+        if (!is_string($value) || !array_key_exists($value, $allowedSet)) {
+            throw new InvalidArgumentException($label.' invalid.');
+        }
+
+        return $value;
+    }
+
+    private static function fields(mixed $row, array $expected, string $label): void
+    {
+        if (!is_array($row) || array_is_list($row)) {
+            throw new InvalidArgumentException($label.' invalid.');
+        }
+
+        $actual = array_keys($row);
+        $missing = array_diff($expected, $actual);
+        $unexpected = array_diff($actual, $expected);
+        if (count($actual) !== count($expected) || $missing !== [] || $unexpected !== []) {
+            throw new InvalidArgumentException($label.' fields invalid.');
+        }
     }
 }

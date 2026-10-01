@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace ControlBot\Business;
 
 require_once __DIR__.'/UiTheme.php';
+require_once __DIR__.'/FactoryAccountCapacitySnapshot.php';
 
 use ControlBot\Ui\UiTheme;
 use InvalidArgumentException;
@@ -21,8 +22,9 @@ final class FactoryLiveUi
     private const FRESH=['current','stale','unknown'];
     private const MATRIX_STATUS=['GREEN','AMBER','RED','UNKNOWN','STALE'];
     private const SENSITIVE='/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|dsn)/i';
+    private const PII='/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?(?=(?:[0-9(). -]*[0-9]){10})[0-9][0-9(). -]{7,}[0-9])/i';
 
-    public static function render(array $snapshot,?array $matrix=null,?array $learning=null,?array $productCosts=null): string
+    public static function render(array $snapshot,?array $matrix=null,?array $learning=null,?array $productCosts=null,?array $accountCapacity=null): string
     {
         self::fields($snapshot,['version','observed_at','sections','tool_usage','fingerprint'],'snapshot');
         if($snapshot['version']!==1||!is_int($snapshot['observed_at'])||!is_array($snapshot['sections']))
@@ -39,7 +41,8 @@ final class FactoryLiveUi
         $matrixHtml=$matrix===null?'':self::matrix($matrix);
         $learningHtml=$learning===null?'':self::learning($learning);
         $productCostsHtml=$productCosts===null?'':self::productCosts($productCosts,$snapshot['observed_at']);
-        return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ControlBot · Fábrica viva</title><style>'.self::styles().'</style></head><body><main class="shell" aria-labelledby="factory-live-title"><header class="top"><p class="eyebrow"><span>CONTROLBOT</span> / FÁBRICA VIVA</p><h1 id="factory-live-title">Fábrica viva</h1><p>Solo lectura · evidencia, freshness y antigüedad visibles.</p></header>'.$matrixHtml.$learningHtml.$productCostsHtml.$body.'<section class="panel section" data-section="tool_usage"><p class="eyebrow">HERRAMIENTAS</p><h2>Uso de herramientas</h2><div class="signal-grid">'.$tool.'</div></section></main></body></html>';
+        $capacityHtml=$accountCapacity===null?'':self::accountCapacity($accountCapacity,$snapshot['observed_at']);
+        return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ControlBot · Fábrica viva</title><style>'.self::styles().'</style></head><body><main class="shell" aria-labelledby="factory-live-title"><header class="top"><p class="eyebrow"><span>CONTROLBOT</span> / FÁBRICA VIVA</p><h1 id="factory-live-title">Fábrica viva</h1><p>Solo lectura · evidencia, freshness y antigüedad visibles.</p></header>'.$matrixHtml.$learningHtml.$capacityHtml.$productCostsHtml.$body.'<section class="panel section" data-section="tool_usage"><p class="eyebrow">HERRAMIENTAS</p><h2>Uso de herramientas</h2><div class="signal-grid">'.$tool.'</div></section></main></body></html>';
     }
 
     private static function matrix(array $matrix): string
@@ -153,6 +156,27 @@ final class FactoryLiveUi
         $link=$metric['evidence_href']===null?'':'<a class="issue-link" href="'.self::e(self::matrixHref($metric['evidence_href'])).'">Evidencia</a>';
         return '<article class="learning-card status-'.strtolower($status).'"><span>'.self::e($scope).'</span><strong>'
             .self::e($value).'</strong><small class="matrix-meta">'.self::e($source).' · '.self::e($age).' · '.self::e($status).'</small>'.$link.'</article>';
+    }
+
+    private static function accountCapacity(array $view,int $snapshotObservedAt): string
+    {
+        $view=FactoryAccountCapacitySnapshot::validate($view,$snapshotObservedAt);
+        $rows='';
+        foreach($view['accounts'] as $row){
+            $alias=self::text($row['accountAlias']);
+            if($row['status']==='UNKNOWN'){
+                $rows.='<article class="learning-card status-unknown"><span>'.self::e($alias).'</span><strong>UNKNOWN</strong><small class="matrix-meta">Sin evidencia vigente de capacidad</small></article>';
+                continue;
+            }
+            $remaining=$row['status']==='FRESH'?(string)$row['remaining']:'UNKNOWN';
+            $css=$row['status']==='FRESH'?'green':'stale';
+            $rows.='<article class="learning-card status-'.$css.'"><span>'.self::e($alias).' · '.self::e($row['confidence']).'</span><strong>'
+                .self::e((string)$row['sent']).' / '.self::e((string)$row['budget']['limit']).'</strong><small class="matrix-meta">Restante: '
+                .self::e($remaining).' · Eventos de límite: '.self::e((string)$row['limitEvents']).'</small><small class="matrix-meta">'
+                .self::e($row['source_ref']).' · '.self::e((string)$row['age_seconds']).'s · '.self::e($row['status']).'</small></article>';
+        }
+        if($rows==='')$rows='<article class="learning-card status-unknown"><strong>UNKNOWN</strong><small class="matrix-meta">Sin evidencia de cuentas</small></article>';
+        return '<section class="panel section" data-section="account_capacity"><p class="eyebrow">CAPACIDAD / LÍMITES</p><h2>Capacidad de cuentas</h2><div class="learning-grid">'.$rows.'</div></section>';
     }
 
     private static function productCosts(array $view,int $snapshotObservedAt): string

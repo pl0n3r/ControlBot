@@ -32,6 +32,8 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      php_lines_to_cover: ${{ steps.php-coverage-evidence.outputs.lines_to_cover }}
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -66,6 +68,29 @@ jobs:
       - name: Generar cobertura Python y PHP
         run: python3 scripts/generate_coverage.py
 
+      - name: Seleccionar evidencia PHP
+        id: php-coverage-evidence
+        run: |
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("build/coverage/php-generic.xml").getroot()
+          files = root.findall("./file")
+          if not files:
+              raise SystemExit("::error::Reporte PHP genérico sin archivos.")
+          lines_to_cover = 0
+          for file_node in files:
+              path = file_node.attrib.get("path", "")
+              if not path or path.startswith("/") or ".." in path.split("/"):
+                  raise SystemExit("::error::Path PHP de cobertura inválido.")
+              lines_to_cover += len(file_node.findall("./lineToCover"))
+          if lines_to_cover <= 0:
+              raise SystemExit("::error::Reporte PHP genérico sin líneas cubribles.")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"lines_to_cover={lines_to_cover}\n")
+          PY
+
       - name: Analizar con SonarQube Cloud
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9
         env:
@@ -74,11 +99,109 @@ jobs:
           args: >-
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=pl0n3r_factory-control
+            -Dsonar.sources=src,scripts
             -Dsonar.tests=tests
             -Dsonar.python.coverage.reportPaths=build/coverage/python.xml
-            -Dsonar.php.coverage.reportPaths=build/coverage/php-clover.xml
+            -Dsonar.coverageReportPaths=build/coverage/php-generic.xml
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
+
+  coverage-published:
+    name: Sonar Coverage = published
+    needs: sonar
+    if: >-
+      needs.sonar.result == 'success' &&
+      vars.SONAR_CI_ENABLED == 'true' &&
+      (
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+        github.event_name == 'push' ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.draft == false &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirmar cobertura PHP publicada
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PHP_LINES: ${{ needs.sonar.outputs.php_lines_to_cover }}
+          SONAR_PULL_REQUEST: ${{ github.event.pull_request.number || '' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          token = os.environ.get("SONAR_TOKEN", "")
+          php_lines_raw = os.environ.get("SONAR_PHP_LINES", "")
+          pull_request = os.environ.get("SONAR_PULL_REQUEST", "")
+          if not token or not php_lines_raw:
+              raise SystemExit("::error::Falta evidencia o credencial Sonar.")
+          try:
+              php_lines = int(php_lines_raw)
+          except ValueError as exc:
+              raise SystemExit("::error::Conteo PHP local inválido.") from exc
+          if php_lines <= 0:
+              raise SystemExit("::error::Reporte PHP local sin líneas cubribles.")
+
+          params = {
+              "component": "pl0n3r_factory-control",
+              "metricKeys": "coverage,lines_to_cover,uncovered_lines",
+          }
+          if pull_request:
+              params["pullRequest"] = pull_request
+          else:
+              params["branch"] = "main"
+
+          url = "https://sonarcloud.io/api/measures/component?" + urlencode(params)
+          request = Request(
+              url,
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/json",
+                  "User-Agent": "controlbot-sonar-coverage-gate/1",
+              },
+          )
+          try:
+              with urlopen(request, timeout=20) as response:
+                  payload = json.load(response)
+          except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+              raise SystemExit("::error::No fue posible verificar cobertura en Sonar.") from exc
+
+          component = payload.get("component")
+          if not isinstance(component, dict):
+              raise SystemExit("::error::Respuesta Sonar sin component.")
+
+          measures = {
+              row.get("metric"): row.get("value")
+              for row in component.get("measures", [])
+              if isinstance(row, dict)
+          }
+          if "coverage" not in measures or "lines_to_cover" not in measures:
+              raise SystemExit("::error::Sonar no publicó métricas de cobertura.")
+          try:
+              lines_to_cover = int(float(measures["lines_to_cover"]))
+          except (TypeError, ValueError) as exc:
+              raise SystemExit("::error::lines_to_cover inválido en Sonar.") from exc
+          if lines_to_cover < php_lines:
+              raise SystemExit(
+                  "::error::Sonar publicó menos líneas cubribles que el reporte PHP "
+                  f"({lines_to_cover} < {php_lines})."
+              )
+
+          print(
+              "Cobertura publicada por Sonar: "
+              f"coverage={measures['coverage']}, "
+              f"lines_to_cover={lines_to_cover}, "
+              f"php_report_lines={php_lines}"
+          )
+          PY
 
   analysis-method:
     name: SonarQube Cloud Analysis Method = CI-based

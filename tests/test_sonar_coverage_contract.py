@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -18,20 +19,27 @@ class SonarCoverageContractTests(unittest.TestCase):
             self.assertIn("coverage==7.16.2", workflow)
             self.assertIn("python3 scripts/generate_coverage.py", workflow)
         self.assertIn('"python.xml"', self.generator)
-        self.assertIn('"php-clover.xml"', self.generator)
+        self.assertIn('"php-generic.xml"', self.generator)
         self.assertIn("xdebug_start_code_coverage", self.bootstrap)
         self.assertIn("XDEBUG_FILTER_CODE_COVERAGE", self.bootstrap)
 
-    def test_sonar_consumes_reports_without_relaxing_quality_gate(self):
+    def test_sonar_consumes_generic_php_coverage_and_verifies_metric(self):
+        self.assertIn("-Dsonar.sources=src,scripts", self.sonar)
         self.assertIn("-Dsonar.tests=tests", self.sonar)
         self.assertIn(
             "-Dsonar.python.coverage.reportPaths=build/coverage/python.xml",
             self.sonar,
         )
         self.assertIn(
-            "-Dsonar.php.coverage.reportPaths=build/coverage/php-clover.xml",
+            "-Dsonar.coverageReportPaths=build/coverage/php-generic.xml",
             self.sonar,
         )
+        self.assertNotIn("sonar.php.coverage.reportPaths", self.sonar)
+        self.assertIn("name: Sonar Coverage = published", self.sonar)
+        self.assertIn("/api/measures/component", self.sonar)
+        self.assertIn("SONAR_PHP_LINES", self.sonar)
+        self.assertIn('"lines_to_cover"', self.sonar)
+        self.assertIn("php_report_lines", self.sonar)
         self.assertIn("-Dsonar.qualitygate.wait=true", self.sonar)
         self.assertNotIn("sonar.coverage.exclusions", self.sonar)
         self.assertNotIn("sonar.qualitygate.wait=false", self.sonar)
@@ -41,8 +49,9 @@ class SonarCoverageContractTests(unittest.TestCase):
         self.assertIn("CONTROLBOT_REAL_PHP", self.generator)
         self.assertIn("CONTROLBOT_PHP_COVERAGE_DIR", combined)
         self.assertIn('{"tests", "vendor", "build"}', self.generator)
-        self.assertIn("str(path.relative_to(ROOT))", self.generator)
-        self.assertNotIn('{"name": str(path)}', self.generator)
+        self.assertIn("path.relative_to(ROOT).as_posix()", self.generator)
+        self.assertIn('"lineToCover"', self.generator)
+        self.assertNotIn("php-clover.xml", self.generator)
         for forbidden in (
             "SONAR_TOKEN",
             "password=",

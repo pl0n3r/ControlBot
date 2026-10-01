@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ejecuta la suite existente y emite cobertura Python XML + PHP Clover con Xdebug."""
+"""Ejecuta la suite existente y emite cobertura Python XML + PHP genérica para Sonar."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +16,7 @@ BUILD = ROOT / "build" / "coverage"
 PHP_FRAGMENTS = BUILD / "php-fragments"
 WRAPPER_DIR = BUILD / "bin"
 PYTHON_XML = BUILD / "python.xml"
-PHP_CLOVER = BUILD / "php-clover.xml"
+PHP_GENERIC = BUILD / "php-generic.xml"
 PHP_BOOTSTRAP = ROOT / "scripts" / "php_coverage_bootstrap.php"
 
 
@@ -100,74 +99,43 @@ def aggregate_php() -> dict[Path, dict[int, int]]:
     return aggregate
 
 
-def metrics_attributes(statements: int, covered: int) -> dict[str, str]:
-    return {
-        "loc": str(statements),
-        "ncloc": str(statements),
-        "classes": "0",
-        "methods": "0",
-        "coveredmethods": "0",
-        "conditionals": "0",
-        "coveredconditionals": "0",
-        "statements": str(statements),
-        "coveredstatements": str(covered),
-        "elements": str(statements),
-        "coveredelements": str(covered),
-    }
 
+def write_php_generic(coverage: dict[Path, dict[int, int]]) -> None:
+    root = ET.Element("coverage", {"version": "1"})
+    statements = 0
 
-def write_php_clover(coverage: dict[Path, dict[int, int]]) -> None:
-    timestamp = str(int(time.time()))
-    root = ET.Element("coverage", {"generated": timestamp})
-    project = ET.SubElement(
-        root,
-        "project",
-        {"timestamp": timestamp, "name": "ControlBot"},
-    )
-    package = ET.SubElement(project, "package", {"name": "ControlBot"})
-
-    total = 0
-    covered = 0
     for path in sorted(coverage):
-        line_states = coverage[path]
         executable = sorted(
-            (line, state) for line, state in line_states.items() if state != 0
+            (line, state)
+            for line, state in coverage[path].items()
+            if state != 0
         )
         if not executable:
             continue
-        relative_name = str(path.relative_to(ROOT))
-        source_path = (ROOT / relative_name).resolve()
-        file_node = ET.SubElement(package, "file", {"name": str(source_path)})
-        file_covered = 0
+
+        relative_name = path.relative_to(ROOT).as_posix()
+        file_node = ET.SubElement(root, "file", {"path": relative_name})
         for line, state in executable:
-            count = 1 if state > 0 else 0
-            file_covered += count
             ET.SubElement(
                 file_node,
-                "line",
-                {"num": str(line), "type": "stmt", "count": str(count)},
+                "lineToCover",
+                {
+                    "lineNumber": str(line),
+                    "covered": "true" if state > 0 else "false",
+                },
             )
-        ET.SubElement(
-            file_node,
-            "metrics",
-            metrics_attributes(len(executable), file_covered),
-        )
-        total += len(executable)
-        covered += file_covered
+        statements += len(executable)
 
-    if total == 0:
-        raise RuntimeError("Clover PHP quedó sin statements ejecutables.")
+    if statements == 0:
+        raise RuntimeError("Cobertura PHP genérica quedó sin líneas ejecutables.")
 
-    ET.SubElement(package, "metrics", metrics_attributes(total, covered))
-    ET.SubElement(project, "metrics", metrics_attributes(total, covered))
     ET.indent(root, space="  ")
-    PHP_CLOVER.write_text(
+    PHP_GENERIC.write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         + ET.tostring(root, encoding="unicode")
         + "\n",
         encoding="utf-8",
     )
-
 
 def main() -> int:
     BUILD.mkdir(parents=True, exist_ok=True)
@@ -193,12 +161,12 @@ def main() -> int:
         env=env,
     )
     run([sys.executable, "-m", "coverage", "xml", "-o", str(PYTHON_XML)])
-    write_php_clover(aggregate_php())
+    write_php_generic(aggregate_php())
 
-    if not PYTHON_XML.is_file() or not PHP_CLOVER.is_file():
+    if not PYTHON_XML.is_file() or not PHP_GENERIC.is_file():
         raise RuntimeError("Faltan reportes de cobertura esperados.")
     print(f"Python coverage: {PYTHON_XML.relative_to(ROOT)}")
-    print(f"PHP coverage: {PHP_CLOVER.relative_to(ROOT)}")
+    print(f"PHP coverage: {PHP_GENERIC.relative_to(ROOT)}")
     return 0
 
 

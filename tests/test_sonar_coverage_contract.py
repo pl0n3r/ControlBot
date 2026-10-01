@@ -24,6 +24,7 @@ class SonarCoverageContractTests(unittest.TestCase):
         self.assertIn("XDEBUG_FILTER_CODE_COVERAGE", self.bootstrap)
 
     def test_sonar_consumes_generic_php_coverage_and_verifies_metric(self):
+        self.assertIn("-Dsonar.sources=src,scripts", self.sonar)
         self.assertIn("-Dsonar.tests=tests", self.sonar)
         self.assertIn(
             "-Dsonar.python.coverage.reportPaths=build/coverage/python.xml",

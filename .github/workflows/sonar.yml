@@ -94,6 +94,7 @@ jobs:
           args: >-
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=pl0n3r_factory-control
+            -Dsonar.sources=src,scripts
             -Dsonar.tests=tests
             -Dsonar.python.coverage.reportPaths=build/coverage/python.xml
             -Dsonar.coverageReportPaths=build/coverage/php-generic.xml

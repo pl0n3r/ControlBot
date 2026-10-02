@@ -129,6 +129,19 @@ class GitHubGlobalUiTests(unittest.TestCase):
         self.assertIn("&lt;stale &amp; incomplete&gt;", html)
         self.assertNotIn("<stale & incomplete>", html)
 
+    def test_invalid_projection_shapes_fail_closed(self):
+        invalid = [
+            {"unexpected": "mapping"},
+            ["not-a-project"],
+            [{**projected_project(), "project_id": ""}],
+            [{**projected_project(), "repositories": {"invalid": True}}],
+            [{**projected_project(), "state": "green"}],
+        ]
+        for projects in invalid:
+            with self.subTest(projects=projects):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    render(projects)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,6 +19,7 @@ class FactoryLiveOrchestratorSnapshotTests(unittest.TestCase):
   self.assertEqual(d["missing"]["fronts"],[]);self.assertTrue(d["mismatch_blocked"])
  def test_projection_is_read_only_bounded_secret_and_pii_free(self):
   d=scenario("safety");self.assertTrue(d["bounded"]);self.assertTrue(d["secret_blocked"]);self.assertTrue(d["deterministic"])
+  self.assertTrue(all(scenario("coverage")["checks"]))
   s=(ROOT/"src/FactoryLiveOrchestratorSnapshot.php").read_text().lower()
   for v in ("apiclient","apitransport","api.github.com","curl_","file_get_contents","fsockopen","entitymanager","pdo","'post'","'patch'","'put'","'delete'"):self.assertNotIn(v,s)
 if __name__=="__main__":unittest.main()

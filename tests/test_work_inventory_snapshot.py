@@ -53,7 +53,7 @@ def php_call(payload, source_ref="github:pl0n3r/Factory@abc123", observed_at=123
 require __SOURCE__;
 $payload = json_decode(base64_decode($argv[1]), true, 512, JSON_THROW_ON_ERROR);
 try {
-    $value = \\ControlBot\\Business\\WorkInventorySnapshot::fromCanonical(
+    $value = \ControlBot\Business\WorkInventorySnapshot::fromCanonical(
         $payload,
         $argv[2],
         (int) $argv[3],

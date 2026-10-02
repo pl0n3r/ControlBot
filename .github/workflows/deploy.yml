@@ -7,7 +7,31 @@ permissions:
   contents: read
 
 jobs:
+  readiness:
+    name: Validar readiness fail-closed
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+      DOMAIN: ${{ vars.DOMAIN }}
+      PUBLIC_ENTRYPOINT: public/index.php
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Exigir configuración y entrypoint antes del deploy
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_ENABLED" == "true" ]] || { echo "::error::DEPLOY_ENABLED no está autorizado"; exit 1; }
+          [[ -n "$DOMAIN" ]] || { echo "::error::DOMAIN no está configurado"; exit 1; }
+          [[ -f "$PUBLIC_ENTRYPOINT" ]] || { echo "::error::Falta $PUBLIC_ENTRYPOINT"; exit 1; }
+
   deploy:
+    name: Deploy protegido
+    needs: readiness
     if: vars.DEPLOY_ENABLED == 'true'
     uses: pl0n3r/factory/.github/workflows/deploy.yml@v1
     with:

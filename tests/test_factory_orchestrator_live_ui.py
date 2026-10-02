@@ -47,9 +47,8 @@ class FactoryOrchestratorLiveUiTests(unittest.TestCase):
         full=render("full")
         self.assertIn("state-stale",full)
         stale=render("stale_unknown")
-        self.assertIn("state-unknown",stale)
-        central=stale.split('data-node="central"',1)[0]
-        self.assertNotIn("state-current",central)
+        self.assertIn('<article class="central state-unknown"',stale)
+        self.assertNotIn('<article class="central state-current"',stale)
         css=re.search(r"<style>(.*?)</style>",stale,re.S).group(1)
         self.assertRegex(css,r"state-stale[^}]*var\(--amber\)")
         self.assertRegex(css,r"state-unknown[^}]*var\(--muted\)")

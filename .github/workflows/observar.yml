@@ -11,8 +11,31 @@ permissions:
   issues: write
 
 jobs:
+  readiness:
+    name: Validar readiness del observador
+    if: vars.DEPLOY_ENABLED == 'true' && vars.DOMAIN != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      DOMAIN: ${{ vars.DOMAIN }}
+      PUBLIC_ENTRYPOINT: public/index.php
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Exigir configuración e identidad observable
+        run: |
+          set -euo pipefail
+          [[ -n "$DOMAIN" ]] || { echo "::error::DOMAIN no está configurado"; exit 1; }
+          [[ -f "$PUBLIC_ENTRYPOINT" ]] || { echo "::error::Falta $PUBLIC_ENTRYPOINT"; exit 1; }
+          [[ -n "$GITHUB_SHA" ]] || { echo "::error::No existe identidad exacta del artefacto"; exit 1; }
+
   observar:
-    if: vars.DOMAIN != ''
+    name: Observar exact-SHA
+    needs: readiness
+    if: vars.DEPLOY_ENABLED == 'true' && vars.DOMAIN != ''
     uses: pl0n3r/factory/.github/workflows/observar.yml@v1
     with:
       domain: ${{ vars.DOMAIN }}
@@ -20,4 +43,5 @@ jobs:
       paths: '["/"]'
       version_source: config/version.json
       version_format: json
+      expected_sha: ${{ github.sha }}
       require_schema: false

@@ -1,5 +1,7 @@
+import base64
 import json
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -7,9 +9,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def project(snapshot, now=1_000, max_age=300):
-    php = r'''
-require $argv[1];
-$payload = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+    encoded = base64.b64encode(
+        json.dumps(
+            {"snapshot": snapshot, "now": now, "max_age": max_age},
+            separators=(",", ":"),
+        ).encode()
+    ).decode()
+    runner = r'''<?php
+require __SOURCE__;
+$payload = json_decode(base64_decode($argv[1]), true, 512, JSON_THROW_ON_ERROR);
 $result = \ControlBot\GitHub\GitHubProjectView::project(
     $payload['snapshot'],
     $payload['now'],
@@ -17,16 +25,23 @@ $result = \ControlBot\GitHub\GitHubProjectView::project(
 );
 echo json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 '''
-    payload = json.dumps({"snapshot": snapshot, "now": now, "max_age": max_age})
-    run = subprocess.run(
-        ["php", "-r", php, str(ROOT / "src/GitHubProjectView.php")],
-        cwd=ROOT,
-        input=payload,
-        text=True,
-        capture_output=True,
-        check=True,
-        timeout=30,
+    runner = runner.replace(
+        "__SOURCE__",
+        json.dumps(str((ROOT / "src" / "GitHubProjectView.php").resolve())),
     )
+    runner_root = ROOT / "build" / "test-runners"
+    runner_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=runner_root) as tempdir:
+        script = Path(tempdir) / "github_project_view.php"
+        script.write_text(runner, encoding="utf-8")
+        run = subprocess.run(
+            ["php", str(script), encoded],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+            timeout=30,
+        )
     return json.loads(run.stdout)
 
 

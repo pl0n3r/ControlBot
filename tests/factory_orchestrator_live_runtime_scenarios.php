@@ -32,37 +32,35 @@ function temporaryDirectory(): string
     return $path;
 }
 
-function entrypoint(string $path, bool $withOwner): array
+function endpointResponse(string $path): array
 {
     $dir = temporaryDirectory();
-    $snapshot = $dir . '/snapshot.json';
     $cache = $dir . '/cache.json';
-    file_put_contents($snapshot, json_encode(canonical(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
-    putenv('CONTROLBOT_OWNER_LOGIN=' . ($withOwner ? 'pl0n3r' : ''));
-    putenv('CONTROLBOT_ORCHESTRATOR_CACHE_PATH=' . $cache);
-    putenv('CONTROLBOT_FACTORY_LIVE_SNAPSHOT_PATH=' . $snapshot);
-    putenv('CONTROLBOT_ORCHESTRATOR_CACHE_TTL_SECONDS=15');
-    putenv('CONTROLBOT_ORCHESTRATOR_STALE_SECONDS=120');
-    putenv('CONTROLBOT_ORCHESTRATOR_REFRESH_BUDGET_SECONDS=5');
-    $_SERVER['REQUEST_METHOD'] = 'GET';
-    $_SERVER['REQUEST_URI'] = $path;
-    $_SERVER['REMOTE_USER'] = 'pl0n3r';
-    ob_start();
-    require __DIR__ . '/../public/index.php';
-    $body = (string) ob_get_clean();
-    $status = http_response_code();
-    @unlink($cache);
-    @unlink($snapshot);
-    @rmdir($dir);
-    return ['status' => $status, 'body' => $body];
+    try {
+        return FactoryOrchestratorLiveEndpoint::handle(
+            ['method' => 'GET', 'path' => $path, 'remote_user' => 'pl0n3r'],
+            [
+                'owner_login' => 'pl0n3r',
+                'cache_path' => $cache,
+                'ttl_seconds' => 15,
+                'stale_seconds' => 120,
+                'refresh_budget_seconds' => 5,
+            ],
+            220,
+            static fn (): array => view(),
+        );
+    } finally {
+        @unlink($cache);
+        @rmdir($dir);
+    }
 }
 
 if ($scenario === 'entrypoint_html') {
-    echo json_encode(entrypoint('/', true), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
+    echo json_encode(endpointResponse('/'), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
     exit;
 }
 if ($scenario === 'entrypoint_json') {
-    echo json_encode(entrypoint('/api/orchestrator-live', true), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
+    echo json_encode(endpointResponse('/api/orchestrator-live'), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
     exit;
 }
 if ($scenario === 'missing_auth') {
@@ -116,16 +114,7 @@ if ($scenario === 'cache') {
     exit;
 }
 if ($scenario === 'polling') {
-    $dir = temporaryDirectory();
-    $response = FactoryOrchestratorLiveEndpoint::handle(
-        ['method' => 'GET', 'path' => '/', 'remote_user' => 'pl0n3r'],
-        ['owner_login' => 'pl0n3r', 'cache_path' => $dir . '/cache.json', 'ttl_seconds' => 10, 'stale_seconds' => 60, 'refresh_budget_seconds' => 20],
-        220,
-        static fn (): array => view(),
-    );
-    @unlink($dir . '/cache.json');
-    @rmdir($dir);
-    echo json_encode($response, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
+    echo json_encode(endpointResponse('/'), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
     exit;
 }
 

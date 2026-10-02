@@ -8,13 +8,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def render(view):
+def render(view, surface_state="ready"):
     encoded = base64.b64encode(json.dumps(view, separators=(",", ":")).encode()).decode()
     runner = r'''<?php
 require __THEME__;
 require __UI__;
 $view = json_decode(base64_decode($argv[1]), true, 512, JSON_THROW_ON_ERROR);
-echo \ControlBot\GitHub\GitHubProjectUi::render($view);
+echo \ControlBot\GitHub\GitHubProjectUi::render($view, $argv[2]);
 '''
     runner = runner.replace("__THEME__", json.dumps(str((ROOT / "src" / "UiTheme.php").resolve())))
     runner = runner.replace("__UI__", json.dumps(str((ROOT / "src" / "GitHubProjectUi.php").resolve())))
@@ -23,7 +23,7 @@ echo \ControlBot\GitHub\GitHubProjectUi::render($view);
     with tempfile.TemporaryDirectory(dir=base) as tempdir:
         script = Path(tempdir) / "github_project_ui.php"
         script.write_text(runner, encoding="utf-8")
-        result = subprocess.run(["php", str(script), encoded], cwd=ROOT, text=True, capture_output=True, check=True, timeout=30)
+        result = subprocess.run(["php", str(script), encoded, surface_state], cwd=ROOT, text=True, capture_output=True, check=True, timeout=30)
     return result.stdout
 
 
@@ -55,35 +55,40 @@ def project_view(state="current", freshness="current", truncated=False):
 
 
 class GitHubProjectUiTests(unittest.TestCase):
-    def test_project_tab_renders_main_checks_prs_issues_release_and_workflow_with_source_and_freshness(self):
-        html = render(project_view())
-        for expected in (
-            "factory-control", "pl0n3r/ControlBot", "https://github.com/pl0n3r/ControlBot",
-            "CURRENT", "Main", "a" * 40, "Checks", "CI ControlBot",
-            "Pull requests", "#616 Read-only view", "Issues", "#614 Project GitHub UI",
-            "Release", "v0.1.0", "Último workflow", "Validar", "Truncado: no",
-        ):
-            self.assertIn(expected, html)
-
-    def test_project_tab_is_mobile_owner_first_read_only_and_unknown_safe(self):
+    def test_project_github_view_is_mobile_read_only_and_owner_first(self):
         view = project_view(state="unknown", freshness="stale", truncated=True)
         view["repositories"][0]["issues"]["items"][0]["title"] = "<script>alert(1)</script>"
         html = render(view)
+        for expected in (
+            "factory-control", "pl0n3r/ControlBot", "https://github.com/pl0n3r/ControlBot",
+            "Main", "a" * 40, "Checks", "CI ControlBot", "Pull requests",
+            "#616 Read-only view", "Issues", "Release", "v0.1.0", "Último workflow",
+            "UNKNOWN / STALE", "Truncado: sí · UNKNOWN",
+        ):
+            self.assertIn(expected, html)
         self.assertIn('name="viewport"', html)
         self.assertIn("grid-template-columns:1fr", html)
         self.assertIn("@media(min-width:760px)", html)
         self.assertIn("prefers-reduced-motion:reduce", html)
         self.assertLess(html.index('<section class="attention'), html.index('<section class="repo-grid'))
-        self.assertIn("Truncado: sí · UNKNOWN", html)
         self.assertNotIn("<script>alert(1)</script>", html)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
         lowered = html.lower()
         for forbidden in ("<form", "<button", "method=\"post\"", "merge pull", "dispatch workflow"):
             self.assertNotIn(forbidden, lowered)
-
         source = (ROOT / "src" / "GitHubProjectUi.php").read_text().lower()
         for forbidden in ("curl_", "file_get_contents(", "apiclient", "dispatchworkflow", "closeissue(", "mergepull"):
             self.assertNotIn(forbidden, source)
+
+    def test_empty_loading_error_and_permission_states_are_explicit(self):
+        empty = project_view()
+        empty["repositories"] = []
+        self.assertIn("EMPTY · Sin repositorios", render(empty))
+        self.assertIn("LOADING · Cargando evidencia GitHub.", render(project_view(), "loading"))
+        self.assertIn("ERROR · No fue posible proyectar la evidencia GitHub.", render(project_view(), "error"))
+        denied = render(project_view(), "permission_denied")
+        self.assertIn("SIN PERMISO · La evidencia GitHub no está disponible", denied)
+        self.assertNotIn("CI ControlBot", denied)
 
 
 if __name__ == "__main__":

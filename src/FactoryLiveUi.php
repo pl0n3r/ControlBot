@@ -5,6 +5,7 @@ namespace ControlBot\Business;
 
 require_once __DIR__.'/UiTheme.php';
 require_once __DIR__.'/FactoryAccountCapacitySnapshot.php';
+require_once __DIR__.'/WorkInventorySnapshot.php';
 
 use ControlBot\Ui\UiTheme;
 use InvalidArgumentException;
@@ -26,7 +27,9 @@ final class FactoryLiveUi
 
     public static function render(array $snapshot,?array $matrix=null,?array $learning=null,?array $productCosts=null,?array $accountCapacity=null): string
     {
-        self::fields($snapshot,['version','observed_at','sections','tool_usage','fingerprint'],'snapshot');
+        $snapshotFields=['version','observed_at','sections','tool_usage','fingerprint'];
+        if(array_key_exists('work_inventory',$snapshot))$snapshotFields[]='work_inventory';
+        self::fields($snapshot,$snapshotFields,'snapshot');
         if($snapshot['version']!==1||!is_int($snapshot['observed_at'])||!is_array($snapshot['sections']))
             throw new InvalidArgumentException('Factory live UI snapshot invalid.');
         self::safe($snapshot); if($matrix!==null)self::safe($matrix); if($learning!==null)self::safe($learning); if($productCosts!==null)self::safe($productCosts);
@@ -39,10 +42,41 @@ final class FactoryLiveUi
         }
         $tool=self::card($snapshot['tool_usage'],'tool_usage');
         $matrixHtml=$matrix===null?'':self::matrix($matrix);
+        $workInventoryHtml=array_key_exists('work_inventory',$snapshot)?self::workInventory($snapshot['work_inventory']):'';
         $learningHtml=$learning===null?'':self::learning($learning);
         $productCostsHtml=$productCosts===null?'':self::productCosts($productCosts,$snapshot['observed_at']);
         $capacityHtml=$accountCapacity===null?'':self::accountCapacity($accountCapacity,$snapshot['observed_at']);
-        return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ControlBot · Fábrica viva</title><style>'.self::styles().'</style></head><body><main class="shell" aria-labelledby="factory-live-title"><header class="top"><p class="eyebrow"><span>CONTROLBOT</span> / FÁBRICA VIVA</p><h1 id="factory-live-title">Fábrica viva</h1><p>Solo lectura · evidencia, freshness y antigüedad visibles.</p></header>'.$matrixHtml.$learningHtml.$capacityHtml.$productCostsHtml.$body.'<section class="panel section" data-section="tool_usage"><p class="eyebrow">HERRAMIENTAS</p><h2>Uso de herramientas</h2><div class="signal-grid">'.$tool.'</div></section></main></body></html>';
+        return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>ControlBot · Fábrica viva</title><style>'.self::styles().'</style></head><body><main class="shell" aria-labelledby="factory-live-title"><header class="top"><p class="eyebrow"><span>CONTROLBOT</span> / FÁBRICA VIVA</p><h1 id="factory-live-title">Fábrica viva</h1><p>Solo lectura · evidencia, freshness y antigüedad visibles.</p></header>'.$matrixHtml.$workInventoryHtml.$learningHtml.$capacityHtml.$productCostsHtml.$body.'<section class="panel section" data-section="tool_usage"><p class="eyebrow">HERRAMIENTAS</p><h2>Uso de herramientas</h2><div class="signal-grid">'.$tool.'</div></section></main></body></html>';
+    }
+
+    private static function workInventory(mixed $raw): string
+    {
+        self::fields($raw,['version','source_ref','observed_at','freshness','projects'],'work_inventory');
+        if(!is_string($raw['source_ref'])||!is_int($raw['observed_at'])||!is_string($raw['freshness']))
+            throw new InvalidArgumentException('Work inventory UI provenance invalid.');
+        $inventory=WorkInventorySnapshot::fromCanonical(
+            ['version'=>$raw['version'],'projects'=>$raw['projects']],
+            $raw['source_ref'],
+            $raw['observed_at'],
+            $raw['freshness'],
+        );
+        if($inventory!==$raw)throw new InvalidArgumentException('Work inventory UI canonical mismatch.');
+
+        $cards='';
+        foreach($inventory['projects'] as $project){
+            $repo=self::text($project['repository_ref']);
+            $state=self::text($project['state']);
+            $counts=$project['counts'];
+            $next=$project['next_work']===null
+                ?'<small class="matrix-meta">Siguiente referencia: ninguna</small>'
+                :'<small class="matrix-meta">Siguiente referencia: '.self::e(self::text($project['next_work'])).'</small>';
+            $cards.='<article class="learning-card" data-work-state="'.self::e($state).'"><span>'.self::e($repo).'</span><strong>'.self::e($state).'</strong>'
+                .'<small class="matrix-meta">Fuente: '.self::e($inventory['source_ref']).' · freshness: '.self::e($inventory['freshness']).'</small>'
+                .'<small class="matrix-meta">Disponible: '.self::e((string)$counts['available']).' · Reservado: '.self::e((string)$counts['reserved']).' · Bloqueado: '.self::e((string)$counts['blocked']).'</small>'.$next.'</article>';
+        }
+        return '<section class="panel section" data-section="work_inventory"><p class="eyebrow">INVENTARIO CANÓNICO</p><h2>Trabajo canónico</h2>'
+            .'<p class="matrix-meta">Fuente: '.self::e($inventory['source_ref']).' · freshness: '.self::e($inventory['freshness']).'</p>'
+            .'<div class="learning-grid">'.$cards.'</div></section>';
     }
 
     private static function matrix(array $matrix): string

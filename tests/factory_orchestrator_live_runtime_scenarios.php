@@ -15,7 +15,7 @@ $scenario = $argv[1] ?? '';
 
 function canonical(): array
 {
-    return FactoryLiveSnapshot::build([], 200);
+    return FactoryLiveSnapshot::build(['batches' => []], 200);
 }
 
 function view(): array

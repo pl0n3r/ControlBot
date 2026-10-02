@@ -23,6 +23,26 @@ def scenario(name):
 
 class FactoryOrchestratorLiveRuntimeTests(unittest.TestCase):
     def test_public_entrypoint_serves_owner_only_read_only_view_and_json(self):
+        lint = subprocess.run(
+            ["php", "-l", str(INDEX)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+            timeout=30,
+        )
+        self.assertIn("No syntax errors detected", lint.stdout)
+
+        index_source = INDEX.read_text()
+        for token in (
+            "FactoryOrchestratorLiveEndpoint::handle",
+            "CONTROLBOT_OWNER_LOGIN",
+            "CONTROLBOT_FACTORY_LIVE_SNAPSHOT_PATH",
+            "CONTROLBOT_ORCHESTRATOR_CACHE_PATH",
+            "REMOTE_USER",
+        ):
+            self.assertIn(token, index_source)
+
         html = scenario("entrypoint_html")
         self.assertEqual(html["status"], 200)
         self.assertIn("Orquestador en vivo", html["body"])

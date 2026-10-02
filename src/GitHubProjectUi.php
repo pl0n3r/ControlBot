@@ -12,8 +12,11 @@ final class GitHubProjectUi
 {
     private const EVIDENCE = ['current', 'stale', 'unknown'];
 
-    public static function render(array $view): string
+    public static function render(array $view, string $surfaceState = 'ready'): string
     {
+        if (!in_array($surfaceState, ['ready', 'loading', 'error', 'permission_denied'], true)) {
+            $surfaceState = 'error';
+        }
         try {
             [$project, $repos] = self::normalize($view);
         } catch (InvalidArgumentException) {
@@ -23,7 +26,7 @@ final class GitHubProjectUi
 
         usort($repos, static fn(array $a, array $b): int => ($a['state'] === 'unknown' ? 0 : 1) <=> ($b['state'] === 'unknown' ? 0 : 1));
         $attention = self::attention($project, $repos);
-        $cards = $repos === [] ? '<p class="empty">UNKNOWN · Sin repositorios verificables.</p>' : implode('', array_map(self::repo(...), $repos));
+        $cards = self::surface($surfaceState, $repos);
 
         return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
@@ -81,6 +84,21 @@ final class GitHubProjectUi
             }
         }
         return $repo;
+    }
+
+    private static function surface(string $state, array $repos): string
+    {
+        if ($state !== 'ready') {
+            $messages = [
+                'loading' => 'LOADING · Cargando evidencia GitHub.',
+                'error' => 'ERROR · No fue posible proyectar la evidencia GitHub.',
+                'permission_denied' => 'SIN PERMISO · La evidencia GitHub no está disponible para esta sesión.',
+            ];
+            return '<p class="surface-state surface-' . $state . '">' . $messages[$state] . '</p>';
+        }
+        return $repos === []
+            ? '<p class="surface-state surface-empty">EMPTY · Sin repositorios en esta proyección.</p>'
+            : implode('', array_map(self::repo(...), $repos));
     }
 
     private static function attention(array $project, array $repos): string
@@ -155,7 +173,7 @@ final class GitHubProjectUi
 .shell{width:min(100%,1180px);margin:auto;padding:24px 16px 48px}header{min-width:0}.eyebrow{color:var(--cyan);letter-spacing:.07em;font:700 .72rem/1.3 ui-monospace,monospace}
 h1,h2,h3{overflow-wrap:anywhere}h1{font-size:clamp(1.8rem,8vw,3rem)}.meta,.truncation,.empty{color:var(--muted);overflow-wrap:anywhere}
 .attention{display:grid;gap:6px;margin:18px 0;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
-.attention-unknown{border-color:var(--amber)}.attention strong{font-family:ui-monospace,monospace}.repo-grid{display:grid;grid-template-columns:1fr;gap:16px}
+.attention-unknown{border-color:var(--amber)}.surface-state{padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--muted)}.attention strong{font-family:ui-monospace,monospace}.repo-grid{display:grid;grid-template-columns:1fr;gap:16px}
 .repo{min-width:0;padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}.repo-unknown{border-color:var(--amber)}
 .block{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.block h3{font-size:.95rem}.block ul{padding-left:20px}.block li{margin:6px 0;overflow-wrap:anywhere}
 code{font-family:"JetBrains Mono",ui-monospace,monospace;overflow-wrap:anywhere}a,button,[tabindex]:not([tabindex="-1"]){outline-offset:3px}

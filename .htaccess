@@ -1,0 +1,24 @@
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Internal repository surfaces are never public.
+RewriteRule ^(?:src|config|docs|scripts|tests|vendor|lecciones)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:\.git|\.github)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:AGENTES|AGENTS|README|CHANGELOG|LICENSE)(?:\.[^/]+)?$ - [F,L,NC]
+RewriteRule \.(?:md|ya?ml|json|lock|sql|log|ini|dist|xml|toml)$ - [F,L,NC]
+RewriteRule ^(?!(?:index\.php|public/index\.php)$).+\.php$ - [F,L,NC]
+
+# Only the front controller handles virtual routes. Existing future public assets remain servable.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule mod_authz_core.c>
+<FilesMatch "(?i)^(?:\.|AGENTES|AGENTS|README|CHANGELOG)|\.(?:md|ya?ml|json|lock|sql|log|ini|dist|xml|toml)$">
+    Require all denied
+</FilesMatch>
+</IfModule>

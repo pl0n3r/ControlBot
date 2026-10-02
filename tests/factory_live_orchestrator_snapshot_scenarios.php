@@ -21,6 +21,11 @@ function raw(string $fresh='current'):array{return [
  'learning'=>[sig('learning:factory-860','incident_lesson')],'tool_usage'=>sig('tool-usage:github','tool_usage'),'work_inventory'=>inv($fresh)];}
 function build(array $raw):array{return FactoryLiveOrchestratorSnapshot::build(FactoryLiveSnapshot::build($raw,200),220);}
 function blocked(callable $f):bool{try{$f();return false;}catch(Throwable){return true;}}
+function snapfail(callable $mut):bool{
+ $x=FactoryLiveSnapshot::build(raw(),200);unset($x['fingerprint']);$mut($x);
+ $x['fingerprint']=hash('sha256',json_encode($x,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
+ return blocked(fn()=>FactoryLiveOrchestratorSnapshot::build($x,220));
+}
 
 if($scenario==='full'){echo json_encode(build(raw()),JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;}
 if($scenario==='fail_closed'){
@@ -33,5 +38,20 @@ if($scenario==='safety'){
  $many=raw();$many['work']=[];for($i=1;$i<=25;$i++)$many['work'][]=sig('work:controlbot-'.$i,'github_project_snapshot','pending','current',['repository_ref'=>'pl0n3r/ControlBot','issue_ref'=>'github:pl0n3r/ControlBot#'.(700+$i),'status'=>'reserved']);
  $secret=raw();$secret['work'][0]['data']['api_key']='nope';$a=build(raw());$b=build(raw());
  echo json_encode(['bounded'=>blocked(fn()=>build($many)),'secret_blocked'=>blocked(fn()=>build($secret)),'deterministic'=>$a===$b,'safe'=>$a],JSON_THROW_ON_ERROR),PHP_EOL;exit;
+}
+if($scenario==='coverage'){
+ $checks=[
+  snapfail(function(&$x){$x['work_inventory']['version']=2;}),
+  snapfail(function(&$x){$x['work_inventory']['freshness']='bad';}),
+  snapfail(function(&$x){$x['work_inventory']['projects']=[];}),
+  snapfail(function(&$x){$x['work_inventory']['projects'][0]['repository_ref']='bad';}),
+  snapfail(function(&$x){$x['sections']['work']='bad';}),
+  snapfail(function(&$x){$x['sections']['work'][0]['data']='bad';}),
+  snapfail(function(&$x){$x['sections']['work'][0]['data']['status']='bad';}),
+  snapfail(function(&$x){$x['sections']['work'][0]['data']['progress_percent']=101;}),
+  snapfail(function(&$x){$x['sections']['owner_decisions']='bad';}),
+  snapfail(function(&$x){$x['sections']['work'][0]['authority']='bad';}),
+ ];
+ echo json_encode(['checks'=>$checks],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
 fwrite(STDERR,"scenario invalid\n");exit(2);

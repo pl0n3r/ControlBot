@@ -116,6 +116,19 @@ class GitHubGlobalUiTests(unittest.TestCase):
         ):
             self.assertNotIn(token, source)
 
+    def test_empty_and_unknown_without_repositories_are_explicit_and_escaped(self):
+        self.assertIn("No hay proyectos GitHub disponibles.", render([]))
+        unknown = projected_project(project_id=None, state="unknown", freshness="unknown")
+        unknown["repositories"] = []
+        unknown["reason"] = "<stale & incomplete>"
+
+        html = render([unknown])
+
+        self.assertIn("proyección desconocida", html)
+        self.assertIn("Sin evidencia de repositorios.", html)
+        self.assertIn("&lt;stale &amp; incomplete&gt;", html)
+        self.assertNotIn("<stale & incomplete>", html)
+
 
 if __name__ == "__main__":
     unittest.main()

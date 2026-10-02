@@ -1,6 +1,7 @@
 import base64
 import json
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -48,11 +49,11 @@ def inventory():
 
 def php_call(payload, source_ref="github:pl0n3r/Factory@abc123", observed_at=123, freshness="current"):
     encoded = base64.b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
-    code = r'''
-require "src/WorkInventorySnapshot.php";
+    runner = r'''<?php
+require __SOURCE__;
 $payload = json_decode(base64_decode($argv[1]), true, 512, JSON_THROW_ON_ERROR);
 try {
-    $value = \ControlBot\Business\WorkInventorySnapshot::fromCanonical(
+    $value = \\ControlBot\\Business\\WorkInventorySnapshot::fromCanonical(
         $payload,
         $argv[2],
         (int) $argv[3],
@@ -63,16 +64,24 @@ try {
     echo json_encode(["ok" => false, "error" => $e->getMessage()], JSON_THROW_ON_ERROR);
 }
 '''
-    result = subprocess.run(
-        ["php", "-r", code, encoded, source_ref, str(observed_at), freshness],
-        cwd=ROOT,
-        check=True,
-        text=True,
-        capture_output=True,
-        timeout=30,
+    runner = runner.replace(
+        "__SOURCE__",
+        json.dumps(str((ROOT / "src" / "WorkInventorySnapshot.php").resolve())),
     )
+    runner_root = ROOT / "build" / "test-runners"
+    runner_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=runner_root) as tempdir:
+        script = Path(tempdir) / "work_inventory_snapshot.php"
+        script.write_text(runner, encoding="utf-8")
+        result = subprocess.run(
+            ["php", str(script), encoded, source_ref, str(observed_at), freshness],
+            cwd=ROOT,
+            check=True,
+            text=True,
+            capture_output=True,
+            timeout=30,
+        )
     return json.loads(result.stdout)
-
 
 class WorkInventorySnapshotTests(unittest.TestCase):
     def test_canonical_projection_preserves_project_identity_state_source_and_freshness(self):

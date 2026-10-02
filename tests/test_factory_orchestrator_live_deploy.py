@@ -36,7 +36,7 @@ class FactoryOrchestratorLiveDeployTests(unittest.TestCase):
 
     def test_observer_fails_closed_on_missing_identity_or_unconfigured_domain(self) -> None:
         source = self.read(OBSERVE)
-        condition = "if: vars.DEPLOY_ENABLED == 'true' && vars.DOMAIN != ''"
+        condition = "if: vars.DOMAIN != '' && vars.DEPLOY_ENABLED == 'true'"
         self.assertGreaterEqual(source.count(condition), 2)
         self.assertIn("PUBLIC_ENTRYPOINT: public/index.php", source)
         self.assertIn('[[ -n "$DOMAIN" ]]', source)

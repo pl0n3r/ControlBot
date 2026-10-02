@@ -61,6 +61,11 @@ class SecurityWorkflowContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, source)
         self.assertIn("github.event_name == 'issue_comment'", source)
+        self.assertEqual(
+            1,
+            source.count("github.event.comment.author_association == 'OWNER'"),
+        )
+        self.assertIn("OWNER|MEMBER|COLLABORATOR", source)
         self.assertNotIn("author_association == 'MEMBER'", source)
         self.assertNotIn("author_association == 'COLLABORATOR'", source)
 

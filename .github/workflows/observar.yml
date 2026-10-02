@@ -13,7 +13,7 @@ permissions:
 jobs:
   readiness:
     name: Validar readiness del observador
-    if: vars.DEPLOY_ENABLED == 'true' && vars.DOMAIN != ''
+    if: vars.DOMAIN != '' && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -35,7 +35,7 @@ jobs:
   observar:
     name: Observar exact-SHA
     needs: readiness
-    if: vars.DEPLOY_ENABLED == 'true' && vars.DOMAIN != ''
+    if: vars.DOMAIN != '' && vars.DEPLOY_ENABLED == 'true'
     uses: pl0n3r/factory/.github/workflows/observar.yml@v1
     with:
       domain: ${{ vars.DOMAIN }}

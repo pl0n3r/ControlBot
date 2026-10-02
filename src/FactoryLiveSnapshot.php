@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace ControlBot\Business;
 
+require_once __DIR__.'/WorkInventorySnapshot.php';
+
 use InvalidArgumentException;
 
 final class FactoryLiveSnapshot
@@ -22,7 +24,7 @@ final class FactoryLiveSnapshot
     public static function build(array $raw,int $now): array
     {
         if($now<1||array_is_list($raw))throw new InvalidArgumentException('Factory live input invalid.');
-        $allowed=[...array_keys(self::AUTHORITIES),'tool_usage'];
+        $allowed=[...array_keys(self::AUTHORITIES),'tool_usage','work_inventory'];
         foreach(array_keys($raw) as $key)
             if(!is_string($key)||!in_array($key,$allowed,true))
                 throw new InvalidArgumentException('Factory live field invalid.');
@@ -37,7 +39,23 @@ final class FactoryLiveSnapshot
             :self::signal($tool,'tool_usage','tool_usage',$now);
 
         $canonical=['version'=>1,'observed_at'=>$now,'sections'=>$sections,'tool_usage'=>$tool];
+        if(array_key_exists('work_inventory',$raw))
+            $canonical['work_inventory']=self::workInventory($raw['work_inventory'],$now);
         return $canonical+['fingerprint'=>hash('sha256',json_encode($canonical,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES))];
+    }
+
+    private static function workInventory(mixed $raw,int $now): array
+    {
+        self::fields($raw,['version','source_ref','observed_at','freshness','projects'],'work_inventory');
+        if(!is_string($raw['source_ref'])||!is_int($raw['observed_at'])||$raw['observed_at']<1||$raw['observed_at']>$now
+            ||!is_string($raw['freshness']))
+            throw new InvalidArgumentException('Work inventory provenance invalid.');
+        return WorkInventorySnapshot::fromCanonical(
+            ['version'=>$raw['version'],'projects'=>$raw['projects']],
+            $raw['source_ref'],
+            $raw['observed_at'],
+            $raw['freshness'],
+        );
     }
 
     private static function section(mixed $raw,string $section,string $authority,int $now): array

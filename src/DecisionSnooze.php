@@ -1,19 +1,14 @@
 <?php
 declare(strict_types=1);
-
 namespace ControlBot\Decisions;
-
 use ControlBot\Approvals\AppendOnlyAuditLog;
 use ControlBot\Approvals\OwnerContext;
 use InvalidArgumentException;
 use RuntimeException;
-
 final class DecisionSnooze
 {
     private const DURATIONS = ['tomorrow' => 86400, 'week' => 604800];
-
     public function __construct(private readonly AppendOnlyAuditLog $audit) {}
-
     public function snooze(
         array $decisions,
         string $repository,
@@ -49,7 +44,6 @@ final class DecisionSnooze
         ]);
         return ['repository' => $repository, 'issue' => $issue, 'duration' => $duration, 'snoozed_until' => $until];
     }
-
     public function visible(array $decisions, int $now): array
     {
         if ($now < 1) {

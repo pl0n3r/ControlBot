@@ -32,7 +32,6 @@ final class WorkUi
         usort($rows, self::order(...));
         $cards = '';
         foreach ($rows as $row) $cards .= self::card($row);
-        if ($cards === '') $cards = '<p class="surface-state state-empty">EMPTY · Sin trabajo observado.</p>';
 
         return self::shell('<header><p class="eyebrow">CONTROLBOT / TRABAJO</p><h1>Trabajo</h1>'
             . '<p class="meta">Readiness canónico del Scheduler · solo lectura</p></header>'
@@ -52,6 +51,8 @@ final class WorkUi
 
         $out = [];
         $seen = [];
+        if ($view['rows'] === []) return ['empty', $message, []];
+
         foreach ($view['rows'] as $row) {
             self::fields($row, ['work_item','context'], 'WorkRow');
             if (!is_array($row['work_item']) || !is_array($row['context'])) throw new InvalidArgumentException('WorkRow invalid.');
@@ -130,7 +131,10 @@ final class WorkUi
     private static function text(mixed $value, int $max, bool $nullable = false): ?string
     {
         if ($nullable && $value === null) return null;
-        if (!is_string($value) || strlen($value) > $max || preg_match('/[\x00-\x1f\x7f]/', $value) === 1) throw new InvalidArgumentException('message invalid.');
+        if (!is_string($value) || strlen($value) > $max || preg_match('/[\x00-\x1f\x7f]/', $value) === 1
+            || preg_match('/(?:-----BEGIN [^-]*PRIVATE KEY-----|\\b(?:bearer\\s+[A-Za-z0-9._~+\\/-]{8,}|(?:password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn|session[_ -]?token)\\s*[:=]\\s*\\S+|(?:ghp_|gho_|github_pat_)[A-Za-z0-9_]{20,}|(?:sk|rk|pk)-[A-Za-z0-9_-]{12,}))/i', $value) === 1) {
+            throw new InvalidArgumentException('message invalid.');
+        }
         return $value;
     }
 

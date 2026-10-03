@@ -1,6 +1,8 @@
 # Entrada pública del Orquestador en Hostinger
 
-ControlBot sigue en **construcción**. Este tramo prepara la entrada web owner-only del Orquestador; no activa deploy, dominio ni go-live y **no se fusiona** hasta que D-059 tenga evidencia de backup y el PR #630 haya completado su preflight de riesgo alto.
+ControlBot sigue en **construcción**. Este tramo prepara la entrada web owner-only del Orquestador; no activa deploy, dominio ni go-live.
+
+Para este sitio y esta fase, la decisión del dueño registrada en ControlBot#634 acepta **Git como respaldo** para D-059. No se exige un backup de Hostinger/hPanel antes de #630/#656 mientras la publicación siga compuesta únicamente por contenido versionado del repositorio. Esta excepción no se extiende a DB, DNS, cron, dominios, planes, otros productos ni datos fuera de Git.
 
 ## Límite y flujo
 
@@ -34,21 +36,32 @@ Contrato de lectura:
 
 El hardening del PR #630 bloquea archivos `.json` y rutas internas desde HTTP. Por eso el orden de merge es obligatorio: **#630 → este PR**. El snapshot nunca se expone como asset público.
 
+## D-059 · respaldo Git-first
+
+Antes de fusionar el frente que auto-despliega, #627 debe registrar evidencia verificable y no sensible de:
+
+1. **SHA exacto de main** inmediatamente antes del merge.
+2. **SHA del último despliegue sano observado** para ControlBot.
+3. Plan de rollback **Git-first**: revert explícito del merge, sin reescribir `main`.
+4. Verificación posterior del rollback: `/src/` y `/config/` continúan deny-by-default con 403/404 y la raíz no expone fuentes internas.
+
+Ese registro satisface D-059 para ControlBot en construcción bajo la decisión vigente del dueño. No se debe fabricar un “backup real” de hPanel ni tratar plantillas incompletas como evidencia.
+
 ## Preparación en hPanel
 
-Estas acciones son operativas y permanecen detrás de D-059; no requieren registrar credenciales en GitHub ni en este runbook.
+Estas acciones pertenecen a la preparación operativa posterior y no sustituyen el respaldo Git-first.
 
 1. En hPanel, abrir el sitio `control.condorapp.com.co`.
-2. Activar la protección con contraseña para el directorio publicado del sitio usando una cuenta exclusiva del dueño.
+2. Activar la protección con contraseña para el directorio publicado usando una cuenta exclusiva del dueño.
 3. Configurar server-side `CONTROLBOT_OWNER_LOGIN` con el mismo identificador que el servidor entrega en `REMOTE_USER`.
-4. No habilitar todavía `DOMAIN` ni `DEPLOY_ENABLED`; esas variables pertenecen a un tramo posterior con decisión explícita.
+4. No habilitar `DOMAIN` ni `DEPLOY_ENABLED` por inferencia; esas variables requieren su autorización explícita.
 5. Confirmar que el productor offline del snapshot escribe `var/orchestrator-live.json` con permisos de lectura del proceso PHP y sin secretos.
 
 No copies usuario, contraseña, cookies, tokens ni valores sensibles en Issues, PRs, comandos compartidos o este documento.
 
 ## Comprobación posterior
 
-Después de D-059, #630 y este PR, pero antes de declarar el sitio live:
+Después de #630 y este PR, pero antes de declarar el sitio live:
 
 1. Una petición a `/` **sin credenciales** debe ser rechazada por la protección del servidor; no debe devolver `200`.
 2. `/src/` y `/config/` deben responder **403/404** y nunca listar o servir código/configuración.
@@ -69,10 +82,10 @@ El primer comando debe ser distinto de 200 sin autenticación; los dos últimos 
 
 ## Gate de merge y activación
 
-Este leaf es build-ahead reversible. El PR puede desarrollarse, probarse y revisarse, pero **no se fusiona** mientras falte cualquiera de estas condiciones:
+Este leaf es build-ahead reversible. **No se fusiona** mientras falte cualquiera de estas condiciones:
 
-- D-059: backup previo verificable registrado para la acción live;
-- PR #630: hardening de raíz fusionable y con su preflight de riesgo alto completado;
+- D-059 Git-first registrado en #627 con los tres datos de evidencia y la verificación 403/404 descrita arriba;
+- PR #630: hardening de raíz con preflight de riesgo alto completado e integrado antes de este PR;
 - ausencia de hallazgos bloqueantes en CI/revisión del HEAD exacto de este PR.
 
 Orden operativo:

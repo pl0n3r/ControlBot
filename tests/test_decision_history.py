@@ -40,5 +40,19 @@ class DecisionHistoryTests(unittest.TestCase):
         self.assertNotIn("evil.example", rendered)
 
 
+    def test_snooze_history_is_safe_and_explicit(self):
+        data = scenario("snooze")
+        active = data["active"][0]
+        expired = data["expired"][0]
+
+        self.assertEqual(active["actions"], ["snooze"])
+        self.assertEqual(active["option"], "S")
+        self.assertEqual(active["snoozed_until"], 500)
+        self.assertEqual(active["snooze_state"], "active")
+        self.assertEqual(expired["snooze_state"], "expired")
+        self.assertEqual(active["evidence"], [])
+        self.assertNotIn("secret", json.dumps(data).lower())
+
+
 if __name__ == "__main__":
     unittest.main()

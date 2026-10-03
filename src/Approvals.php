@@ -193,7 +193,7 @@ final class AppendOnlyAuditLog
 
     public function record(array $entry): void
     {
-        $allowed = ['actor', 'action', 'repository', 'issue', 'category', 'option', 'sha', 'result', 'evidence', 'at'];
+        $allowed = ['actor', 'action', 'repository', 'issue', 'category', 'option', 'sha', 'result', 'evidence', 'at', 'snoozed_until'];
         if (array_diff(array_keys($entry), $allowed) !== []) {
             throw new InvalidArgumentException('Campo de auditoría no permitido.');
         }
@@ -233,7 +233,7 @@ final class AppendOnlyAuditLog
         if (!is_array($lines) || count($lines) > 5000) {
             throw new RuntimeException('Bitácora inválida.');
         }
-        $allowed = ['actor', 'action', 'repository', 'issue', 'category', 'option', 'sha', 'result', 'evidence', 'at'];
+        $allowed = ['actor', 'action', 'repository', 'issue', 'category', 'option', 'sha', 'result', 'evidence', 'at', 'snoozed_until'];
         $entries = [];
         foreach ($lines as $line) {
             if ($line === '' || strlen($line) > 8192) {

@@ -28,6 +28,8 @@ if ($scenario === 'empty') {
     echo DecisionUi::render($decision, true, $csrf);
 } elseif ($scenario === 'no-csrf') {
     echo DecisionUi::render($decision, true);
+} elseif ($scenario === 'snooze') {
+    echo DecisionUi::render($decision, true, $csrf);
 } elseif ($scenario === 'batch') {
     $decision[0]['category'] = 'brand';
     $decision[0]['title_simple'] = '¿Aplicar cambio seguro?';

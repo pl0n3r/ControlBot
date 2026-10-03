@@ -34,11 +34,12 @@ final class AgentUi
             $agentSessions = array_values(array_filter($sessions, static fn(array $session): bool => $session['agent_id'] === $agent['agent_id']));
             $cards .= self::agentCard($agent, $agentSessions, $assignments);
         }
-        if ($cards === '') $cards = '<p class="surface-state state-empty">EMPTY · Sin agentes observados.</p>';
-
         $handoffRows = '';
         foreach ($handoffs as $handoff) {
-            $handoffRows .= '<li><strong>' . self::e($handoff['handoff_id']) . '</strong>'
+            $handoffRows .= '<li data-handoff="' . self::e($handoff['handoff_id']) . '"><strong>' . self::e($handoff['handoff_id']) . '</strong>'
+                . '<span>Assignment: ' . self::e($handoff['assignment_id']) . '</span>'
+                . '<span>From: ' . self::e($handoff['from_session_id']) . '</span>'
+                . '<span>To: ' . self::e($handoff['to_session_id'] ?? 'NONE') . '</span>'
                 . '<span>' . self::e($handoff['objective']) . '</span>'
                 . '<span>' . self::e($handoff['issue_ref']) . ($handoff['pr_ref'] === null ? '' : ' · ' . self::e($handoff['pr_ref'])) . '</span>'
                 . '<code>' . self::e($handoff['sha']) . '</code>'
@@ -72,6 +73,9 @@ final class AgentUi
         $sessions = self::index($view['sessions'], AgentRuntime::session(...), 'session_id');
         $assignments = self::index($view['assignments'], AgentRuntime::assignment(...), 'assignment_id');
         $handoffs = self::index($view['handoffs'], AgentRuntime::handoff(...), 'handoff_id');
+        if ($agents === [] && $sessions === [] && $assignments === [] && $handoffs === []) {
+            return ['empty', $message, [], [], [], []];
+        }
 
         foreach ($sessions as $session) {
             if (!isset($agents[$session['agent_id']])) throw new InvalidArgumentException('Session agent missing.');
@@ -145,7 +149,10 @@ final class AgentUi
     private static function text(mixed $value, int $max, bool $nullable = false): ?string
     {
         if ($nullable && $value === null) return null;
-        if (!is_string($value) || strlen($value) > $max || preg_match('/[\x00-\x1f\x7f]/', $value) === 1) throw new InvalidArgumentException('message invalid.');
+        if (!is_string($value) || strlen($value) > $max || preg_match('/[\x00-\x1f\x7f]/', $value) === 1
+            || preg_match('/(?:-----BEGIN [^-]*PRIVATE KEY-----|\\b(?:bearer\\s+[A-Za-z0-9._~+\\/-]{8,}|(?:password|passwd|token|secret|cookie|authorization|private[_ -]?key|api[_ -]?key|dsn|session[_ -]?token)\\s*[:=]\\s*\\S+|(?:ghp_|gho_|github_pat_)[A-Za-z0-9_]{20,}|(?:sk|rk|pk)-[A-Za-z0-9_-]{12,}))/i', $value) === 1) {
+            throw new InvalidArgumentException('message invalid.');
+        }
         return $value;
     }
 

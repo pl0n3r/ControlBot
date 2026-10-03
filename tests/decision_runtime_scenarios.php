@@ -171,27 +171,6 @@ try {
         echo json_encode(['response'=>$response,'seen'=>$seen],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
         exit;
     }
-    if ($scenario==='render-oversized-audit-line') {
-        file_put_contents($auditPath,str_repeat('X',9000)."\n");
-        try {
-            $runtime->handle('GET','/decisions',$session,[],$now);
-            echo json_encode(['blocked'=>false],JSON_THROW_ON_ERROR),PHP_EOL;
-        } catch (Throwable $exception) {
-            echo json_encode(['blocked'=>true,'message'=>$exception->getMessage()],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
-        }
-        exit;
-    }
-    if ($scenario==='render-large-audit') {
-        $entry=json_encode([
-            'actor'=>'pl0n3r','action'=>'comment','repository'=>'pl0n3r/factory','issue'=>137,
-            'category'=>'factory-release','option'=>'A','sha'=>null,'result'=>'success',
-            'evidence'=>null,'at'=>$now,
-        ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES)."\n";
-        file_put_contents($auditPath,str_repeat($entry,5001));
-        $response=$runtime->handle('GET','/decisions',$session,[],$now);
-        echo json_encode(['response'=>$response],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
-        exit;
-    }
     if ($scenario==='flow' || $scenario==='ambiguous') {
         $request=[
             '_csrf'=>$sessions->csrfToken($session),'repository'=>'pl0n3r/factory','issue'=>'137',

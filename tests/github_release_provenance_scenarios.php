@@ -11,9 +11,9 @@ use ControlBot\GitHub\GitHubReleaseProvenance;
 
 $scenario = $argv[1] ?? '';
 
-const TAG_SHA = str_repeat('b', 40);
-const COMMIT_SHA = str_repeat('c', 40);
-const LIGHT_SHA = str_repeat('d', 40);
+$TAG_SHA = str_repeat('b', 40);
+$COMMIT_SHA = str_repeat('c', 40);
+$LIGHT_SHA = str_repeat('d', 40);
 
 function releaseRow(int $id, string $tag, bool $draft = false, bool $prerelease = false): array
 {

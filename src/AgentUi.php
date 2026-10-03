@@ -85,7 +85,9 @@ final class AgentUi
             if ($session === null || $session['assignment_id'] !== $assignment['assignment_id']) throw new InvalidArgumentException('Assignment session mismatch.');
         }
         foreach ($handoffs as $handoff) {
-            if (!isset($assignments[$handoff['assignment_id']]) || !isset($sessions[$handoff['from_session_id']])
+            $assignment = $assignments[$handoff['assignment_id']] ?? null;
+            if ($assignment === null || !isset($sessions[$handoff['from_session_id']])
+                || $assignment['session_id'] !== $handoff['from_session_id']
                 || ($handoff['to_session_id'] !== null && !isset($sessions[$handoff['to_session_id']]))) {
                 throw new InvalidArgumentException('Handoff relation invalid.');
             }

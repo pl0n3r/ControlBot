@@ -66,6 +66,11 @@ class AgentUiTests(unittest.TestCase):
         self.assertNotIn("agent-builder", html)
         self.assertNotIn("assignment-638", html)
 
+        handoff_mismatch = render("handoff_mismatch")
+        self.assertIn('data-state="error"', handoff_mismatch)
+        self.assertIn("ERROR · Runtime incoherente o inválido.", handoff_mismatch)
+        self.assertNotIn("handoff-638", handoff_mismatch)
+
     def test_loading_empty_error_and_hostile_content_are_explicit_and_escaped(self):
         data = json.loads(render("states"))
         self.assertIn('data-state="loading"', data["loading"])

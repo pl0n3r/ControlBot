@@ -56,6 +56,12 @@ if ($scenario === 'incoherent') {
     echo AgentUi::render($view);
     exit;
 }
+if ($scenario === 'handoff_mismatch') {
+    $view = baseView();
+    $view['handoffs'][0]['from_session_id'] = 'session-reviewer';
+    echo AgentUi::render($view);
+    exit;
+}
 if ($scenario === 'secret') {
     $view = baseView();
     $view['handoffs'][0]['objective'] = 'token=supersecretvalue';

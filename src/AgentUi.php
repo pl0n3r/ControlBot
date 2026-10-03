@@ -102,7 +102,7 @@ final class AgentUi
         foreach ($sessions as $session) {
             $assignment = $session['assignment_id'] === null ? null : $assignments[$session['assignment_id']];
             $work = $assignment === null ? '<span class="unknown">Assignment UNKNOWN</span>' :
-                '<span>' . self::e($assignment['project_id']) . ' · ' . self::e($assignment['source_ref']) . ' · ' . self::e($assignment['status']) . '</span>';
+                '<span>' . self::e($assignment['assignment_id']) . ' · ' . self::e($assignment['project_id']) . ' · ' . self::e($assignment['source_ref']) . ' · ' . self::e($assignment['status']) . '</span>';
             $rows .= '<li><strong>' . self::e($session['session_id']) . '</strong>'
                 . '<span>' . self::e($session['status']) . ' · account ' . self::e($session['account_id']) . ' · profile ' . self::e($session['profile_alias']) . '</span>'
                 . '<span>heartbeat ' . ($session['last_heartbeat_at'] === null ? 'UNKNOWN' : (string)$session['last_heartbeat_at']) . '</span>'

@@ -31,7 +31,7 @@ class HostingerRootPublicationTests(unittest.TestCase):
         lower = source.lower()
         self.assertIn("options -indexes", lower)
         self.assertIn("directoryindex index.php", lower)
-        for internal in ("src", "config", "docs", "scripts", "tests", "vendor", "lecciones"):
+        for internal in ("src", "config", "docs", "scripts", "tests", "vendor", "lecciones", "openapi", "readme"):
             self.assertIn(internal, lower)
         self.assertIn(".git", lower)
         self.assertRegex(lower, r"md\|ya\?ml\|json")

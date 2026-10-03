@@ -10,10 +10,7 @@ use RuntimeException;
 
 final class DecisionSnooze
 {
-    private const DURATIONS = [
-        'tomorrow' => 86400,
-        'week' => 604800,
-    ];
+    private const DURATIONS = ['tomorrow' => 86400, 'week' => 604800];
 
     public function __construct(private readonly AppendOnlyAuditLog $audit) {}
 
@@ -25,11 +22,11 @@ final class DecisionSnooze
         OwnerContext $owner,
         int $now,
     ): array {
-        if (!isset(self::DURATIONS[$duration]) || $issue < 1 || $now < 1) {
+        $seconds = self::DURATIONS[$duration] ?? null;
+        if (!is_int($seconds) || $issue < 1 || $now < 1) {
             throw new InvalidArgumentException('Recordatorio inválido.');
         }
         $owner->assertFresh($now);
-
         $matches = array_values(array_filter(
             $decisions,
             static fn (mixed $decision): bool => is_array($decision)
@@ -39,34 +36,18 @@ final class DecisionSnooze
         if (count($matches) !== 1) {
             throw new RuntimeException('La decisión no está disponible para posponer.');
         }
-
-        $decision = $matches[0];
-        $category = $decision['category'] ?? null;
+        $category = $matches[0]['category'] ?? null;
         if (!is_string($category) || $category === '') {
             throw new RuntimeException('Categoría de decisión inválida.');
         }
-
-        $until = $now + self::DURATIONS[$duration];
+        $until = $now + $seconds;
         $this->audit->record([
-            'actor' => $owner->login,
-            'action' => 'snooze',
-            'repository' => $repository,
-            'issue' => $issue,
-            'category' => $category,
-            'option' => 'S',
-            'sha' => null,
-            'result' => 'success',
-            'evidence' => null,
-            'at' => $now,
-            'snoozed_until' => $until,
+            'actor' => $owner->login, 'action' => 'snooze',
+            'repository' => $repository, 'issue' => $issue, 'category' => $category,
+            'option' => 'S', 'sha' => null, 'result' => 'success',
+            'evidence' => null, 'at' => $now, 'snoozed_until' => $until,
         ]);
-
-        return [
-            'repository' => $repository,
-            'issue' => $issue,
-            'duration' => $duration,
-            'snoozed_until' => $until,
-        ];
+        return ['repository' => $repository, 'issue' => $issue, 'duration' => $duration, 'snoozed_until' => $until];
     }
 
     public function visible(array $decisions, int $now): array
@@ -74,43 +55,31 @@ final class DecisionSnooze
         if ($now < 1) {
             throw new InvalidArgumentException('Tiempo de recordatorio inválido.');
         }
-
         $latest = [];
-        foreach ($this->audit->entriesByAction('snooze') as $entry) {
+        foreach ($this->audit->entries() as $entry) {
+            if (($entry['action'] ?? null) !== 'snooze') {
+                continue;
+            }
             $repository = $entry['repository'] ?? null;
             $issue = $entry['issue'] ?? null;
             $at = $entry['at'] ?? null;
             $until = $entry['snoozed_until'] ?? null;
-            if (
-                !is_string($repository)
-                || !is_int($issue) || $issue < 1
-                || !is_int($at) || $at < 1
-                || !is_int($until) || $until <= $at
-                || ($entry['option'] ?? null) !== 'S'
-                || ($entry['result'] ?? null) !== 'success'
-            ) {
+            if (!is_string($repository) || !is_int($issue) || $issue < 1
+                || !is_int($at) || $at < 1 || !is_int($until) || $until <= $at
+                || ($entry['option'] ?? null) !== 'S' || ($entry['result'] ?? null) !== 'success') {
                 throw new RuntimeException('Entrada de recordatorio inválida.');
             }
-
             $key = $repository . '#' . $issue;
             if (!isset($latest[$key]) || $at > $latest[$key]['at']) {
                 $latest[$key] = ['at' => $at, 'until' => $until];
             }
         }
-
-        return array_values(array_filter(
-            $decisions,
-            static function (mixed $decision) use ($latest, $now): bool {
-                if (
-                    !is_array($decision)
-                    || !is_string($decision['repository'] ?? null)
-                    || !is_int($decision['issue'] ?? null)
-                ) {
-                    throw new RuntimeException('Decisión de inbox inválida.');
-                }
-                $key = $decision['repository'] . '#' . $decision['issue'];
-                return !isset($latest[$key]) || $latest[$key]['until'] <= $now;
-            },
-        ));
+        return array_values(array_filter($decisions, static function (mixed $decision) use ($latest, $now): bool {
+            if (!is_array($decision) || !is_string($decision['repository'] ?? null) || !is_int($decision['issue'] ?? null)) {
+                throw new RuntimeException('Decisión de inbox inválida.');
+            }
+            $key = $decision['repository'] . '#' . $decision['issue'];
+            return !isset($latest[$key]) || $latest[$key]['until'] <= $now;
+        }));
     }
 }

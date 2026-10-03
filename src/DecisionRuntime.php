@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace ControlBot\Decisions;
 
+require_once __DIR__ . '/DecisionSnooze.php';
+
 use ControlBot\Approvals\AppendOnlyAuditLog;
 use ControlBot\Approvals\ApprovalEndpoint;
 use ControlBot\Approvals\HumanGate;

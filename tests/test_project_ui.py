@@ -27,7 +27,10 @@ class ProjectUiTests(unittest.TestCase):
         source = (ROOT / "src" / "ProjectUi.php").read_text(encoding="utf-8")
         self.assertIn("ProjectModel::normalize", source)
         self.assertNotIn("private const PHASES", source)
-        self.assertLess(html.index("Condor"), html.index("ControlBot"))
+        self.assertLess(
+            html.index('data-project="project-condor"'),
+            html.index('data-project="project-controlbot"'),
+        )
 
     def test_detail_preserves_repository_environment_and_aggregate_provenance(self):
         html = render("detail")

@@ -75,16 +75,15 @@ final class AccountUi
             }
             return ['state'=>$state, 'message'=>$message, 'providers'=>[], 'accounts'=>[]];
         }
-        if ($input['accounts'] === []) {
-            return ['state'=>'empty', 'message'=>$message, 'providers'=>[], 'accounts'=>[]];
-        }
-
         $providers = [];
         foreach ($input['providers'] as $raw) {
             if (!is_array($raw)) throw new InvalidArgumentException('Provider invalid.');
             $provider = AgentRuntime::provider($raw);
             if (isset($providers[$provider['provider_id']])) throw new InvalidArgumentException('Provider duplicated.');
             $providers[$provider['provider_id']] = $provider;
+        }
+        if ($input['accounts'] === []) {
+            return ['state'=>'empty', 'message'=>$message, 'providers'=>[], 'accounts'=>[]];
         }
 
         $accounts = [];

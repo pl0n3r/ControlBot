@@ -61,6 +61,8 @@ class AccountUiTests(unittest.TestCase):
         self.assertIn('data-state="empty"', ready_empty)
         self.assertIn('role="status"', ready_empty)
         self.assertNotIn("chatgpt-web", ready_empty)
+        invalid_provider_empty = render("ready_empty_invalid_provider")
+        self.assertIn('data-state="error"', invalid_provider_empty)
         secret = render("message_secret")
         self.assertIn('data-state="error"', secret)
         self.assertNotIn("supersecretvalue", secret)

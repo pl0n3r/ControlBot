@@ -48,6 +48,10 @@ if($scenario==='ready_empty'){
     echo AccountUi::render(['state'=>'ready','message'=>null,'providers'=>[['version'=>1,'provider_id'=>'chatgpt-web','adapter'=>'autofactory']],'accounts'=>[]]);
     exit;
 }
+if($scenario==='ready_empty_invalid_provider'){
+    echo AccountUi::render(['state'=>'ready','message'=>null,'providers'=>[['version'=>1,'provider_id'=>'INVALID PROVIDER','adapter'=>'autofactory']],'accounts'=>[]]);
+    exit;
+}
 if($scenario==='states'){
     $out=[];
     foreach(['loading','empty','error'] as $state){

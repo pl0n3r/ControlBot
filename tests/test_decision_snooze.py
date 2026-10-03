@@ -22,7 +22,6 @@ class DecisionSnoozeTests(unittest.TestCase):
         tomorrow = scenario("snooze")
         week = scenario("snooze-week")
         invalid = scenario("snooze-invalid-duration")
-
         self.assertEqual(tomorrow["response"]["duration"], "tomorrow")
         self.assertEqual(
             tomorrow["response"]["snoozed_until"] - tomorrow["audit"][0]["at"],
@@ -35,11 +34,9 @@ class DecisionSnoozeTests(unittest.TestCase):
         )
         self.assertTrue(invalid["blocked"])
         self.assertEqual(invalid["audit"], [])
-
     def test_snooze_rebuilds_target_from_server_side_inbox(self):
         valid = scenario("snooze")
         manipulated = scenario("snooze-manipulated")
-
         self.assertEqual(valid["audit"][0]["repository"], "pl0n3r/factory")
         self.assertEqual(valid["audit"][0]["issue"], 137)
         self.assertEqual(valid["audit"][0]["category"], "factory-release")
@@ -52,7 +49,6 @@ class DecisionSnoozeTests(unittest.TestCase):
     def test_snooze_requires_csrf_and_recent_reauth(self):
         no_csrf = scenario("snooze-no-csrf")
         stale = scenario("snooze-stale-reauth")
-
         self.assertTrue(no_csrf["blocked"])
         self.assertEqual(no_csrf["audit"], [])
         self.assertTrue(stale["blocked"])
@@ -60,14 +56,12 @@ class DecisionSnoozeTests(unittest.TestCase):
 
     def test_snoozed_gate_reappears_after_expiry(self):
         data = scenario("snooze")
-
         self.assertNotIn("¿Publicamos Factory?", data["before"])
         self.assertIn("Sin decisiones pendientes", data["before"])
         self.assertIn("¿Publicamos Factory?", data["after"])
 
     def test_snoozed_gate_blocks_stale_individual_approval(self):
         data = scenario("snooze-direct-approval")
-
         self.assertTrue(data["blocked"])
         self.assertEqual([row["action"] for row in data["audit"]], ["snooze"])
         urls = [row[1] for row in data["seen"]]

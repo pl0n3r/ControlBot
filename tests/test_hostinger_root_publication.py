@@ -54,6 +54,9 @@ class HostingerRootPublicationTests(unittest.TestCase):
         htaccess = HTACCESS.read_text().lower()
         self.assertNotRegex(htaccess, r"rewriterule\s+\^public.*\-\s+\[f")
         self.assertRegex(htaccess, r"\^\(\?:src\|config\|docs\|scripts\|tests")
+        self.assertIn("rewriterule ^(?:index\\.php$|public(?:/|$)) - [l,nc]", htaccess)
+        self.assertNotIn("rewritecond %{request_filename} !-f", htaccess)
+        self.assertNotIn("rewritecond %{request_filename} !-d", htaccess)
 
     def test_runbook_records_hostinger_root_mapping_and_keeps_live_verification_human_gated(self):
         text = RUNBOOK.read_text().lower()
@@ -61,6 +64,8 @@ class HostingerRootPublicationTests(unittest.TestCase):
             self.assertIn(required, text)
         for boundary in ("no activa deploy", "no se prueba hostinger real", "no se declara el sistema live"):
             self.assertIn(boundary, text)
+        self.assertIn("aunque exista físicamente en la raíz", text)
+        self.assertIn("fuera de `public/`", text)
 
 
 if __name__ == "__main__":

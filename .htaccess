@@ -11,9 +11,8 @@ RewriteRule ^(?:AGENTES|AGENTS|README|CHANGELOG|LICENSE)(?:\.[^/]+)?$ - [F,L,NC]
 RewriteRule \.(?:md|ya?ml|json|lock|sql|log|ini|dist|xml|toml)$ - [F,L,NC]
 RewriteRule ^(?!(?:index\.php|public/index\.php)$).+\.php$ - [F,L,NC]
 
-# Only the front controller handles virtual routes. Existing future public assets remain servable.
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
+# Only the intended public surface bypasses the front controller.
+RewriteRule ^(?:index\.php$|public(?:/|$)) - [L,NC]
 RewriteRule ^ index.php [L]
 </IfModule>
 

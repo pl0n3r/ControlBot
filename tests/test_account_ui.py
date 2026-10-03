@@ -74,11 +74,6 @@ class AccountUiTests(unittest.TestCase):
         html = render("message_json_secret")
         self.assertIn('data-state="error"', html)
         self.assertNotIn("supersecretvalue", html)
-
-    def test_json_quoted_credential_keys_are_rejected(self):
-        html = render("message_json_secret")
-        self.assertIn('data-state="error"', html)
-        self.assertNotIn("supersecretvalue", html)
         self.assertNotIn("&quot;token&quot;", html)
 
     def test_ui_is_mobile_first_accessible_and_read_only(self):

@@ -8,7 +8,7 @@ ControlBot sigue en **construcción**. Este contrato solo endurece el caso actua
 
 El `index.php` raíz es un bootstrap mínimo. Si `public/index.php` no existe, no es un archivo regular o resuelve fuera de `public/`, responde `503 Service unavailable` y no carga código alternativo. Esto mantiene el repositorio fail-closed mientras el entrypoint público siga pendiente del tramo de deploy/readiness #624.
 
-`.htaccess` desactiva índices de directorio, bloquea rutas internas (`src/`, `config/`, `docs/`, `scripts/`, `tests/`, `vendor/`, `lecciones/`), metadata/dotfiles, documentación/configuración serializada y PHP arbitrario. Solo `index.php`, el futuro `public/index.php`, assets existentes bajo `public/` y rutas virtuales atendidas por el front controller forman parte de la superficie prevista.
+`.htaccess` desactiva índices de directorio, bloquea rutas internas (`src/`, `config/`, `docs/`, `scripts/`, `tests/`, `vendor/`, `lecciones/`, `openapi/`, `readme/`), metadata/dotfiles, documentación/configuración serializada y PHP arbitrario. Solo `index.php`, el futuro `public/index.php`, assets existentes bajo `public/` y rutas virtuales atendidas por el front controller forman parte de la superficie prevista.
 
 ## Verificación offline
 

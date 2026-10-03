@@ -127,7 +127,7 @@ final class AccountUi
 
         $credentialPattern = '/\b(?:bearer\s+[A-Za-z0-9._~+\/-]{8,}|'
             . '(?:password|passwd|token|secret|cookie|authorization|'
-            . 'api[_ -]?key|private[_ -]?key|dsn|session[_ -]?token)\s*[:=])/i';
+            . 'api[_ -]?key|private[_ -]?key|dsn|session[_ -]?token)["\']?\s*[:=])/i';
         $tokenPattern = '/\b(?:ghp_|gho_|github_pat_|sk-|rk-|pk-)[A-Za-z0-9_-]{8,}/i';
         $privateKeyPattern = '/-----BEGIN [^-]*PRIVATE KEY-----/i';
         if (

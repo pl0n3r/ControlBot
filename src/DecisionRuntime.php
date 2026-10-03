@@ -212,31 +212,33 @@ final class DecisionRuntime
 
     private function snooze(array &$session, array $request, int $now): array
     {
+        $csrf = $request['_csrf'] ?? null;
+        $repository = $request['repository'] ?? null;
+        $rawIssue = $request['issue'] ?? null;
+        $duration = $request['duration'] ?? null;
+        $issue = is_int($rawIssue)
+            ? $rawIssue
+            : (is_string($rawIssue) && ctype_digit($rawIssue) ? (int) $rawIssue : 0);
+
         if (
-            array_diff(array_keys($request), ['_csrf', 'repository', 'issue', 'duration']) !== []
-            || !is_string($request['_csrf'] ?? null)
-            || !is_string($request['repository'] ?? null)
-            || (!is_int($request['issue'] ?? null)
-                && !(is_string($request['issue'] ?? null) && ctype_digit($request['issue'])))
-            || !is_string($request['duration'] ?? null)
+            count($request) !== 4
+            || !is_string($csrf)
+            || !is_string($repository)
+            || !is_string($duration)
+            || $issue < 1
+            || !in_array($repository, $this->repositories, true)
         ) {
             throw new InvalidArgumentException('Solicitud de recordatorio inválida.');
         }
 
-        $repository = $request['repository'];
-        $issue = (int) $request['issue'];
-        if (!in_array($repository, $this->repositories, true) || $issue < 1) {
-            throw new InvalidArgumentException('Decisión fuera de allowlist runtime.');
-        }
-
-        $owner = $this->sessions->contextFromRequest($session, ['_csrf' => $request['_csrf']], $now);
+        $owner = $this->sessions->contextFromRequest($session, ['_csrf' => $csrf], $now);
         $decisions = (new DecisionSnooze($this->audit))->visible($this->loadDecisions($session), $now);
 
         return (new DecisionSnooze($this->audit))->snooze(
             $decisions,
             $repository,
             $issue,
-            $request['duration'],
+            $duration,
             $owner,
             $now,
         );

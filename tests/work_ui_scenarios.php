@@ -71,6 +71,16 @@ if ($scenario === 'invalid') {
     ]));
     exit;
 }
+if ($scenario === 'message_secret') {
+    echo WorkUi::render([
+        'state'=>'error','rows'=>[],'message'=>'token=supersecretvalue',
+    ]);
+    exit;
+}
+if ($scenario === 'ready_empty') {
+    echo WorkUi::render(['state'=>'ready','rows'=>[],'message'=>null]);
+    exit;
+}
 if ($scenario === 'states') {
     $out = [];
     foreach (['loading','empty','error'] as $state) {

@@ -308,7 +308,7 @@ dd,
 
 .account-grid {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns:1fr;
     gap: 16px;
 }
 
@@ -364,7 +364,7 @@ button:focus-visible,
     outline: 3px solid var(--amber);
 }
 
-@media (min-width: 760px) {
+@media(min-width:760px) {
     .accounts-page {
         padding: 36px 28px 60px;
     }
@@ -374,7 +374,7 @@ button:focus-visible,
     }
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media(prefers-reduced-motion:reduce) {
     *,
     *::before,
     *::after {

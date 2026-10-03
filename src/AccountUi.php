@@ -125,9 +125,9 @@ final class AccountUi
             throw new InvalidArgumentException('message invalid.');
         }
 
-        $credentialPattern = '/\b(?:bearer\s+[A-Za-z0-9._~+\/-]{8,}|'
+        $credentialPattern = '/(?:\\bbearer\\s+[A-Za-z0-9._~+\\/-]{8,}|"?\\b'
             . '(?:password|passwd|token|secret|cookie|authorization|'
-            . 'api[_ -]?key|private[_ -]?key|dsn|session[_ -]?token)["\']?\s*[:=])/i';
+            . 'api[_ -]?key|private[_ -]?key|dsn|session[_ -]?token)\\b"?\\s*[:=])/i';
         $tokenPattern = '/\b(?:ghp_|gho_|github_pat_|sk-|rk-|pk-)[A-Za-z0-9_-]{8,}/i';
         $privateKeyPattern = '/-----BEGIN [^-]*PRIVATE KEY-----/i';
         if (

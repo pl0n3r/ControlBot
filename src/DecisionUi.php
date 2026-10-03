@@ -207,6 +207,15 @@ final class DecisionUi
             . '<input type="hidden" name="displayed_sha" value="' . $shaEscaped . '">'
             . $options
             . '</form>'
+            . '<form method="post" action="/decisions/snooze" class="snooze-actions" aria-label="Posponer decisión">'
+            . $csrfField
+            . '<input type="hidden" name="repository" value="' . $repository . '">'
+            . '<input type="hidden" name="issue" value="' . $issue . '">'
+            . '<span class="snooze-label">Recordármelo:</span>'
+            . '<div class="snooze-buttons">'
+            . '<button class="snooze-action" type="submit" name="duration" value="tomorrow"' . ($actionEnabled ? '' : ' disabled aria-disabled="true"') . '>Mañana</button>'
+            . '<button class="snooze-action" type="submit" name="duration" value="week"' . ($actionEnabled ? '' : ' disabled aria-disabled="true"') . '>En una semana</button>'
+            . '</div></form>'
             . $questionForm
             . '</article>';
     }
@@ -472,6 +481,17 @@ h1 { font-size: clamp(1.9rem, 9vw, 3.2rem); letter-spacing: -.035em; line-height
 .decision-action:hover:not(:disabled) { background: #17212a; border-color: var(--cyan); }
 .decision-action:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
 .decision-action:disabled { opacity: .5; cursor: not-allowed; }
+.snooze-actions { display: grid; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #294d56; }
+.snooze-label { color: var(--muted); font-size: .9rem; }
+.snooze-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.snooze-action {
+  min-height: 52px; border: 1px solid #357d8d; border-radius: 10px;
+  background: transparent; color: var(--cyan-soft); padding: 10px 12px;
+  font: 700 .95rem/1.2 Rajdhani, system-ui, sans-serif; cursor: pointer;
+}
+.snooze-action:hover:not(:disabled) { background: rgba(14,51,62,.7); }
+.snooze-action:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+.snooze-action:disabled { opacity: .5; cursor: not-allowed; }
 .badge {
   flex: none;
   color: #0a0e13;

@@ -189,12 +189,16 @@ interface GitHubGateway
 
 final class AppendOnlyAuditLog
 {
+    private const ALLOWED_FIELDS = [
+        'actor', 'action', 'repository', 'issue', 'category', 'option',
+        'sha', 'result', 'evidence', 'at', 'snoozed_until',
+    ];
+
     public function __construct(private readonly string $path) {}
 
     public function record(array $entry): void
     {
-        $allowed = ['actor', 'action', 'repository', 'issue', 'category', 'option', 'sha', 'result', 'evidence', 'at'];
-        if (array_diff(array_keys($entry), $allowed) !== []) {
+        if (array_diff(array_keys($entry), self::ALLOWED_FIELDS) !== []) {
             throw new InvalidArgumentException('Campo de auditoría no permitido.');
         }
         $line = json_encode($entry, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) . "\n";
@@ -233,19 +237,58 @@ final class AppendOnlyAuditLog
         if (!is_array($lines) || count($lines) > 5000) {
             throw new RuntimeException('Bitácora inválida.');
         }
-        $allowed = ['actor', 'action', 'repository', 'issue', 'category', 'option', 'sha', 'result', 'evidence', 'at'];
         $entries = [];
         foreach ($lines as $line) {
             if ($line === '' || strlen($line) > 8192) {
                 throw new RuntimeException('Entrada de bitácora inválida.');
             }
             $entry = json_decode($line, true, 32, JSON_THROW_ON_ERROR);
-            if (!is_array($entry) || array_diff(array_keys($entry), $allowed) !== []) {
+            if (!is_array($entry) || array_diff(array_keys($entry), self::ALLOWED_FIELDS) !== []) {
                 throw new RuntimeException('Entrada de bitácora inválida.');
             }
             $entries[] = $entry;
         }
         return $entries;
+    }
+
+    public function entriesByAction(string $action): iterable
+    {
+        if ($action === '' || strlen($action) > 80 || str_contains($action, "\n") || str_contains($action, "\r")) {
+            throw new InvalidArgumentException('Acción de auditoría inválida.');
+        }
+        if (!is_file($this->path)) {
+            return;
+        }
+
+        $handle = fopen($this->path, 'rb');
+        if ($handle === false || !flock($handle, LOCK_SH)) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            throw new RuntimeException('No fue posible leer la bitácora.');
+        }
+
+        try {
+            while (($line = fgets($handle, 8195)) !== false) {
+                $line = rtrim($line, "\r\n");
+                if ($line === '' || strlen($line) > 8192) {
+                    throw new RuntimeException('Entrada de bitácora inválida.');
+                }
+                $entry = json_decode($line, true, 32, JSON_THROW_ON_ERROR);
+                if (!is_array($entry) || array_diff(array_keys($entry), self::ALLOWED_FIELDS) !== []) {
+                    throw new RuntimeException('Entrada de bitácora inválida.');
+                }
+                if (($entry['action'] ?? null) === $action) {
+                    yield $entry;
+                }
+            }
+            if (!feof($handle)) {
+                throw new RuntimeException('No fue posible leer la bitácora.');
+            }
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
     }
 }
 

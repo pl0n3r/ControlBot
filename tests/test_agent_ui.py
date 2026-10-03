@@ -52,6 +52,9 @@ class AgentUiTests(unittest.TestCase):
         ):
             self.assertIn(expected, html)
         self.assertIn("Revisar &lt;b&gt;Agent UI&lt;/b&gt;", html)
+        handoff = html.split('data-handoff="handoff-638"', 1)[1].split("</li>", 1)[0]
+        for expected in ("assignment-638", "session-builder", "session-reviewer"):
+            self.assertIn(expected, handoff)
         lowered = html.lower()
         for forbidden in ("transcript", "chain-of-thought", "cookie=", "password=", "token="):
             self.assertNotIn(forbidden, lowered)
@@ -80,6 +83,12 @@ class AgentUiTests(unittest.TestCase):
         self.assertIn('data-state="error"', data["error"])
         self.assertNotIn("<script>retry</script>", data["error"])
         self.assertIn("&lt;script&gt;retry&lt;/script&gt;", data["error"])
+        ready_empty = render("ready_empty")
+        self.assertIn('data-state="empty"', ready_empty)
+        self.assertIn('role="status"', ready_empty)
+        message_secret = render("message_secret")
+        self.assertIn('data-state="error"', message_secret)
+        self.assertNotIn("supersecretvalue", message_secret)
 
     def test_ui_is_mobile_first_accessible_and_read_only(self):
         html = render("ready")

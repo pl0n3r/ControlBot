@@ -14,7 +14,7 @@ final class DecisionHistory
         'product-direction', 'brand', 'money', 'legal',
         'real-customer-data', 'release-1.0.0', 'factory-release', 'go-live',
     ];
-    private const ACTIONS = ['preflight-sha', 'comment', 'move-v1', 'dispatch-release', 'close-issue'];
+    private const ACTIONS = ['preflight-sha', 'comment', 'move-v1', 'dispatch-release', 'close-issue', 'snooze'];
 
     private array $repositories;
 
@@ -36,13 +36,16 @@ final class DecisionHistory
         $this->repositories = array_keys($normalized);
     }
 
-    public function load(?string $repository = null, ?string $category = null): array
+    public function load(?string $repository = null, ?string $category = null, ?int $now = null): array
     {
         if ($repository !== null && !in_array($repository, $this->repositories, true)) {
             throw new InvalidArgumentException('Repositorio de historial fuera de allowlist.');
         }
         if ($category !== null && !in_array($category, self::CATEGORIES, true)) {
             throw new InvalidArgumentException('Categoría de historial inválida.');
+        }
+        if ($now !== null && $now < 1) {
+            throw new InvalidArgumentException('Tiempo de historial inválido.');
         }
 
         $groups = [];
@@ -70,6 +73,7 @@ final class DecisionHistory
                     'at' => $row['at'],
                     'actions' => [],
                     'evidence' => [],
+                    'snoozed_until' => $row['snoozed_until'],
                 ];
             }
 
@@ -83,12 +87,18 @@ final class DecisionHistory
             if ($row['evidence'] !== null) {
                 $groups[$key]['evidence'][] = $row['evidence'];
             }
+            if ($groups[$key]['snoozed_until'] === null && $row['snoozed_until'] !== null) {
+                $groups[$key]['snoozed_until'] = $row['snoozed_until'];
+            }
         }
 
         $history = array_values($groups);
         foreach ($history as &$item) {
             $item['actions'] = array_values(array_unique($item['actions']));
             $item['evidence'] = array_values(array_unique($item['evidence']));
+            if ($item['snoozed_until'] !== null) {
+                $item['snooze_state'] = $now !== null && $item['snoozed_until'] > $now ? 'active' : 'expired';
+            }
         }
         unset($item);
 
@@ -113,17 +123,22 @@ final class DecisionHistory
         $category = $entry['category'] ?? 'unknown';
         $sha = $entry['sha'] ?? null;
         $evidence = $entry['evidence'] ?? null;
+        $snoozedUntil = $entry['snoozed_until'] ?? null;
 
         if (
             !is_string($repository)
             || !is_int($issue) || $issue < 1
-            || !is_string($option) || preg_match('/^[A-D]$/', $option) !== 1
+            || !is_string($option)
             || !is_string($action) || !in_array($action, self::ACTIONS, true)
+            || ($action === 'snooze' ? $option !== 'S' : preg_match('/^[A-D]$/', $option) !== 1)
             || !is_string($result) || !in_array($result, ['success', 'failed', 'blocked'], true)
             || !is_int($at) || $at < 1
             || !is_string($category) || ($category !== 'unknown' && !in_array($category, self::CATEGORIES, true))
             || ($sha !== null && (!is_string($sha) || preg_match('/^[0-9a-f]{40}$/', $sha) !== 1))
             || ($evidence !== null && !is_string($evidence))
+            || ($action === 'snooze'
+                ? (!is_int($snoozedUntil) || $snoozedUntil <= $at)
+                : $snoozedUntil !== null)
         ) {
             throw new RuntimeException('Entrada de historial inválida.');
         }
@@ -156,6 +171,7 @@ final class DecisionHistory
             'result' => $result,
             'evidence' => $safeEvidence,
             'at' => $at,
+            'snoozed_until' => $snoozedUntil,
         ];
     }
 }

@@ -51,6 +51,26 @@ try {
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
         exit;
     }
+    if ($scenario === 'snooze') {
+        $audit->record([
+            'actor' => 'pl0n3r',
+            'action' => 'snooze',
+            'repository' => 'pl0n3r/ControlBot',
+            'issue' => 65,
+            'category' => 'product-direction',
+            'option' => 'S',
+            'sha' => null,
+            'result' => 'success',
+            'evidence' => null,
+            'at' => 400,
+            'snoozed_until' => 500,
+        ]);
+        echo json_encode([
+            'active' => $history->load(null, null, 450),
+            'expired' => $history->load(null, null, 600),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
+        exit;
+    }
     if ($scenario === 'bad-filter') {
         $history->load('example.invalid/repo', null);
         exit(3);

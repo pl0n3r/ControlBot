@@ -27,6 +27,18 @@ class DecisionBatchTests(unittest.TestCase):
         self.assertTrue(tampered["blocked"])
         self.assertEqual(tampered["seen"], [])
 
+    def test_snoozed_decisions_are_excluded_from_server_side_batch(self):
+        data = run("decision_runtime_scenarios.php", "batch-snoozed")
+        self.assertEqual(data["response"]["state"], "empty")
+        self.assertEqual(data["response"]["completed"], [])
+        urls = [row[1] for row in data["seen"]]
+        self.assertTrue(any("/issues?state=open&per_page=100&page=1" in url for url in urls))
+        self.assertFalse(any("/issues/138/comments" in url for url in urls))
+        self.assertFalse(any(
+            url.endswith("/issues/138") and method == "PATCH"
+            for method, url in data["seen"]
+        ))
+
     def test_batch_reuses_individual_approval_guards(self):
         expired = run("decision_runtime_scenarios.php", "batch-reauth")
         self.assertTrue(expired["blocked"])

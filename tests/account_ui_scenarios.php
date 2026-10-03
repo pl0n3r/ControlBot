@@ -50,6 +50,12 @@ if($scenario==='message_bearer'){
     ]);
     exit;
 }
+if($scenario==='message_json_secret'){
+    echo AccountUi::render([
+        'state'=>'error','message'=>'{"token":"supersecretvalue"}','providers'=>[],'accounts'=>[],
+    ]);
+    exit;
+}
 if($scenario==='ready_empty'){
     echo AccountUi::render(['state'=>'ready','message'=>null,'providers'=>[['version'=>1,'provider_id'=>'chatgpt-web','adapter'=>'autofactory']],'accounts'=>[]]);
     exit;

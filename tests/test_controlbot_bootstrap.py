@@ -111,9 +111,9 @@ class ControlBotBootstrapTests(unittest.TestCase):
         self.assertIn("if: vars.DEPLOY_ENABLED == 'true'", deploy)
         self.assertIn("PRODUCTION_STAGE || 'construccion'", deploy)
         self.assertIn("if: vars.DOMAIN != ''", observe)
-        self.assertFalse(
-            (ROOT / "public").exists(),
-            "El hardening raíz autorizado no crea public/ ni su entrypoint.",
+        self.assertTrue(
+            (ROOT / "public" / "index.php").is_file(),
+            "El entrypoint owner-only autorizado debe existir sin activar deploy.",
         )
         for path in ("index.php", ".htaccess"):
             with self.subTest(path=path):

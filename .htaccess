@@ -5,7 +5,7 @@ DirectoryIndex index.php
 RewriteEngine On
 
 # Internal repository surfaces are never public.
-RewriteRule ^(?:src|config|docs|scripts|tests|vendor|lecciones)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:src|config|docs|scripts|tests|vendor|lecciones|openapi|readme)(?:/|$) - [F,L,NC]
 RewriteRule ^(?:\.git|\.github)(?:/|$) - [F,L,NC]
 RewriteRule ^(?:AGENTES|AGENTS|README|CHANGELOG|LICENSE)(?:\.[^/]+)?$ - [F,L,NC]
 RewriteRule \.(?:md|ya?ml|json|lock|sql|log|ini|dist|xml|toml)$ - [F,L,NC]

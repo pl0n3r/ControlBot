@@ -93,6 +93,10 @@ class FactoryOrchestratorWebEntrypointTests(unittest.TestCase):
 
         for value in (
             "D-059",
+            "Git como respaldo",
+            "SHA exacto de main",
+            "SHA del último despliegue sano observado",
+            "revert explícito del merge",
             "PR #630",
             "#630 → este PR",
             "var/orchestrator-live.json",
@@ -103,6 +107,7 @@ class FactoryOrchestratorWebEntrypointTests(unittest.TestCase):
         ):
             self.assertIn(value, guide)
         self.assertIn("no se fusiona", guide.lower())
+        self.assertIn("no se exige un backup de hostinger/hpanel", guide.lower())
         self.assertNotIn("password=", guide.lower())
         self.assertNotIn("authorization:", guide.lower())
 

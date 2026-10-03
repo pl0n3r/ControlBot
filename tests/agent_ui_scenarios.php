@@ -68,6 +68,20 @@ if ($scenario === 'secret') {
     echo AgentUi::render($view);
     exit;
 }
+if ($scenario === 'message_secret') {
+    echo AgentUi::render([
+        'state'=>'error','message'=>'token=supersecretvalue',
+        'agents'=>[],'sessions'=>[],'assignments'=>[],'handoffs'=>[],
+    ]);
+    exit;
+}
+if ($scenario === 'ready_empty') {
+    echo AgentUi::render([
+        'state'=>'ready','message'=>null,
+        'agents'=>[],'sessions'=>[],'assignments'=>[],'handoffs'=>[],
+    ]);
+    exit;
+}
 if ($scenario === 'states') {
     $out = [];
     foreach (['loading','empty','error'] as $state) {

@@ -75,7 +75,7 @@ final class AccountUi
             }
             return ['state'=>$state, 'message'=>$message, 'providers'=>[], 'accounts'=>[]];
         }
-        if ($input['accounts'] === [] && $input['providers'] === []) {
+        if ($input['accounts'] === []) {
             return ['state'=>'empty', 'message'=>$message, 'providers'=>[], 'accounts'=>[]];
         }
 

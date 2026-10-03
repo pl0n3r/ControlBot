@@ -45,7 +45,7 @@ if($scenario==='message_secret'){
     exit;
 }
 if($scenario==='ready_empty'){
-    echo AccountUi::render(['state'=>'ready','message'=>null,'providers'=>[],'accounts'=>[]]);
+    echo AccountUi::render(['state'=>'ready','message'=>null,'providers'=>[['version'=>1,'provider_id'=>'chatgpt-web','adapter'=>'autofactory']],'accounts'=>[]]);
     exit;
 }
 if($scenario==='states'){

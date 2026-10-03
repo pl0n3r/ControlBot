@@ -25,7 +25,7 @@ class FactoryOrchestratorLiveRuntimeTests(unittest.TestCase):
         self.assertTrue(payload["read_only"])
         self.assertTrue(payload["snapshot"]["read_only"])
         self.assertRegex(payload["snapshot"]["fingerprint"], r"^[0-9a-f]{64}$")
-        self.assertFalse((ROOT / "public").exists())
+        self.assertTrue((ROOT / "public" / "index.php").is_file())
 
     def test_cache_ttl_and_stale_fallback_bound_refresh_rate_without_daemon(self):
         result = scenario("cache")

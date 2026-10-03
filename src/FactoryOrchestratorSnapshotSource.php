@@ -14,14 +14,21 @@ final class FactoryOrchestratorSnapshotSource
 
     public static function fromInjectedEvidence(array $evidence, int $now): array
     {
+        return FactoryLiveOrchestratorSnapshot::build(
+            self::canonicalFromInjectedEvidence($evidence, $now),
+            $now
+        );
+    }
+
+    public static function canonicalFromInjectedEvidence(array $evidence, int $now): array
+    {
         if ($now < 1 || array_is_list($evidence)) {
             throw new InvalidArgumentException('Injected Factory evidence invalid.');
         }
 
         self::assertInjectedGitHubEvidence($evidence);
 
-        $snapshot = FactoryLiveSnapshot::build($evidence, $now);
-        return FactoryLiveOrchestratorSnapshot::build($snapshot, $now);
+        return FactoryLiveSnapshot::build($evidence, $now);
     }
 
     private static function assertInjectedGitHubEvidence(array $evidence): void

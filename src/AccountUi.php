@@ -108,9 +108,9 @@ final class AccountUi
         if (!is_string($value) || strlen($value) > 240 || preg_match('/[\x00-\x1f\x7f]/', $value) === 1) {
             throw new InvalidArgumentException('message invalid.');
         }
-        if (preg_match('/\b(?:password|passwd|token|secret|cookie|authorization|api[_ -]?key|private[_ -]?key)\s*[:=]/i', $value) === 1
+        if (preg_match('/\b(?:bearer\s+[A-Za-z0-9._~+\/-]{8,}|(?:password|passwd|token|secret|cookie|authorization|api[_ -]?key|private[_ -]?key|dsn|session[_ -]?token)\s*[:=])/i', $value) === 1
             || preg_match('/\b(?:ghp_|gho_|github_pat_|sk-|rk-|pk-)[A-Za-z0-9_-]{8,}/i', $value) === 1
-            || stripos($value, 'BEGIN PRIVATE KEY') !== false) {
+            || preg_match('/-----BEGIN [^-]*PRIVATE KEY-----/i', $value) === 1) {
             throw new InvalidArgumentException('message invalid.');
         }
         return $value;

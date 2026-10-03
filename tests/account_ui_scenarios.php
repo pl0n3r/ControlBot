@@ -44,6 +44,12 @@ if($scenario==='message_secret'){
     ]);
     exit;
 }
+if($scenario==='message_bearer'){
+    echo AccountUi::render([
+        'state'=>'error','message'=>'Bearer abcdefghijklmnop','providers'=>[],'accounts'=>[],
+    ]);
+    exit;
+}
 if($scenario==='ready_empty'){
     echo AccountUi::render(['state'=>'ready','message'=>null,'providers'=>[['version'=>1,'provider_id'=>'chatgpt-web','adapter'=>'autofactory']],'accounts'=>[]]);
     exit;

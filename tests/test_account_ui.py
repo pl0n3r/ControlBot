@@ -66,6 +66,9 @@ class AccountUiTests(unittest.TestCase):
         secret = render("message_secret")
         self.assertIn('data-state="error"', secret)
         self.assertNotIn("supersecretvalue", secret)
+        bearer = render("message_bearer")
+        self.assertIn('data-state="error"', bearer)
+        self.assertNotIn("abcdefghijklmnop", bearer)
 
     def test_ui_is_mobile_first_accessible_and_read_only(self):
         html = render("ready")

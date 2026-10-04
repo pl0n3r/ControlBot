@@ -107,6 +107,32 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
             json.loads(direct.stdout),
         )
 
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evidence_path = root / "invalid-evidence.json"
+            snapshot_path = root / "orchestrator-live.json"
+            evidence_path.write_text("{invalid-json")
+
+            enabled_env = base_environment()
+            enabled_env["CONTROLBOT_ORCHESTRATOR_CRON_ENABLED"] = "1"
+            enabled_env["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"] = str(evidence_path)
+            enabled_env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"] = str(snapshot_path)
+
+            failed = subprocess.run(
+                ["php", str(SCRIPT)],
+                cwd=ROOT,
+                env=enabled_env,
+                text=True,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+
+        self.assertEqual(70, failed.returncode)
+        self.assertEqual("", failed.stdout)
+        self.assertIn("execution failed", failed.stderr)
+        self.assertFalse(snapshot_path.exists())
+
     def test_runbook_keeps_token_cron_hosting_and_live_activation_outside_repository_values(self) -> None:
         runbook = RUNBOOK.read_text()
         wrapper = SCRIPT.read_text()

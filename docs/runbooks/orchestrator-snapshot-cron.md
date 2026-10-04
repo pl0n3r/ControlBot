@@ -1,41 +1,36 @@
 # Refresco cron-ready del snapshot del Orquestador
 
-Este runbook describe únicamente el **punto de integración offline** de `ORCH_SNAPSHOT_CRON_V1`. No instala una tarea programada, no configura Hostinger y no activa ControlBot en producción.
+El flujo permanece apagado por defecto. El colector \`scripts/orchestrator-evidence-collector.php\` hace solo GET a \`api.github.com\`; el wrapper \`scripts/orchestrator-snapshot-cron.php\` solo lee la evidencia local y escribe el snapshot. Ninguno se invoca desde requests web.
 
-## Estado por defecto
+## Token read-only fuera del repo
 
-`scripts/orchestrator-snapshot-cron.php` permanece apagado salvo que el servidor entregue explícitamente la habilitación esperada. En el estado por defecto termina con éxito y responde `{"executed":false,"state":"disabled"}` **antes de leer evidencia o escribir el snapshot**.
+Crea un fine-grained personal access token limitado a los siete repos gobernados, con **Metadata: read**, **Issues: read** y **Pull requests: read**. No concedas Content write, Actions write, Administration ni otros permisos. El valor no se pega en Issues, PRs, logs ni chat.
 
-El wrapper es exclusivo de CLI. No se invoca desde `public/index.php`, no participa en requests web y no contiene cliente HTTP/GitHub.
+En el servidor, guárdalo sin eco y con permisos 600:
 
-## Entradas server-side
+\`\`\`sh
+install -d -m 700 "$HOME/.controlbot"
+read -r -s CONTROLBOT_GITHUB_READ_TOKEN && printf '%s' "$CONTROLBOT_GITHUB_READ_TOKEN" > "$HOME/.controlbot/github-read-token" && unset CONTROLBOT_GITHUB_READ_TOKEN
+chmod 600 "$HOME/.controlbot/github-read-token"
+\`\`\`
 
-Cuando una activación separada sea autorizada, el entorno del proceso deberá entregar:
+## Variables y ejecución manual
 
-- la señal explícita de habilitación del wrapper;
-- una ruta absoluta a un archivo de evidencia JSON ya recolectada y sanitizada;
-- una ruta absoluta al snapshot local que consume el entrypoint.
+\`\`\`sh
+export CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED=1
+export CONTROLBOT_GITHUB_READ_TOKEN_FILE="$HOME/.controlbot/github-read-token"
+export CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-evidence.json"
+export CONTROLBOT_ORCHESTRATOR_CRON_ENABLED=1
+export CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json"
+/opt/alt/php85/usr/bin/php scripts/orchestrator-evidence-collector.php && /opt/alt/php85/usr/bin/php scripts/orchestrator-snapshot-cron.php
+\`\`\`
 
-Los **valores concretos** se administran fuera del repositorio. El archivo de evidencia debe provenir de un colector read-only separado y no debe contener credenciales ni material sensible.
+El colector falla cerrado si el token/ruta/permisos son inválidos, el rate limit está bajo o GitHub responde con error. La escritura es atómica y conserva la evidencia anterior ante fallo.
 
-El wrapper valida la evidencia y delega en `FactoryOrchestratorSnapshotRefresh`, que limita el snapshot a 2 MB y hace el reemplazo mediante archivo temporal + `rename()`.
+## Cron en hPanel
 
-## Credenciales y transporte GitHub
-
-Este repositorio no define ni almacena el token del proveedor, su valor, el mecanismo de secret storage ni un cliente GitHub para este wrapper. Cualquier credencial necesaria por un colector futuro permanece en la configuración privada del servidor o del proveedor de ejecución y se entrega únicamente a ese colector externo.
-
-El archivo de evidencia es el boundary de inyección. El wrapper no recibe encabezados de requests web, no usa `curl` y no llama APIs remotas.
-
-## Programación y hosting
-
-La frecuencia, zona horaria, comando real de scheduler y configuración del panel de hosting se definen fuera del repositorio durante una activación operativa separada. Este runbook no contiene una expresión de cron instalable ni modifica hPanel.
-
-La preparación aquí solo garantiza que el comando es CLI-only, está apagado por defecto y puede consumir evidencia inyectada cuando exista una autorización posterior.
-
-## Activación live
-
-Esta hoja no cambia `DOMAIN`, `DEPLOY_ENABLED`, DNS, Basic Auth ni el estado de go-live. ControlBot #625 conserva la autoridad de producción y su evidencia terminal sigue siendo obligatoria antes de declarar el sistema validado en producción.
+Cuando el dueño decida instalarlo, programa cada 5 minutos el mismo encadenamiento \`colector && wrapper\` con \`/opt/alt/php85/usr/bin/php\`, definiendo las variables en configuración privada del servidor. No cambies \`DOMAIN\`, \`DEPLOY_ENABLED\`, DNS ni go-live desde este runbook.
 
 ## Reversión
 
-Si una futura activación detecta errores, se deshabilita la señal server-side del wrapper. Sin esa señal, el comando vuelve al estado `disabled` y no lee ni escribe archivos. El snapshot anterior permanece gobernado por el fail-closed del consumidor.
+Deshabilita \`CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED\` y \`CONTROLBOT_ORCHESTRATOR_CRON_ENABLED\`. Sin esas señales no hay red ni escrituras nuevas; el consumidor conserva su fail-closed de frescura.

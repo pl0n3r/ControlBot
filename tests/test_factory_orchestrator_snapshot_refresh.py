@@ -44,8 +44,14 @@ class FactoryOrchestratorSnapshotRefreshTests(unittest.TestCase):
         self.assertTrue(data["collection_preserved"])
         self.assertTrue(data["sensitive_preserved"])
         self.assertTrue(data["size_preserved"])
+        self.assertTrue(data["invalid_type_preserved"])
         self.assertEqual(
-            ["Snapshot refresh failed.", "Snapshot refresh failed.", "Snapshot refresh failed."],
+            [
+                "Snapshot refresh failed.",
+                "Snapshot refresh failed.",
+                "Snapshot refresh failed.",
+                "Snapshot refresh failed.",
+            ],
             data["messages"],
         )
         self.assertFalse(data["secret_echo"])

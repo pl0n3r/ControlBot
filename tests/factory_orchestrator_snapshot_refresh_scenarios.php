@@ -142,13 +142,24 @@ if ($scenario === 'fail_closed') {
             )
         );
         $sizePreserved = hash_equals($baselineHash, hash('sha256', file_get_contents($path)));
-        $messages = [$collectionMessage, $sensitiveMessage, $sizeMessage];
+
+        $invalidTypeMessage = failure(
+            static fn (): array => FactoryOrchestratorSnapshotRefresh::refresh(
+                static fn (): string => 'invalid',
+                $path,
+                221
+            )
+        );
+        $invalidTypePreserved = hash_equals($baselineHash, hash('sha256', file_get_contents($path)));
+
+        $messages = [$collectionMessage, $sensitiveMessage, $sizeMessage, $invalidTypeMessage];
         $live = FactoryOrchestratorWebEntrypoint::localSnapshot($path, 221);
 
         echo json_encode([
             'collection_preserved' => $collectionPreserved,
             'sensitive_preserved' => $sensitivePreserved,
             'size_preserved' => $sizePreserved,
+            'invalid_type_preserved' => $invalidTypePreserved,
             'messages' => $messages,
             'secret_echo' => preg_match('/(?:do-not-echo|bearer|token|secret)/i', implode(' ', $messages)) === 1,
             'temporary_count' => count(glob($directory . DIRECTORY_SEPARATOR . '.orchestrator-live-*') ?: []),

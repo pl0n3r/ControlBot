@@ -1,6 +1,25 @@
 Options -Indexes
 DirectoryIndex index.php
 
+# Owner-only access gate. Credentials stay outside the repository.
+# If any authentication module is unavailable, PHP still fails closed because REMOTE_USER is absent.
+<IfModule mod_auth_basic.c>
+<IfModule mod_authn_file.c>
+<IfModule mod_authz_core.c>
+AuthType Basic
+AuthName "ControlBot"
+AuthUserFile /home/u151692719/.htpasswds/controlbot
+Require valid-user
+</IfModule>
+</IfModule>
+</IfModule>
+
+# Public login identifier only; password/hash remain server-side.
+# If mod_env is unavailable, the application fails closed because owner_login is missing.
+<IfModule mod_env.c>
+SetEnv CONTROLBOT_OWNER_LOGIN USUARIO
+</IfModule>
+
 <IfModule mod_rewrite.c>
 RewriteEngine On
 

@@ -80,6 +80,33 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
         self.assertNotIn("api.github.com", wrapper)
         self.assertNotIn("Authorization", wrapper)
 
+        source = ROOT / "src/FactoryOrchestratorSnapshotCron.php"
+        direct = subprocess.run(
+            [
+                "php",
+                "-r",
+                (
+                    "require $argv[1]; "
+                    "$result=\\ControlBot\\Business\\FactoryOrchestratorSnapshotCron::run("
+                    "['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>''],"
+                    "static function (): array { throw new RuntimeException('collector should not run'); },"
+                    "'/tmp/controlbot-disabled-snapshot.json',1);"
+                    "echo json_encode($result, JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);"
+                ),
+                str(source),
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+        self.assertEqual(0, direct.returncode, direct.stderr)
+        self.assertEqual(
+            {"executed": False, "state": "disabled"},
+            json.loads(direct.stdout),
+        )
+
     def test_runbook_keeps_token_cron_hosting_and_live_activation_outside_repository_values(self) -> None:
         runbook = RUNBOOK.read_text()
         wrapper = SCRIPT.read_text()

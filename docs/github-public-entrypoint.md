@@ -1,23 +1,9 @@
 # GitHub read-only public entrypoint
 
-`GitHubPublicEntrypoint` exposes only `GET /github` behind the existing owner identity supplied by the web server. It reads a bounded local projection file and never calls GitHub itself.
+`GitHubPublicEntrypoint` expone únicamente `GET /github` detrás del owner gate existente y lee `var/github-readonly.json`; nunca llama GitHub directamente.
 
-## Local projection contract
+Contrato local: `{"version":1,"projects":[...]}`. Cada snapshot se normaliza con `GitHubProjectView` y se renderiza con `GitHubGlobalUi`; evidencia ausente, inválida, stale u oversized permanece `UNKNOWN`.
 
-The default path is `var/github-readonly.json`. The file is a versioned object:
+Frontera: owner incorrecto → 403; configuración inválida → 503; método distinto de GET → 405; path distinto de `/github` → 404. Todas las respuestas usan `no-store`, `nosniff`, frame-deny y no-referrer.
 
-```json
-{"version":1,"projects":[{"version":1,"project_id":"...","observed_at":0,"repositories":[]}]}
-```
-
-Each item in `projects` is the canonical snapshot consumed by `GitHubProjectView`. That projector owns freshness/truncation semantics; `GitHubGlobalUi` only renders its output. Missing, malformed, oversized or unreadable local evidence is rendered as `UNKNOWN`, never as healthy/current.
-
-## Trust boundary
-
-- owner mismatch: `403` without projection data;
-- invalid/missing owner configuration: `503`;
-- non-GET: `405` with `Allow: GET`;
-- paths other than `/github`: `404`;
-- all responses are `no-store`, `nosniff`, frame-denied and no-referrer.
-
-This component does not contain GitHub credentials, networking, workflow dispatch, PR merge, Issue mutation, deploy or live activation. `public/index.php` wiring is intentionally deferred to the dependent slice.
+No contiene credenciales GitHub, networking, workflow dispatch, merge, mutaciones de Issues, deploy ni live. El wiring de `public/index.php` queda para el leaf dependiente.

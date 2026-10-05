@@ -9,7 +9,7 @@ require getcwd() . '/src/RunnerGateway.php';
 require getcwd() . '/src/RunnerOutcomeProjection.php';
 $i = json_decode($argv[1], true, 512, JSON_THROW_ON_ERROR);
 try {
-    $r = \\ControlBot\\Runner\\RunnerOutcomeProjection::project(
+    $r = \ControlBot\Runner\RunnerOutcomeProjection::project(
         $i['delivery'], $i['event'], $i['now'], $i['stale_after']
     );
     echo json_encode(['ok' => true, 'result' => $r], JSON_THROW_ON_ERROR);

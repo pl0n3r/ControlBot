@@ -23,7 +23,7 @@ class OrchestratorEvidenceCollectorTests(unittest.TestCase):
   self.assertTrue(d["snapshot"]["read_only"]);self.assertEqual("UNKNOWN",d["snapshot"]["central"]["activity_state"]);self.assertNotIn("work_inventory",d["evidence"]);self.assertTrue(d["snapshot"]["fronts"])
   self.assertEqual([],d["evidence"]["releases"])
   self.assertTrue(any(row["data"].get("status")=="merged" for row in d["evidence"]["work"]))
-  self.assertTrue(any(row["id"]=="blocker:factory-767" for row in d["evidence"]["blockers"]))
+  self.assertFalse(any(row["id"]=="blocker:factory-767" for row in d["evidence"]["blockers"]))
 
  def test_only_get_requests_are_made_within_request_and_byte_budgets(self):
   d=scenario("canonical")

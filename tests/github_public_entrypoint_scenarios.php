@@ -78,5 +78,69 @@ if ($scenario === 'unknown') {
     exit;
 }
 
+if ($scenario === 'guards') {
+    $valid = projection([snapshot()]);
+    $badEnvelope = tempnam(sys_get_temp_dir(), 'controlbot-github-envelope-');
+    $listRoot = tempnam(sys_get_temp_dir(), 'controlbot-github-list-');
+    $tiny = tempnam(sys_get_temp_dir(), 'controlbot-github-tiny-');
+    $tooMany = projection(array_fill(0, 51, snapshot()));
+    $invalidRow = projection(['not-a-snapshot']);
+    foreach ([$badEnvelope, $listRoot, $tiny] as $path) {
+        if (!is_string($path)) throw new RuntimeException('temp file failed');
+    }
+    file_put_contents($badEnvelope, json_encode(['version' => 2, 'projects' => []], JSON_THROW_ON_ERROR));
+    file_put_contents($listRoot, '[]');
+    file_put_contents($tiny, 'x');
+    try {
+        $config = ['owner_login' => 'owner', 'max_age_seconds' => 300];
+        echo json_encode([
+            'bad_path' => GitHubPublicEntrypoint::handle(
+                ['method' => 'GET', 'path' => '/other', 'remote_user' => 'owner'],
+                $config,
+                1000,
+                $valid,
+            ),
+            'bad_owner_config' => GitHubPublicEntrypoint::handle(
+                ['method' => 'GET', 'path' => '/github', 'remote_user' => 'owner'],
+                ['owner_login' => '', 'max_age_seconds' => 300],
+                1000,
+                $valid,
+            ),
+            'bad_max_age' => GitHubPublicEntrypoint::handle(
+                ['method' => 'GET', 'path' => '/github', 'remote_user' => 'owner'],
+                ['owner_login' => 'owner', 'max_age_seconds' => 0],
+                1000,
+                $valid,
+            ),
+            'bad_clock' => GitHubPublicEntrypoint::handle(
+                ['method' => 'GET', 'path' => '/github', 'remote_user' => 'owner'],
+                $config,
+                0,
+                $valid,
+            ),
+            'missing_method' => GitHubPublicEntrypoint::handle(
+                ['path' => '/github', 'remote_user' => 'owner'],
+                $config,
+                1000,
+                $valid,
+            ),
+            'bad_envelope' => handle($badEnvelope),
+            'list_root' => handle($listRoot),
+            'tiny' => handle($tiny),
+            'relative_path' => handle('relative'),
+            'too_many' => handle($tooMany),
+            'invalid_row' => handle($invalidRow),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    } finally {
+        @unlink($valid);
+        @unlink($badEnvelope);
+        @unlink($listRoot);
+        @unlink($tiny);
+        @unlink($tooMany);
+        @unlink($invalidRow);
+    }
+    exit;
+}
+
 fwrite(STDERR, "unknown scenario\n");
 exit(2);

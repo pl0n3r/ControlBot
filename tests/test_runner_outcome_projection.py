@@ -81,7 +81,7 @@ class RunnerOutcomeProjectionTests(unittest.TestCase):
             "state": state,
             "occurred_at": 1_050,
             "evidence": {
-                "code": "runner_event",
+                "code": "runner-event",
                 "summary": f"runner state {state}",
                 "ref": "controlbot:event/730",
             },
@@ -125,7 +125,7 @@ class RunnerOutcomeProjectionTests(unittest.TestCase):
                 self.assertEqual(result["provenance"]["event_id"], "44444444-4444-4444-8444-444444444444")
                 self.assertEqual(result["provenance"]["sequence"], 1)
                 self.assertEqual(result["provenance"]["occurred_at"], 1_050)
-                self.assertEqual(result["provenance"]["evidence_code"], "runner_event")
+                self.assertEqual(result["provenance"]["evidence_code"], "runner-event")
                 self.assertEqual(result["provenance"]["evidence_ref"], "controlbot:event/730")
 
     def test_missing_stale_or_mismatched_event_remains_unknown_and_never_fabricates_success(self):

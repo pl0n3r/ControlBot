@@ -17,6 +17,15 @@ function runCollector(callable $transport):array{
  $result=FactoryOrchestratorEvidenceCollector::run(['CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED'=>'1','CONTROLBOT_GITHUB_READ_TOKEN_FILE'=>$credential,'CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH'=>$evidence],$transport,200);
  return [$result,json_decode(file_get_contents($evidence),true,64,JSON_THROW_ON_ERROR)];
 }
-if($scenario==='canonical'){$x=runCollector($transport);$snapshot=FactoryOrchestratorSnapshotSource::fromInjectedEvidence($x[1],220);echo json_encode(['result'=>$x[0],'evidence'=>$x[1],'snapshot'=>$snapshot,'calls'=>$calls],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);exit;}
+if($scenario==='canonical'){
+ foreach([
+  static fn()=>null,
+  static fn()=>['status'=>'bad','headers'=>[],'bytes'=>0],
+  static fn()=>['status'=>200,'headers'=>[]],
+  static fn()=>['status'=>200,'headers'=>[],'bytes'=>2_000_001,'json'=>[]],
+ ] as $invalid)try{runCollector($invalid);}catch(Throwable){}
+ $x=runCollector($transport);$snapshot=FactoryOrchestratorSnapshotSource::fromInjectedEvidence($x[1],220);
+ echo json_encode(['result'=>$x[0],'evidence'=>$x[1],'snapshot'=>$snapshot,'calls'=>$calls],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);exit;
+}
 if($scenario==='failure'){$dir=sys_get_temp_dir().'/cb685-fail-'.bin2hex(random_bytes(4));mkdir($dir);$credential=$dir.'/credential';$evidence=$dir.'/evidence.json';file_put_contents($credential,'sentinel-read-value');chmod($credential,0600);file_put_contents($evidence,'{"old":true}');$bad=static fn()=>['status'=>429,'headers'=>['retry-after'=>'60','x-ratelimit-remaining'=>'0'],'bytes'=>0];$failed=false;try{FactoryOrchestratorEvidenceCollector::run(['CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED'=>'1','CONTROLBOT_GITHUB_READ_TOKEN_FILE'=>$credential,'CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH'=>$evidence],$bad,200);}catch(Throwable){$failed=true;}echo json_encode(['failed'=>$failed,'previous'=>file_get_contents($evidence)]);exit;}
 fwrite(STDERR,"scenario invalid\n");exit(2);

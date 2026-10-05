@@ -22,7 +22,7 @@ caller
   -> resultado saneado por SecretsBroker
 ```
 
-El handle del caller no puede promoverar una referencia registrada de otro provider/kind: la metadata autoritativa es la que conserva el broker. La credencial no sale del callback. Scope incorrecto, referencia revocada/desconocida, generación distinta o metadata incompatible fallan cerrado antes del transporte.
+El handle del caller no puede promover una referencia registrada de otro provider/kind: la metadata autoritativa es la que conserva el broker. La credencial no sale del callback. Scope incorrecto, referencia revocada/desconocida, generación distinta o metadata incompatible fallan cerrado antes del transporte.
 
 ## Operaciones
 

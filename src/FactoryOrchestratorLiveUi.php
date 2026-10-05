@@ -136,14 +136,10 @@ final class FactoryOrchestratorLiveUi
 
     private static function decision(mixed $decision): string
     {
-        $legacyFields = ['id','issue_ref','source_ref','observed_at','freshness','age_seconds'];
-        $actual = array_keys(is_array($decision) ? $decision : []);
-        sort($legacyFields);
-        sort($actual);
-        if ($actual === $legacyFields) {
-            return self::legacyDecision($decision);
-        }
-
+        $legacy=['id','issue_ref','source_ref','observed_at','freshness','age_seconds'];
+        $actual=array_keys(is_array($decision)?$decision:[]);
+        sort($legacy);sort($actual);
+        if($actual===$legacy)return self::legacyDecision($decision);
         self::fields(
             $decision,
             ['id','issue_ref','repository_ref','issue_number','format','title','title_simple',
@@ -152,151 +148,104 @@ final class FactoryOrchestratorLiveUi
              'freshness','age_seconds'],
             'decision',
         );
-        $id = self::text($decision['id'], 'decision.id');
-        $fresh = self::one($decision['freshness'], self::FRESH, 'decision.freshness');
-        $age = self::age($decision['age_seconds']);
-        $href = self::issueHref($decision['issue_ref']);
-        $repo = self::decisionRepository($decision['repository_ref']);
-        $number = self::decisionNumber($decision['issue_number']);
-        if ($href !== 'https://github.com/'.$repo.'/issues/'.$number) {
+        $id=self::text($decision['id'],'decision.id');
+        $fresh=self::one($decision['freshness'],self::FRESH,'decision.freshness');
+        $age=self::age($decision['age_seconds']);
+        $href=self::issueHref($decision['issue_ref']);
+        $repo=self::decisionRepository($decision['repository_ref']);
+        $number=self::decisionNumber($decision['issue_number']);
+        if($href!=='https://github.com/'.$repo.'/issues/'.$number)
             throw new InvalidArgumentException('decision identity mismatch.');
-        }
-
-        $title = self::decisionText($decision['title'], 'decision.title');
-        $format = self::one($decision['format'], ['legacy','structured'], 'decision.format');
-        if ($format === 'legacy') {
-            return self::legacyRichDecision($id, $fresh, $age, $href, $title);
-        }
-        return self::structuredDecision($decision, $id, $fresh, $age, $href, $repo, $number);
+        $title=self::decisionText($decision['title'],'decision.title');
+        if(self::one($decision['format'],['legacy','structured'],'decision.format')==='legacy')
+            return self::legacyRichDecision($id,$fresh,$age,$href,$title);
+        return self::structuredDecision($decision,$id,$fresh,$age,$href,$repo,$number);
     }
 
     private static function structuredDecision(
-        array $decision,
-        string $id,
-        string $fresh,
-        int $age,
-        string $href,
-        string $repo,
-        int $number,
+        array $decision,string $id,string $fresh,int $age,string $href,string $repo,int $number
     ): string {
-        $recommended = self::decisionOptionId($decision['recommendation']);
-        $safeDefault = self::decisionOptionId($decision['safe_default']);
-        if (!is_array($decision['options']) || !array_is_list($decision['options'])
-            || $decision['options'] === []) {
+        $recommended=self::decisionOptionId($decision['recommendation']);
+        $safe=self::decisionOptionId($decision['safe_default']);
+        if(!is_array($decision['options'])||!array_is_list($decision['options'])||$decision['options']===[])
             throw new InvalidArgumentException('decision options invalid.');
+        $cards='';$seen=[];
+        foreach($decision['options'] as $option){
+            [$optionId,$card]=self::decisionOptionCard($option,$repo,$number,$recommended,$safe);
+            if(isset($seen[$optionId]))throw new InvalidArgumentException('decision option duplicate.');
+            $seen[$optionId]=true;$cards.=$card;
         }
-
-        $options = '';
-        $ids = [];
-        foreach ($decision['options'] as $option) {
-            [$optionId, $card] = self::decisionOptionCard(
-                $option, $repo, $number, $recommended, $safeDefault
-            );
-            if (isset($ids[$optionId])) {
-                throw new InvalidArgumentException('decision option duplicate.');
-            }
-            $ids[$optionId] = true;
-            $options .= $card;
-        }
-        if (!isset($ids[$recommended]) || !isset($ids[$safeDefault])) {
+        if(!isset($seen[$recommended])||!isset($seen[$safe]))
             throw new InvalidArgumentException('decision recommendation invalid.');
-        }
-
-        $title = self::e(self::decisionText($decision['title_simple'], 'decision.title_simple'));
-        $summary = self::e(self::decisionText($decision['summary_simple'], 'decision.summary_simple'));
-        $blocks = self::e(self::decisionText($decision['blocks'], 'decision.blocks'));
-        $why = self::e(self::decisionText($decision['why_recommended'], 'decision.why_recommended'));
-        $explain = $decision['explain_simple'] === null ? '' : '<p>'.self::e(
-            self::decisionText($decision['explain_simple'], 'decision.explain_simple')
+        $explain=$decision['explain_simple']===null?'':'<p>'.self::e(
+            self::decisionText($decision['explain_simple'],'decision.explain_simple')
         ).'</p>';
-
-        return '<article class="decision decision-rich '.self::stateClass('pending', $fresh).'"'
+        return '<article class="decision decision-rich '.self::stateClass('pending',$fresh).'"'
             .' data-decision="'.self::e($id).'" data-format="structured">'
-            .'<p class="eyebrow">'.self::e($repo).' #'.$number.'</p><h3>'.$title.'</h3>'
-            .'<p>'.$summary.'</p>'.$explain
-            .'<p><strong>Bloquea:</strong> '.$blocks.'</p>'
-            .'<p><strong>Por qué se recomienda:</strong> '.$why.'</p>'
-            .self::decisionExpiry($decision)
-            .'<div class="choices">'.$options.'</div>'
+            .'<p class="eyebrow">'.self::e($repo).' #'.$number.'</p>'
+            .'<h3>'.self::e(self::decisionText($decision['title_simple'],'decision.title_simple')).'</h3>'
+            .'<p>'.self::e(self::decisionText($decision['summary_simple'],'decision.summary_simple')).'</p>'.$explain
+            .'<p><strong>Bloquea:</strong> '.self::e(self::decisionText($decision['blocks'],'decision.blocks')).'</p>'
+            .'<p><strong>Por qué se recomienda:</strong> '
+            .self::e(self::decisionText($decision['why_recommended'],'decision.why_recommended')).'</p>'
+            .self::decisionExpiry($decision).'<div class="choices">'.$cards.'</div>'
             .'<small>freshness='.self::e($fresh).' · antigüedad='.$age.'s</small>'
             .'<a href="'.self::e($href).'" rel="noreferrer noopener">Abrir Issue</a></article>';
     }
 
     private static function decisionOptionCard(
-        mixed $option,
-        string $repo,
-        int $number,
-        string $recommended,
-        string $safeDefault,
+        mixed $option,string $repo,int $number,string $recommended,string $safe
     ): array {
         self::fields(
-            $option,
-            ['id','label','effect','pros','cons','risk','cost','reversible','explain_simple'],
+            $option,['id','label','effect','pros','cons','risk','cost','reversible','explain_simple'],
             'decision.option',
         );
-        $id = self::decisionOptionId($option['id']);
-        if (!is_bool($option['reversible'])) {
-            throw new InvalidArgumentException('decision reversible invalid.');
-        }
-        $command = self::decisionCommand($repo, $number, $id);
-        $classes = 'choice'.($id === $recommended ? ' recommended' : '')
-            .($id === $safeDefault ? ' safe-default' : '');
-        $badges = ($id === $recommended ? '<span class="badge">RECOMENDADA</span>' : '')
-            .($id === $safeDefault ? '<span class="badge safe">DEFAULT SEGURO</span>' : '');
-        $cost = $option['cost'] === null ? '' : '<span>Coste: '.self::e(
-            self::decisionText($option['cost'], 'decision.option.cost')
+        $id=self::decisionOptionId($option['id']);
+        if(!is_bool($option['reversible']))throw new InvalidArgumentException('decision reversible invalid.');
+        $command=self::decisionCommand($repo,$number,$id);
+        $classes='choice'.($id===$recommended?' recommended':'').($id===$safe?' safe-default':'');
+        $badges=($id===$recommended?'<span class="badge">RECOMENDADA</span>':'')
+            .($id===$safe?'<span class="badge safe">DEFAULT SEGURO</span>':'');
+        $cost=$option['cost']===null?'':'<span>Coste: '.self::e(
+            self::decisionText($option['cost'],'decision.option.cost')
         ).'</span>';
-        $explain = $option['explain_simple'] === null ? '' : '<p>'.self::e(
-            self::decisionText($option['explain_simple'], 'decision.option.explain')
+        $explain=$option['explain_simple']===null?'':'<p>'.self::e(
+            self::decisionText($option['explain_simple'],'decision.option.explain')
         ).'</p>';
-
-        $card = '<article class="'.$classes.'" data-option="'.self::e($id).'">'
+        $card='<article class="'.$classes.'" data-option="'.self::e($id).'">'
             .'<header><strong>'.self::e($id).' · '
-            .self::e(self::decisionText($option['label'], 'decision.option.label'))
-            .'</strong>'.$badges.'</header>'
-            .'<p>'.self::e(self::decisionText($option['effect'], 'decision.option.effect')).'</p>'
-            .$explain.'<div class="choice-meta"><span>Riesgo: '
-            .self::e(self::decisionText($option['risk'], 'decision.option.risk')).'</span>'
-            .$cost.'<span>Reversible: '.($option['reversible'] ? 'sí' : 'no').'</span></div>'
-            .self::decisionList('Pros', $option['pros'])
-            .self::decisionList('Contras', $option['cons'])
+            .self::e(self::decisionText($option['label'],'decision.option.label')).'</strong>'.$badges.'</header>'
+            .'<p>'.self::e(self::decisionText($option['effect'],'decision.option.effect')).'</p>'.$explain
+            .'<div class="choice-meta"><span>Riesgo: '
+            .self::e(self::decisionText($option['risk'],'decision.option.risk')).'</span>'.$cost
+            .'<span>Reversible: '.($option['reversible']?'sí':'no').'</span></div>'
+            .self::decisionList('Pros',$option['pros']).self::decisionList('Contras',$option['cons'])
             .'<div class="copy-row"><code>'.self::e($command).'</code>'
             .'<button type="button" data-copy-command="'.self::e($command).'"'
-            .' aria-label="Copiar comando para opción '.self::e($id).'">Copiar</button></div>'
-            .'</article>';
-        return [$id, $card];
+            .' aria-label="Copiar comando para opción '.self::e($id).'">Copiar</button></div></article>';
+        return [$id,$card];
     }
 
     private static function decisionExpiry(array $decision): string
     {
-        if ($decision['expires_at'] === null) {
-            if ($decision['seconds_left'] !== null || $decision['expired'] !== null) {
+        if($decision['expires_at']===null){
+            if($decision['seconds_left']!==null||$decision['expired']!==null)
                 throw new InvalidArgumentException('decision expiry invalid.');
-            }
             return '';
         }
-        if (!is_string($decision['expires_at']) || !is_int($decision['seconds_left'])
-            || !is_bool($decision['expired']) || $decision['seconds_left'] < 0) {
+        if(!is_string($decision['expires_at'])||!is_int($decision['seconds_left'])
+            ||!is_bool($decision['expired'])||$decision['seconds_left']<0)
             throw new InvalidArgumentException('decision expiry invalid.');
-        }
-        $class = $decision['expired'] ? 'expired' : 'active';
-        $text = $decision['expired']
-            ? 'Ventana caducada'
-            : 'Ventana: '.$decision['seconds_left'].'s restantes';
-        return '<p class="expiry '.$class.'" data-seconds-left="'.$decision['seconds_left'].'">'
-            .$text.'</p>';
+        $class=$decision['expired']?'expired':'active';
+        $text=$decision['expired']?'Ventana caducada':'Ventana: '.$decision['seconds_left'].'s restantes';
+        return '<p class="expiry '.$class.'" data-seconds-left="'.$decision['seconds_left'].'">'.$text.'</p>';
     }
 
     private static function legacyRichDecision(
-        string $id,
-        string $fresh,
-        int $age,
-        string $href,
-        string $title,
+        string $id,string $fresh,int $age,string $href,string $title
     ): string {
-        return '<article class="decision '.self::stateClass('pending', $fresh).'"'
-            .' data-decision="'.self::e($id).'" data-format="legacy">'
-            .'<strong>'.self::e($title).'</strong>'
+        return '<article class="decision '.self::stateClass('pending',$fresh).'"'
+            .' data-decision="'.self::e($id).'" data-format="legacy"><strong>'.self::e($title).'</strong>'
             .'<span>Formato legacy · abre el Issue para revisar opciones.</span>'
             .'<span>Antigüedad: '.$age.'s · freshness='.self::e($fresh).'</span>'
             .'<a href="'.self::e($href).'" rel="noreferrer noopener">Abrir Issue</a></article>';

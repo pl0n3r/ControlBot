@@ -250,7 +250,7 @@ final class FactoryOrchestratorEvidenceCollector
 
     private static function ownerDecisionData(array $row,string $repo,int $number): array
     {
-        $title=self::boundedPlainText($row['title']??null,160)??('Issue '.$number);
+        $title=self::boundedUntrustedText($row['title']??null,160)??('Issue '.$number);
         $legacy=[
             'issue_ref'=>'github:'.$repo.'#'.$number,
             'repository_ref'=>$repo,
@@ -346,6 +346,17 @@ final class FactoryOrchestratorEvidenceCollector
             $out[]=$text;
         }
         return $out;
+    }
+
+    private static function boundedUntrustedText(mixed $value,int $maxLength): ?string
+    {
+        if(!is_string($value))return null;
+        $value=trim(preg_replace('/\\s+/u',' ',$value)??'');
+        if(
+            $value===''||strlen($value)>$maxLength
+            ||preg_match('/[\\x00-\\x1f\\x7f]/',$value)===1
+        )return null;
+        return $value;
     }
 
     private static function boundedPlainText(mixed $value,int $maxLength,bool $optional=false): ?string

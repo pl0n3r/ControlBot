@@ -162,7 +162,8 @@ final class HostingerPublicApiAdapter
     private static function command(mixed $value): string
     {
         $value=self::text($value,500);
-        if(preg_match('/(?:bearer\s+\S+|password\s*[=:]|token\s*[=:]|api[_-]?key\s*[=:])/i',$value)===1){
+        $sensitive="/(?:\\bbearer\\s+\\S+|\\b(?:password|passwd|pwd|token|api[_-]?key|secret)[\"']?\\s*(?:[=:]\\s*|\\s+)[\"']?\\S+|\\b[A-Z0-9_]*(?:TOKEN|PASSWORD|PASSWD|PWD|API_KEY|SECRET)[A-Z0-9_]*\\s*=\\s*\\S+)/i";
+        if(preg_match($sensitive,$value)===1){
             throw new RuntimeException('Hostinger evidence contains sensitive command.');
         }
         return $value;

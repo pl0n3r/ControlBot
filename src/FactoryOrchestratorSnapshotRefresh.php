@@ -74,8 +74,12 @@ final class FactoryOrchestratorSnapshotRefresh
                 throw self::failure('internal_error');
             }
 
-            $temporary = $tempnam($directory, self::TEMP_PREFIX);
-            if (!is_string($temporary) || $temporary === '' || $writeTemp($temporary, $encoded) !== $bytes) {
+            $candidate = $tempnam($directory, self::TEMP_PREFIX);
+            if (!is_string($candidate) || $candidate === '') {
+                throw self::failure('temp_write_failed');
+            }
+            $temporary = $candidate;
+            if ($writeTemp($temporary, $encoded) !== $bytes) {
                 throw self::failure('temp_write_failed');
             }
             if (!$chmod($temporary, 0640) && !self::hasSafeMode($temporary)) {

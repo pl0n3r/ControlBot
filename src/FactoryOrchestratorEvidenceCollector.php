@@ -250,162 +250,118 @@ final class FactoryOrchestratorEvidenceCollector
 
     private static function ownerDecisionData(array $row, string $repo, int $number): array
     {
-        $title = self::boundedUntrustedText($row['title'] ?? null, 160) ?? ('Issue '.$number);
-        $legacy = [
-            'issue_ref' => 'github:'.$repo.'#'.$number, 'repository_ref' => $repo,
-            'issue_number' => $number, 'format' => 'legacy', 'title' => $title,
-            'title_simple' => null, 'summary_simple' => null, 'explain_simple' => null,
-            'why_recommended' => null, 'blocks' => null, 'options' => [],
-            'recommendation' => null, 'safe_default' => null, 'expires_at' => null,
+        $title=self::boundedUntrustedText($row['title']??null,160)??('Issue '.$number);
+        $legacy=[
+            'issue_ref'=>'github:'.$repo.'#'.$number,'repository_ref'=>$repo,'issue_number'=>$number,
+            'format'=>'legacy','title'=>$title,'title_simple'=>null,'summary_simple'=>null,
+            'explain_simple'=>null,'why_recommended'=>null,'blocks'=>null,'options'=>[],
+            'recommendation'=>null,'safe_default'=>null,'expires_at'=>null,
         ];
-        $body = $row['body'] ?? null;
-        if (!is_string($body) || strlen($body) > self::MAX_DECISION_BODY_BYTES) {
-            return $legacy;
-        }
+        $body=$row['body']??null;
+        if(!is_string($body)||strlen($body)>self::MAX_DECISION_BODY_BYTES)return $legacy;
+        $gate=self::decisionMarker($body,'factory-human-gate',16);
+        if($gate===null)return $legacy;
 
-        $gate = self::decisionMarker($body, 'factory-human-gate', 16);
-        if ($gate === null) {
-            return $legacy;
-        }
-        $titleSimple = self::boundedPlainText($gate['title_simple'] ?? null, 160);
-        $summary = self::boundedPlainText($gate['summary_simple'] ?? null, 600);
-        $why = self::boundedPlainText($gate['why_recommended'] ?? null, 600);
-        $blocks = self::boundedPlainText($gate['blocks'] ?? null, 600);
-        $explain = self::boundedPlainText($gate['explain_simple'] ?? null, 600, true);
-        $recommendation = $gate['recommendation'] ?? null;
-        $safeDefault = $gate['safe_default'] ?? null;
-        $options = self::decisionOptions($gate['options'] ?? null);
-        if ($titleSimple === null || $summary === null || $why === null || $blocks === null
-            || !is_string($recommendation) || !is_string($safeDefault) || $options === null) {
-            return $legacy;
-        }
+        $fields=[
+            'title_simple'=>self::boundedPlainText($gate['title_simple']??null,160),
+            'summary_simple'=>self::boundedPlainText($gate['summary_simple']??null,600),
+            'explain_simple'=>self::boundedPlainText($gate['explain_simple']??null,600,true),
+            'why_recommended'=>self::boundedPlainText($gate['why_recommended']??null,600),
+            'blocks'=>self::boundedPlainText($gate['blocks']??null,600),
+        ];
+        $recommendation=$gate['recommendation']??null;
+        $safeDefault=$gate['safe_default']??null;
+        $options=self::decisionOptions($gate['options']??null);
+        if(in_array(null,[$fields['title_simple'],$fields['summary_simple'],$fields['why_recommended'],$fields['blocks'],$options],true)
+            ||!is_string($recommendation)||!is_string($safeDefault))return $legacy;
 
-        $ids = array_column($options, 'id');
-        if (!in_array($recommendation, $ids, true) || !in_array($safeDefault, $ids, true)) {
-            return $legacy;
-        }
-        [$windowValid, $expiresAt] = self::decisionReleaseExpiry($body);
-        if (!$windowValid) {
-            return $legacy;
-        }
-        return array_replace($legacy, [
-            'format' => 'structured', 'title_simple' => $titleSimple, 'summary_simple' => $summary,
-            'explain_simple' => $explain, 'why_recommended' => $why, 'blocks' => $blocks,
-            'options' => $options, 'recommendation' => $recommendation,
-            'safe_default' => $safeDefault, 'expires_at' => $expiresAt,
+        $ids=array_column($options,'id');
+        if(!in_array($recommendation,$ids,true)||!in_array($safeDefault,$ids,true))return $legacy;
+        [$windowValid,$expiresAt]=self::decisionReleaseExpiry($body);
+        if(!$windowValid)return $legacy;
+        return array_replace($legacy,$fields,[
+            'format'=>'structured','options'=>$options,'recommendation'=>$recommendation,
+            'safe_default'=>$safeDefault,'expires_at'=>$expiresAt,
         ]);
     }
 
-    private static function decisionMarker(string $body, string $name, int $depth): ?array
+    private static function decisionMarker(string $body,string $name,int $depth): ?array
     {
-        $pattern = '/<!--\\s*'.preg_quote($name, '/').'\\s+(.+?)\\s*-->/s';
-        $count = preg_match_all($pattern, $body, $matches);
-        if ($count !== 1) {
-            return null;
-        }
-        try {
-            $value = json_decode($matches[1][0], true, $depth, JSON_THROW_ON_ERROR);
-        } catch (Throwable) {
-            return null;
-        }
-        return is_array($value) && !array_is_list($value) ? $value : null;
+        $pattern='/<!--\\s*'.preg_quote($name,'/').'\\s+(.+?)\\s*-->/s';
+        if(preg_match_all($pattern,$body,$matches)!==1)return null;
+        try{$value=json_decode($matches[1][0],true,$depth,JSON_THROW_ON_ERROR);}
+        catch(Throwable){return null;}
+        return is_array($value)&&!array_is_list($value)?$value:null;
     }
 
     private static function decisionOptions(mixed $raw): ?array
     {
-        if (!is_array($raw) || !array_is_list($raw) || $raw === []
-            || count($raw) > self::MAX_DECISION_OPTIONS) {
-            return null;
-        }
-        $options = [];
-        $ids = [];
-        foreach ($raw as $option) {
-            $id = is_array($option) && !array_is_list($option) ? ($option['id'] ?? null) : null;
-            if (!is_string($id) || !in_array($id, self::DECISION_OPTION_IDS, true)
-                || isset($ids[$id]) || !is_bool($option['reversible'] ?? null)) {
-                return null;
-            }
-            $pros = self::boundedTextList($option['pros'] ?? null, 6, 300);
-            $cons = self::boundedTextList($option['cons'] ?? null, 6, 300);
-            $label = self::boundedPlainText($option['label'] ?? null, 200);
-            $effect = self::boundedPlainText($option['effect'] ?? null, 600);
-            $risk = self::boundedPlainText($option['risk'] ?? null, 80);
-            if ($pros === null || $cons === null || $label === null || $effect === null || $risk === null) {
-                return null;
-            }
-            $ids[$id] = true;
-            $options[] = [
-                'id' => $id, 'label' => $label, 'effect' => $effect, 'pros' => $pros, 'cons' => $cons,
-                'risk' => $risk, 'cost' => self::boundedPlainText($option['cost'] ?? null, 240, true),
-                'reversible' => $option['reversible'],
-                'explain_simple' => self::boundedPlainText($option['explain_simple'] ?? null, 400, true),
+        if(!is_array($raw)||!array_is_list($raw)||$raw===[]||count($raw)>self::MAX_DECISION_OPTIONS)return null;
+        $out=[];$ids=[];
+        foreach($raw as $option){
+            $id=is_array($option)&&!array_is_list($option)?($option['id']??null):null;
+            if(!is_string($id)||!in_array($id,self::DECISION_OPTION_IDS,true)
+                ||isset($ids[$id])||!is_bool($option['reversible']??null))return null;
+            $pros=self::boundedTextList($option['pros']??null,6,300);
+            $cons=self::boundedTextList($option['cons']??null,6,300);
+            $label=self::boundedPlainText($option['label']??null,200);
+            $effect=self::boundedPlainText($option['effect']??null,600);
+            $risk=self::boundedPlainText($option['risk']??null,80);
+            if(in_array(null,[$pros,$cons,$label,$effect,$risk],true))return null;
+            $ids[$id]=true;
+            $out[]=[
+                'id'=>$id,'label'=>$label,'effect'=>$effect,'pros'=>$pros,'cons'=>$cons,'risk'=>$risk,
+                'cost'=>self::boundedPlainText($option['cost']??null,240,true),
+                'reversible'=>$option['reversible'],
+                'explain_simple'=>self::boundedPlainText($option['explain_simple']??null,400,true),
             ];
-        }
-        return $options;
-    }
-
-    private static function decisionReleaseExpiry(string $body): array
-    {
-        $pattern = '/<!--\\s*factory-release-window\\s+(.+?)\\s*-->/s';
-        $count = preg_match_all($pattern, $body, $matches);
-        if ($count === 0) {
-            return [true, null];
-        }
-        if ($count !== 1) {
-            return [false, null];
-        }
-        try {
-            $window = json_decode($matches[1][0], true, 8, JSON_THROW_ON_ERROR);
-        } catch (Throwable) {
-            return [false, null];
-        }
-        $expiresAt = is_array($window) && !array_is_list($window) ? ($window['expires_at'] ?? null) : null;
-        $valid = is_string($expiresAt)
-            && preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/D', $expiresAt) === 1
-            && strtotime($expiresAt) !== false;
-        return [$valid, $valid ? $expiresAt : null];
-    }
-
-    private static function boundedTextList(mixed $raw, int $maxItems, int $maxLength): ?array
-    {
-        if (!is_array($raw) || !array_is_list($raw) || count($raw) > $maxItems) {
-            return null;
-        }
-        $out = [];
-        foreach ($raw as $value) {
-            $text = self::boundedPlainText($value, $maxLength);
-            if ($text === null) {
-                return null;
-            }
-            $out[] = $text;
         }
         return $out;
     }
 
-    private static function boundedUntrustedText(mixed $value, int $maxLength): ?string
+    private static function decisionReleaseExpiry(string $body): array
     {
-        if (!is_string($value)) {
-            return null;
-        }
-        $value = trim(preg_replace('/\\s+/u', ' ', $value) ?? '');
-        $valid = $value !== '' && strlen($value) <= $maxLength
-            && preg_match('/[\\x00-\\x1f\\x7f]/', $value) !== 1;
-        return $valid ? $value : null;
+        $pattern='/<!--\\s*factory-release-window\\s+(.+?)\\s*-->/s';
+        $count=preg_match_all($pattern,$body,$matches);
+        if($count===0)return [true,null];
+        if($count!==1)return [false,null];
+        try{$window=json_decode($matches[1][0],true,8,JSON_THROW_ON_ERROR);}
+        catch(Throwable){return [false,null];}
+        $expires=is_array($window)&&!array_is_list($window)?($window['expires_at']??null):null;
+        $valid=is_string($expires)
+            &&preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/D',$expires)===1
+            &&strtotime($expires)!==false;
+        return [$valid,$valid?$expires:null];
     }
 
-    private static function boundedPlainText(mixed $value, int $maxLength, bool $optional = false): ?string
+    private static function boundedTextList(mixed $raw,int $maxItems,int $maxLength): ?array
     {
-        if ($value === null && $optional) {
-            return null;
+        if(!is_array($raw)||!array_is_list($raw)||count($raw)>$maxItems)return null;
+        $out=[];
+        foreach($raw as $value){
+            $text=self::boundedPlainText($value,$maxLength);
+            if($text===null)return null;
+            $out[]=$text;
         }
-        if (!is_string($value)) {
-            return null;
-        }
-        $value = trim(preg_replace('/\\s+/u', ' ', $value) ?? '');
-        $valid = $value !== '' && strlen($value) <= $maxLength
-            && preg_match('/[\\x00-\\x1f\\x7f]/', $value) !== 1
-            && !str_contains($value, '<') && !str_contains($value, '>');
-        return $valid ? $value : null;
+        return $out;
+    }
+
+    private static function boundedUntrustedText(mixed $value,int $maxLength): ?string
+    {
+        if(!is_string($value))return null;
+        $value=trim(preg_replace('/\\s+/u',' ',$value)??'');
+        $valid=$value!==''&&strlen($value)<=$maxLength&&preg_match('/[\\x00-\\x1f\\x7f]/',$value)!==1;
+        return $valid?$value:null;
+    }
+
+    private static function boundedPlainText(mixed $value,int $maxLength,bool $optional=false): ?string
+    {
+        if($value===null&&$optional)return null;
+        if(!is_string($value))return null;
+        $value=trim(preg_replace('/\\s+/u',' ',$value)??'');
+        $valid=$value!==''&&strlen($value)<=$maxLength&&preg_match('/[\\x00-\\x1f\\x7f]/',$value)!==1
+            &&!str_contains($value,'<')&&!str_contains($value,'>');
+        return $valid?$value:null;
     }
 
     private static function appendWork(array &$rows,array $row): void

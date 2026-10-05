@@ -2,7 +2,7 @@
 
 ## Propósito
 
-`HostingerPublicApiRuntime` conecta Production Authority con el adapter Hostinger Public API sin permitir que callers o agentes resuelvan credenciales por su cuenta. Recibe una `SecretReference`, delega la resolución a `SecretsBroker` y ejecuta el adapter dentro del callback efímero del broker.
+`HostingerPublicApiRuntime` conecta Production Authority con el adapter Hostinger Public API sin permitir que callers o agentes resuelvan credenciales por su cuenta. Recibe un handle `SecretReference`, delega la resolución a `SecretsBroker` y ejecuta el adapter dentro del callback efímero del broker.
 
 No crea otra autoridad. `CapabilityPolicy`, `CapabilityGrant`, `SecretReference` y `SecretsBroker` siguen siendo los contratos canónicos.
 
@@ -13,15 +13,16 @@ Flujo read-only:
 ```text
 caller
   -> HostingerPublicApiRuntime
-  -> valida metadata pública: provider=hostinger, secret_kind=api_token, capability exacta
+  -> usa del handle solo reference_id + generation
   -> SecretsBroker(executor_id=hostinger-public-api, scope exacto)
-  -> callback efímero con credencial
+  -> callback con metadata de la referencia registrada + credencial efímera
+  -> valida metadata autoritativa: provider=hostinger, secret_kind=api_token, capability exacta
   -> HostingerPublicApiAdapter
   -> transporte inyectado
   -> resultado saneado por SecretsBroker
 ```
 
-La credencial no sale del callback del broker. Scope incorrecto, referencia revocada/desconocida, generación distinta o metadata incompatible fallan cerrado antes del transporte.
+El handle del caller no puede promoverar una referencia registrada de otro provider/kind: la metadata autoritativa es la que conserva el broker. La credencial no sale del callback. Scope incorrecto, referencia revocada/desconocida, generación distinta o metadata incompatible fallan cerrado antes del transporte.
 
 ## Operaciones
 
@@ -41,4 +42,4 @@ Este slice no autoriza ni configura:
 - `DOMAIN` / `DEPLOY_ENABLED`;
 - DNS, deploy, billing o go-live.
 
-Una activación futura debe aportar una `SecretReference` server-side válida, registrar la credencial por canal seguro y continuar usando el mismo policy/broker. La activación live sigue sujeta a la autoridad explícita de #625/#45.
+Una activación futura debe registrar la referencia/credencial por canal seguro y continuar usando el mismo policy/broker. La activación live sigue sujeta a la autoridad explícita de #625/#45.

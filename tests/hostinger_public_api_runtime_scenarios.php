@@ -121,24 +121,36 @@ if ($name === 'scope') {
         $calls++;
         return ['status' => 200, 'headers' => [], 'body' => '{"data":[]}'];
     };
+
     $registered = reference('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee1', 'hostinger.read');
     $broker = brokerWith([$registered]);
     $runtime = new HostingerPublicApiRuntime($broker, $transport);
-
     $generation2 = reference(
         'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee1',
         'hostinger.read',
         ['generation' => 2],
     );
-    $wrongProvider = reference(
-        'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee1',
+
+    $providerRegistered = reference(
+        'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee2',
         'hostinger.read',
         ['provider' => 'github'],
     );
-    $wrongKind = reference(
-        'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee1',
+    $providerHandle = reference('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee2', 'hostinger.read');
+    $providerRuntime = new HostingerPublicApiRuntime(
+        brokerWith([$providerRegistered]),
+        $transport,
+    );
+
+    $kindRegistered = reference(
+        'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee3',
         'hostinger.read',
         ['secret_kind' => 'password'],
+    );
+    $kindHandle = reference('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee3', 'hostinger.read');
+    $kindRuntime = new HostingerPublicApiRuntime(
+        brokerWith([$kindRegistered]),
+        $transport,
     );
 
     $cases = [
@@ -146,9 +158,10 @@ if ($name === 'scope') {
         'project' => $runtime->websites($registered, 'condor', 'production', $now),
         'environment' => $runtime->websites($registered, 'controlbot', 'staging', $now),
         'generation' => $runtime->websites($generation2, 'controlbot', 'production', $now),
-        'provider' => $runtime->websites($wrongProvider, 'controlbot', 'production', $now),
-        'secret_kind' => $runtime->websites($wrongKind, 'controlbot', 'production', $now),
+        'provider' => $providerRuntime->websites($providerHandle, 'controlbot', 'production', $now),
+        'secret_kind' => $kindRuntime->websites($kindHandle, 'controlbot', 'production', $now),
     ];
+
     $broker->revoke($registered->referenceId(), '2026-10-05T04:05:00Z');
     $cases['revoked'] = $runtime->websites($registered, 'controlbot', 'production', $now);
 

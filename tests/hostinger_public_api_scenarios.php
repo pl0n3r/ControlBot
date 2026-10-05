@@ -59,6 +59,49 @@ if($scenario==='guards'){
  ] as $case){try{HostingerPublicApi::request($case[0],$case[1],$token,$transport);$fail[]=false;}catch(Throwable){$fail[]=true;}}
  echo json_encode(['failed'=>$fail],JSON_THROW_ON_ERROR);exit;
 }
+if($scenario==='url-semantics'){
+ $fail=[];
+ foreach([
+  'https://developers.hostinger.com/api/hosting/v1/websites?limit=1',
+  'https://developers.hostinger.com/api/hosting/v1/websites#fragment',
+  'https://developers.hostinger.com/api/hosting/v1/accounts/u123456789/cron-jobs?cursor=next',
+ ] as $url){
+  try{HostingerPublicApi::request('GET',$url,$token,$transport);$fail[]=false;}catch(Throwable){$fail[]=true;}
+ }
+ echo json_encode(['failed'=>$fail],JSON_THROW_ON_ERROR);exit;
+}
+if($scenario==='secret-evidence'){
+ $variants=[
+  'php collector.php --token sentinel-cli-secret',
+  'php collector.php --password=sentinel-password-secret',
+  'HOSTINGER_TOKEN=sentinel-env-secret php collector.php',
+  'api_key: sentinel-api-secret',
+ ];
+ $commandDenied=[];$outputDenied=[];$messagesSecretFree=[];
+ foreach($variants as $value){
+  $commandTransport=static fn()=>[
+   'status'=>200,'headers'=>[],
+   'body'=>json_encode([['uid'=>'cron_1','time'=>'*/5 * * * *','command'=>$value]],JSON_THROW_ON_ERROR),
+  ];
+  try{
+   HostingerPublicApiAdapter::cronSnapshot('u123456789',$token,$commandTransport,$now);
+   $commandDenied[]=false;$messagesSecretFree[]=false;
+  }catch(Throwable $e){
+   $commandDenied[]=true;$messagesSecretFree[]=!str_contains($e->getMessage(),'sentinel-');
+  }
+  $outputTransport=static fn()=>[
+   'status'=>200,'headers'=>[],
+   'body'=>json_encode(['output'=>$value],JSON_THROW_ON_ERROR),
+  ];
+  try{
+   HostingerPublicApiAdapter::cronOutput('u123456789','cron_1',$token,$outputTransport,$now);
+   $outputDenied[]=false;$messagesSecretFree[]=false;
+  }catch(Throwable $e){
+   $outputDenied[]=true;$messagesSecretFree[]=!str_contains($e->getMessage(),'sentinel-');
+  }
+ }
+ echo json_encode(compact('commandDenied','outputDenied','messagesSecretFree'),JSON_THROW_ON_ERROR);exit;
+}
 if($scenario==='failures'){
  $out=[];
  foreach([

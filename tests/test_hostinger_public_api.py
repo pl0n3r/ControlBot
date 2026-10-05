@@ -10,6 +10,9 @@ class HostingerPublicApiTests(unittest.TestCase):
  def test_transport_allowlist_is_https_hostinger_only_and_secret_free(self):
   d=scenario("guards");self.assertTrue(all(d["failed"]))
 
+ def test_allowlisted_url_rejects_query_fragment_and_unmodeled_semantics(self):
+  d=scenario("url-semantics");self.assertTrue(all(d["failed"]))
+
  def test_hostinger_read_lists_websites_with_source_and_freshness(self):
   d=scenario("canonical");self.assertEqual("hostinger-public-api",d["web"]["source"])
   self.assertEqual("current",d["web"]["freshness"]);self.assertEqual("control.example.test",d["web"]["data"]["websites"][0]["domain"])
@@ -18,6 +21,12 @@ class HostingerPublicApiTests(unittest.TestCase):
   row=scenario("canonical")["cron"]["data"]["cron_jobs"][0]
   self.assertEqual({"uid":"cron_1","time":"*/5 * * * *","command":"php collector.php"},row)
   self.assertNotIn("status",row)
+
+ def test_cron_evidence_rejects_secret_bearing_command_and_output_variants(self):
+  d=scenario("secret-evidence")
+  self.assertTrue(all(d["commandDenied"]))
+  self.assertTrue(all(d["outputDenied"]))
+  self.assertTrue(all(d["messagesSecretFree"]))
 
  def test_http_rate_limit_invalid_json_and_payload_overflow_fail_closed(self):
   self.assertTrue(all(scenario("failures")["failed"]))

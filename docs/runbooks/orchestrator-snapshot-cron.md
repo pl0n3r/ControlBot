@@ -24,12 +24,40 @@ chmod 600 "$HOME/.controlbot/github-read-token"
 
 - Transporte **HTTPS-only** contra `api.github.com`; cualquier otro scheme, host, userinfo o puerto no permitido falla cerrado.
 - Máximo **40 requests HTTP reales** por ejecución, contando retries.
-- Máximo **2 MB** acumulados descargados por ejecución y **2 MB** para la evidencia final.
+- Máximo **2 MB por respuesta**, **8 MB acumulados descargados por ejecución** y **2 MB para la evidencia final**.
 - Cada respuesta debe reportar `bytes` reales; no se estiman reserializando JSON.
 - Un primer **5xx** puede hacer **retry 5xx** aunque el body no sea JSON; una respuesta HTTP 200 sí debe contener JSON válido.
 - Factory **Issue #767** solo se considera RUNNING si el payload corresponde exactamente al Issue 767, el autor es `pl0n3r`, existe un único marker y su JSON exacto es `{"version":1,"state":"RUNNING","owner":"pl0n3r"}`. Duplicados, marker inválido, autor distinto o issue distinto fallan cerrado.
-- Issues pueden paginar como máximo dos páginas de 100; closed PRs consultan solo **una página reciente** de 100 y no solicitan page=2 aunque esa primera página venga llena.
+- Issues pueden paginar como máximo dos páginas de 100; closed PRs consultan solo **una página reciente de 10** y no solicitan page=2 porque únicamente se necesita el primer merge reciente.
 - Ante rate-limit, retry-after, budget excedido o transporte inválido, se conserva el archivo anterior mediante reemplazo atómico.
+- El transporte continúa siendo REST/GET-only. La reducción de la página de PRs evita ampliar la superficie a GraphQL/POST para resolver este incidente.
+
+## Diagnóstico seguro del CLI
+
+Ante fallo, el CLI emite solo un código allowlisted y, cuando existe, el path de API sin query y el estado HTTP. Nunca imprime el token, cabeceras, body de GitHub, mensaje crudo de excepción ni rutas privadas del servidor.
+
+Códigos operativos:
+
+- `download_budget_exceeded`
+- `request_budget_exceeded`
+- `token_file_invalid`
+- `evidence_path_unwritable`
+- `transport_unavailable`
+- `rate_limited`
+- `github_response_invalid`
+- `github_read_failed`
+- `evidence_budget_exceeded`
+- `signal_budget_exceeded`
+- `request_policy_denied`
+- `clock_invalid`
+- `http_status_<código>`
+- `internal_error` como fallback fail-closed para una causa no clasificada
+
+Ejemplo seguro:
+
+```text
+orchestrator-evidence-collector: http_status_403 path=/repos/pl0n3r/Factory/issues status=403
+```
 
 ## Ruta canónica del snapshot
 
@@ -77,7 +105,9 @@ ls -ld "$(dirname "$SNAPSHOT")" "$SNAPSHOT"
 test -f "$SNAPSHOT" && echo "snapshot_age_seconds=$(( $(date +%s) - $(stat -c %Y "$SNAPSHOT") ))"
 ```
 
-El colector usa un máximo de 40 requests reales y un budget acumulado de **2 MB** de bytes descargados; la evidencia serializada también está limitada a 2 MB. Cada retry consume requests y bytes reales, sin fallback estimado. Issues pueden paginar como máximo dos páginas de 100 y fallan cerrado si existiría una tercera; closed PRs consultan solo **una página reciente** de 100 porque únicamente se publica el primer merge observado y no se recorre historial. El snapshot admite como máximo 24 fronts: si el trabajo activo excede el contrato, el colector falla cerrado en vez de truncar o rankear. Ante rate-limit/error/budget excedido conserva el archivo anterior mediante reemplazo atómico.
+El colector usa un máximo de 40 requests reales y un budget acumulado de **8 MB** de bytes descargados; cada respuesta individual conserva el tope de 2 MB y la evidencia serializada también está limitada a 2 MB. Cada retry consume requests y bytes reales, sin fallback estimado. Issues pueden paginar como máximo dos páginas de 100 y fallan cerrado si existiría una tercera; closed PRs consultan solo **una página reciente** de 10 porque únicamente se publica el primer merge observado y no se recorre historial. El snapshot admite como máximo 24 fronts: si el trabajo activo excede el contrato, el colector falla cerrado en vez de truncar o rankear. Ante rate-limit/error/budget excedido conserva el archivo anterior mediante reemplazo atómico.
+
+La regresión de #720 cubre una respuesta grande de aproximadamente **1,8 MB** y un conjunto de respuestas de varios repos que supera 5 MB sin rebasar el límite acumulado de 8 MB. El problema observado originalmente provenía de pedir 100 PRs cerrados de Factory en una sola respuesta; limitar esa consulta a 10 reduce el volumen sin cambiar el modelo de evidencia ni los permisos del token.
 
 ## Cron en hPanel
 

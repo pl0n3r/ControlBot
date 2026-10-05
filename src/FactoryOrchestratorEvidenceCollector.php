@@ -13,6 +13,10 @@ final class FactoryOrchestratorEvidenceCollector
     private const MAX_BYTES=2_000_000;
     private const MAX_SIGNALS=50;
     private const MAX_WORK_SIGNALS=24;
+    private const WORKFLOW_LABELS=[
+        'estado: disponible','estado: reservado','estado: en revisión','estado: bloqueado',
+        'status: available','status: reserved','status: in review','status: blocked',
+    ];
 
     public static function run(array $env,callable $transport,int $now): array
     {
@@ -31,14 +35,21 @@ final class FactoryOrchestratorEvidenceCollector
                     'User-Agent'=>'controlbot-orchestrator-evidence-collector/1',
                     'X-GitHub-Api-Version'=>'2022-11-28',
                 ]);
-                if(!is_array($r)||array_is_list($r)||!is_int($r['status']??null)||!is_array($r['headers']??null)||!is_array($r['json']??null))throw new RuntimeException('transport invalid.');
-                $bytes=$r['bytes']??strlen(json_encode($r['json'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
-                if(!is_int($bytes)||$bytes<0||($downloadBytes+=$bytes)>self::MAX_BYTES)throw new RuntimeException('download byte budget exceeded.');
+                if(
+                    !is_array($r)||array_is_list($r)
+                    ||!is_int($r['status']??null)
+                    ||!is_array($r['headers']??null)
+                    ||!array_key_exists('bytes',$r)
+                    ||!is_int($r['bytes'])
+                    ||$r['bytes']<0
+                )throw new RuntimeException('transport invalid.');
+                if(($downloadBytes+=$r['bytes'])>self::MAX_BYTES)throw new RuntimeException('download byte budget exceeded.');
                 if(isset($r['headers']['retry-after']))throw new RuntimeException('github retry deferred.');
                 $remaining=$r['headers']['x-ratelimit-remaining']??null;
                 if(is_numeric($remaining)&&(int)$remaining<5)throw new RuntimeException('rate limit low.');
                 if($r['status']>=500&&$attempt===0)continue;
                 if($r['status']!==200)throw new RuntimeException('github read failed.');
+                if(!is_array($r['json']??null))throw new RuntimeException('github json invalid.');
                 return $r['json'];
             }
             throw new RuntimeException('github read failed.');
@@ -66,39 +77,76 @@ final class FactoryOrchestratorEvidenceCollector
         foreach(self::REPOS as $name){
             $repo='pl0n3r/'.$name;
             $issues=$paged('/repos/'.$repo.'/issues',['state'=>'open']);
-            $closedPrs=$paged('/repos/'.$repo.'/pulls',['state'=>'closed','sort'=>'updated','direction'=>'desc']);
+            $closedPrs=$get('/repos/'.$repo.'/pulls',[
+                'state'=>'closed','sort'=>'updated','direction'=>'desc','per_page'=>100,'page'=>1,
+            ]);
+            if(!array_is_list($closedPrs))throw new RuntimeException('github pull page invalid.');
             foreach($issues as $row){
                 if(!is_array($row)||array_is_list($row))throw new RuntimeException('github issue invalid.');
                 $number=self::positive($row['number']??null);
                 if(isset($row['pull_request'])){
-                    self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'in_review'],$now));
+                    self::appendWork($work,self::signal(
+                        'work:'.strtolower($name).'-pr-'.$number,
+                        'github_project_snapshot','pending',$repo,$number,
+                        ['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'pending'],
+                        $now
+                    ));
                     continue;
                 }
-                $labels=self::labels($row['labels']??[]);$status=self::status($labels);
-                if($status==='blocked')
-                    self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number],$now));
-                elseif($status!==null)
-                    self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>$status],$now));
+                $labels=self::labels($row['labels']??[]);
+                $workflowLabels=self::workflowLabels($labels);
+                if(self::blocked($workflowLabels))
+                    self::append($blockers,self::signal(
+                        'blocker:'.strtolower($name).'-'.$number,
+                        'github_project_snapshot','blocked',$repo,$number,
+                        ['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],
+                        $now
+                    ));
+                elseif($workflowLabels!==[])
+                    self::appendWork($work,self::signal(
+                        'work:'.strtolower($name).'-'.$number,
+                        'github_project_snapshot','pending',$repo,$number,
+                        ['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'pending','labels'=>$workflowLabels],
+                        $now
+                    ));
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))
-                    self::append($decisions,self::signal('decision:'.strtolower($name).'-'.$number,'owner_inbox','pending',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number],$now));
+                    self::append($decisions,self::signal(
+                        'decision:'.strtolower($name).'-'.$number,
+                        'owner_inbox','pending',$repo,$number,
+                        ['issue_ref'=>'github:'.$repo.'#'.$number],
+                        $now
+                    ));
             }
             foreach($closedPrs as $pr){
                 if(!is_array($pr)||array_is_list($pr))throw new RuntimeException('github pull invalid.');
                 if(($pr['merged_at']??null)===null)continue;
                 $n=self::positive($pr['number']??null);
-                self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],$now));
+                self::appendWork($work,self::signal(
+                    'work:'.strtolower($name).'-pr-'.$n,
+                    'github_project_snapshot','healthy',$repo,$n,
+                    ['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],
+                    $now
+                ));
                 break;
             }
         }
         $factory767=$get('/repos/pl0n3r/Factory/issues/767');
         if(!self::killSwitchRunning($factory767))
-            self::append($blockers,self::signal('blocker:factory-767','github_project_snapshot','blocked','pl0n3r/Factory',767,['issue_ref'=>'github:pl0n3r/Factory#767'],$now));
+            self::append($blockers,self::signal(
+                'blocker:factory-767','github_project_snapshot','blocked','pl0n3r/Factory',767,
+                ['issue_ref'=>'github:pl0n3r/Factory#767'],$now
+            ));
         return ['owner_decisions'=>$decisions,'releases'=>[],'blockers'=>$blockers,'work'=>$work];
     }
 
     private static function killSwitchRunning(mixed $issue): bool
     {
-        if(!is_array($issue)||array_is_list($issue)||($issue['user']['login']??null)!=='pl0n3r'||!is_string($issue['body']??null))return false;
+        if(
+            !is_array($issue)||array_is_list($issue)
+            ||($issue['number']??null)!==767
+            ||($issue['user']['login']??null)!=='pl0n3r'
+            ||!is_string($issue['body']??null)
+        )return false;
         $count=preg_match_all('/<!--\s*factory-unattended-kill-switch\s+(\{.*?\})\s*-->/s',$issue['body'],$matches);
         if($count!==1)return false;
         try{$marker=json_decode($matches[1][0],true,8,JSON_THROW_ON_ERROR);}catch(\Throwable){return false;}
@@ -110,6 +158,20 @@ final class FactoryOrchestratorEvidenceCollector
             &&($marker['owner']??null)==='pl0n3r';
     }
 
+    private static function workflowLabels(array $labels): array
+    {
+        $out=[];
+        foreach($labels as $label)
+            if(in_array($label,self::WORKFLOW_LABELS,true)&&!in_array($label,$out,true))$out[]=$label;
+        sort($out,SORT_STRING);
+        return $out;
+    }
+
+    private static function blocked(array $labels): bool
+    {
+        return in_array('estado: bloqueado',$labels,true)||in_array('status: blocked',$labels,true);
+    }
+
     private static function appendWork(array &$rows,array $row): void
     {if(count($rows)>=self::MAX_WORK_SIGNALS)throw new RuntimeException('active work signal budget exceeded.');$rows[]=$row;}
     private static function append(array &$rows,array $row): void
@@ -118,8 +180,6 @@ final class FactoryOrchestratorEvidenceCollector
     {return ['id'=>$id,'authority'=>$authority,'state'=>$state,'source_ref'=>'github:'.$repo.'#'.$n,'observed_at'=>$now,'freshness'=>'current','data'=>$data];}
     private static function labels(mixed $raw): array
     {if(!is_array($raw)||!array_is_list($raw))throw new RuntimeException('labels invalid.');$out=[];foreach($raw as $x){$v=is_array($x)?($x['name']??null):$x;if(is_string($v))$out[]=mb_strtolower(trim($v));}return $out;}
-    private static function status(array $labels): ?string
-    {foreach(['available'=>'estado: disponible','reserved'=>'estado: reservado','in_review'=>'estado: en revisión','blocked'=>'estado: bloqueado'] as $s=>$l)if(in_array($l,$labels,true))return $s;foreach(['available'=>'status: available','reserved'=>'status: reserved','in_review'=>'status: in review','blocked'=>'status: blocked'] as $s=>$l)if(in_array($l,$labels,true))return $s;return null;}
     private static function positive(mixed $v): int
     {if(!is_int($v)||$v<1)throw new RuntimeException('github number invalid.');return $v;}
     private static function path(mixed $v,string $label,bool $mustExist): string

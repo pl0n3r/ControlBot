@@ -61,6 +61,7 @@ final class HostingerPublicApi
             || ($parts['scheme']??null)!=='https'
             || ($parts['host']??null)!=='developers.hostinger.com'
             || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])
+            || isset($parts['query']) || isset($parts['fragment'])
         ){
             throw new InvalidArgumentException('Hostinger URL denied.');
         }

@@ -1,6 +1,6 @@
 # GitHub Intent Preview V1
 
-`GitHubIntentPreview` es un view-model owner-first, local y read-only para el tramo de intenciones GitHub. Revalida el envelope y la salida de policy antes de exponerlos y siempre devuelve `execution=false`.
+`GitHubIntentPreview` es un view-model owner-first, local y read-only para el tramo de intenciones GitHub. Revalida el envelope y una salida de policy con contrato cerrado antes de exponerlos y siempre devuelve `execution=false`.
 
 ## Campos visibles
 
@@ -12,7 +12,13 @@ La vista expone únicamente:
 - `evidence_refs` e `idempotency_key`;
 - `mutation_controls=[]`.
 
-No se renderizan botones, comandos, adapters ni capacidades de ejecución, incluso cuando la decisión es `allow`.
+No se renderizan botones, comandos, adapters ni capacidades de ejecución, incluso si una policy upstream legítima entrega `allow` u `owner_decision_required`.
+
+## Relación con GitHubIntentPolicy
+
+La policy reparada por #687 falla cerrado cuando solo recibe freshness cruda: un intent válido con `evidence_ref` enlazado pero `observed_at`/TTL caller-controlled produce `deny / untrusted_evidence_freshness`. La preview proyecta esa decisión tal cual; no la eleva ni fabrica grants.
+
+Los tests de integración usan esa policy real para el caso live fail-closed. `owner_decision_required` se cubre únicamente como fixture presentacional del contrato cerrado de salida para verificar el view-model; esa fixture no representa authority, grant ni aprobación real. Ninguna fixture usa `hostinger.read`, `database.restore` u otra capability ajena como authority GitHub.
 
 ## Fail-closed
 
@@ -22,4 +28,4 @@ La sanitización sigue el patrón owner-first ya usado por ControlBot: password/
 
 ## Fuera de alcance
 
-GitHub App/PAT/tokens, HTTP/API GitHub, HTML accionable, botones o adapters de mutación real, merge/cierre/edición, workflow dispatch, releases, deploy, producción, DOMAIN/DEPLOY_ENABLED, DNS, gasto, datos reales y go-live.
+GitHub App/PAT/tokens, HTTP/API GitHub, HTML accionable, botones o adapters de mutación real, merge/cierre/edición, workflow dispatch, releases, authority GitHub, grants/aprobaciones reales, deploy, producción, DOMAIN/DEPLOY_ENABLED, DNS, gasto, datos reales y go-live.

@@ -60,17 +60,23 @@ echo json_encode(["result"=>$result,"calls"=>$calls,"byte_failed"=>$failed,"prev
 require "src/FactoryOrchestratorEvidenceCollector.php";
 use ControlBot\Business\FactoryOrchestratorEvidenceCollector;
 $dir=sys_get_temp_dir()."/cb720-realistic-".bin2hex(random_bytes(4));mkdir($dir);$token=$dir."/token";$evidence=$dir."/evidence.json";file_put_contents($token,"read-only");chmod($token,0600);
-$transport=static function(string $method,string $url,array $headers):array{
+$issueBytes=["Factory"=>65459,"Condor"=>201188,"GrindFlow"=>191896,"brvtal"=>40021,"ControlBot"=>98851,"AutoFactory"=>20569,"FactoryRunner"=>2];
+$pullBytes=["Factory"=>168290,"Condor"=>178840,"GrindFlow"=>191396,"brvtal"=>175206,"ControlBot"=>190371,"AutoFactory"=>189392,"FactoryRunner"=>185681];
+$transport=static function(string $method,string $url,array $headers)use($issueBytes,$pullBytes):array{
  $path=parse_url($url,PHP_URL_PATH)?:"";$json=[];$bytes=10;
  if(str_ends_with($path,"/issues/767")){$json=["number"=>767,"user"=>["login"=>"pl0n3r"],"body"=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];$bytes=5000;}
- elseif(str_ends_with($path,"/issues")){$bytes=str_contains($path,"/Factory/")?1_800_000:450_000;}
- elseif(str_ends_with($path,"/pulls")){$json=[["number"=>9,"merged_at"=>"2026-10-04T20:00:00Z"]];$bytes=180_000;}
+ elseif(preg_match('#^/repos/pl0n3r/([^/]+)/issues$#',$path,$m)===1){$bytes=$issueBytes[$m[1]];}
+ elseif(preg_match('#^/repos/pl0n3r/([^/]+)/pulls$#',$path,$m)===1){$json=[["number"=>9,"merged_at"=>"2026-10-04T20:00:00Z"]];$bytes=$pullBytes[$m[1]];}
  return ["status"=>200,"headers"=>["x-ratelimit-remaining"=>"100"],"bytes"=>$bytes,"json"=>$json];
 };
 $result=FactoryOrchestratorEvidenceCollector::run(["CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED"=>"1","CONTROLBOT_GITHUB_READ_TOKEN_FILE"=>$token,"CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"=>$evidence],$transport,200);
-echo json_encode($result,JSON_THROW_ON_ERROR),PHP_EOL;
+echo json_encode(["result"=>$result,"measured_main_reads"=>array_sum($issueBytes)+array_sum($pullBytes)],JSON_THROW_ON_ERROR),PHP_EOL;
 ''')
-  self.assertEqual("written",data["state"]);self.assertGreater(data["download_bytes"],5_000_000);self.assertLessEqual(data["download_bytes"],8_000_000)
+  self.assertEqual(1_897_162,data["measured_main_reads"])
+  self.assertEqual("written",data["result"]["state"])
+  self.assertGreaterEqual(data["result"]["download_bytes"],1_897_162)
+  self.assertLessEqual(data["result"]["download_bytes"],8_000_000)
+  self.assertLessEqual(data["result"]["evidence_bytes"],2_000_000)
 
  def test_each_failure_cause_prints_an_allowlisted_code_without_secrets(self):
   data=php_eval(r'''

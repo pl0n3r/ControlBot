@@ -89,6 +89,21 @@ if($case==='reuse'){
         'raw_fresh'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(),NOW),
         'stale_ref'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(NOW-1000),NOW),
     ];
+}elseif($case==='invalid_context'){
+    $execution=env();$execution['execution']=true;
+    $extra=ctx();$extra['extra']='x';
+    $future=ctx(NOW+1);
+    $badTtl=ctx();$badTtl['evidence_max_age_seconds']=0;
+    $badAuthority=ctx();$badAuthority['restrictions']='invalid';
+    $out=[
+        'execution'=>GitHubIntentPolicy::evaluate($execution,null,ctx(),NOW),
+        'list_context'=>GitHubIntentPolicy::evaluate(env(),null,[],NOW),
+        'extra_context'=>GitHubIntentPolicy::evaluate(env(),null,$extra,NOW),
+        'zero_now'=>GitHubIntentPolicy::evaluate(env(),null,ctx(),0),
+        'future_observed'=>GitHubIntentPolicy::evaluate(env(),null,$future,NOW),
+        'bad_ttl'=>GitHubIntentPolicy::evaluate(env(),null,$badTtl,NOW),
+        'bad_authority'=>GitHubIntentPolicy::evaluate(env(),null,$badAuthority,NOW),
+    ];
 }else{
     fwrite(STDERR,"Unknown github intent policy scenario\n");exit(2);
 }

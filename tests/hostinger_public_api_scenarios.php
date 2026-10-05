@@ -53,6 +53,8 @@ if($scenario==='guards'){
   ['POST','https://developers.hostinger.com/api/hosting/v1/websites'],
   ['GET','http://developers.hostinger.com/api/hosting/v1/websites'],
   ['GET','https://example.com/api/hosting/v1/websites'],
+  ['GET','https://u:p@developers.hostinger.com/api/hosting/v1/websites'],
+  ['GET','https://developers.hostinger.com:444/api/hosting/v1/websites'],
   ['GET','https://developers.hostinger.com/api/hosting/v1/unknown'],
  ] as $case){try{HostingerPublicApi::request($case[0],$case[1],$token,$transport);$fail[]=false;}catch(Throwable){$fail[]=true;}}
  echo json_encode(['failed'=>$fail],JSON_THROW_ON_ERROR);exit;

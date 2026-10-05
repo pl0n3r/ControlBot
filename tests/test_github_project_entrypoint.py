@@ -30,9 +30,9 @@ class GitHubProjectEntrypointTests(unittest.TestCase):
         self.assertIn("pl0n3r/Alpha", current["body"])
         self.assertNotIn("beta-project", current["body"])
         self.assertNotIn("pl0n3r/Beta", current["body"])
-        self.assertIn("state=current", current["body"])
-        self.assertIn("freshness=current", current["body"])
-        self.assertIn("freshness=stale", data["stale"]["body"])
+        self.assertIn("Estado <strong>CURRENT</strong>", current["body"])
+        self.assertIn("Freshness <strong>CURRENT</strong>", current["body"])
+        self.assertIn("Freshness <strong>STALE</strong>", data["stale"]["body"])
 
     def test_unknown_or_malformed_project_never_leaks_other_project_evidence(self):
         data = scenario("closed")

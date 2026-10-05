@@ -92,7 +92,7 @@ echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
   self.assertEqual({"code":"http_status_403","path":"/repos/pl0n3r/Factory/issues","status":403},data[-1])
   actual=php_eval(r'''
 require "src/FactoryOrchestratorEvidenceCollector.php";
-use ControlBot\\Business\\FactoryOrchestratorEvidenceCollector;
+use ControlBot\Business\FactoryOrchestratorEvidenceCollector;
 $diagnostic=null;try{FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(200,[],"sentinel-not-json");}catch(Throwable $error){$diagnostic=FactoryOrchestratorEvidenceCollector::diagnosticFor($error);}
 echo json_encode($diagnostic,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
 ''')

@@ -142,6 +142,11 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
         self.assertIn("ControlBot #625", runbook)
         self.assertIn("La línea es instalable tal cual", runbook)
         self.assertIn("*/5 * * * *", runbook)
+        self.assertIn(
+            'CONTROLBOT_GITHUB_READ_TOKEN_FILE="$HOME/.controlbot/github-read-token"',
+            runbook,
+        )
+        self.assertNotIn("CONTROLBOT_GITHUB_READ_TOKEN=", runbook)
         self.assertNotRegex(runbook, r"(?:ghp_|github_pat_)[A-Za-z0-9_]+")
         self.assertNotRegex(runbook, r"(?m)^\s*[^#\n]*\b(?:DOMAIN|DEPLOY_ENABLED)\s*=\s*\S+")
         self.assertNotRegex(runbook, r"(?m)^\s*\d+\s+\d+\s+\S+\s+\S+\s+\S+\s+")

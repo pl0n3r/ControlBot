@@ -4,31 +4,26 @@
 
 ## Binding de autoridad
 
-La capability ya no viene del caller. La policy deriva un nombre canónico desde el tipo de intent:
+La capability no viene del caller. La policy mantiene un binding cerrado intent → capability canónica GitHub (`github.issue.write`, `github.pr.review`, `github.pr.merge`, `github.workflow.dispatch`, `github.release.approve`, `github.project.write`). Ese binding **no concede authority**.
 
-- Issue write → `github.issue.write`
-- PR review/merge → `github.pr.review|github.pr.merge`
-- workflow dispatch → `github.workflow.dispatch`
-- release approval → `github.release.approve`
-- project freeze/unfreeze → `github.project.write`
+`CapabilityPolicy` todavía no gobierna esas capabilities GitHub. Esta reparación tampoco las añade: grants `hostinger.*`, `database.*`, `config.*` u otros dominios no pueden convertirse en authority GitHub por sustitución.
 
-Este binding **no concede authority**. `CapabilityPolicy::classify()` sigue siendo la fuente canónica y actualmente no contiene esas capabilities GitHub; por tanto la decisión es `unknown` hasta que una hoja separada y autorizada las gobierne. Grants `hostinger.*`, `database.*`, `config.*` u otras capabilities ajenas nunca pueden autorizar un intent GitHub.
+## Freshness y provenance
 
-`CapabilityGrant::authorize()` se reutiliza únicamente si la capability canónica llega a existir en `CapabilityPolicy`; el scope sigue derivándose del envelope, no del caller.
+`evidence_ref` debe existir exactamente en los `evidence_refs` validados del envelope. Sin embargo, un `observed_at` y TTL recibidos como valores crudos siguen siendo caller-controlled y no prueban provenance.
 
-## Freshness vinculada a evidencia
+Por eso V1 falla cerrado:
 
-El contexto debe seleccionar `evidence_ref` y esa referencia debe existir exactamente dentro de los `evidence_refs` ya validados por el envelope. Solo entonces se evalúan `evidence_observed_at` y el TTL (máximo 900 s). Ref ausente/mismatch o evidencia stale fallan cerrado antes de considerar authority.
+- `evidence_ref` no vinculado → `deny / evidence_mismatch`;
+- timestamp fuera del TTL → `deny / stale_evidence`;
+- ref válido + timestamp/TTL crudos aparentemente frescos → `deny / untrusted_evidence_freshness`.
+
+No existe hoy una proyección de freshness confiable dentro del alcance de esta hoja. Una hoja futura deberá introducirla explícitamente antes de que la policy pueda consultar grants/approvals y producir `allow` o `owner_decision_required`.
 
 ## Decisiones
 
-Solo existen `allow | owner_decision_required | deny | unknown`.
-
-- envelope/tipo no reconocido → `unknown`;
-- capability GitHub canónica aún no gobernada → `unknown`;
-- evidencia no vinculada/stale, authority inválida o scope mismatch → `deny`;
-- una futura capability gobernada podrá reutilizar policy/grant/approval existentes sin crear autoridad paralela.
+El contrato de salida sigue cerrado a `allow | owner_decision_required | deny | unknown`, pero en esta versión reparada ningún contexto de freshness crudo puede llegar a `allow`. Tipos inválidos permanecen `unknown`; evidencia inválida o no confiable permanece `deny`.
 
 ## Fuera de alcance
 
-Añadir capabilities GitHub a `CapabilityPolicy.php`, GitHub App/PAT/tokens, HTTP/API GitHub, adapters, shell/git libre, mutaciones reales, deploy, producción, DOMAIN/DEPLOY_ENABLED, gasto y datos reales.
+Añadir capabilities GitHub a `CapabilityPolicy.php`, crear una proyección de freshness confiable, GitHub App/PAT/tokens, HTTP/API GitHub, adapters, shell/git libre, mutaciones reales, deploy, producción, DOMAIN/DEPLOY_ENABLED, gasto y datos reales.

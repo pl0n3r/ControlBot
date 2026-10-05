@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace ControlBot\Dashboard;
 
 require_once __DIR__ . '/UiTheme.php';
+require_once __DIR__ . '/ControlCenterShell.php';
 
+use ControlBot\Ui\ControlCenterShell;
 use ControlBot\Ui\UiTheme;
 use InvalidArgumentException;
 
@@ -19,7 +21,7 @@ final class DashboardUi
 
     private const HEALTH = ['healthy', 'warning', 'critical', 'unknown'];
 
-    public static function render(array $state): string
+    public static function render(array $state, array $routes = []): string
     {
         $health = self::health($state['health'] ?? null);
         $domains = is_array($state['domains'] ?? null) ? $state['domains'] : [];
@@ -29,12 +31,7 @@ final class DashboardUi
             $cards .= self::domainCard($key, $label, $domains[$key] ?? null);
         }
 
-        return '<!doctype html><html lang="es"><head>'
-            . '<meta charset="utf-8">'
-            . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
-            . '<title>ControlBot · Centro de control</title>'
-            . '<style>' . self::styles() . '</style>'
-            . '</head><body><main class="shell" aria-labelledby="dashboard-title">'
+        $content = '<main class="shell" aria-labelledby="dashboard-title">'
             . '<header class="topbar"><p class="eyebrow"><span class="brand-mark">CONTROLBOT</span> / OVERVIEW</p>'
             . '<h1 id="dashboard-title">Centro de control</h1>'
             . '<p class="lede">Estado operativo resumido. Sin evidencia suficiente, ControlBot muestra estado desconocido en lugar de inventar datos.</p>'
@@ -44,7 +41,9 @@ final class DashboardUi
             . '<div class="health-copy"><span>salud de fábrica</span><strong>' . self::healthLabel($health) . '</strong></div>'
             . '</section>'
             . '<section class="dashboard-grid" aria-label="Dominios operativos">' . $cards . '</section>'
-            . '</main></body></html>';
+            . '</main>';
+
+        return ControlCenterShell::render('Centro de control', 'overview', $routes, $content, self::styles());
     }
 
     private static function health(mixed $value): string

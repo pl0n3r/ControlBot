@@ -272,7 +272,7 @@ final class FactoryOrchestratorEvidenceCollector
         if(!isset($ids[$recommendation])||!isset($ids[$safeDefault]))return $legacy;
         $expiresAt=null;$wc=preg_match_all('/<!--\\s*factory-release-window\\s+(.+?)\\s*-->/s',$body,$wm);if($wc>1)return $legacy;
         if($wc===1){try{$w=json_decode($wm[1][0],true,8,JSON_THROW_ON_ERROR);}catch(Throwable){return $legacy;}$expiresAt=$w['expires_at']??null;if(!is_string($expiresAt)||preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/D',$expiresAt)!==1||strtotime($expiresAt)===false)return $legacy;}
-        return $legacy+['format'=>'structured','title_simple'=>$titleSimple,'summary_simple'=>$summary,'explain_simple'=>$explain,'why_recommended'=>$why,'blocks'=>$blocks,'options'=>$options,'recommendation'=>$recommendation,'safe_default'=>$safeDefault,'expires_at'=>$expiresAt];
+        return array_replace($legacy,['format'=>'structured','title_simple'=>$titleSimple,'summary_simple'=>$summary,'explain_simple'=>$explain,'why_recommended'=>$why,'blocks'=>$blocks,'options'=>$options,'recommendation'=>$recommendation,'safe_default'=>$safeDefault,'expires_at'=>$expiresAt]);
     }
 
     private static function boundedTextList(mixed $raw,int $maxItems,int $maxLength): ?array

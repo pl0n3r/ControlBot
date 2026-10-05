@@ -18,6 +18,17 @@ read -r -s CONTROLBOT_GITHUB_READ_TOKEN && printf '%s' "$CONTROLBOT_GITHUB_READ_
 chmod 600 "$HOME/.controlbot/github-read-token"
 ```
 
+## Guardrails del colector
+
+- Transporte **HTTPS-only** contra `api.github.com`; cualquier otro scheme, host, userinfo o puerto no permitido falla cerrado.
+- Máximo **40 requests HTTP reales** por ejecución, contando retries.
+- Máximo **2 MB** acumulados descargados por ejecución y **2 MB** para la evidencia final.
+- Cada respuesta debe reportar `bytes` reales; no se estiman reserializando JSON.
+- Un primer **5xx** puede hacer **retry 5xx** aunque el body no sea JSON; una respuesta HTTP 200 sí debe contener JSON válido.
+- Factory **Issue #767** solo se considera RUNNING si el payload corresponde exactamente al Issue 767, el autor es `pl0n3r`, existe un único marker y su JSON exacto es `{"version":1,"state":"RUNNING","owner":"pl0n3r"}`. Duplicados, marker inválido, autor distinto o issue distinto fallan cerrado.
+- Issues pueden paginar como máximo dos páginas de 100; closed PRs consultan solo **una página reciente** de 100 y no solicitan page=2 aunque esa primera página venga llena.
+- Ante rate-limit, retry-after, budget excedido o transporte inválido, se conserva el archivo anterior mediante reemplazo atómico.
+
 ## Variables y prueba manual
 
 ```sh

@@ -1,6 +1,6 @@
 # Refresco cron-ready del snapshot del Orquestador
 
-El colector `scripts/orchestrator-evidence-collector.php` hace GET read-only a GitHub y el wrapper `scripts/orchestrator-snapshot-cron.php` consume la evidencia local. Ambos permanecen apagados por defecto y fuera de requests web.
+El colector `scripts/orchestrator-evidence-collector.php` hace GET read-only a GitHub y el wrapper `scripts/orchestrator-snapshot-cron.php` consume la evidencia local. El colector permanece apagado por defecto y el wrapper también; ambos quedan fuera de requests web.
 
 El colector publica únicamente evidencia que los contratos actuales pueden demostrar: frentes desde labels explícitos, bloqueos, decisiones del dueño y PRs fusionados recientes. **No fabrica `work_inventory` ni porcentajes**: hoy no existe un productor canónico que derive `READY/ALL_BLOCKED/...` desde GitHub crudo, por lo que el panel central queda `UNKNOWN` hasta que exista ese contrato.
 

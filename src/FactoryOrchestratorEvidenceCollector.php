@@ -75,8 +75,10 @@ final class FactoryOrchestratorEvidenceCollector
                     continue;
                 }
                 $labels=self::labels($row['labels']??[]);$status=self::status($labels);
-                if($status!==null)self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot',$status==='blocked'?'blocked':'pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>$status],$now));
-                if($status==='blocked')self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number],$now));
+                if($status==='blocked')
+                    self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number],$now));
+                elseif($status!==null)
+                    self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>$status],$now));
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))
                     self::append($decisions,self::signal('decision:'.strtolower($name).'-'.$number,'owner_inbox','pending',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number],$now));
             }
@@ -84,8 +86,7 @@ final class FactoryOrchestratorEvidenceCollector
                 if(!is_array($pr)||array_is_list($pr))throw new RuntimeException('github pull invalid.');
                 if(($pr['merged_at']??null)===null)continue;
                 $n=self::positive($pr['number']??null);
-                if(count($work)<self::MAX_WORK_SIGNALS)
-                    $work[]=self::signal('work:'.strtolower($name).'-pr-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],$now);
+                self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],$now));
                 break;
             }
         }

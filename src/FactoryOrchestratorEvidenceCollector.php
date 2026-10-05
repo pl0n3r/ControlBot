@@ -31,14 +31,14 @@ final class FactoryOrchestratorEvidenceCollector
                     'User-Agent'=>'controlbot-orchestrator-evidence-collector/1',
                     'X-GitHub-Api-Version'=>'2022-11-28',
                 ]);
-                if(!is_array($r)||array_is_list($r)||!is_int($r['status']??null)||!is_array($r['headers']??null)||!is_array($r['json']??null))throw new RuntimeException('transport invalid.');
-                $bytes=$r['bytes']??strlen(json_encode($r['json'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
-                if(!is_int($bytes)||$bytes<0||($downloadBytes+=$bytes)>self::MAX_BYTES)throw new RuntimeException('download byte budget exceeded.');
+                if(!is_array($r)||array_is_list($r)||!is_int($r['status']??null)||!is_array($r['headers']??null)||!array_key_exists('bytes',$r)||!is_int($r['bytes'])||$r['bytes']<0)throw new RuntimeException('transport invalid.');
+                if(($downloadBytes+=$r['bytes'])>self::MAX_BYTES)throw new RuntimeException('download byte budget exceeded.');
                 if(isset($r['headers']['retry-after']))throw new RuntimeException('github retry deferred.');
                 $remaining=$r['headers']['x-ratelimit-remaining']??null;
                 if(is_numeric($remaining)&&(int)$remaining<5)throw new RuntimeException('rate limit low.');
                 if($r['status']>=500&&$attempt===0)continue;
                 if($r['status']!==200)throw new RuntimeException('github read failed.');
+                if(!is_array($r['json']??null))throw new RuntimeException('github json invalid.');
                 return $r['json'];
             }
             throw new RuntimeException('github read failed.');
@@ -98,7 +98,7 @@ final class FactoryOrchestratorEvidenceCollector
 
     private static function killSwitchRunning(mixed $issue): bool
     {
-        if(!is_array($issue)||array_is_list($issue)||($issue['user']['login']??null)!=='pl0n3r'||!is_string($issue['body']??null))return false;
+        if(!is_array($issue)||array_is_list($issue)||($issue['number']??null)!==767||($issue['user']['login']??null)!=='pl0n3r'||!is_string($issue['body']??null))return false;
         $count=preg_match_all('/<!--\s*factory-unattended-kill-switch\s+(\{.*?\})\s*-->/s',$issue['body'],$matches);
         if($count!==1)return false;
         try{$marker=json_decode($matches[1][0],true,8,JSON_THROW_ON_ERROR);}catch(\Throwable){return false;}

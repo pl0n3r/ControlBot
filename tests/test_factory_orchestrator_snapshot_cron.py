@@ -57,11 +57,17 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
             "catch(\\ControlBot\\Business\\FactoryOrchestratorSnapshotRefreshFailure $e){"
             "echo json_encode(['ok'=>0,'code'=>$e->failureCode()]);}"
         )
-        result = subprocess.run(
-            ["php","-r",code,str(REFRESH),json.dumps(evidence or canonical_evidence(int(time.time()))),
-             str(snapshot),str(now if now is not None else int(time.time())),str(max_bytes)],
-            cwd=ROOT,text=True,capture_output=True,timeout=30,check=False,
-        )
+        with tempfile.NamedTemporaryFile("w", suffix=".php", delete=False) as driver:
+            driver.write("<?php\n" + code)
+            driver_path = Path(driver.name)
+        try:
+            result = subprocess.run(
+                ["php",str(driver_path),str(REFRESH),json.dumps(evidence or canonical_evidence(int(time.time()))),
+                 str(snapshot),str(now if now is not None else int(time.time())),str(max_bytes)],
+                cwd=ROOT,text=True,capture_output=True,timeout=30,check=False,
+            )
+        finally:
+            driver_path.unlink(missing_ok=True)
         self.assertEqual(0,result.returncode,result.stderr)
         return json.loads(result.stdout)
 

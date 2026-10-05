@@ -137,7 +137,7 @@ $marker='<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","own
   source=(ROOT/"src/FactoryOrchestratorEvidenceCollector.php").read_text(encoding="utf-8");self.assertNotIn("function status(",source)
 
  def test_recent_merged_pr_lookup_is_bounded_and_runbook_matches_guardrails(self):
-  d=scenario("canonical");pull_urls=[x["url"] for x in d["calls"] if urlparse(x["url"]).path.endswith("/pulls")]
+  d=scenario("full-pull-page");pull_urls=[url for url in d["calls"] if urlparse(url).path.endswith("/pulls")]
   self.assertEqual(7,len(pull_urls))
   for url in pull_urls:
    query=parse_qs(urlparse(url).query);self.assertEqual(["100"],query.get("per_page"));self.assertEqual(["1"],query.get("page"))
@@ -145,7 +145,7 @@ $marker='<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","own
   self.assertEqual([],d["evidence"]["releases"])
   merged=[row for row in d["evidence"]["work"] if row["data"].get("status")=="merged"];self.assertEqual(7,len(merged))
   doc=(ROOT/"docs/runbooks/orchestrator-snapshot-cron.md").read_text(encoding="utf-8")
-  for phrase in ("PR fusionado", "una página reciente", "signal.state=pending", "data.status=in_review", "releases"): self.assertIn(phrase,doc)
+  for phrase in ("PR fusionado", "una página reciente", "signal.state=pending", "data.status=in_review", "releases", "HTTPS-only", "2 MB", "retry 5xx", "Issue #767"): self.assertIn(phrase,doc)
 
  def test_token_never_appears_in_output_logs_evidence_or_snapshot(self):
   d=scenario("canonical");blob=json.dumps(d);self.assertNotIn("sentinel-read-value",blob);self.assertTrue(all(x["authorized"] for x in d["calls"]))

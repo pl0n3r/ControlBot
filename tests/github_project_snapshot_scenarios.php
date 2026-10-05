@@ -16,6 +16,17 @@ function reply(string $path,string $mode): array {
   if($mode==='bad-check')$rows=[['name'=>'CI','status'=>'completed','conclusion'=>null]];
   return ['status'=>200,'body'=>json_encode(['total_count'=>count($rows),'check_runs'=>$rows])];
  }
+ if(preg_match('#/pulls/\\d+/reviews$#D',$path)===1){
+  if($mode==='bad-review')return ['status'=>200,'body'=>json_encode([['id'=>1,'state'=>'INVALID','user'=>['login'=>'reviewer']]])];
+  return ['status'=>200,'body'=>json_encode([
+   ['id'=>1,'state'=>'APPROVED','user'=>['login'=>'reviewer-a']],
+   ['id'=>2,'state'=>'COMMENTED','user'=>['login'=>'reviewer-b']],
+  ])];
+ }
+ if(preg_match('#/pulls/\\d+$#D',$path)===1){
+  $mergeable=match($mode){'null-mergeable'=>null,'bad-mergeability'=>'yes',default=>true};
+  return ['status'=>200,'body'=>json_encode(['mergeable'=>$mergeable])];
+ }
  if(str_ends_with($path,'/pulls')){
   $row=['number'=>7,'title'=>'Read model','draft'=>false,'head'=>['sha'=>str_repeat('b',40)],'base'=>['ref'=>'main']];
   return ['status'=>200,'body'=>json_encode($mode==='bounded'?array_fill(0,100,$row):[$row])];
@@ -41,9 +52,16 @@ if($scenario==='invalid'){
  try{snapshot(['bad repo']);$blocked['project']=false;}catch(Throwable){$blocked['project']=true;}
  echo json_encode(['blocked'=>$blocked],JSON_THROW_ON_ERROR),PHP_EOL;exit;
 }
+if($scenario==='review-invalid'){
+ $badReview=snapshot(['pl0n3r/ControlBot'],'bad-review')['snapshot']['repositories'][0]['pull_requests'];
+ $nullMerge=snapshot(['pl0n3r/ControlBot'],'null-mergeable')['snapshot']['repositories'][0]['pull_requests'];
+ $badMerge=snapshot(['pl0n3r/ControlBot'],'bad-mergeability')['snapshot']['repositories'][0]['pull_requests'];
+ echo json_encode(['bad_review'=>$badReview,'null_mergeable'=>$nullMerge,'bad_mergeability'=>$badMerge],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+}
 if($scenario==='bounded'){
- $bounded=snapshot(['pl0n3r/ControlBot'],'bounded')['snapshot']['repositories'][0];
+ $result=snapshot(['pl0n3r/ControlBot'],'bounded');
+ $bounded=$result['snapshot']['repositories'][0];
  $none=snapshot(['pl0n3r/ControlBot'],'no-release')['snapshot']['repositories'][0]['latest_release'];
- echo json_encode(['bounded'=>$bounded,'no_release'=>$none],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
+ echo json_encode(['bounded'=>$bounded,'calls'=>$result['calls'],'no_release'=>$none],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit;
 }
 fwrite(STDERR,"scenario inválido\n");exit(2);

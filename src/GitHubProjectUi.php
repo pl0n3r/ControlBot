@@ -11,6 +11,8 @@ use InvalidArgumentException;
 final class GitHubProjectUi
 {
     private const EVIDENCE = ['current', 'stale', 'unknown'];
+    private const REVIEW_STATES = ['approved', 'changes_requested', 'commented', 'dismissed', 'pending', 'unknown'];
+    private const MERGEABILITY = ['mergeable', 'conflicting', 'unknown'];
 
     public static function render(array $view, string $surfaceState = 'ready'): string
     {
@@ -83,6 +85,15 @@ final class GitHubProjectUi
                 throw new InvalidArgumentException("Repository {$key} invalid.");
             }
         }
+        foreach ($repo['pull_requests']['items'] as $pullRequest) {
+            if (
+                !is_array($pullRequest)
+                || !in_array($pullRequest['review_state'] ?? null, self::REVIEW_STATES, true)
+                || !in_array($pullRequest['mergeability'] ?? null, self::MERGEABILITY, true)
+            ) {
+                throw new InvalidArgumentException('Pull request evidence invalid.');
+            }
+        }
         return $repo;
     }
 
@@ -107,6 +118,11 @@ final class GitHubProjectUi
         foreach ($repos as $repo) {
             $unknown = $unknown || $repo['state'] === 'unknown' || $repo['freshness'] !== 'current'
                 || $repo['checks']['truncated'] || $repo['pull_requests']['truncated'] || $repo['issues']['truncated'];
+            foreach ($repo['pull_requests']['items'] as $pullRequest) {
+                $unknown = $unknown
+                    || ($pullRequest['review_state'] ?? 'unknown') === 'unknown'
+                    || ($pullRequest['mergeability'] ?? 'unknown') === 'unknown';
+            }
         }
         return '<section class="attention ' . ($unknown ? 'attention-unknown' : 'attention-current') . '" aria-label="Atención del dueño">'
             . '<strong>' . ($unknown ? 'UNKNOWN / STALE' : 'EVIDENCIA ACTUAL') . '</strong>'
@@ -125,9 +141,19 @@ final class GitHubProjectUi
             . self::section('Checks', self::rows($repo['checks'], static fn(array $row): string =>
                 self::e((string)($row['name'] ?? 'UNKNOWN')) . ' · ' . self::e((string)($row['status'] ?? 'unknown'))
                 . ' · ' . self::e((string)($row['conclusion'] ?? 'pending'))))
-            . self::section('Pull requests', self::rows($repo['pull_requests'], static fn(array $row): string =>
-                '#' . self::e((string)($row['number'] ?? '?')) . ' ' . self::e((string)($row['title'] ?? 'UNKNOWN'))
-                . ' · ' . self::e((string)($row['base_ref'] ?? '?')) . ' ← ' . self::e((string)($row['head_sha'] ?? '?'))))
+            . self::section(
+                'Pull requests',
+                self::rows(
+                    $repo['pull_requests'],
+                    static fn(array $row): string =>
+                        '#' . self::e((string) ($row['number'] ?? '?'))
+                        . ' ' . self::e((string) ($row['title'] ?? 'UNKNOWN'))
+                        . ' · ' . self::e((string) ($row['base_ref'] ?? '?'))
+                        . ' ← ' . self::e((string) ($row['head_sha'] ?? '?'))
+                        . ' · review ' . self::e((string) ($row['review_state'] ?? 'unknown'))
+                        . ' · merge ' . self::e((string) ($row['mergeability'] ?? 'unknown'))
+                )
+            )
             . self::section('Issues', self::rows($repo['issues'], static fn(array $row): string =>
                 '#' . self::e((string)($row['number'] ?? '?')) . ' ' . self::e((string)($row['title'] ?? 'UNKNOWN'))))
             . self::section('Release', self::release($repo['latest_release'] ?? null))

@@ -46,7 +46,7 @@ def project_view(state="current", freshness="current", truncated=False):
             "state": state,
             "main_sha": sha,
             "checks": {"items": [{"name": "CI ControlBot", "status": "completed", "conclusion": "success"}], "truncated": truncated},
-            "pull_requests": {"items": [{"number": 616, "title": "Read-only view", "draft": False, "head_sha": "b" * 40, "base_ref": "main"}], "truncated": False},
+            "pull_requests": {"items": [{"number": 616, "title": "Read-only view", "draft": False, "head_sha": "b" * 40, "base_ref": "main", "review_state": "approved", "mergeability": "mergeable"}], "truncated": False},
             "issues": {"items": [{"number": 614, "title": "Project GitHub UI", "labels": ["estado: reservado"]}], "truncated": False},
             "latest_release": {"tag_name": "v0.1.0", "draft": False, "prerelease": False},
             "latest_workflow": {"name": "Validar", "status": "completed", "conclusion": "success", "head_sha": sha, "run_number": 1},
@@ -89,6 +89,24 @@ class GitHubProjectUiTests(unittest.TestCase):
         denied = render(project_view(), "permission_denied")
         self.assertIn("SIN PERMISO · La evidencia GitHub no está disponible", denied)
         self.assertNotIn("CI ControlBot", denied)
+
+    def test_pr_review_visibility_is_read_only_mobile_and_escapes_untrusted_titles(self):
+        view = project_view()
+        view["repositories"][0]["pull_requests"]["items"][0].update({
+            "title": "<img src=x onerror=alert(1)>",
+            "review_state": "changes_requested",
+            "mergeability": "conflicting",
+        })
+        html = render(view)
+        self.assertIn("review changes_requested", html)
+        self.assertIn("merge conflicting", html)
+        self.assertNotIn("<img src=x onerror=alert(1)>", html)
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
+        self.assertIn('name="viewport"', html)
+        self.assertIn("grid-template-columns:1fr", html)
+        lowered = html.lower()
+        for forbidden in ("<form", "<button", 'method="post"', "merge pull", "dispatch workflow"):
+            self.assertNotIn(forbidden, lowered)
 
 
 if __name__ == "__main__":

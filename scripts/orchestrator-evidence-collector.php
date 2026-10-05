@@ -9,10 +9,16 @@ $env=[
  'CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH'=>getenv('CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH')?:'',
 ];
 $transport=static function(string $method,string $url,array $headers):array{
- if($method!=='GET')throw new RuntimeException('method denied.');$responseHeaders=[];$ch=curl_init($url);
- curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>3,CURLOPT_TIMEOUT=>10,CURLOPT_HTTPGET=>true,CURLOPT_HTTPHEADER=>array_map(static fn($k,$v)=>$k.': '.$v,array_keys($headers),$headers),CURLOPT_HEADERFUNCTION=>static function($ch,$line)use(&$responseHeaders){$p=strpos($line,':');if($p!==false)$responseHeaders[strtolower(trim(substr($line,0,$p)))]=trim(substr($line,$p+1));return strlen($line);}]);
+ if($method!=='GET')throw new RuntimeException('method denied.');
+ $parts=parse_url($url);
+ if(!is_array($parts)||($parts['scheme']??null)!=='https'||($parts['host']??null)!=='api.github.com'||isset($parts['user'],$parts['pass'])||(isset($parts['port'])&&(int)$parts['port']!==443))throw new RuntimeException('github url denied.');
+ $responseHeaders=[];$ch=curl_init($url);if($ch===false)throw new RuntimeException('github transport unavailable.');
+ curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>3,CURLOPT_TIMEOUT=>10,CURLOPT_HTTPGET=>true,CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS,CURLOPT_HTTPHEADER=>array_map(static fn($k,$v)=>$k.': '.$v,array_keys($headers),$headers),CURLOPT_HEADERFUNCTION=>static function($ch,$line)use(&$responseHeaders){$p=strpos($line,':');if($p!==false)$responseHeaders[strtolower(trim(substr($line,0,$p)))]=trim(substr($line,$p+1));return strlen($line);}]);
  $body=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);
  if(!is_string($body)||strlen($body)>2_000_000)throw new RuntimeException('github response invalid.');
- return ['status'=>$status,'headers'=>$responseHeaders,'bytes'=>strlen($body),'json'=>json_decode($body,true,64,JSON_THROW_ON_ERROR)];
+ $base=['status'=>$status,'headers'=>$responseHeaders,'bytes'=>strlen($body)];
+ if($status!==200)return $base;
+ $json=json_decode($body,true,64,JSON_THROW_ON_ERROR);if(!is_array($json))throw new RuntimeException('github json invalid.');
+ return $base+['json'=>$json];
 };
 try{$result=FactoryOrchestratorEvidenceCollector::run($env,$transport,time());echo json_encode($result,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit(0);}catch(Throwable){fwrite(STDERR,"orchestrator-evidence-collector: execution failed\n");exit(70);}

@@ -16,7 +16,7 @@ NOW = 1_800_000_000
 UNKNOWN_SOURCE = hashlib.sha256(b"UNKNOWN").hexdigest()
 PRIVATE_SNAPSHOT = "/home/u151692719/domains/control.condorapp.com.co/private/orchestrator-live.json"
 
-PHP_RUNNER = r'''
+PHP_RUNNER = r'''<?php
 require $argv[1] . '/src/FactoryOrchestratorWebEntrypoint.php';
 $environment = ['CONTROLBOT_OWNER_LOGIN' => 'owner'];
 if ($argv[3] !== '__UNSET__') {
@@ -60,22 +60,27 @@ class OrchestratorSnapshotPathEnvTests(unittest.TestCase):
         return json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False).encode(), fingerprint
 
     def _invoke(self, configured_path: str | None, cache_path: Path) -> dict:
-        completed = subprocess.run(
-            [
-                "php",
-                "-r",
-                PHP_RUNNER,
-                str(ROOT),
-                str(ROOT),
-                configured_path if configured_path is not None else "__UNSET__",
-                str(NOW),
-                str(cache_path),
-            ],
-            cwd=ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        runner = cache_path.parent / f"orchestrator-runner-{cache_path.stem}.php"
+        runner.write_text(PHP_RUNNER, encoding="utf-8")
+        try:
+            completed = subprocess.run(
+                [
+                    "php",
+                    str(runner),
+                    str(ROOT),
+                    str(ROOT),
+                    configured_path if configured_path is not None else "__UNSET__",
+                    str(NOW),
+                    str(cache_path),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        finally:
+            runner.unlink(missing_ok=True)
+
         response = json.loads(completed.stdout)
         self.assertEqual(response["status"], 200)
         return json.loads(response["body"])["snapshot"]

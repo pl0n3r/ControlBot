@@ -228,6 +228,128 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
         self.assertEqual(70, result.returncode)
         self.assertEqual("orchestrator-snapshot-cron: evidence_invalid\n", result.stderr)
 
+    def test_diagnostics_opt_in_reports_safe_directory_metadata_without_paths(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="private-diagnostics-") as directory:
+            root = Path(directory)
+            evidence_path = root / "evidence.json"
+            snapshot_path = root / "orchestrator-live.json"
+            evidence_path.write_text("[]")
+
+            env = base_environment()
+            env["CONTROLBOT_ORCHESTRATOR_CRON_ENABLED"] = "1"
+            env["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"] = str(evidence_path)
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"] = str(snapshot_path)
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS"] = "1"
+
+            result = subprocess.run(
+                ["php", str(SCRIPT)],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+
+        self.assertEqual(70, result.returncode)
+        self.assertEqual("", result.stdout)
+        self.assertRegex(
+            result.stderr,
+            r"^orchestrator-snapshot-cron: evidence_invalid "
+            r"dir_exists=1 dir_writable=1 dir_owner_match=(?:0|1|unknown) "
+            r"dir_mode=[0-7]{4}\n$",
+        )
+        self.assertNotIn(str(root), result.stderr)
+        self.assertNotIn("evidence.json", result.stderr)
+
+    def test_direct_cron_rejects_invalid_clock_target_and_non_array_evidence(self) -> None:
+        source = ROOT / "src/FactoryOrchestratorSnapshotCron.php"
+        code = (
+            "require $argv[1];"
+            "$cases=["
+            "[0,'/tmp/controlbot-clock.json',static fn()=>[]],"
+            "[1,'relative.json',static fn()=>[]],"
+            "[1,'/tmp/controlbot-evidence.json',static fn()=>null]"
+            "];$out=[];foreach($cases as [$now,$path,$collector]){"
+            "try{\\ControlBot\\Business\\FactoryOrchestratorSnapshotCron::run("
+            "['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],$collector,$path,$now);"
+            "$out[]='ok';"
+            "}catch(\\ControlBot\\Business\\FactoryOrchestratorSnapshotRefreshFailure $e){"
+            "$out[]=$e->failureCode();}}echo json_encode($out);"
+        )
+        result = subprocess.run(
+            ["php", "-r", code, str(source)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(
+            ["clock_invalid", "snapshot_target_invalid", "evidence_invalid"],
+            json.loads(result.stdout),
+        )
+
+    def test_fallback_failure_restores_or_removes_partial_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            previous = root / "previous.json"
+            previous.write_text("previous\n")
+            failure = self.refresh_case(
+                previous,
+                io=(
+                    "['rename'=>static fn($a,$b)=>false,"
+                    "'write_target'=>static function($p,$d){"
+                    "file_put_contents($p,'corrupt',LOCK_EX);return 7;}]"
+                ),
+            )
+            self.assertEqual("atomic_rename_failed", failure["code"])
+            self.assertEqual("previous\n", previous.read_text())
+
+            fresh = root / "fresh.json"
+            failure = self.refresh_case(
+                fresh,
+                io=(
+                    "['rename'=>static fn($a,$b)=>false,"
+                    "'write_target'=>static function($p,$d){"
+                    "file_put_contents($p,'corrupt',LOCK_EX);return false;}]"
+                ),
+            )
+            self.assertEqual("atomic_rename_failed", failure["code"])
+            self.assertFalse(fresh.exists())
+
+    def test_temp_write_mode_and_final_verification_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                "temp_write_failed",
+                self.refresh_case(
+                    root / "short-write.json",
+                    io="['write_temp'=>static fn($p,$d)=>false]",
+                )["code"],
+            )
+            self.assertEqual(
+                "temp_write_failed",
+                self.refresh_case(
+                    root / "unsafe-mode.json",
+                    io=(
+                        "['chmod'=>static function($p,$m){"
+                        "chmod($p,0666);return false;}]"
+                    ),
+                )["code"],
+            )
+            self.assertEqual(
+                "atomic_rename_failed",
+                self.refresh_case(
+                    root / "bad-final-size.json",
+                    io=(
+                        "['rename'=>static function($a,$b){"
+                        "file_put_contents($b,'x');unlink($a);return true;}]"
+                    ),
+                )["code"],
+            )
+
     def test_each_failure_cause_prints_an_allowlisted_code_without_paths_or_secrets(self) -> None:
         with tempfile.TemporaryDirectory(prefix="private-secret-") as directory:
             root = Path(directory); snapshot = root / "snapshot.json"

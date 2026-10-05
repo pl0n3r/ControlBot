@@ -12,6 +12,7 @@ final class FactoryOrchestratorEvidenceCollector
     private const MAX_REQUESTS=40;
     private const MAX_BYTES=2_000_000;
     private const MAX_SIGNALS=50;
+    private const MAX_WORK_SIGNALS=24;
 
     public static function run(array $env,callable $transport,int $now): array
     {
@@ -70,11 +71,11 @@ final class FactoryOrchestratorEvidenceCollector
                 if(!is_array($row)||array_is_list($row))throw new RuntimeException('github issue invalid.');
                 $number=self::positive($row['number']??null);
                 if(isset($row['pull_request'])){
-                    self::append($work,self::signal('work:'.strtolower($name).'-pr-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'in_review'],$now));
+                    self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'in_review'],$now));
                     continue;
                 }
                 $labels=self::labels($row['labels']??[]);$status=self::status($labels);
-                if($status!==null)self::append($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot',$status==='blocked'?'blocked':'pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>$status],$now));
+                if($status!==null)self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot',$status==='blocked'?'blocked':'pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>$status],$now));
                 if($status==='blocked')self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number],$now));
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))
                     self::append($decisions,self::signal('decision:'.strtolower($name).'-'.$number,'owner_inbox','pending',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number],$now));
@@ -83,7 +84,8 @@ final class FactoryOrchestratorEvidenceCollector
                 if(!is_array($pr)||array_is_list($pr))throw new RuntimeException('github pull invalid.');
                 if(($pr['merged_at']??null)===null)continue;
                 $n=self::positive($pr['number']??null);
-                self::append($work,self::signal('work:'.strtolower($name).'-pr-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],$now));
+                if(count($work)<self::MAX_WORK_SIGNALS)
+                    $work[]=self::signal('work:'.strtolower($name).'-pr-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],$now);
                 break;
             }
         }
@@ -107,6 +109,8 @@ final class FactoryOrchestratorEvidenceCollector
             &&($marker['owner']??null)==='pl0n3r';
     }
 
+    private static function appendWork(array &$rows,array $row): void
+    {if(count($rows)>=self::MAX_WORK_SIGNALS)throw new RuntimeException('active work signal budget exceeded.');$rows[]=$row;}
     private static function append(array &$rows,array $row): void
     {if(count($rows)>=self::MAX_SIGNALS)throw new RuntimeException('signal budget exceeded.');$rows[]=$row;}
     private static function signal(string $id,string $authority,string $state,string $repo,int $n,array $data,int $now): array

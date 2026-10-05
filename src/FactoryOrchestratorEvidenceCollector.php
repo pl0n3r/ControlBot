@@ -10,6 +10,7 @@ final class FactoryOrchestratorEvidenceCollector
 {
     private const REPOS=['Factory','Condor','GrindFlow','brvtal','ControlBot','AutoFactory','FactoryRunner'];
     private const MAX_REQUESTS=40;
+    private const MAX_BYTES=2_000_000;
     private const MAX_SIGNALS=50;
 
     public static function run(array $env,callable $transport,int $now): array
@@ -18,18 +19,25 @@ final class FactoryOrchestratorEvidenceCollector
         if($now<1)throw new InvalidArgumentException('collector clock invalid.');
         $tokenPath=self::path($env['CONTROLBOT_GITHUB_READ_TOKEN_FILE']??'','token',true);
         $evidencePath=self::path($env['CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH']??'','evidence',false);
-        $token=self::token($tokenPath);$requests=0;
-        $get=static function(string $path,array $query=[])use($transport,$token,&$requests):array{
-            if(++$requests>self::MAX_REQUESTS)throw new RuntimeException('request budget exceeded.');
+        $token=self::token($tokenPath);$requests=0;$downloadBytes=0;
+        $get=static function(string $path,array $query=[])use($transport,$token,&$requests,&$downloadBytes):array{
             $url='https://api.github.com'.$path.($query?'?'.http_build_query($query):'');
             for($attempt=0;$attempt<2;$attempt++){
-                $r=$transport('GET',$url,['Accept'=>'application/vnd.github+json','Authorization'=>'Bearer '.$token]);
-                if(!is_array($r)||array_is_list($r)||!is_int($r['status']??null)||!is_array($r['headers']??null))throw new RuntimeException('transport invalid.');
+                if(++$requests>self::MAX_REQUESTS)throw new RuntimeException('request budget exceeded.');
+                $r=$transport('GET',$url,[
+                    'Accept'=>'application/vnd.github+json',
+                    'Authorization'=>'Bearer '.$token,
+                    'User-Agent'=>'controlbot-orchestrator-evidence-collector/1',
+                    'X-GitHub-Api-Version'=>'2022-11-28',
+                ]);
+                if(!is_array($r)||array_is_list($r)||!is_int($r['status']??null)||!is_array($r['headers']??null)||!is_array($r['json']??null))throw new RuntimeException('transport invalid.');
+                $bytes=$r['bytes']??strlen(json_encode($r['json'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
+                if(!is_int($bytes)||$bytes<0||($downloadBytes+=$bytes)>self::MAX_BYTES)throw new RuntimeException('download byte budget exceeded.');
                 if(isset($r['headers']['retry-after']))throw new RuntimeException('github retry deferred.');
                 $remaining=$r['headers']['x-ratelimit-remaining']??null;
                 if(is_numeric($remaining)&&(int)$remaining<5)throw new RuntimeException('rate limit low.');
                 if($r['status']>=500&&$attempt===0)continue;
-                if($r['status']!==200||!is_array($r['json']??null))throw new RuntimeException('github read failed.');
+                if($r['status']!==200)throw new RuntimeException('github read failed.');
                 return $r['json'];
             }
             throw new RuntimeException('github read failed.');
@@ -45,14 +53,15 @@ final class FactoryOrchestratorEvidenceCollector
         };
         $evidence=self::collect($get,$paged,$now);
         $json=json_encode($evidence,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
-        if(strlen($json)>2_000_000)throw new RuntimeException('evidence too large.');
+        $evidenceBytes=strlen($json);
+        if($evidenceBytes>self::MAX_BYTES)throw new RuntimeException('evidence too large.');
         self::atomicWrite($evidencePath,$json."\n");
-        return ['executed'=>true,'state'=>'written','requests'=>$requests,'bytes'=>strlen($json)];
+        return ['executed'=>true,'state'=>'written','requests'=>$requests,'download_bytes'=>$downloadBytes,'evidence_bytes'=>$evidenceBytes];
     }
 
     private static function collect(callable $get,callable $paged,int $now): array
     {
-        $work=[];$blockers=[];$decisions=[];$releases=[];
+        $work=[];$blockers=[];$decisions=[];
         foreach(self::REPOS as $name){
             $repo='pl0n3r/'.$name;
             $issues=$paged('/repos/'.$repo.'/issues',['state'=>'open']);
@@ -74,14 +83,28 @@ final class FactoryOrchestratorEvidenceCollector
                 if(!is_array($pr)||array_is_list($pr))throw new RuntimeException('github pull invalid.');
                 if(($pr['merged_at']??null)===null)continue;
                 $n=self::positive($pr['number']??null);
-                self::append($releases,self::signal('release:'.strtolower($name).'-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'pr_number'=>$n],$now));
+                self::append($work,self::signal('work:'.strtolower($name).'-pr-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],$now));
                 break;
             }
         }
         $factory767=$get('/repos/pl0n3r/Factory/issues/767');
-        if(!is_array($factory767)||array_is_list($factory767)||!preg_match('/factory-unattended-kill-switch\s+\{[^}]*"state":"RUNNING"/',$factory767['body']??''))
+        if(!self::killSwitchRunning($factory767))
             self::append($blockers,self::signal('blocker:factory-767','github_project_snapshot','blocked','pl0n3r/Factory',767,['issue_ref'=>'github:pl0n3r/Factory#767'],$now));
-        return ['owner_decisions'=>$decisions,'releases'=>$releases,'blockers'=>$blockers,'work'=>$work];
+        return ['owner_decisions'=>$decisions,'releases'=>[],'blockers'=>$blockers,'work'=>$work];
+    }
+
+    private static function killSwitchRunning(mixed $issue): bool
+    {
+        if(!is_array($issue)||array_is_list($issue)||($issue['user']['login']??null)!=='pl0n3r'||!is_string($issue['body']??null))return false;
+        $count=preg_match_all('/<!--\s*factory-unattended-kill-switch\s+(\{.*?\})\s*-->/s',$issue['body'],$matches);
+        if($count!==1)return false;
+        try{$marker=json_decode($matches[1][0],true,8,JSON_THROW_ON_ERROR);}catch(\Throwable){return false;}
+        if(!is_array($marker)||array_is_list($marker))return false;
+        $keys=array_keys($marker);sort($keys);
+        return $keys===['owner','state','version']
+            &&($marker['version']??null)===1
+            &&($marker['state']??null)==='RUNNING'
+            &&($marker['owner']??null)==='pl0n3r';
     }
 
     private static function append(array &$rows,array $row): void

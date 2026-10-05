@@ -60,7 +60,11 @@ final class FactoryOrchestratorEvidenceCollector
         if ($status !== 200) {
             return $response;
         }
-        $json = json_decode($body, true, 64, JSON_THROW_ON_ERROR);
+        try {
+            $json = json_decode($body, true, 64, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new RuntimeException('github json invalid.');
+        }
         if (!is_array($json)) {
             throw new RuntimeException('github json invalid.');
         }
@@ -88,8 +92,10 @@ final class FactoryOrchestratorEvidenceCollector
             'github response invalid.'=>'github_response_invalid',
             'github json invalid.'=>'github_response_invalid',
             'github page invalid.'=>'github_response_invalid',
+            'github pagination exceeded.'=>'github_response_invalid',
             'github pull page invalid.'=>'github_response_invalid',
             'github issue invalid.'=>'github_response_invalid',
+            'github pull invalid.'=>'github_response_invalid',
             'github number invalid.'=>'github_response_invalid',
             'labels invalid.'=>'github_response_invalid',
             'github read failed.'=>'github_read_failed',

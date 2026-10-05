@@ -32,7 +32,7 @@ class GitHubShellE2ETests(unittest.TestCase):
             self.assertEqual(html.count("<html"), 1)
             self.assertIn('data-section="github"', html)
             self.assertIn('data-nav="github" href="/github" aria-current="page"', html)
-            self.assertIn('data-nav="overview" href="/"', html)
+            self.assertIn('data-nav="overview" href="/overview"', html)
             self.assertIn('name="viewport"', html)
             self.assertIn("focus-visible", html)
             self.assertIn("prefers-reduced-motion", html)

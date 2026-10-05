@@ -54,6 +54,30 @@ echo json_encode(["result"=>$result,"calls"=>$calls,"byte_failed"=>$failed,"prev
   self.assertEqual(data["calls"],data["result"]["requests"]);self.assertGreater(data["calls"],15)
   self.assertTrue(data["byte_failed"]);self.assertEqual('{"old":true}',data["previous"])
 
+
+ def test_transport_requires_real_bytes_and_retries_non_json_5xx(self):
+  data=php_eval(r'''
+require "src/FactoryOrchestratorEvidenceCollector.php";
+use ControlBot\Business\FactoryOrchestratorEvidenceCollector;
+$dir=sys_get_temp_dir()."/cb695-transport-".bin2hex(random_bytes(4));mkdir($dir);$token=$dir."/token";$evidence=$dir."/evidence.json";file_put_contents($token,"read-only");chmod($token,0600);
+$env=["CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED"=>"1","CONTROLBOT_GITHUB_READ_TOKEN_FILE"=>$token,"CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"=>$evidence];$calls=0;
+$transport=static function(string $method,string $url,array $headers)use(&$calls):array{$calls++;if($calls===1)return ["status"=>502,"headers"=>["x-ratelimit-remaining"=>"100"],"bytes"=>18];$path=parse_url($url,PHP_URL_PATH)?:"";$json=str_ends_with($path,"/issues/767")?["number"=>767,"user"=>["login"=>"pl0n3r"],"body"=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->']:[];return ["status"=>200,"headers"=>["x-ratelimit-remaining"=>"100"],"bytes"=>strlen(json_encode($json,JSON_THROW_ON_ERROR)),"json"=>$json];};
+$result=FactoryOrchestratorEvidenceCollector::run($env,$transport,200);$old=$dir."/old.json";file_put_contents($old,'{"old":true}');$missing=static fn()=>["status"=>200,"headers"=>["x-ratelimit-remaining"=>"100"],"json"=>[]];$failed=false;try{FactoryOrchestratorEvidenceCollector::run($env|["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"=>$old],$missing,200);}catch(Throwable){$failed=true;}echo json_encode(["result"=>$result,"calls"=>$calls,"missing_failed"=>$failed,"previous"=>file_get_contents($old)],JSON_THROW_ON_ERROR),PHP_EOL;
+''')
+  self.assertEqual(data["calls"],data["result"]["requests"]);self.assertGreater(data["calls"],15);self.assertTrue(data["missing_failed"]);self.assertEqual('{"old":true}',data["previous"])
+  script=(ROOT/"scripts/orchestrator-evidence-collector.php").read_text()
+  for needle in ("CURLPROTO_HTTPS","($parts['scheme']??null)!=='https'","($parts['host']??null)!=='api.github.com'","if($status!==200)return $base;"): self.assertIn(needle,script)
+
+ def test_kill_switch_requires_issue_767_single_exact_owner_marker(self):
+  data=php_eval(r'''
+require "src/FactoryOrchestratorEvidenceCollector.php";
+use ControlBot\Business\FactoryOrchestratorEvidenceCollector;
+function runCase(array $factory):bool{$dir=sys_get_temp_dir()."/cb695-kill-".bin2hex(random_bytes(4));mkdir($dir);$token=$dir."/token";$evidence=$dir."/evidence.json";file_put_contents($token,"read-only");chmod($token,0600);$transport=static function(string $method,string $url,array $headers)use($factory):array{$path=parse_url($url,PHP_URL_PATH)?:"";$json=str_ends_with($path,"/issues/767")?$factory:[];return ["status"=>200,"headers"=>["x-ratelimit-remaining"=>"100"],"bytes"=>strlen(json_encode($json,JSON_THROW_ON_ERROR)),"json"=>$json];};FactoryOrchestratorEvidenceCollector::run(["CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED"=>"1","CONTROLBOT_GITHUB_READ_TOKEN_FILE"=>$token,"CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"=>$evidence],$transport,200);$out=json_decode(file_get_contents($evidence),true,64,JSON_THROW_ON_ERROR);foreach($out["blockers"] as $row)if(($row["id"]??null)==="blocker:factory-767")return true;return false;}
+$marker='<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->';$valid=["number"=>767,"user"=>["login"=>"pl0n3r"],"body"=>$marker];$wrongNumber=$valid;$wrongNumber["number"]=766;$wrongAuthor=$valid;$wrongAuthor["user"]["login"]="other";$duplicate=$valid;$duplicate["body"].="\n".$marker;$paused=$valid;$paused["body"]='<!-- factory-unattended-kill-switch {"version":1,"state":"PAUSED","owner":"pl0n3r"} -->';echo json_encode(["valid"=>runCase($valid),"wrong_number"=>runCase($wrongNumber),"wrong_author"=>runCase($wrongAuthor),"duplicate"=>runCase($duplicate),"paused"=>runCase($paused)],JSON_THROW_ON_ERROR),PHP_EOL;
+''')
+  self.assertFalse(data["valid"])
+  for key in ("wrong_number","wrong_author","duplicate","paused"): self.assertTrue(data[key],key)
+
  def test_token_never_appears_in_output_logs_evidence_or_snapshot(self):
   d=scenario("canonical");blob=json.dumps(d);self.assertNotIn("sentinel-read-value",blob);self.assertTrue(all(x["authorized"] for x in d["calls"]))
 

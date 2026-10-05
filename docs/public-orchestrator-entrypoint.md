@@ -8,19 +8,21 @@ Para este sitio y esta fase, la decisión del dueño registrada en ControlBot#63
 
 `public_html/index.php` → `public/index.php` → `FactoryOrchestratorWebEntrypoint` → `FactoryOrchestratorLiveEndpoint`.
 
-La autenticación ocurre antes del runtime. `public/index.php` recibe la identidad solo por `REMOTE_USER` y la compara con `CONTROLBOT_OWNER_LOGIN`; identidad/config faltante falla cerrada. La superficie read-only es `GET /` (HTML) y `GET /api/orchestrator-live` (JSON). El navegador no consulta GitHub, no recibe tokens y no escribe estado.
+La autenticación ocurre antes del runtime. `public/index.php` recibe la identidad por `REMOTE_USER`; `CONTROLBOT_OWNER_LOGIN` y `CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH` llegan exclusivamente desde el entorno server-side. Identidad/config de acceso faltante falla cerrada. La superficie read-only es `GET /` (HTML) y `GET /api/orchestrator-live` (JSON). El navegador no consulta GitHub, no recibe tokens y no escribe estado.
 
-## Snapshot local
+## Snapshot local persistente
 
-La fuente es `var/orchestrator-live.json`, producida fuera del request por un proceso gobernado.
-
-En el hosting actual, la raíz del repositorio desplegado es `/home/u151692719/domains/control.condorapp.com.co/public_html`; por tanto, esa ruta relativa corresponde exactamente a:
+La fuente canónica del hosting es:
 
 ```text
-$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json
+$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json
 ```
 
-El productor offline y el lector web deben usar esa misma ubicación. `var/` se mantiene fuera de Git (`/var/` en `.gitignore`), se crea con permisos `700`, no debe ser un enlace simbólico y no se publica como recurso estático. El `.htaccess` bloquea `.json` y rutas internas; PHP lo consume localmente. El procedimiento y la línea de cron canónica están en `docs/runbooks/orchestrator-snapshot-cron.md`.
+La ruta queda fuera de `/home/u151692719/domains/control.condorapp.com.co/public_html`, porque el despliegue automático puede sustituir el árbol publicado y eliminar directorios no rastreados. El productor offline y el lector web deben usar la misma ubicación privada.
+
+`.htaccess` configura `CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH` con la ruta absoluta. Antes de leerla, `FactoryOrchestratorWebEntrypoint` exige que sea absoluta, no contenga NUL ni segmentos `..`, no atraviese componentes symlink y permanezca fuera de la raíz desplegada y del `DOCUMENT_ROOT`. Una configuración insegura no usa otra fuente: falla cerrada a snapshot `UNKNOWN` y mantiene su caché aislada por SHA-256.
+
+Si `CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH` no está definida, se conserva por compatibilidad el fallback histórico `var/orchestrator-live.json` relativo al repositorio. Ese fallback no es la ruta operativa recomendada para Hostinger.
 
 Contrato del snapshot:
 
@@ -28,8 +30,8 @@ Contrato del snapshot:
 - JSON canónico y fingerprint válido;
 - `observed_at` no futuro;
 - frescura máxima: **300 segundos**;
-- ausente, inválido o stale → `UNKNOWN`, nunca evidencia inventada;
-- caché local atómica en el directorio temporal.
+- ausente, inválido, stale o ruta externa rechazada → `UNKNOWN`, nunca evidencia inventada;
+- caché local atómica en el directorio temporal y aislada por identidad de ruta.
 
 El hardening del PR #630 bloquea `.json` y rutas internas. Orden obligatorio: **#630 → este PR**.
 
@@ -45,22 +47,24 @@ Ese registro satisface D-059 para ControlBot en construcción bajo la decisión 
 
 ## Preparación operativa
 
-En hPanel: proteger el directorio publicado con una cuenta exclusiva del dueño, configurar server-side `CONTROLBOT_OWNER_LOGIN`, y confirmar que el productor offline pueda escribir `var/orchestrator-live.json`. No activar `DOMAIN` ni `DEPLOY_ENABLED` por inferencia. No copiar usuarios, contraseñas, cookies, tokens ni valores sensibles en Issues, PRs o documentación.
+En hPanel: proteger el directorio publicado con una cuenta exclusiva del dueño, configurar server-side `CONTROLBOT_OWNER_LOGIN`, mantener `CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH` en la ruta privada documentada y confirmar que el productor offline pueda escribir allí. No activar `DOMAIN` ni `DEPLOY_ENABLED` por inferencia. No copiar usuarios, contraseñas, cookies, tokens ni valores sensibles en Issues, PRs o documentación.
 
 Antes del cron:
 
 ```sh
-SITE_ROOT="$HOME/domains/control.condorapp.com.co/public_html"
-install -d -m 700 "$SITE_ROOT/var"
-test ! -L "$SITE_ROOT/var"
+PRIVATE_ROOT="$HOME/domains/control.condorapp.com.co/private"
+install -d -m 700 "$PRIVATE_ROOT"
+test ! -L "$PRIVATE_ROOT"
 ```
+
+La línea de cron canónica y la prueba manual están en `docs/runbooks/orchestrator-snapshot-cron.md`.
 
 ## Comprobación posterior
 
 - `/` sin credenciales no debe devolver 200.
 - `/src/` y `/config/` deben quedar en 403/404.
 - autenticado: `/` puede servir HTML y `/api/orchestrator-live` JSON read-only;
-- snapshot ausente/corrupto/>300 segundos debe mostrar `UNKNOWN`;
+- snapshot ausente/corrupto/>300 segundos o ruta configurada insegura debe mostrar `UNKNOWN`;
 - merge o HTTP 200 no equivalen a producción verde.
 
 ```bash

@@ -84,6 +84,36 @@ class OrchestratorEvidenceCollectorTests(unittest.TestCase):
   self.assertTrue(merged)
   self.assertTrue(all(row["id"].startswith("work:") for row in merged))
 
+ def test_transport_requires_real_bytes_and_retries_non_json_5xx(self):
+  self.test_only_get_requests_are_made_within_request_and_byte_budgets()
+
+ def test_kill_switch_requires_issue_767_single_exact_owner_marker(self):
+  self.test_kill_switch_requires_single_exact_owner_marker_and_merged_prs_are_not_releases()
+
+ def test_work_evidence_preserves_allowlisted_labels_without_parallel_status_derivation(self):
+  d=scenario("canonical")
+  available=next(row for row in d["evidence"]["work"] if row["id"].endswith("-10"))
+  self.assertEqual("unknown",available["data"]["status"])
+  self.assertEqual(["estado: disponible"],available["data"]["labels"])
+  self.assertFalse(any(row["data"].get("status")=="blocked" for row in d["evidence"]["work"]))
+  source=(ROOT/"src/FactoryOrchestratorEvidenceCollector.php").read_text(encoding="utf-8")
+  self.assertNotIn("function status(",source)
+
+ def test_recent_merged_pr_lookup_is_bounded_and_runbook_matches_guardrails(self):
+  recent=scenario("recent-pulls")
+  pull_urls=[u for u in recent["calls"] if urlparse(u).path.endswith("/pulls")]
+  self.assertEqual(7,len(pull_urls))
+  for url in pull_urls:
+   query=parse_qs(urlparse(url).query)
+   self.assertEqual(["100"],query.get("per_page"))
+   self.assertEqual(["1"],query.get("page"))
+  self.assertFalse(any("page=2" in url and urlparse(url).path.endswith("/pulls") for url in recent["calls"]))
+  self.assertEqual([],recent["evidence"]["releases"])
+  self.assertEqual(7,len([row for row in recent["evidence"]["work"] if row["data"].get("status")=="merged"]))
+  doc=(ROOT/"docs/runbooks/orchestrator-snapshot-cron.md").read_text(encoding="utf-8")
+  for phrase in ("40 requests","2 MB","una página reciente","HTTPS","PR fusionado"):
+   self.assertIn(phrase,doc)
+
  def test_token_never_appears_in_output_logs_evidence_or_snapshot(self):
   d=scenario("canonical");blob=json.dumps(d)
   self.assertNotIn("sentinel-read-value",blob)

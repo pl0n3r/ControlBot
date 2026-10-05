@@ -14,6 +14,16 @@ La autenticación ocurre antes del runtime. `public/index.php` recibe la identid
 
 La fuente es `var/orchestrator-live.json`, producida fuera del request por un proceso gobernado.
 
+En el hosting actual, la raíz del repositorio desplegado es `/home/u151692719/domains/control.condorapp.com.co/public_html`; por tanto, esa ruta relativa corresponde exactamente a:
+
+```text
+$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json
+```
+
+El productor offline y el lector web deben usar esa misma ubicación. `var/` se mantiene fuera de Git (`/var/` en `.gitignore`), se crea con permisos `700`, no debe ser un enlace simbólico y no se publica como recurso estático. El `.htaccess` bloquea `.json` y rutas internas; PHP lo consume localmente. El procedimiento y la línea de cron canónica están en `docs/runbooks/orchestrator-snapshot-cron.md`.
+
+Contrato del snapshot:
+
 - máximo 2 MB;
 - JSON canónico y fingerprint válido;
 - `observed_at` no futuro;
@@ -36,6 +46,14 @@ Ese registro satisface D-059 para ControlBot en construcción bajo la decisión 
 ## Preparación operativa
 
 En hPanel: proteger el directorio publicado con una cuenta exclusiva del dueño, configurar server-side `CONTROLBOT_OWNER_LOGIN`, y confirmar que el productor offline pueda escribir `var/orchestrator-live.json`. No activar `DOMAIN` ni `DEPLOY_ENABLED` por inferencia. No copiar usuarios, contraseñas, cookies, tokens ni valores sensibles en Issues, PRs o documentación.
+
+Antes del cron:
+
+```sh
+SITE_ROOT="$HOME/domains/control.condorapp.com.co/public_html"
+install -d -m 700 "$SITE_ROOT/var"
+test ! -L "$SITE_ROOT/var"
+```
 
 ## Comprobación posterior
 

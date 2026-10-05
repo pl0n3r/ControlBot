@@ -82,7 +82,7 @@ final class ControlBotWebEntrypoint
             ? $styleMatch[1]
             : '';
 
-        $routes = ['overview' => '/', 'github' => '/github'];
+        $routes = ['overview' => '/overview', 'github' => '/github'];
         $response['body'] = ControlCenterShell::render(
             $title,
             'github',

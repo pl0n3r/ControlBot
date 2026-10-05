@@ -107,7 +107,7 @@ test -f "$SNAPSHOT" && echo "snapshot_age_seconds=$(( $(date +%s) - $(stat -c %Y
 
 El colector usa un máximo de 40 requests reales y un budget acumulado de **8 MB** de bytes descargados; cada respuesta individual conserva el tope de 2 MB y la evidencia serializada también está limitada a 2 MB. Cada retry consume requests y bytes reales, sin fallback estimado. Issues pueden paginar como máximo dos páginas de 100 y fallan cerrado si existiría una tercera; closed PRs consultan solo **una página reciente** de 10 porque únicamente se publica el primer merge observado y no se recorre historial. El snapshot admite como máximo 24 fronts: si el trabajo activo excede el contrato, el colector falla cerrado en vez de truncar o rankear. Ante rate-limit/error/budget excedido conserva el archivo anterior mediante reemplazo atómico.
 
-La regresión de #720 cubre una respuesta grande de aproximadamente **1,8 MB** y un conjunto de respuestas de varios repos que supera 5 MB sin rebasar el límite acumulado de 8 MB. El problema observado originalmente provenía de pedir 100 PRs cerrados de Factory en una sola respuesta; limitar esa consulta a 10 reduce el volumen sin cambiar el modelo de evidencia ni los permisos del token.
+La medición read-only de #720 sobre los siete repos dio **617.986 B** en Issues y **1.279.176 B** en closed PRs con `per_page=10`: **1.897.162 B** en las 14 lecturas principales, antes de la lectura pequeña de Factory#767. En Factory, closed PRs bajó de **1.758.268 B** con 100 elementos a **168.290 B** con 10 (~10,4× menos). El límite acumulado de 8 MB conserva margen para crecimiento y un retry sin volver al fallo original, sin cambiar el modelo de evidencia ni los permisos del token.
 
 ## Cron en hPanel
 

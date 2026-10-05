@@ -79,6 +79,8 @@ echo json_encode(["result"=>$result,"measured_main_reads"=>array_sum($issueBytes
   self.assertLessEqual(data["result"]["evidence_bytes"],2_000_000)
 
  def test_each_failure_cause_prints_an_allowlisted_code_without_secrets(self):
+  negative=scenario("transport-negative-branches")
+  self.assertEqual({"code":"http_status_403","path":"/repos/pl0n3r/Factory/issues","status":403},negative["http_diagnostic"])
   data=php_eval(r'''
 require "src/FactoryOrchestratorEvidenceCollector.php";
 use ControlBot\Business\FactoryOrchestratorEvidenceCollector;

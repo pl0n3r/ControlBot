@@ -31,22 +31,63 @@ chmod 600 "$HOME/.controlbot/github-read-token"
 - Issues pueden paginar como máximo dos páginas de 100; closed PRs consultan solo **una página reciente** de 100 y no solicitan page=2 aunque esa primera página venga llena.
 - Ante rate-limit, retry-after, budget excedido o transporte inválido, se conserva el archivo anterior mediante reemplazo atómico.
 
-## Variables y prueba manual
+## Ruta canónica del snapshot
+
+El repositorio desplegado vive en:
+
+```text
+/home/u151692719/domains/control.condorapp.com.co/public_html
+```
+
+`FactoryOrchestratorWebEntrypoint` lee, por defecto, `var/orchestrator-live.json` relativo a esa raíz. Por tanto, el productor offline debe escribir exactamente en:
+
+```text
+$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json
+```
+
+Prepara el directorio una sola vez. `var/` está ignorado por Git, por lo que el despliegue que reemplaza archivos rastreados no debe pisar el snapshot. No uses enlaces simbólicos:
 
 ```sh
+SITE_ROOT="$HOME/domains/control.condorapp.com.co/public_html"
+install -d -m 700 "$SITE_ROOT/var"
+test ! -L "$SITE_ROOT/var"
+```
+
+El `.htaccess` del sitio bloquea `.json` y rutas internas; el archivo queda destinado al lector PHP local, no a descarga pública.
+
+## Variables y prueba manual
+
+Ejecuta desde la raíz desplegada:
+
+```sh
+cd "$HOME/domains/control.condorapp.com.co/public_html"
 export CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED=1
 export CONTROLBOT_GITHUB_READ_TOKEN_FILE="$HOME/.controlbot/github-read-token"
 export CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-evidence.json"
 export CONTROLBOT_ORCHESTRATOR_CRON_ENABLED=1
-export CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json"
+export CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json"
 /opt/alt/php85/usr/bin/php scripts/orchestrator-evidence-collector.php && /opt/alt/php85/usr/bin/php scripts/orchestrator-snapshot-cron.php
+```
+
+Comprueba permisos y edad sin imprimir secretos:
+
+```sh
+SNAPSHOT="$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json"
+ls -ld "$(dirname "$SNAPSHOT")" "$SNAPSHOT"
+test -f "$SNAPSHOT" && echo "snapshot_age_seconds=$(( $(date +%s) - $(stat -c %Y "$SNAPSHOT") ))"
 ```
 
 El colector usa un máximo de 40 requests reales y un budget acumulado de **2 MB** de bytes descargados; la evidencia serializada también está limitada a 2 MB. Cada retry consume requests y bytes reales, sin fallback estimado. Issues pueden paginar como máximo dos páginas de 100 y fallan cerrado si existiría una tercera; closed PRs consultan solo **una página reciente** de 100 porque únicamente se publica el primer merge observado y no se recorre historial. El snapshot admite como máximo 24 fronts: si el trabajo activo excede el contrato, el colector falla cerrado en vez de truncar o rankear. Ante rate-limit/error/budget excedido conserva el archivo anterior mediante reemplazo atómico.
 
 ## Cron en hPanel
 
-Este runbook **no contiene una expresión de cron instalable** ni modifica hPanel por sí mismo. Cuando el dueño lo decida, programa cada 5 minutos el mismo encadenamiento `colector && wrapper` con `/opt/alt/php85/usr/bin/php` y variables privadas del servidor. Este runbook no cambia `DOMAIN`, `DEPLOY_ENABLED`, DNS ni go-live. **ControlBot #625** conserva la autoridad separada de producción y activación live.
+Configura **cada 5 minutos** el mismo encadenamiento `colector && wrapper`, usando PHP 8.5 y un log estable. La línea es instalable tal cual para este hosting y no contiene el token, solo la ruta privada del archivo de credencial:
+
+```cron
+*/5 * * * * cd "$HOME/domains/control.condorapp.com.co/public_html" && { export CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED=1 CONTROLBOT_GITHUB_READ_TOKEN_FILE="$HOME/.controlbot/github-read-token" CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-evidence.json" CONTROLBOT_ORCHESTRATOR_CRON_ENABLED=1 CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json"; /opt/alt/php85/usr/bin/php scripts/orchestrator-evidence-collector.php && /opt/alt/php85/usr/bin/php scripts/orchestrator-snapshot-cron.php; } >> "$HOME/.controlbot/orchestrator-snapshot-cron.log" 2>&1
+```
+
+Este runbook no modifica hPanel por sí mismo, no cambia `DOMAIN`, `DEPLOY_ENABLED`, DNS ni go-live. **ControlBot #625** conserva la autoridad separada de producción y activación live.
 
 ## Reversión
 

@@ -18,6 +18,9 @@ final class FactoryOrchestratorEvidenceCollector
     private const CLOSED_PULLS_PER_PAGE=10;
     private const MAX_SIGNALS=50;
     private const MAX_WORK_SIGNALS=24;
+    private const MAX_DECISION_BODY_BYTES=65_536;
+    private const MAX_DECISION_OPTIONS=6;
+    private const DECISION_OPTION_IDS=['A','B','C','D'];
 
     public static function validateLiveRequest(
         string $method,
@@ -196,7 +199,15 @@ final class FactoryOrchestratorEvidenceCollector
                 elseif($workflowLabels!==[])
                     self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now));
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))
-                    self::append($decisions,self::signal('decision:'.strtolower($name).'-'.$number,'owner_inbox','pending',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number],$now));
+                    self::append($decisions,self::signal(
+                        'decision:'.strtolower($name).'-'.$number,
+                        'owner_inbox',
+                        'pending',
+                        $repo,
+                        $number,
+                        self::ownerDecisionData($row,$repo,$number),
+                        $now,
+                    ));
             }
             foreach($closedPrs as $pr){
                 if(!is_array($pr)||array_is_list($pr))throw new RuntimeException('github pull invalid.');
@@ -235,6 +246,115 @@ final class FactoryOrchestratorEvidenceCollector
             &&($marker['version']??null)===1
             &&($marker['state']??null)==='RUNNING'
             &&($marker['owner']??null)==='pl0n3r';
+    }
+
+    private static function ownerDecisionData(array $row,string $repo,int $number): array
+    {
+        $title=self::boundedPlainText($row['title']??null,160)??('Issue '.$number);
+        $legacy=[
+            'issue_ref'=>'github:'.$repo.'#'.$number,
+            'repository_ref'=>$repo,
+            'issue_number'=>$number,
+            'format'=>'legacy',
+            'title'=>$title,
+            'title_simple'=>null,
+            'summary_simple'=>null,
+            'explain_simple'=>null,
+            'why_recommended'=>null,
+            'blocks'=>null,
+            'options'=>[],
+            'recommendation'=>null,
+            'safe_default'=>null,
+            'expires_at'=>null,
+        ];
+        $body=$row['body']??null;
+        if(!is_string($body)||strlen($body)>self::MAX_DECISION_BODY_BYTES)return $legacy;
+
+        $count=preg_match_all('/<!--\s*factory-human-gate\s+(\{.*?\})\s*-->/s',$body,$matches);
+        if($count!==1)return $legacy;
+        try{$gate=json_decode($matches[1][0],true,8,JSON_THROW_ON_ERROR);}catch(Throwable){return $legacy;}
+        if(!is_array($gate)||array_is_list($gate))return $legacy;
+
+        $titleSimple=self::boundedPlainText($gate['title_simple']??null,160);
+        $summary=self::boundedPlainText($gate['summary_simple']??null,600);
+        $why=self::boundedPlainText($gate['why_recommended']??null,600);
+        $blocks=self::boundedPlainText($gate['blocks']??null,600);
+        $explain=self::boundedPlainText($gate['explain_simple']??null,600,true);
+        $recommendation=$gate['recommendation']??null;
+        $safeDefault=$gate['safe_default']??null;
+        $rawOptions=$gate['options']??null;
+        if(
+            $titleSimple===null||$summary===null||$why===null||$blocks===null
+            ||!is_string($recommendation)||!is_string($safeDefault)
+            ||!is_array($rawOptions)||!array_is_list($rawOptions)
+            ||count($rawOptions)<1||count($rawOptions)>self::MAX_DECISION_OPTIONS
+        )return $legacy;
+
+        $options=[];$ids=[];
+        foreach($rawOptions as $option){
+            if(!is_array($option)||array_is_list($option))return $legacy;
+            $id=$option['id']??null;
+            if(!is_string($id)||!in_array($id,self::DECISION_OPTION_IDS,true)||isset($ids[$id]))return $legacy;
+            $label=self::boundedPlainText($option['label']??null,200);
+            $effect=self::boundedPlainText($option['effect']??null,600);
+            $risk=self::boundedPlainText($option['risk']??null,80);
+            $cost=self::boundedPlainText($option['cost']??null,240,true);
+            $optionExplain=self::boundedPlainText($option['explain_simple']??null,400,true);
+            $pros=self::boundedTextList($option['pros']??[],6,300);
+            $cons=self::boundedTextList($option['cons']??[],6,300);
+            if($label===null||$effect===null||$risk===null||$pros===null||$cons===null||!is_bool($option['reversible']??null))return $legacy;
+            $ids[$id]=true;
+            $options[]=[
+                'id'=>$id,'label'=>$label,'effect'=>$effect,'pros'=>$pros,'cons'=>$cons,
+                'risk'=>$risk,'cost'=>$cost,'reversible'=>$option['reversible'],'explain_simple'=>$optionExplain,
+            ];
+        }
+        if(!isset($ids[$recommendation])||!isset($ids[$safeDefault]))return $legacy;
+
+        $expiresAt=null;
+        $windowCount=preg_match_all('/<!--\s*factory-release-window\s+(\{.*?\})\s*-->/s',$body,$windows);
+        if($windowCount>1)return $legacy;
+        if($windowCount===1){
+            try{$window=json_decode($windows[1][0],true,8,JSON_THROW_ON_ERROR);}catch(Throwable){return $legacy;}
+            if(!is_array($window)||array_is_list($window))return $legacy;
+            $candidate=$window['expires_at']??null;
+            if(!is_string($candidate)||preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D',$candidate)!==1||strtotime($candidate)===false)return $legacy;
+            $expiresAt=$candidate;
+        }
+
+        return $legacy+[
+            'format'=>'structured',
+            'title_simple'=>$titleSimple,
+            'summary_simple'=>$summary,
+            'explain_simple'=>$explain,
+            'why_recommended'=>$why,
+            'blocks'=>$blocks,
+            'options'=>$options,
+            'recommendation'=>$recommendation,
+            'safe_default'=>$safeDefault,
+            'expires_at'=>$expiresAt,
+        ];
+    }
+
+    private static function boundedTextList(mixed $raw,int $maxItems,int $maxLength): ?array
+    {
+        if(!is_array($raw)||!array_is_list($raw)||count($raw)>$maxItems)return null;
+        $out=[];
+        foreach($raw as $value){
+            $text=self::boundedPlainText($value,$maxLength);
+            if($text===null)return null;
+            $out[]=$text;
+        }
+        return $out;
+    }
+
+    private static function boundedPlainText(mixed $value,int $maxLength,bool $optional=false): ?string
+    {
+        if($value===null&&$optional)return null;
+        if(!is_string($value))return null;
+        $value=trim(preg_replace('/\s+/u',' ',$value)??'');
+        if($value===''||strlen($value)>$maxLength||preg_match('/[\x00-\x1f\x7f]/',$value)===1)return null;
+        return $value;
     }
 
     private static function appendWork(array &$rows,array $row): void

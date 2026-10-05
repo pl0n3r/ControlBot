@@ -287,29 +287,21 @@ final class FactoryLiveOrchestratorSnapshot
 
     private static function decisionTextList(mixed $raw,int $maxItems,int $maxLength): array
     {
-        if(!is_array($raw)||!array_is_list($raw)||count($raw)>$maxItems)
-            throw new InvalidArgumentException('decision list invalid.');
-        return array_map(
-            static fn(mixed $value):string=>self::decisionText($value,'decision list item',$maxLength),
-            $raw
-        );
+        if(!is_array($raw)||!array_is_list($raw)||count($raw)>$maxItems)throw new InvalidArgumentException('decision list invalid.');
+        return array_map(static fn(mixed $value):string=>self::decisionText($value,'decision list item',$maxLength),$raw);
     }
 
     private static function decisionText(mixed $value,string $label,int $max): string
     {
-        if(!is_string($value))throw new InvalidArgumentException($label.' invalid.');
-        $value=trim($value);
-        if($value===''||strlen($value)>$max||preg_match('/[\\x00-\\x1f\\x7f]/',$value)===1)
-            throw new InvalidArgumentException($label.' invalid.');
+        if(!is_string($value))throw new InvalidArgumentException($label.' invalid.');$value=trim($value);
+        if($value===''||strlen($value)>$max||preg_match('/[\\x00-\\x1f\\x7f]/',$value)===1)throw new InvalidArgumentException($label.' invalid.');
         return $value;
     }
 
     private static function decisionIdentity(string $issue): array
     {
-        if(preg_match('~^github:(pl0n3r/[A-Za-z0-9_.-]+)#([1-9][0-9]*)$~D',$issue,$match)===1)
-            return [$match[1],(int)$match[2]];
-        if(preg_match('~^https://github\\.com/(pl0n3r/[A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)$~D',$issue,$match)===1)
-            return [$match[1],(int)$match[2]];
+        if(preg_match('~^github:(pl0n3r/[A-Za-z0-9_.-]+)#([1-9][0-9]*)$~D',$issue,$match)===1)return [$match[1],(int)$match[2]];
+        if(preg_match('~^https://github\\.com/(pl0n3r/[A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)$~D',$issue,$match)===1)return [$match[1],(int)$match[2]];
         throw new InvalidArgumentException('owner decision issue invalid.');
     }
 

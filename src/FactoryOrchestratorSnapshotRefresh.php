@@ -10,25 +10,16 @@ use Throwable;
 
 final class FactoryOrchestratorSnapshotRefreshFailure extends RuntimeException
 {
-    private const FAILURE_CODES = [
-        'snapshot_target_invalid',
-        'snapshot_directory_unwritable',
-        'evidence_invalid',
-        'snapshot_build_failed',
-        'snapshot_size_invalid',
-        'temp_write_failed',
-        'atomic_rename_failed',
-        'clock_invalid',
-        'internal_error',
+    private const CODES = [
+        'snapshot_target_invalid', 'snapshot_directory_unwritable', 'evidence_invalid',
+        'snapshot_build_failed', 'snapshot_size_invalid', 'temp_write_failed',
+        'atomic_rename_failed', 'clock_invalid', 'internal_error',
     ];
-
-    private readonly string $failureCode;
+    private string $failureCode;
 
     public function __construct(string $failureCode, ?Throwable $previous = null)
     {
-        $this->failureCode = in_array($failureCode, self::FAILURE_CODES, true)
-            ? $failureCode
-            : 'internal_error';
+        $this->failureCode = in_array($failureCode, self::CODES, true) ? $failureCode : 'internal_error';
         parent::__construct('Snapshot refresh failed.', 0, $previous);
     }
 
@@ -52,6 +43,7 @@ final class FactoryOrchestratorSnapshotRefresh
         array $io = []
     ): array {
         $temporary = null;
+
         try {
             $directory = self::targetDirectory($snapshotPath, $now, $maxBytes);
             try {
@@ -66,28 +58,24 @@ final class FactoryOrchestratorSnapshotRefresh
             try {
                 $snapshot = FactoryOrchestratorSnapshotSource::canonicalFromInjectedEvidence($evidence, $now);
                 $encoded = json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) . PHP_EOL;
-            } catch (FactoryOrchestratorSnapshotRefreshFailure $exception) {
-                throw $exception;
             } catch (Throwable $exception) {
                 throw self::failure('snapshot_build_failed', $exception);
             }
-
             $bytes = strlen($encoded);
             if ($bytes < 2 || $bytes > $maxBytes) {
                 throw self::failure('snapshot_size_invalid');
             }
 
-            $tempnam = self::operation($io, 'tempnam', static fn (string $path, string $prefix): string|false => tempnam($path, $prefix));
-            $writeTemp = self::operation($io, 'write_temp', static fn (string $path, string $data): int|false => file_put_contents($path, $data, LOCK_EX));
-            $chmod = self::operation($io, 'chmod', static fn (string $path, int $mode): bool => chmod($path, $mode));
-            $rename = self::operation($io, 'rename', static fn (string $from, string $to): bool => rename($from, $to));
-
-            $candidate = $tempnam($directory, self::TEMP_PREFIX);
-            if (!is_string($candidate) || $candidate === '') {
-                throw self::failure('temp_write_failed');
+            $tempnam = $io['tempnam'] ?? static fn (string $path, string $prefix): string|false => tempnam($path, $prefix);
+            $writeTemp = $io['write_temp'] ?? static fn (string $path, string $data): int|false => file_put_contents($path, $data, LOCK_EX);
+            $chmod = $io['chmod'] ?? static fn (string $path, int $mode): bool => chmod($path, $mode);
+            $rename = $io['rename'] ?? static fn (string $from, string $to): bool => rename($from, $to);
+            if (!is_callable($tempnam) || !is_callable($writeTemp) || !is_callable($chmod) || !is_callable($rename)) {
+                throw self::failure('internal_error');
             }
-            $temporary = $candidate;
-            if ($writeTemp($temporary, $encoded) !== $bytes) {
+
+            $temporary = $tempnam($directory, self::TEMP_PREFIX);
+            if (!is_string($temporary) || $temporary === '' || $writeTemp($temporary, $encoded) !== $bytes) {
                 throw self::failure('temp_write_failed');
             }
             if (!$chmod($temporary, 0640) && !self::hasSafeMode($temporary)) {
@@ -130,11 +118,17 @@ final class FactoryOrchestratorSnapshotRefresh
         if ($now < 1) {
             throw self::failure('clock_invalid');
         }
-        if ($snapshotPath === '' || !str_starts_with($snapshotPath, DIRECTORY_SEPARATOR)
-            || $maxBytes < 2 || $maxBytes > self::MAX_BYTES || is_link($snapshotPath)
-            || (file_exists($snapshotPath) && !is_file($snapshotPath))) {
+        if (
+            $snapshotPath === ''
+            || !str_starts_with($snapshotPath, DIRECTORY_SEPARATOR)
+            || $maxBytes < 2
+            || $maxBytes > self::MAX_BYTES
+            || is_link($snapshotPath)
+            || (file_exists($snapshotPath) && !is_file($snapshotPath))
+        ) {
             throw self::failure('snapshot_target_invalid');
         }
+
         $directory = dirname($snapshotPath);
         if (!is_dir($directory) || !is_writable($directory)) {
             throw self::failure('snapshot_directory_unwritable');
@@ -147,22 +141,24 @@ final class FactoryOrchestratorSnapshotRefresh
         if (is_link($snapshotPath)) {
             return false;
         }
-        $writeTarget = self::operation($io, 'write_target', static fn (string $path, string $data): int|false => file_put_contents($path, $data, LOCK_EX));
-        $previous = null;
-        if (is_file($snapshotPath)) {
-            $existing = file_get_contents($snapshotPath);
-            $previous = is_string($existing) && strlen($existing) <= self::MAX_BYTES ? $existing : null;
+        $writeTarget = $io['write_target'] ?? static fn (string $path, string $data): int|false => file_put_contents($path, $data, LOCK_EX);
+        if (!is_callable($writeTarget)) {
+            throw self::failure('internal_error');
         }
 
+        $previous = is_file($snapshotPath) ? file_get_contents($snapshotPath) : null;
+        $previous = is_string($previous) && strlen($previous) <= self::MAX_BYTES ? $previous : null;
         $written = $writeTarget($snapshotPath, $encoded);
         clearstatcache(true, $snapshotPath);
-        $verified = $written === $bytes && is_file($snapshotPath)
-            && filesize($snapshotPath) === $bytes && file_get_contents($snapshotPath) === $encoded;
+        $verified = $written === $bytes
+            && is_file($snapshotPath)
+            && filesize($snapshotPath) === $bytes
+            && file_get_contents($snapshotPath) === $encoded;
+
         if ($verified) {
             @chmod($snapshotPath, 0640);
             return self::hasSafeMode($snapshotPath);
         }
-
         if ($previous !== null) {
             @file_put_contents($snapshotPath, $previous, LOCK_EX);
         } elseif (file_exists($snapshotPath)) {
@@ -176,15 +172,6 @@ final class FactoryOrchestratorSnapshotRefresh
         clearstatcache(true, $path);
         $permissions = fileperms($path);
         return is_int($permissions) && in_array($permissions & 0777, self::SAFE_MODES, true);
-    }
-
-    private static function operation(array $io, string $name, callable $default): callable
-    {
-        $candidate = $io[$name] ?? $default;
-        if (!is_callable($candidate)) {
-            throw self::failure('internal_error');
-        }
-        return $candidate;
     }
 
     private static function failure(string $code, ?Throwable $previous = null): FactoryOrchestratorSnapshotRefreshFailure

@@ -10,9 +10,11 @@ use Throwable;
 
 final class FactoryOrchestratorSnapshotRefreshFailure extends RuntimeException
 {
-    public function __construct(private readonly string $failureCode)
-    {
-        parent::__construct($failureCode);
+    public function __construct(
+        private readonly string $failureCode,
+        ?Throwable $previous = null
+    ) {
+        parent::__construct($failureCode, 0, $previous);
     }
 
     public function failureCode(): string

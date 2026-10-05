@@ -7,7 +7,7 @@ use ControlBot\Business\FactoryOrchestratorSnapshotCron;
 use ControlBot\Business\FactoryOrchestratorSnapshotRefreshFailure;
 
 if (PHP_SAPI !== 'cli') {
-    fwrite(STDERR, "orchestrator-snapshot-cron: cli_only\n");
+    fwrite(STDERR, "orchestrator-snapshot-cron: cli only\n");
     exit(64);
 }
 

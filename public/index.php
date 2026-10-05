@@ -9,7 +9,10 @@ use ControlBot\Web\ControlBotWebEntrypoint;
 // through ControlBotWebEntrypoint.
 $response=ControlBotWebEntrypoint::handle(
     $_SERVER,
-    ['CONTROLBOT_OWNER_LOGIN'=>getenv('CONTROLBOT_OWNER_LOGIN')?:null],
+    [
+        'CONTROLBOT_OWNER_LOGIN'=>getenv('CONTROLBOT_OWNER_LOGIN')?:null,
+        'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH'=>getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH')?:null,
+    ],
     time(),
 );
 http_response_code($response['status']);

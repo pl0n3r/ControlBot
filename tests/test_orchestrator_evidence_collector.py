@@ -90,6 +90,13 @@ echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
   self.assertNotIn("internal_error",codes)
   self.assertIn("download_budget_exceeded",codes);self.assertIn("request_budget_exceeded",codes);self.assertIn("token_file_invalid",codes)
   self.assertEqual({"code":"http_status_403","path":"/repos/pl0n3r/Factory/issues","status":403},data[-1])
+  actual=php_eval(r'''
+require "src/FactoryOrchestratorEvidenceCollector.php";
+use ControlBot\\Business\\FactoryOrchestratorEvidenceCollector;
+$diagnostic=null;try{FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(200,[],"sentinel-not-json");}catch(Throwable $error){$diagnostic=FactoryOrchestratorEvidenceCollector::diagnosticFor($error);}
+echo json_encode($diagnostic,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+''')
+  self.assertEqual("github_response_invalid",actual["code"]);self.assertNotIn("sentinel-not-json",json.dumps(actual))
   env=os.environ|{"CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED":"1","CONTROLBOT_GITHUB_READ_TOKEN_FILE":"/definitely/private/sentinel-token-path","CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH":"/tmp/cb-evidence.json"}
   r=subprocess.run(["php",str(ROOT/"scripts/orchestrator-evidence-collector.php")],cwd=ROOT,text=True,capture_output=True,env=env)
   self.assertEqual(70,r.returncode);self.assertIn("token_file_invalid",r.stderr);self.assertNotIn("sentinel-token-path",r.stderr)

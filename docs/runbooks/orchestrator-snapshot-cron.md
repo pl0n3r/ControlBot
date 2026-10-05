@@ -59,7 +59,21 @@ Ejemplo seguro:
 orchestrator-evidence-collector: http_status_403 path=/repos/pl0n3r/Factory/issues status=403
 ```
 
-El wrapper del snapshot usa además `snapshot_target_invalid`, `snapshot_directory_unwritable`, `evidence_invalid`, `snapshot_build_failed`, `snapshot_size_invalid`, `temp_write_failed` y `atomic_rename_failed`; `CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS=1` solo añade `dir_exists`, `dir_writable`, `dir_owner_match` y `dir_mode` sin path, y la escritura conserva temporal en el mismo directorio, `LOCK_EX`, modos seguros `0600/0640`, `rename` primario y fallback verificado con restauración del snapshot previo.
+El wrapper del snapshot aplica un allowlist cerrado; cualquier código desconocido se reduce a `internal_error` antes de llegar a STDERR.
+
+| Código del wrapper | Lectura operativa |
+| --- | --- |
+| `snapshot_target_invalid` | Ruta objetivo inválida, relativa, symlink o target no regular. |
+| `snapshot_directory_unwritable` | El directorio padre no existe o no es escribible. |
+| `evidence_invalid` | La evidencia local falta, no es JSON objeto válido o el collector inyectado falla. |
+| `snapshot_build_failed` | La evidencia no puede componerse en un snapshot canónico. |
+| `snapshot_size_invalid` | El snapshot serializado queda fuera del budget permitido. |
+| `temp_write_failed` | Falló creación/escritura/verificación/permisos del temporal seguro. |
+| `atomic_rename_failed` | Falló el rename y también el fallback verificado/restauración segura. |
+| `clock_invalid` | El reloj/epoch recibido no es válido. |
+| `internal_error` | Fallback fail-closed para una causa no clasificada o un código no allowlisted. |
+
+Con `CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS=1` se añaden únicamente `dir_exists`, `dir_writable`, `dir_owner_match` y `dir_mode`, nunca paths. La escritura conserva temporal en el mismo directorio, `LOCK_EX`, modos seguros `0600/0640`, `rename` primario y fallback verificado con restauración del snapshot previo.
 
 ## Ruta canónica del snapshot
 

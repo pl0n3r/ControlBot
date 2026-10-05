@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace ControlBot\Dashboard;
 
 require_once __DIR__ . '/UiTheme.php';
+require_once __DIR__ . '/ControlCenterShell.php';
 
+use ControlBot\Ui\ControlCenterShell;
 use ControlBot\Ui\UiTheme;
 use InvalidArgumentException;
 

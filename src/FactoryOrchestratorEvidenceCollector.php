@@ -353,7 +353,12 @@ final class FactoryOrchestratorEvidenceCollector
         if($value===null&&$optional)return null;
         if(!is_string($value))return null;
         $value=trim(preg_replace('/\s+/u',' ',$value)??'');
-        if($value===''||strlen($value)>$maxLength||preg_match('/[\x00-\x1f\x7f]/',$value)===1)return null;
+        if(
+            $value===''||strlen($value)>$maxLength
+            ||preg_match('/[\x00-\x1f\x7f]/',$value)===1
+            ||str_contains($value,'<')||str_contains($value,'>')
+            ||preg_match('~(?:https?://|javascript:)~i',$value)===1
+        )return null;
         return $value;
     }
 

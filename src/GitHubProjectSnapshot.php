@@ -10,6 +10,8 @@ use RuntimeException;
 final class GitHubProjectSnapshot
 {
     private const LIMIT=100;
+    private const PR_DETAIL_LIMIT = 20;
+    private const REVIEW_STATES = ['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED', 'PENDING'];
     private const STATES=['queued','in_progress','completed','waiting','requested','pending'];
     private const CONCLUSIONS=['success','failure','neutral','cancelled','skipped','timed_out','action_required','stale','startup_failure'];
 
@@ -30,7 +32,16 @@ final class GitHubProjectSnapshot
         $branch=$this->api->json('GET',$base.'/branches/main',null,[200]);
         $sha=self::sha(self::object($branch['commit']??null,'main.commit')['sha']??null,'main.sha');
         $checks=$this->checks($this->api->json('GET',$base.'/commits/'.$sha.'/check-runs',null,[200],['per_page'=>self::LIMIT]));
-        $prs=$this->pullRequests($this->api->json('GET',$base.'/pulls',null,[200],['state'=>'open','per_page'=>self::LIMIT]));
+        $prs = $this->pullRequests(
+            $this->api->json(
+                'GET',
+                $base . '/pulls',
+                null,
+                [200],
+                ['state' => 'open', 'per_page' => self::LIMIT]
+            ),
+            $base
+        );
         $issues=$this->issues($this->api->json('GET',$base.'/issues',null,[200],['state'=>'open','per_page'=>self::LIMIT]));
         $release=$this->release($this->api->json('GET',$base.'/releases',null,[200],['per_page'=>1]));
         $workflow=$this->workflow($this->api->json('GET',$base.'/actions/runs',null,[200],['branch'=>'main','per_page'=>1]));
@@ -56,20 +67,123 @@ final class GitHubProjectSnapshot
         return ['items'=>$items,'truncated'=>$total>count($items)||count($rows)>=self::LIMIT];
     }
 
-    private function pullRequests(array $rows): array
+    private function pullRequests(array $rows, string $base): array
     {
-        $rows=self::rows($rows,'pull_requests'); $items=[];
-        foreach($rows as $row){
-            $row=self::object($row,'pull_request');
-            if(!is_bool($row['draft']??null)) throw new RuntimeException('Pull request draft invalid.');
-            $items[]=[
-                'number'=>self::natural($row['number']??null,'pull_request.number'),
-                'title'=>self::text($row['title']??null,'pull_request.title',300),'draft'=>$row['draft'],
-                'head_sha'=>self::sha(self::object($row['head']??null,'pull_request.head')['sha']??null,'pull_request.head_sha'),
-                'base_ref'=>self::ref(self::object($row['base']??null,'pull_request.base')['ref']??null,'pull_request.base_ref'),
+        $rows = self::rows($rows, 'pull_requests');
+        $items = [];
+        $partial = count($rows) >= self::LIMIT || count($rows) > self::PR_DETAIL_LIMIT;
+
+        foreach ($rows as $index => $row) {
+            $row = self::object($row, 'pull_request');
+
+            if (!is_bool($row['draft'] ?? null)) {
+                throw new RuntimeException('Pull request draft invalid.');
+            }
+
+            $number = self::natural($row['number'] ?? null, 'pull_request.number');
+            $reviewState = 'unknown';
+            $mergeability = 'unknown';
+
+            if ($index < self::PR_DETAIL_LIMIT) {
+                try {
+                    $detail = self::object(
+                        $this->api->json('GET', $base . '/pulls/' . $number, null, [200]),
+                        'pull_request.detail'
+                    );
+                    $reviews = $this->api->json(
+                        'GET',
+                        $base . '/pulls/' . $number . '/reviews',
+                        null,
+                        [200],
+                        ['per_page' => self::LIMIT]
+                    );
+                    $mergeability = self::mergeability($detail['mergeable'] ?? null);
+                    $reviewState = self::reviewState($reviews);
+
+                    if ($mergeability === 'unknown' || $reviewState === 'unknown') {
+                        $partial = true;
+                    }
+                } catch (\Throwable) {
+                    $partial = true;
+                }
+            }
+
+            $items[] = [
+                'number' => $number,
+                'title' => self::text($row['title'] ?? null, 'pull_request.title', 300),
+                'draft' => $row['draft'],
+                'head_sha' => self::sha(
+                    self::object($row['head'] ?? null, 'pull_request.head')['sha'] ?? null,
+                    'pull_request.head_sha'
+                ),
+                'base_ref' => self::ref(
+                    self::object($row['base'] ?? null, 'pull_request.base')['ref'] ?? null,
+                    'pull_request.base_ref'
+                ),
+                'review_state' => $reviewState,
+                'mergeability' => $mergeability,
             ];
         }
-        return ['items'=>$items,'truncated'=>count($rows)>=self::LIMIT];
+
+        return ['items' => $items, 'truncated' => $partial];
+    }
+
+    private static function mergeability(mixed $value): string
+    {
+        if ($value === true) {
+            return 'mergeable';
+        }
+        if ($value === false) {
+            return 'conflicting';
+        }
+        if ($value === null) {
+            return 'unknown';
+        }
+
+        throw new RuntimeException('Pull request mergeability invalid.');
+    }
+
+    private static function reviewState(array $rows): string
+    {
+        $rows = self::rows($rows, 'pull_request.reviews');
+
+        if ($rows === []) {
+            return 'pending';
+        }
+        if (count($rows) >= self::LIMIT) {
+            return 'unknown';
+        }
+
+        $latest = [];
+        foreach ($rows as $row) {
+            $row = self::object($row, 'pull_request.review');
+            $state = self::enum(
+                $row['state'] ?? null,
+                self::REVIEW_STATES,
+                'pull_request.review.state'
+            );
+            $user = self::object($row['user'] ?? null, 'pull_request.review.user');
+            $reviewer = self::text(
+                $user['login'] ?? null,
+                'pull_request.review.user.login',
+                100
+            );
+            $latest[$reviewer] = $state;
+        }
+
+        foreach ([
+            'CHANGES_REQUESTED' => 'changes_requested',
+            'APPROVED' => 'approved',
+            'COMMENTED' => 'commented',
+            'DISMISSED' => 'dismissed',
+            'PENDING' => 'pending',
+        ] as $raw => $normalized) {
+            if (in_array($raw, array_values($latest), true)) {
+                return $normalized;
+            }
+        }
+
+        return 'unknown';
     }
 
     private function issues(array $rows): array

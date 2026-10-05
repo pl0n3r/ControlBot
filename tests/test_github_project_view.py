@@ -69,6 +69,8 @@ def canonical_snapshot(observed_at=900):
                         "draft": False,
                         "head_sha": "b" * 40,
                         "base_ref": "main",
+                        "review_state": "approved",
+                        "mergeability": "mergeable",
                     }],
                     "truncated": False,
                 },
@@ -147,6 +149,33 @@ class GitHubProjectViewTests(unittest.TestCase):
         self.assertEqual(ambiguous["state"], "unknown")
         self.assertEqual(ambiguous["freshness"], "unknown")
         self.assertNotIn("green", json.dumps(ambiguous).lower())
+
+    def test_pr_review_and_mergeability_preserve_partial_unknown_and_freshness(self):
+        current = project(canonical_snapshot())
+        pr = current["repositories"][0]["pull_requests"]["items"][0]
+        self.assertEqual(pr["review_state"], "approved")
+        self.assertEqual(pr["mergeability"], "mergeable")
+        self.assertEqual(current["repositories"][0]["state"], "current")
+
+        unknown_review = canonical_snapshot()
+        unknown_review["repositories"][0]["pull_requests"]["items"][0]["review_state"] = "unknown"
+        projected = project(unknown_review)
+        self.assertEqual(projected["repositories"][0]["state"], "unknown")
+        self.assertEqual(projected["state"], "unknown")
+
+        unknown_merge = canonical_snapshot()
+        unknown_merge["repositories"][0]["pull_requests"]["items"][0]["mergeability"] = "unknown"
+        projected = project(unknown_merge)
+        self.assertEqual(projected["repositories"][0]["state"], "unknown")
+
+        partial = canonical_snapshot()
+        partial["repositories"][0]["pull_requests"]["truncated"] = True
+        projected = project(partial)
+        self.assertEqual(projected["repositories"][0]["state"], "unknown")
+
+        stale = project(canonical_snapshot(observed_at=500), now=1_000, max_age=300)
+        self.assertEqual(stale["repositories"][0]["freshness"], "stale")
+        self.assertEqual(stale["repositories"][0]["state"], "unknown")
 
 
 if __name__ == "__main__":

@@ -9,6 +9,8 @@ final class GitHubProjectView
 {
     private const STATES=['queued','in_progress','completed','waiting','requested','pending'];
     private const CONCLUSIONS=['success','failure','neutral','cancelled','skipped','timed_out','action_required','stale','startup_failure'];
+    private const REVIEW_STATES = ['approved', 'changes_requested', 'commented', 'dismissed', 'pending', 'unknown'];
+    private const MERGEABILITY = ['mergeable', 'conflicting', 'unknown'];
     private const LIMIT=100;
 
     public static function project(array $snapshot,int $now,int $maxAgeSeconds=300): array
@@ -54,7 +56,13 @@ final class GitHubProjectView
         $checks=self::collection($row['checks'],'checks');
         $prs=self::collection($row['pull_requests'],'pull_requests');
         $issues=self::collection($row['issues'],'issues');
-        $partial=$checks['truncated']||$prs['truncated']||$issues['truncated'];
+        $partial = $checks['truncated'] || $prs['truncated'] || $issues['truncated'];
+        foreach ($prs['items'] as $pr) {
+            if ($pr['review_state'] === 'unknown' || $pr['mergeability'] === 'unknown') {
+                $partial = true;
+                break;
+            }
+        }
         return [
             'repository_id'=>self::id($row['repository_id'],'repository_id'),
             'repository'=>$repository,
@@ -94,13 +102,28 @@ final class GitHubProjectView
 
     private static function pullRequest(mixed $row): array
     {
-        self::fields($row,['number','title','draft','head_sha','base_ref'],'pull_request');
+        self::fields(
+            $row,
+            ['number', 'title', 'draft', 'head_sha', 'base_ref', 'review_state', 'mergeability'],
+            'pull_request'
+        );
+
         return [
-            'number'=>self::natural($row['number'],'pull_request.number'),
-            'title'=>self::text($row['title'],'pull_request.title',300),
-            'draft'=>self::boolean($row['draft'],'pull_request.draft'),
-            'head_sha'=>self::sha($row['head_sha'],'pull_request.head_sha'),
-            'base_ref'=>self::ref($row['base_ref'],'pull_request.base_ref'),
+            'number' => self::natural($row['number'], 'pull_request.number'),
+            'title' => self::text($row['title'], 'pull_request.title', 300),
+            'draft' => self::boolean($row['draft'], 'pull_request.draft'),
+            'head_sha' => self::sha($row['head_sha'], 'pull_request.head_sha'),
+            'base_ref' => self::ref($row['base_ref'], 'pull_request.base_ref'),
+            'review_state' => self::choice(
+                $row['review_state'],
+                self::REVIEW_STATES,
+                'pull_request.review_state'
+            ),
+            'mergeability' => self::choice(
+                $row['mergeability'],
+                self::MERGEABILITY,
+                'pull_request.mergeability'
+            ),
         ];
     }
 

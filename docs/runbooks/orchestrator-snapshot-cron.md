@@ -2,6 +2,8 @@
 
 El colector `scripts/orchestrator-evidence-collector.php` hace GET read-only a GitHub y el wrapper `scripts/orchestrator-snapshot-cron.php` consume la evidencia local. El colector permanece apagado por defecto y el wrapper también; ambos quedan fuera de requests web.
 
+Guardrails de transporte: el adapter es **HTTPS-only** sobre `https://api.github.com` y fuerza `CURLPROTO_HTTPS`. Un primer 5xx puede conservar body no-JSON para que el collector lo contabilice y haga un **retry 5xx** único; solo HTTP 200 exige JSON válido. Factory **Issue #767** se acepta como RUNNING únicamente con número exacto 767, autor `pl0n3r` y un único marker canónico; cualquier ambigüedad falla cerrado.
+
 El colector publica únicamente evidencia que los contratos actuales pueden demostrar. Para Issues con labels de workflow allowlisted conserva `signal.state=pending` y `data.labels` sin derivar un `data.status`; el consumidor los presenta como `unknown`. Los PRs abiertos usan `data.status=in_review`, los bloqueos viven solo en `blockers` y el PR fusionado reciente usa `data.status=merged`. Un **PR fusionado no equivale a release**: `releases` permanece vacío hasta disponer de provenance real de tag/release. **No fabrica `work_inventory`, ranking ni porcentajes**.
 
 ## Credencial read-only fuera del repo
@@ -40,7 +42,7 @@ export CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.co
 /opt/alt/php85/usr/bin/php scripts/orchestrator-evidence-collector.php && /opt/alt/php85/usr/bin/php scripts/orchestrator-snapshot-cron.php
 ```
 
-El colector usa un máximo de 40 requests reales. Issues pueden paginar como máximo dos páginas de 100 y fallan cerrado si existiría una tercera; closed PRs consultan solo **una página reciente** de 100 porque únicamente se publica el primer merge observado y no se recorre historial. El snapshot admite como máximo 24 fronts: si el trabajo activo excede el contrato, el colector falla cerrado en vez de truncar o rankear. Ante rate-limit/error/budget excedido conserva el archivo anterior mediante reemplazo atómico.
+El colector usa un máximo de 40 requests reales y un budget acumulado de **2 MB** de bytes descargados; la evidencia serializada también está limitada a 2 MB. Cada retry consume requests y bytes reales, sin fallback estimado. Issues pueden paginar como máximo dos páginas de 100 y fallan cerrado si existiría una tercera; closed PRs consultan solo **una página reciente** de 100 porque únicamente se publica el primer merge observado y no se recorre historial. El snapshot admite como máximo 24 fronts: si el trabajo activo excede el contrato, el colector falla cerrado en vez de truncar o rankear. Ante rate-limit/error/budget excedido conserva el archivo anterior mediante reemplazo atómico.
 
 ## Cron en hPanel
 

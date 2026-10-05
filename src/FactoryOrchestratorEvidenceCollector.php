@@ -88,7 +88,7 @@ final class FactoryOrchestratorEvidenceCollector
                     self::appendWork($work,self::signal(
                         'work:'.strtolower($name).'-pr-'.$number,
                         'github_project_snapshot','pending',$repo,$number,
-                        ['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'pending'],
+                        ['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'in_review'],
                         $now
                     ));
                     continue;
@@ -106,7 +106,7 @@ final class FactoryOrchestratorEvidenceCollector
                     self::appendWork($work,self::signal(
                         'work:'.strtolower($name).'-'.$number,
                         'github_project_snapshot','pending',$repo,$number,
-                        ['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'pending','labels'=>$workflowLabels],
+                        ['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'unknown','labels'=>$workflowLabels],
                         $now
                     ));
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))

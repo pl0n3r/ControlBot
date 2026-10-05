@@ -1,5 +1,6 @@
 import json, os, subprocess, tempfile, unittest
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 ROOT=Path(__file__).resolve().parents[1]
 
 def scenario(name):
@@ -124,6 +125,27 @@ $marker='<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","own
 ''')
   self.assertFalse(data["valid"])
   for key in ("wrong_number","wrong_author","duplicate","paused"): self.assertTrue(data[key],key)
+
+ def test_work_evidence_preserves_allowlisted_labels_without_parallel_status_derivation(self):
+  d=scenario("canonical")
+  available=next(row for row in d["evidence"]["work"] if row["id"].endswith("-10"))
+  self.assertEqual("pending",available["state"]);self.assertEqual(["estado: disponible"],available["data"]["labels"]);self.assertNotIn("status",available["data"])
+  self.assertEqual("unknown",next(row for row in d["snapshot"]["fronts"] if row["issue_ref"].endswith("#10"))["status"])
+  self.assertFalse(any(row["id"].endswith("-11") for row in d["evidence"]["work"]))
+  self.assertTrue(any(row["id"].endswith("-11") for row in d["evidence"]["blockers"]))
+  opened=next(row for row in d["evidence"]["work"] if row["id"].endswith("-pr-13"));self.assertEqual("in_review",opened["data"]["status"])
+  source=(ROOT/"src/FactoryOrchestratorEvidenceCollector.php").read_text(encoding="utf-8");self.assertNotIn("function status(",source)
+
+ def test_recent_merged_pr_lookup_is_bounded_and_runbook_matches_guardrails(self):
+  d=scenario("canonical");pull_urls=[x["url"] for x in d["calls"] if urlparse(x["url"]).path.endswith("/pulls")]
+  self.assertEqual(7,len(pull_urls))
+  for url in pull_urls:
+   query=parse_qs(urlparse(url).query);self.assertEqual(["100"],query.get("per_page"));self.assertEqual(["1"],query.get("page"))
+  self.assertFalse(any("page=2" in url for url in pull_urls))
+  self.assertEqual([],d["evidence"]["releases"])
+  merged=[row for row in d["evidence"]["work"] if row["data"].get("status")=="merged"];self.assertEqual(7,len(merged))
+  doc=(ROOT/"docs/runbooks/orchestrator-snapshot-cron.md").read_text(encoding="utf-8")
+  for phrase in ("PR fusionado", "una página reciente", "signal.state=pending", "data.status=in_review", "releases"): self.assertIn(phrase,doc)
 
  def test_token_never_appears_in_output_logs_evidence_or_snapshot(self):
   d=scenario("canonical");blob=json.dumps(d);self.assertNotIn("sentinel-read-value",blob);self.assertTrue(all(x["authorized"] for x in d["calls"]))

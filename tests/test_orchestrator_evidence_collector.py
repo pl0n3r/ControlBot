@@ -56,6 +56,8 @@ echo json_encode(["result"=>$result,"calls"=>$calls,"byte_failed"=>$failed,"prev
 
 
  def test_transport_requires_real_bytes_and_retries_non_json_5xx(self):
+  negative=scenario("transport-negative-branches")
+  self.assertTrue(all(negative["failed"]));self.assertEqual(502,negative["retry"]["status"]);self.assertNotIn("json",negative["retry"])
   data=php_eval(r'''
 require "src/FactoryOrchestratorEvidenceCollector.php";
 use ControlBot\Business\FactoryOrchestratorEvidenceCollector;

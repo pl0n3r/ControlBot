@@ -6,6 +6,8 @@ El colector publica únicamente evidencia que los contratos actuales pueden demo
 
 ## Credencial read-only fuera del repo
 
+La credencial y sus valores concretos permanecen **fuera del repositorio** y se administran únicamente en la configuración privada del servidor.
+
 Crea un fine-grained personal access token limitado a los siete repos gobernados con **Metadata: read**, **Issues: read** y **Pull requests: read**; sin permisos de escritura.
 
 En el servidor, guárdalo sin eco:
@@ -31,7 +33,7 @@ El colector usa un máximo de 40 requests, pagina como máximo dos páginas por 
 
 ## Cron en hPanel
 
-Cuando el dueño lo decida, programa cada 5 minutos el mismo encadenamiento `colector && wrapper` con `/opt/alt/php85/usr/bin/php` y variables privadas del servidor. Este runbook no cambia `DOMAIN`, `DEPLOY_ENABLED`, DNS ni go-live.
+Este runbook **no contiene una expresión de cron instalable** ni modifica hPanel por sí mismo. Cuando el dueño lo decida, programa cada 5 minutos el mismo encadenamiento `colector && wrapper` con `/opt/alt/php85/usr/bin/php` y variables privadas del servidor. Este runbook no cambia `DOMAIN`, `DEPLOY_ENABLED`, DNS ni go-live. **ControlBot #625** conserva la autoridad separada de producción y activación live.
 
 ## Reversión
 

@@ -19,7 +19,7 @@ class HostingerPublicApiRuntimeTests(unittest.TestCase):
  def test_scope_provider_kind_revocation_and_generation_fail_closed_before_transport(self):
   d=scenario("scope")
   self.assertEqual(0,d["transport_calls"])
-  self.assertEqual("secret_reference_incompatible",d["cases"]["capability"]["reason"])
+  self.assertEqual("secret_scope_mismatch",d["cases"]["capability"]["reason"])
   self.assertEqual("secret_scope_mismatch",d["cases"]["project"]["reason"])
   self.assertEqual("secret_scope_mismatch",d["cases"]["environment"]["reason"])
   self.assertEqual("secret_scope_mismatch",d["cases"]["generation"]["reason"])

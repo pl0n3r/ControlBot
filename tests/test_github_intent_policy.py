@@ -10,20 +10,41 @@ def scenario(name):
 class GitHubIntentPolicyTests(unittest.TestCase):
     def test_policy_reuses_existing_capability_and_approval_contracts_without_execution(self):
         data=scenario("reuse")
-        self.assertEqual(data["allow"]["decision"],"allow")
-        self.assertEqual(data["owner_required"]["decision"],"owner_decision_required")
-        self.assertEqual(data["owner_allow"]["decision"],"allow")
+        self.assertTrue(all(row["decision"]=="deny" for row in data.values()))
+        self.assertTrue(all(row["reasons"]==["untrusted_evidence_freshness"] for row in data.values()))
         self.assertTrue(all(row["execution"] is False for row in data.values()))
 
     def test_unknown_stale_scope_mismatch_or_missing_authority_fails_closed_without_adapter_calls(self):
         data=scenario("closed")
         self.assertEqual(data["unknown"]["decision"],"unknown")
-        self.assertEqual(data["stale"]["decision"],"deny")
-        self.assertEqual(data["scope_mismatch"]["decision"],"deny")
-        self.assertEqual(data["missing_authority"]["decision"],"deny")
-        self.assertNotEqual(data["ambiguous"]["decision"],"allow")
+        self.assertEqual(data["stale"]["reasons"],["stale_evidence"])
+        self.assertTrue(all(row["decision"]!="allow" for row in data.values()))
         source=(ROOT/"src"/"GitHubIntentPolicy.php").read_text(encoding="utf-8").lower()
         for forbidden in ("curl_init(","file_get_contents('http",'file_get_contents("http',"shell_exec(","exec(","system(","proc_open(","githubgateway","github_pat_"):
             self.assertNotIn(forbidden,source)
+
+    def test_semantically_unbound_capability_never_allows_github_intent(self):
+        data=scenario("binding")
+        self.assertTrue(all(row["decision"]=="deny" for row in data.values()))
+        self.assertTrue(all(row["reasons"]==["untrusted_evidence_freshness"] for row in data.values()))
+        self.assertTrue(all(row["execution"] is False for row in data.values()))
+        source=(ROOT/"src"/"GitHubIntentPolicy.php").read_text(encoding="utf-8")
+        self.assertNotIn("context['capability']",source)
+
+    def test_freshness_without_evidence_binding_never_allows(self):
+        data=scenario("freshness")
+        self.assertEqual(data["unbound_ref"]["reasons"],["evidence_mismatch"])
+        self.assertEqual(data["raw_fresh"]["reasons"],["untrusted_evidence_freshness"])
+        self.assertEqual(data["stale_ref"]["reasons"],["stale_evidence"])
+        self.assertTrue(all(row["decision"]=="deny" for row in data.values()))
+
+    def test_invalid_execution_context_time_and_authority_fail_closed(self):
+        data=scenario("invalid_context")
+        self.assertEqual(data["execution"]["decision"],"unknown")
+        self.assertEqual(data["execution"]["reasons"],["invalid_intent"])
+        for key in ("list_context","extra_context","zero_now","future_observed","bad_ttl","bad_authority"):
+            self.assertEqual(data[key]["decision"],"deny")
+            self.assertEqual(data[key]["reasons"],["invalid_authority"])
+            self.assertFalse(data[key]["execution"])
 
 if __name__=="__main__": unittest.main()

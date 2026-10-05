@@ -29,15 +29,17 @@ final class FactoryOrchestratorEvidenceCollector
                 $remaining=$r['headers']['x-ratelimit-remaining']??null;
                 if(is_numeric($remaining)&&(int)$remaining<5)throw new RuntimeException('rate limit low.');
                 if($r['status']>=500&&$attempt===0)continue;
-                if($r['status']!==200||!is_array($r['json']??null)||!array_is_list($r['json']))throw new RuntimeException('github read failed.');
+                if($r['status']!==200||!is_array($r['json']??null))throw new RuntimeException('github read failed.');
                 return $r['json'];
             }
             throw new RuntimeException('github read failed.');
         };
         $paged=static function(string $path,array $query=[])use($get):array{
             $query['per_page']=100;$query['page']=1;$first=$get($path,$query);
+            if(!array_is_list($first))throw new RuntimeException('github page invalid.');
             if(count($first)<100)return $first;
             $query['page']=2;$second=$get($path,$query);
+            if(!array_is_list($second))throw new RuntimeException('github page invalid.');
             if(count($second)===100)throw new RuntimeException('github pagination exceeded.');
             return [...$first,...$second];
         };

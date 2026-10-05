@@ -251,126 +251,46 @@ final class FactoryOrchestratorEvidenceCollector
     private static function ownerDecisionData(array $row,string $repo,int $number): array
     {
         $title=self::boundedUntrustedText($row['title']??null,160)??('Issue '.$number);
-        $legacy=[
-            'issue_ref'=>'github:'.$repo.'#'.$number,
-            'repository_ref'=>$repo,
-            'issue_number'=>$number,
-            'format'=>'legacy',
-            'title'=>$title,
-            'title_simple'=>null,
-            'summary_simple'=>null,
-            'explain_simple'=>null,
-            'why_recommended'=>null,
-            'blocks'=>null,
-            'options'=>[],
-            'recommendation'=>null,
-            'safe_default'=>null,
-            'expires_at'=>null,
-        ];
-        $body=$row['body']??null;
-        if(!is_string($body)||strlen($body)>self::MAX_DECISION_BODY_BYTES)return $legacy;
-
-        $count=preg_match_all('/<!--\s*factory-human-gate\s+(\{.*?\})\s*-->/s',$body,$matches);
-        if($count!==1)return $legacy;
-        try{$gate=json_decode($matches[1][0],true,8,JSON_THROW_ON_ERROR);}catch(Throwable){return $legacy;}
+        $legacy=['issue_ref'=>'github:'.$repo.'#'.$number,'repository_ref'=>$repo,'issue_number'=>$number,'format'=>'legacy','title'=>$title,'title_simple'=>null,'summary_simple'=>null,'explain_simple'=>null,'why_recommended'=>null,'blocks'=>null,'options'=>[],'recommendation'=>null,'safe_default'=>null,'expires_at'=>null];
+        $body=$row['body']??null;if(!is_string($body)||strlen($body)>self::MAX_DECISION_BODY_BYTES)return $legacy;
+        $count=preg_match_all('/<!--\\s*factory-human-gate\\s+(.+?)\\s*-->/s',$body,$matches);if($count!==1)return $legacy;
+        try{$gate=json_decode($matches[1][0],true,16,JSON_THROW_ON_ERROR);}catch(Throwable){return $legacy;}
         if(!is_array($gate)||array_is_list($gate))return $legacy;
-
-        $titleSimple=self::boundedPlainText($gate['title_simple']??null,160);
-        $summary=self::boundedPlainText($gate['summary_simple']??null,600);
-        $why=self::boundedPlainText($gate['why_recommended']??null,600);
-        $blocks=self::boundedPlainText($gate['blocks']??null,600);
-        $explain=self::boundedPlainText($gate['explain_simple']??null,600,true);
-        $recommendation=$gate['recommendation']??null;
-        $safeDefault=$gate['safe_default']??null;
-        $rawOptions=$gate['options']??null;
-        if(
-            $titleSimple===null||$summary===null||$why===null||$blocks===null
-            ||!is_string($recommendation)||!is_string($safeDefault)
-            ||!is_array($rawOptions)||!array_is_list($rawOptions)
-            ||count($rawOptions)<1||count($rawOptions)>self::MAX_DECISION_OPTIONS
-        )return $legacy;
-
+        $text=static fn(mixed $v,int $n,bool $o=false):?string=>self::boundedPlainText($v,$n,$o);
+        $titleSimple=$text($gate['title_simple']??null,160);$summary=$text($gate['summary_simple']??null,600);$why=$text($gate['why_recommended']??null,600);$blocks=$text($gate['blocks']??null,600);$explain=$text($gate['explain_simple']??null,600,true);
+        $recommendation=$gate['recommendation']??null;$safeDefault=$gate['safe_default']??null;$raw=$gate['options']??null;
+        if($titleSimple===null||$summary===null||$why===null||$blocks===null||!is_string($recommendation)||!is_string($safeDefault)||!is_array($raw)||!array_is_list($raw)||$raw===[]||count($raw)>self::MAX_DECISION_OPTIONS)return $legacy;
         $options=[];$ids=[];
-        foreach($rawOptions as $option){
-            if(!is_array($option)||array_is_list($option))return $legacy;
-            $id=$option['id']??null;
-            if(!is_string($id)||!in_array($id,self::DECISION_OPTION_IDS,true)||isset($ids[$id]))return $legacy;
-            $label=self::boundedPlainText($option['label']??null,200);
-            $effect=self::boundedPlainText($option['effect']??null,600);
-            $risk=self::boundedPlainText($option['risk']??null,80);
-            $cost=self::boundedPlainText($option['cost']??null,240,true);
-            $optionExplain=self::boundedPlainText($option['explain_simple']??null,400,true);
-            $pros=self::boundedTextList($option['pros']??[],6,300);
-            $cons=self::boundedTextList($option['cons']??[],6,300);
-            if($label===null||$effect===null||$risk===null||$pros===null||$cons===null||!is_bool($option['reversible']??null))return $legacy;
-            $ids[$id]=true;
-            $options[]=[
-                'id'=>$id,'label'=>$label,'effect'=>$effect,'pros'=>$pros,'cons'=>$cons,
-                'risk'=>$risk,'cost'=>$cost,'reversible'=>$option['reversible'],'explain_simple'=>$optionExplain,
-            ];
+        foreach($raw as $o){
+            if(!is_array($o)||array_is_list($o))return $legacy;$id=$o['id']??null;
+            if(!is_string($id)||!in_array($id,self::DECISION_OPTION_IDS,true)||isset($ids[$id])||!is_bool($o['reversible']??null))return $legacy;
+            $pros=self::boundedTextList($o['pros']??null,6,300);$cons=self::boundedTextList($o['cons']??null,6,300);
+            $label=$text($o['label']??null,200);$effect=$text($o['effect']??null,600);$risk=$text($o['risk']??null,80);$cost=$text($o['cost']??null,240,true);$oe=$text($o['explain_simple']??null,400,true);
+            if($label===null||$effect===null||$risk===null||$pros===null||$cons===null)return $legacy;
+            $ids[$id]=true;$options[]=['id'=>$id,'label'=>$label,'effect'=>$effect,'pros'=>$pros,'cons'=>$cons,'risk'=>$risk,'cost'=>$cost,'reversible'=>$o['reversible'],'explain_simple'=>$oe];
         }
         if(!isset($ids[$recommendation])||!isset($ids[$safeDefault]))return $legacy;
-
-        $expiresAt=null;
-        $windowCount=preg_match_all('/<!--\s*factory-release-window\s+(\{.*?\})\s*-->/s',$body,$windows);
-        if($windowCount>1)return $legacy;
-        if($windowCount===1){
-            try{$window=json_decode($windows[1][0],true,8,JSON_THROW_ON_ERROR);}catch(Throwable){return $legacy;}
-            if(!is_array($window)||array_is_list($window))return $legacy;
-            $candidate=$window['expires_at']??null;
-            if(!is_string($candidate)||preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D',$candidate)!==1||strtotime($candidate)===false)return $legacy;
-            $expiresAt=$candidate;
-        }
-
-        return $legacy+[
-            'format'=>'structured',
-            'title_simple'=>$titleSimple,
-            'summary_simple'=>$summary,
-            'explain_simple'=>$explain,
-            'why_recommended'=>$why,
-            'blocks'=>$blocks,
-            'options'=>$options,
-            'recommendation'=>$recommendation,
-            'safe_default'=>$safeDefault,
-            'expires_at'=>$expiresAt,
-        ];
+        $expiresAt=null;$wc=preg_match_all('/<!--\\s*factory-release-window\\s+(.+?)\\s*-->/s',$body,$wm);if($wc>1)return $legacy;
+        if($wc===1){try{$w=json_decode($wm[1][0],true,8,JSON_THROW_ON_ERROR);}catch(Throwable){return $legacy;}$expiresAt=$w['expires_at']??null;if(!is_string($expiresAt)||preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/D',$expiresAt)!==1||strtotime($expiresAt)===false)return $legacy;}
+        return $legacy+['format'=>'structured','title_simple'=>$titleSimple,'summary_simple'=>$summary,'explain_simple'=>$explain,'why_recommended'=>$why,'blocks'=>$blocks,'options'=>$options,'recommendation'=>$recommendation,'safe_default'=>$safeDefault,'expires_at'=>$expiresAt];
     }
 
     private static function boundedTextList(mixed $raw,int $maxItems,int $maxLength): ?array
     {
-        if(!is_array($raw)||!array_is_list($raw)||count($raw)>$maxItems)return null;
-        $out=[];
-        foreach($raw as $value){
-            $text=self::boundedPlainText($value,$maxLength);
-            if($text===null)return null;
-            $out[]=$text;
-        }
-        return $out;
+        if(!is_array($raw)||!array_is_list($raw)||count($raw)>$maxItems)return null;$out=[];
+        foreach($raw as $value){$text=self::boundedPlainText($value,$maxLength);if($text===null)return null;$out[]=$text;}return $out;
     }
 
     private static function boundedUntrustedText(mixed $value,int $maxLength): ?string
     {
-        if(!is_string($value))return null;
-        $value=trim(preg_replace('/\\s+/u',' ',$value)??'');
-        if(
-            $value===''||strlen($value)>$maxLength
-            ||preg_match('/[\\x00-\\x1f\\x7f]/',$value)===1
-        )return null;
-        return $value;
+        if(!is_string($value))return null;$value=trim(preg_replace('/\\s+/u',' ',$value)??'');
+        return $value!==''&&strlen($value)<=$maxLength&&preg_match('/[\\x00-\\x1f\\x7f]/',$value)!==1?$value:null;
     }
 
     private static function boundedPlainText(mixed $value,int $maxLength,bool $optional=false): ?string
     {
-        if($value===null&&$optional)return null;
-        if(!is_string($value))return null;
-        $value=trim(preg_replace('/\s+/u',' ',$value)??'');
-        if(
-            $value===''||strlen($value)>$maxLength
-            ||preg_match('/[\x00-\x1f\x7f]/',$value)===1
-            ||str_contains($value,'<')||str_contains($value,'>')
-            ||preg_match('~(?:https?://|javascript:)~i',$value)===1
-        )return null;
-        return $value;
+        if($value===null&&$optional)return null;if(!is_string($value))return null;$value=trim(preg_replace('/\\s+/u',' ',$value)??'');
+        return $value!==''&&strlen($value)<=$maxLength&&preg_match('/[\\x00-\\x1f\\x7f]/',$value)!==1&&!str_contains($value,'<')&&!str_contains($value,'>')?$value:null;
     }
 
     private static function appendWork(array &$rows,array $row): void

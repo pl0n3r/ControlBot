@@ -397,5 +397,181 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
             self.assertTrue(result["ok"]); self.assertEqual(result["r"]["fingerprint"], json.loads(rename_snapshot.read_text())["fingerprint"])
 
 
+    def test_cron_classifies_invalid_clock_and_target_before_refresh(self) -> None:
+        source = ROOT / "src/FactoryOrchestratorSnapshotCron.php"
+
+        def invoke(snapshot: str, now: int) -> str:
+            code = (
+                "require $argv[1];"
+                "try{\\ControlBot\\Business\\FactoryOrchestratorSnapshotCron::run("
+                "['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],"
+                "static fn():array=>[],$argv[2],(int)$argv[3]);echo 'ok';}"
+                "catch(\\ControlBot\\Business\\FactoryOrchestratorSnapshotRefreshFailure $e){"
+                "echo $e->failureCode();}"
+            )
+            result = subprocess.run(
+                ["php", "-r", code, str(source), snapshot, str(now)],
+                cwd=ROOT, text=True, capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+            return result.stdout
+
+        self.assertEqual("clock_invalid", invoke("/tmp/controlbot-clock.json", 0))
+        self.assertEqual("snapshot_target_invalid", invoke("relative.json", 1))
+
+    def test_diagnostics_are_opt_in_bounded_and_never_expose_paths(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="private-secret-") as directory:
+            root = Path(directory)
+            evidence_path = root / "invalid-evidence.json"
+            evidence_path.write_text("{broken-json")
+            snapshot_path = root / "snapshot.json"
+
+            env = base_environment()
+            env["CONTROLBOT_ORCHESTRATOR_CRON_ENABLED"] = "1"
+            env["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"] = str(evidence_path)
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"] = str(snapshot_path)
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS"] = "1"
+
+            result = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(70, result.returncode)
+            self.assertRegex(
+                result.stderr,
+                r"^orchestrator-snapshot-cron: evidence_invalid "
+                r"dir_exists=1 dir_writable=[01] "
+                r"dir_owner_match=(?:0|1|unknown) dir_mode=(?:[0-7]{4}|unknown)\n$",
+            )
+            self.assertNotIn(str(root), result.stderr)
+            self.assertNotIn("broken-json", result.stderr)
+
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"] = str(root / "missing" / "snapshot.json")
+            missing = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(70, missing.returncode)
+            self.assertIn(
+                "dir_exists=0 dir_writable=0 dir_owner_match=unknown dir_mode=unknown",
+                missing.stderr,
+            )
+            self.assertNotIn(str(root), missing.stderr)
+
+    def test_wrapper_rejects_invalid_evidence_shapes_and_relative_target(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evidence_path = root / "evidence.json"
+            snapshot_path = root / "snapshot.json"
+
+            env = base_environment()
+            env["CONTROLBOT_ORCHESTRATOR_CRON_ENABLED"] = "1"
+            env["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"] = str(evidence_path)
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"] = str(snapshot_path)
+
+            evidence_path.write_text("[]")
+            listed = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(70, listed.returncode)
+            self.assertEqual("orchestrator-snapshot-cron: evidence_invalid\n", listed.stderr)
+
+            evidence_path.write_text(" ")
+            tiny = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(70, tiny.returncode)
+            self.assertEqual("orchestrator-snapshot-cron: evidence_invalid\n", tiny.stderr)
+
+            evidence_path.write_text(json.dumps(canonical_evidence(int(time.time()))))
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"] = "relative.json"
+            relative = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(70, relative.returncode)
+            self.assertEqual("orchestrator-snapshot-cron: snapshot_target_invalid\n", relative.stderr)
+
+    def test_refresh_io_failures_cleanup_and_restore_previous_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot = root / "snapshot.json"
+            snapshot.write_text("previous\n")
+
+            short_write = self.refresh_case(
+                snapshot,
+                io="['write_temp'=>static fn($p,$d)=>0]",
+            )
+            self.assertEqual("temp_write_failed", short_write["code"])
+            self.assertEqual("previous\n", snapshot.read_text())
+            self.assertEqual([], list(root.glob(".orchestrator-live-*")))
+
+            unsafe_mode = self.refresh_case(
+                snapshot,
+                io=(
+                    "['tempnam'=>static function($d,$p){"
+                    "$f=$d.'/unsafe.tmp';file_put_contents($f,'');chmod($f,0666);return $f;},"
+                    "'chmod'=>static fn($p,$m)=>false]"
+                ),
+            )
+            self.assertEqual("temp_write_failed", unsafe_mode["code"])
+            self.assertFalse((root / "unsafe.tmp").exists())
+            self.assertEqual("previous\n", snapshot.read_text())
+
+            rollback = self.refresh_case(
+                snapshot,
+                io=(
+                    "['rename'=>static fn($a,$b)=>false,"
+                    "'write_target'=>static fn($p,$d)=>file_put_contents($p,'broken',LOCK_EX)]"
+                ),
+            )
+            self.assertEqual("atomic_rename_failed", rollback["code"])
+            self.assertEqual("previous\n", snapshot.read_text())
+
+            absent = root / "absent.json"
+            no_previous = self.refresh_case(
+                absent,
+                io=(
+                    "['rename'=>static fn($a,$b)=>false,"
+                    "'write_target'=>static fn($p,$d)=>file_put_contents($p,'broken',LOCK_EX)]"
+                ),
+            )
+            self.assertEqual("atomic_rename_failed", no_previous["code"])
+            self.assertFalse(absent.exists())
+
+            internal = self.refresh_case(
+                snapshot,
+                io="['tempnam'=>static function($d,$p){throw new Error('secret path');}]",
+            )
+            self.assertEqual("internal_error", internal["code"])
+            self.assertNotIn("secret", json.dumps(internal).lower())
+
+    def test_refresh_rejects_unsafe_targets_and_invalid_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                "snapshot_target_invalid",
+                self.refresh_case(root, now=int(time.time()))["code"],
+            )
+            self.assertEqual(
+                "snapshot_target_invalid",
+                self.refresh_case(root / "limit.json", max_bytes=2_000_001)["code"],
+            )
+
+            real = root / "real.json"
+            real.write_text("previous\n")
+            linked = root / "linked.json"
+            try:
+                linked.symlink_to(real)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable")
+            self.assertEqual(
+                "snapshot_target_invalid",
+                self.refresh_case(linked)["code"],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

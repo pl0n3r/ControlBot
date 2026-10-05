@@ -10,16 +10,23 @@ def scenario(name):
 class GitHubIntentPreviewTests(unittest.TestCase):
     def test_preview_exposes_allowlisted_intent_policy_approval_and_evidence_with_execution_false(self):
         data=scenario("preview")
-        allow=data["allow"]; owner=data["owner"]
-        self.assertEqual(set(allow["intent"]),{"intent_id","project_ref","repository_ref","type","params"})
-        self.assertEqual(allow["policy"]["decision"],"allow")
-        self.assertFalse(allow["approval"]["required"])
+        live=data["live"]; owner=data["owner"]
+        self.assertEqual(set(live["intent"]),{"intent_id","project_ref","repository_ref","type","params"})
+        self.assertEqual(live["policy"]["decision"],"deny")
+        self.assertEqual(live["policy"]["reasons"],["untrusted_evidence_freshness"])
+        self.assertFalse(live["approval"]["required"])
+        self.assertEqual(live["approval"]["state"],"unavailable")
         self.assertEqual(owner["policy"]["decision"],"owner_decision_required")
         self.assertTrue(owner["approval"]["required"])
-        self.assertEqual(allow["evidence_refs"],["github:evidence/main-96c31c2","controlbot:evidence/policy-679"])
-        self.assertEqual(allow["idempotency_key"],"intent:controlbot:680:1")
-        self.assertEqual(allow["mutation_controls"],[])
-        self.assertFalse(allow["execution"])
+        self.assertEqual(owner["approval"]["state"],"required")
+        self.assertEqual(live["evidence_refs"],["github:evidence/main-7369763","controlbot:evidence/policy-687"])
+        self.assertEqual(live["idempotency_key"],"intent:controlbot:680:1")
+        for row in data.values():
+            self.assertEqual(row["mutation_controls"],[])
+            self.assertFalse(row["execution"])
+        source=(ROOT/"tests"/"github_intent_preview_scenarios.php").read_text(encoding="utf-8")
+        self.assertNotIn("hostinger.read",source)
+        self.assertNotIn("database.restore",source)
 
     def test_denied_unknown_or_sensitive_context_never_exposes_mutation_controls_or_secrets(self):
         data=scenario("safe")

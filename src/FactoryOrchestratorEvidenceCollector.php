@@ -14,6 +14,27 @@ final class FactoryOrchestratorEvidenceCollector
     private const MAX_SIGNALS=50;
     private const MAX_WORK_SIGNALS=24;
 
+    public static function validateLiveRequest(string $method,string $url): void
+    {
+        if($method!=='GET')throw new RuntimeException('method denied.');
+        $parts=parse_url($url);
+        if(!is_array($parts))throw new RuntimeException('github url denied.');
+        if(($parts['scheme']??null)!=='https')throw new RuntimeException('github url denied.');
+        if(($parts['host']??null)!=='api.github.com')throw new RuntimeException('github url denied.');
+        if(isset($parts['user'])||isset($parts['pass']))throw new RuntimeException('github url denied.');
+        if(isset($parts['port'])&&(int)$parts['port']!==443)throw new RuntimeException('github url denied.');
+    }
+
+    public static function normalizeLiveResponse(int $status,array $headers,mixed $body): array
+    {
+        if(!is_string($body)||strlen($body)>self::MAX_BYTES)throw new RuntimeException('github response invalid.');
+        $base=['status'=>$status,'headers'=>$headers,'bytes'=>strlen($body)];
+        if($status!==200)return $base;
+        $json=json_decode($body,true,64,JSON_THROW_ON_ERROR);
+        if(!is_array($json))throw new RuntimeException('github json invalid.');
+        return $base+['json'=>$json];
+    }
+
     public static function run(array $env,callable $transport,int $now): array
     {
         if(($env['CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED']??'')!=='1')return ['executed'=>false,'state'=>'disabled'];
@@ -31,7 +52,9 @@ final class FactoryOrchestratorEvidenceCollector
                     'User-Agent'=>'controlbot-orchestrator-evidence-collector/1',
                     'X-GitHub-Api-Version'=>'2022-11-28',
                 ]);
-                if(!is_array($r)||array_is_list($r)||!is_int($r['status']??null)||!is_array($r['headers']??null)||!array_key_exists('bytes',$r)||!is_int($r['bytes'])||$r['bytes']<0)throw new RuntimeException('transport invalid.');
+                if(!is_array($r)||array_is_list($r))throw new RuntimeException('transport invalid.');
+                if(!is_int($r['status']??null)||!is_array($r['headers']??null))throw new RuntimeException('transport invalid.');
+                if(!array_key_exists('bytes',$r)||!is_int($r['bytes'])||$r['bytes']<0)throw new RuntimeException('transport invalid.');
                 if(($downloadBytes+=$r['bytes'])>self::MAX_BYTES)throw new RuntimeException('download byte budget exceeded.');
                 if(isset($r['headers']['retry-after']))throw new RuntimeException('github retry deferred.');
                 $remaining=$r['headers']['x-ratelimit-remaining']??null;
@@ -98,7 +121,10 @@ final class FactoryOrchestratorEvidenceCollector
 
     private static function killSwitchRunning(mixed $issue): bool
     {
-        if(!is_array($issue)||array_is_list($issue)||($issue['number']??null)!==767||($issue['user']['login']??null)!=='pl0n3r'||!is_string($issue['body']??null))return false;
+        if(!is_array($issue)||array_is_list($issue))return false;
+        if(($issue['number']??null)!==767)return false;
+        if(($issue['user']['login']??null)!=='pl0n3r')return false;
+        if(!is_string($issue['body']??null))return false;
         $count=preg_match_all('/<!--\s*factory-unattended-kill-switch\s+(\{.*?\})\s*-->/s',$issue['body'],$matches);
         if($count!==1)return false;
         try{$marker=json_decode($matches[1][0],true,8,JSON_THROW_ON_ERROR);}catch(\Throwable){return false;}

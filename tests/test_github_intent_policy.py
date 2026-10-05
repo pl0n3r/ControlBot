@@ -38,4 +38,13 @@ class GitHubIntentPolicyTests(unittest.TestCase):
         self.assertEqual(data["stale_ref"]["reasons"],["stale_evidence"])
         self.assertTrue(all(row["decision"]=="deny" for row in data.values()))
 
+    def test_invalid_execution_context_time_and_authority_fail_closed(self):
+        data=scenario("invalid_context")
+        self.assertEqual(data["execution"]["decision"],"unknown")
+        self.assertEqual(data["execution"]["reasons"],["invalid_intent"])
+        for key in ("list_context","extra_context","zero_now","future_observed","bad_ttl","bad_authority"):
+            self.assertEqual(data[key]["decision"],"deny")
+            self.assertEqual(data[key]["reasons"],["invalid_authority"])
+            self.assertFalse(data[key]["execution"])
+
 if __name__=="__main__": unittest.main()

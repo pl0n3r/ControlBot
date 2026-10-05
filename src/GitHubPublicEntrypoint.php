@@ -100,7 +100,12 @@ final class GitHubPublicEntrypoint
 
     private static function owner(mixed $value): string
     {
-        if (!is_string($value) || trim($value) === '' || strlen($value) > 100 || preg_match('/[\x00-\x20\x7f]/', $value) === 1) {
+        if (
+            !is_string($value)
+            || trim($value) === ''
+            || strlen($value) > 100
+            || preg_match('/[\x00-\x20\x7f]/', $value) === 1
+        ) {
             throw new InvalidArgumentException('owner invalid');
         }
         return $value;

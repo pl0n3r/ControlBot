@@ -32,10 +32,10 @@ class OrchestratorEvidenceCollectorTests(unittest.TestCase):
   self.assertTrue(d["snapshot"]["fronts"])
   self.assertEqual([],d["evidence"]["releases"])
   statuses={row["data"].get("status") for row in d["evidence"]["work"]}
-  self.assertEqual({"pending","merged"},statuses)
+  self.assertEqual({"unknown","in_review","merged"},statuses)
   self.assertFalse(any(row["data"].get("status")=="blocked" for row in d["evidence"]["work"]))
   available=next(row for row in d["evidence"]["work"] if row["id"].endswith("-10"))
-  self.assertEqual(["estado: disponible"],available["data"]["labels"])
+  self.assertEqual(["estado: disponible"],available["data"]["labels"])\n  self.assertEqual("unknown",available["data"]["status"])
   self.assertTrue(any(row["id"].endswith("-11") for row in d["evidence"]["blockers"]))
   self.assertFalse(any(row["id"]=="blocker:factory-767" for row in d["evidence"]["blockers"]))
 

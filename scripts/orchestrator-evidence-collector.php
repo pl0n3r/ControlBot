@@ -13,6 +13,6 @@ $transport=static function(string $method,string $url,array $headers):array{
  curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>3,CURLOPT_TIMEOUT=>10,CURLOPT_HTTPGET=>true,CURLOPT_HTTPHEADER=>array_map(static fn($k,$v)=>$k.': '.$v,array_keys($headers),$headers),CURLOPT_HEADERFUNCTION=>static function($ch,$line)use(&$responseHeaders){$p=strpos($line,':');if($p!==false)$responseHeaders[strtolower(trim(substr($line,0,$p)))]=trim(substr($line,$p+1));return strlen($line);}]);
  $body=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);
  if(!is_string($body)||strlen($body)>2_000_000)throw new RuntimeException('github response invalid.');
- return ['status'=>$status,'headers'=>$responseHeaders,'json'=>json_decode($body,true,64,JSON_THROW_ON_ERROR)];
+ return ['status'=>$status,'headers'=>$responseHeaders,'bytes'=>strlen($body),'json'=>json_decode($body,true,64,JSON_THROW_ON_ERROR)];
 };
 try{$result=FactoryOrchestratorEvidenceCollector::run($env,$transport,time());echo json_encode($result,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;exit(0);}catch(Throwable){fwrite(STDERR,"orchestrator-evidence-collector: execution failed\n");exit(70);}

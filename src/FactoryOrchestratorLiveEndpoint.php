@@ -48,19 +48,8 @@ final class FactoryOrchestratorLiveEndpoint
         }
         $fp = json_encode($cached['payload']['fingerprint'], JSON_THROW_ON_ERROR);
         $script = '<script>(()=>{const current=' . $fp
-            . ';const endpoint="/api/orchestrator-live";'
-            . 'document.addEventListener("click",async(event)=>{'
-            . 'const target=event.target instanceof Element?event.target:null;'
-            . 'const button=target?.closest("[data-copy-command]");if(!button)return;'
-            . 'const command=button.getAttribute("data-copy-command");'
-            . 'if(typeof command!=="string"||command==="")return;'
-            . 'try{await navigator.clipboard.writeText(command);button.textContent="Copiado"}'
-            . 'catch(_){button.textContent="Copia manual"}});'
-            . 'setInterval(async()=>{try{'
-            . 'const r=await fetch(endpoint,{credentials:"same-origin",cache:"no-store"});'
-            . 'if(!r.ok)return;const p=await r.json();'
-            . 'if(p.snapshot?.fingerprint&&p.snapshot.fingerprint!==current)location.reload()'
-            . '}catch(_){}},5000)})();</script>';
+            . ';const endpoint="/api/orchestrator-live";document.addEventListener("click",async(event)=>{const target=event.target instanceof Element?event.target:null;const button=target?.closest("[data-copy-command]");if(!button)return;const command=button.getAttribute("data-copy-command");if(typeof command!=="string"||command==="")return;try{await navigator.clipboard.writeText(command);button.textContent="Copiado"}catch(_){button.textContent="Copia manual"}});setInterval(async()=>{try{const r=await fetch(endpoint,{credentials:"same-origin",cache:"no-store"});'
+            . 'if(!r.ok)return;const p=await r.json();if(p.snapshot?.fingerprint&&p.snapshot.fingerprint!==current)location.reload()}catch(_){}},5000)})();</script>';
         return self::response(200, str_replace('</body>', $script . '</body>', $html), [], 'text/html; charset=utf-8');
     }
 

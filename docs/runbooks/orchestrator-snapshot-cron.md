@@ -83,21 +83,25 @@ El repositorio desplegado vive en:
 /home/u151692719/domains/control.condorapp.com.co/public_html
 ```
 
-`FactoryOrchestratorWebEntrypoint` lee, por defecto, `var/orchestrator-live.json` relativo a esa raíz. Por tanto, el productor offline debe escribir exactamente en:
+Los despliegues automáticos de Hostinger pueden sustituir ese árbol y eliminar directorios no rastreados como `var/`. Por eso el snapshot persistente **no debe vivir dentro de `public_html`**.
+
+La ubicación canónica para este hosting es:
 
 ```text
-$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json
+/home/u151692719/domains/control.condorapp.com.co/private/orchestrator-live.json
 ```
 
-Prepara el directorio una sola vez. `var/` está ignorado por Git, por lo que el despliegue que reemplaza archivos rastreados no debe pisar el snapshot. No uses enlaces simbólicos:
+El lector web obtiene esa ruta desde `CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH`, configurada server-side en `.htaccess`, y valida que sea absoluta, sin NUL ni segmentos `..`, sin componentes symlink y fuera tanto de la raíz desplegada como del árbol servido. Una configuración inválida falla cerrada a `UNKNOWN`. Si la variable no está definida se conserva, solo por compatibilidad, el fallback histórico `var/orchestrator-live.json` relativo al repositorio.
+
+Prepara la carpeta privada una sola vez y no uses enlaces simbólicos:
 
 ```sh
-SITE_ROOT="$HOME/domains/control.condorapp.com.co/public_html"
-install -d -m 700 "$SITE_ROOT/var"
-test ! -L "$SITE_ROOT/var"
+PRIVATE_ROOT="$HOME/domains/control.condorapp.com.co/private"
+install -d -m 700 "$PRIVATE_ROOT"
+test ! -L "$PRIVATE_ROOT"
 ```
 
-El `.htaccess` del sitio bloquea `.json` y rutas internas; el archivo queda destinado al lector PHP local, no a descarga pública.
+El productor offline y el lector web deben apuntar exactamente al mismo archivo privado. El snapshot queda fuera del árbol servido y no depende de las reglas de archivos estáticos de Apache.
 
 ## Variables y prueba manual
 
@@ -109,14 +113,14 @@ export CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED=1
 export CONTROLBOT_GITHUB_READ_TOKEN_FILE="$HOME/.controlbot/github-read-token"
 export CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-evidence.json"
 export CONTROLBOT_ORCHESTRATOR_CRON_ENABLED=1
-export CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json"
+export CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json"
 /opt/alt/php85/usr/bin/php scripts/orchestrator-evidence-collector.php && /opt/alt/php85/usr/bin/php scripts/orchestrator-snapshot-cron.php
 ```
 
 Comprueba permisos y edad sin imprimir secretos:
 
 ```sh
-SNAPSHOT="$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json"
+SNAPSHOT="$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json"
 ls -ld "$(dirname "$SNAPSHOT")" "$SNAPSHOT"
 test -f "$SNAPSHOT" && echo "snapshot_age_seconds=$(( $(date +%s) - $(stat -c %Y "$SNAPSHOT") ))"
 ```
@@ -130,7 +134,7 @@ La medición read-only de #720 sobre los siete repos dio **617.986 B** en Issues
 Configura **cada 5 minutos** el mismo encadenamiento `colector && wrapper`, usando PHP 8.5 y un log estable. La línea es instalable tal cual para este hosting y no contiene el token, solo la ruta privada del archivo de credencial:
 
 ```cron
-*/5 * * * * cd "$HOME/domains/control.condorapp.com.co/public_html" && { export CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED=1 CONTROLBOT_GITHUB_READ_TOKEN_FILE="$HOME/.controlbot/github-read-token" CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-evidence.json" CONTROLBOT_ORCHESTRATOR_CRON_ENABLED=1 CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json"; /opt/alt/php85/usr/bin/php scripts/orchestrator-evidence-collector.php && /opt/alt/php85/usr/bin/php scripts/orchestrator-snapshot-cron.php; } >> "$HOME/.controlbot/orchestrator-snapshot-cron.log" 2>&1
+*/5 * * * * cd "$HOME/domains/control.condorapp.com.co/public_html" && { export CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED=1 CONTROLBOT_GITHUB_READ_TOKEN_FILE="$HOME/.controlbot/github-read-token" CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-evidence.json" CONTROLBOT_ORCHESTRATOR_CRON_ENABLED=1 CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json"; /opt/alt/php85/usr/bin/php scripts/orchestrator-evidence-collector.php && /opt/alt/php85/usr/bin/php scripts/orchestrator-snapshot-cron.php; } >> "$HOME/.controlbot/orchestrator-snapshot-cron.log" 2>&1
 ```
 
 Este runbook no modifica hPanel por sí mismo, no cambia `DOMAIN`, `DEPLOY_ENABLED`, DNS ni go-live. **ControlBot #625** conserva la autoridad separada de producción y activación live.

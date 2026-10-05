@@ -3,13 +3,16 @@ declare(strict_types=1);
 require __DIR__.'/../src/FactoryOrchestratorEvidenceCollector.php';
 require __DIR__.'/../src/FactoryOrchestratorSnapshotSource.php';
 use ControlBot\Business\{FactoryOrchestratorEvidenceCollector,FactoryOrchestratorSnapshotSource};
-$scenario=$argv[1]??'';$calls=[];
+$scenario=$argv[1]??'';$calls=[];$recentPulls=$scenario==='recent-pulls';
 function issue(int $n,array $labels=[]):array{return ['number'=>$n,'title'=>'Issue '.$n,'labels'=>array_map(fn($x)=>['name'=>$x],$labels)];}
-$transport=static function(string $method,string $url,array $headers)use(&$calls):array{
+$transport=static function(string $method,string $url,array $headers)use(&$calls,$recentPulls):array{
  $calls[]=['method'=>$method,'url'=>$url,'authorized'=>isset($headers['Authorization'])&&str_starts_with($headers['Authorization'],'Bearer ')];$path=parse_url($url,PHP_URL_PATH)?:'';$json=[];
  if(str_ends_with($path,'/issues/767'))$json=['number'=>767,'user'=>['login'=>'pl0n3r'],'body'=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
  elseif(str_ends_with($path,'/issues'))$json=[issue(10,['estado: disponible']),issue(11,['estado: bloqueado']),issue(12,['decisión: dueño']),['number'=>13,'title'=>'PR 13','labels'=>[],'pull_request'=>[]]];
- elseif(str_ends_with($path,'/pulls'))$json=[['number'=>9,'merged_at'=>'2026-10-04T20:00:00Z']];
+ elseif(str_ends_with($path,'/pulls')){
+  if($recentPulls){$json=[];for($i=0;$i<100;$i++)$json[]=['number'=>900-$i,'merged_at'=>$i===0?'2026-10-04T20:00:00Z':null];}
+  else $json=[['number'=>9,'merged_at'=>'2026-10-04T20:00:00Z']];
+ }
  $bytes=strlen(json_encode($json,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));return ['status'=>200,'headers'=>['x-ratelimit-remaining'=>'100'],'bytes'=>$bytes,'json'=>$json];
 };
 function runCollector(callable $transport):array{
@@ -17,7 +20,7 @@ function runCollector(callable $transport):array{
  $result=FactoryOrchestratorEvidenceCollector::run(['CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED'=>'1','CONTROLBOT_GITHUB_READ_TOKEN_FILE'=>$credential,'CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH'=>$evidence],$transport,200);
  return [$result,json_decode(file_get_contents($evidence),true,64,JSON_THROW_ON_ERROR)];
 }
-if($scenario==='canonical'){
+if(in_array($scenario,['canonical','recent-pulls'],true)){
  foreach([
   static fn()=>null,
   static fn()=>['status'=>'bad','headers'=>[],'bytes'=>0],

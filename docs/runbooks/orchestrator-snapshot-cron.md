@@ -59,13 +59,7 @@ Ejemplo seguro:
 orchestrator-evidence-collector: http_status_403 path=/repos/pl0n3r/Factory/issues status=403
 ```
 
-### Diagnóstico del wrapper del snapshot
-
-El wrapper usa códigos cerrados adicionales: `snapshot_target_invalid`, `snapshot_directory_unwritable`, `evidence_invalid`, `snapshot_build_failed`, `snapshot_size_invalid`, `temp_write_failed` y `atomic_rename_failed`. Nunca imprime rutas ni el mensaje crudo de la excepción.
-
-`CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS=1` habilita solo una pista manual read-only: `dir_exists`, `dir_writable`, `dir_owner_match` y `dir_mode`. No incluye el path y permanece apagada por defecto.
-
-La escritura crea el temporal en el mismo directorio, usa `LOCK_EX` y verifica bytes. Un `chmod` fallido solo se tolera si el modo observado ya es `0600` o `0640`. `rename` sigue siendo primario; si falla, el fallback escribe con `LOCK_EX`, verifica contenido/tamaño y restaura el snapshot previo cuando la verificación falla.
+El wrapper del snapshot usa además `snapshot_target_invalid`, `snapshot_directory_unwritable`, `evidence_invalid`, `snapshot_build_failed`, `snapshot_size_invalid`, `temp_write_failed` y `atomic_rename_failed`; `CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS=1` solo añade `dir_exists`, `dir_writable`, `dir_owner_match` y `dir_mode` sin path, y la escritura conserva temporal en el mismo directorio, `LOCK_EX`, modos seguros `0600/0640`, `rename` primario y fallback verificado con restauración del snapshot previo.
 
 ## Ruta canónica del snapshot
 

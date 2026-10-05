@@ -14,7 +14,7 @@ final class FactoryOrchestratorSnapshotRefreshFailure extends RuntimeException
         private readonly string $failureCode,
         ?Throwable $previous = null
     ) {
-        parent::__construct($failureCode, 0, $previous);
+        parent::__construct('Snapshot refresh failed.', 0, $previous);
     }
 
     public function failureCode(): string
@@ -88,10 +88,11 @@ final class FactoryOrchestratorSnapshotRefresh
                 static fn (string $from, string $to): bool => rename($from, $to)
             );
 
-            $temporary = $tempnam($directory, self::TEMP_PREFIX);
-            if (!is_string($temporary) || $temporary === '') {
+            $candidate = $tempnam($directory, self::TEMP_PREFIX);
+            if (!is_string($candidate) || $candidate === '') {
                 throw self::failure('temp_write_failed');
             }
+            $temporary = $candidate;
 
             $written = $writeTemp($temporary, $encoded);
             if ($written !== $bytes) {

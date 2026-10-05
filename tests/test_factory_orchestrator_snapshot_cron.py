@@ -51,7 +51,7 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
     def refresh_case(self, snapshot: Path, *, evidence=None, now=None, max_bytes=2_000_000, collector="$evidence", io="[]") -> dict:
         code = (
             "require $argv[1];$evidence=json_decode($argv[2],true);"
-            f"$collector=static function() use ($evidence): array {{return {collector};}};$io={io};"
+            f"$collector=static function() use ($evidence) {{return {collector};}};$io={io};"
             "try{$r=\\ControlBot\\Business\\FactoryOrchestratorSnapshotRefresh::refresh("
             "$collector,$argv[3],(int)$argv[4],(int)$argv[5],$io);echo json_encode(['ok'=>1,'r'=>$r]);}"
             "catch(\\ControlBot\\Business\\FactoryOrchestratorSnapshotRefreshFailure $e){"
@@ -237,9 +237,9 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
                 self.refresh_case(snapshot,collector="throw new RuntimeException('secret /private/path')"),
                 self.refresh_case(snapshot,collector="'not-array'"),
                 self.refresh_case(snapshot,evidence={"work":"invalid"}), self.refresh_case(snapshot,max_bytes=10),
-                self.refresh_case(snapshot,io="['tempnam'=>static fn($d,$p)=>false]"),
-                self.refresh_case(snapshot,io="['rename'=>static fn($a,$b)=>false,'write_target'=>static fn($p,$d)=>false]"),
-                self.refresh_case(snapshot,io="['tempnam'=>'not-callable']"),
+                self.refresh_case(snapshot,io="['tempnam'=>static fn($d,$p)=>false]"), self.refresh_case(snapshot,io="['write_temp'=>static fn($p,$d)=>false]"), self.refresh_case(snapshot,io="['tempnam'=>static function($d,$p){throw new Error('boom');}]"),
+                self.refresh_case(snapshot,io="['rename'=>static fn($a,$b)=>false,'write_target'=>static fn($p,$d)=>false]"), self.refresh_case(root/"fresh.json",io="['rename'=>static fn($a,$b)=>false,'write_target'=>static function($p,$d){file_put_contents($p,'x');return false;}]"),
+                self.refresh_case(snapshot,io="['tempnam'=>'not-callable']"), self.refresh_case(snapshot,io="['tempnam'=>static function($d,$p){$f=$d.'/unsafe.tmp';file_put_contents($f,'');chmod($f,0666);return $f;},'chmod'=>static fn($p,$m)=>false]"),
             ]
             self.assertEqual(
                 {"clock_invalid","snapshot_target_invalid","snapshot_directory_unwritable","evidence_invalid",
@@ -253,7 +253,11 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
                 "CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS":"1"}
             cli=subprocess.run(["php",str(SCRIPT)],cwd=ROOT,env=env,text=True,capture_output=True,timeout=30,check=False)
             self.assertRegex(cli.stderr,r"^orchestrator-snapshot-cron: evidence_invalid dir_exists=1 dir_writable=1 dir_owner_match=(?:0|1|unknown) dir_mode=[0-7]{4}\n$")
-            self.assertNotIn(str(root),json.dumps(cases)+cli.stderr); self.assertNotIn("secret",json.dumps(cases).lower())
+            direct=subprocess.run(["php","-r","require $argv[1];$o=[(new \\ControlBot\\Business\\FactoryOrchestratorSnapshotRefreshFailure('secret'))->failureCode()];foreach([[0,'/tmp/x'],[1,'relative']] as [$n,$p]){try{\\ControlBot\\Business\\FactoryOrchestratorSnapshotCron::run(['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],static fn()=>[],$p,$n);$o[]='ok';}catch(\\ControlBot\\Business\\FactoryOrchestratorSnapshotRefreshFailure $e){$o[]=$e->failureCode();}}echo json_encode($o);",str(ROOT/"src/FactoryOrchestratorSnapshotCron.php")],cwd=ROOT,text=True,capture_output=True,timeout=30,check=False)
+            self.assertEqual(["internal_error","clock_invalid","snapshot_target_invalid"],json.loads(direct.stdout))
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"]=str(root/"missing"/"snapshot.json"); missing=subprocess.run(["php",str(SCRIPT)],cwd=ROOT,env=env,text=True,capture_output=True,timeout=30,check=False)
+            self.assertIn("dir_exists=0 dir_writable=0 dir_owner_match=unknown dir_mode=unknown",missing.stderr)
+            self.assertNotIn(str(root),json.dumps(cases)+cli.stderr+missing.stderr); self.assertNotIn("secret",json.dumps(cases).lower())
 
     def test_unwritable_or_missing_directory_is_classified_and_keeps_previous_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -83,7 +83,10 @@ if($case==='reuse'){
     ];
 }elseif($case==='freshness'){
     $out=[
-        'unbound_ref'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(NOW-100,'github:evidence/other'),NOW),
+        'unbound_ref'=>GitHubIntentPolicy::evaluate(
+            env(),foreignGrant(),ctx(NOW-100,'github:evidence/other'),NOW
+        ),
+        'raw_fresh'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(),NOW),
         'stale_ref'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(NOW-1000),NOW),
     ];
 }else{

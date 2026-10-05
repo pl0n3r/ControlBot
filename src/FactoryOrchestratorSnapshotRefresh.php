@@ -10,8 +10,25 @@ use Throwable;
 
 final class FactoryOrchestratorSnapshotRefreshFailure extends RuntimeException
 {
-    public function __construct(private readonly string $failureCode, ?Throwable $previous = null)
+    private const FAILURE_CODES = [
+        'snapshot_target_invalid',
+        'snapshot_directory_unwritable',
+        'evidence_invalid',
+        'snapshot_build_failed',
+        'snapshot_size_invalid',
+        'temp_write_failed',
+        'atomic_rename_failed',
+        'clock_invalid',
+        'internal_error',
+    ];
+
+    private readonly string $failureCode;
+
+    public function __construct(string $failureCode, ?Throwable $previous = null)
     {
+        $this->failureCode = in_array($failureCode, self::FAILURE_CODES, true)
+            ? $failureCode
+            : 'internal_error';
         parent::__construct('Snapshot refresh failed.', 0, $previous);
     }
 

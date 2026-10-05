@@ -2,7 +2,7 @@
 
 El colector `scripts/orchestrator-evidence-collector.php` hace GET read-only a GitHub y el wrapper `scripts/orchestrator-snapshot-cron.php` consume la evidencia local. El colector permanece apagado por defecto y el wrapper también; ambos quedan fuera de requests web.
 
-El colector publica únicamente evidencia que los contratos actuales pueden demostrar: trabajo abierto como `pending` con labels de workflow allowlisted, bloqueos solo ante label explícita de bloqueo, decisiones del dueño y el PR fusionado reciente como `work.status=merged`. **Un PR fusionado no demuestra una release**: `releases` permanece vacío/UNKNOWN hasta que exista provenance real de release/tag. **No fabrica `work_inventory` ni porcentajes**: el panel central queda `UNKNOWN` cuando no existe una fuente canónica para esa señal.
+El colector publica únicamente evidencia que los contratos actuales pueden demostrar: trabajo abierto con `signal.state=pending`; Issues con labels de workflow allowlisted usan `data.status=unknown` sin inferir ranking, PRs abiertos usan `data.status=in_review`, bloqueos solo ante label explícita de bloqueo, decisiones del dueño y el PR fusionado reciente usa `data.status=merged`. **Un PR fusionado no demuestra una release**: `releases` permanece vacío/UNKNOWN hasta que exista provenance real de release/tag. **No fabrica `work_inventory` ni porcentajes**: el panel central queda `UNKNOWN` cuando no existe una fuente canónica para esa señal.
 
 ## Límites fail-closed
 

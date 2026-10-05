@@ -56,6 +56,7 @@ if($scenario==='transport-negative-branches'){
   static fn()=>FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(200,[],'not-json'),
  ] as $case){$failed=false;try{$case();}catch(Throwable){$failed=true;}$results[]=$failed;}
  $retry=FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(502,[],'<html>bad gateway</html>');
- echo json_encode(['failed'=>$results,'retry'=>$retry],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);exit;
+ $httpDiagnostic=FactoryOrchestratorEvidenceCollector::diagnosticFor(new RuntimeException('github http status 403 path /repos/pl0n3r/Factory/issues'));
+ echo json_encode(['failed'=>$results,'retry'=>$retry,'http_diagnostic'=>$httpDiagnostic],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);exit;
 }
 fwrite(STDERR,"scenario invalid\n");exit(2);

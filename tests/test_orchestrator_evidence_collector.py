@@ -31,7 +31,7 @@ class OrchestratorEvidenceCollectorTests(unittest.TestCase):
  def test_only_get_requests_are_made_within_request_and_byte_budgets(self):
   d=scenario("canonical")
   self.assertEqual(len(d["calls"]),d["result"]["requests"]);self.assertLessEqual(d["result"]["requests"],40)
-  self.assertLessEqual(d["result"]["download_bytes"],2_000_000);self.assertLessEqual(d["result"]["evidence_bytes"],2_000_000)
+  self.assertLessEqual(d["result"]["download_bytes"],8_000_000);self.assertLessEqual(d["result"]["evidence_bytes"],2_000_000)
   self.assertTrue(all(x["method"]=="GET" for x in d["calls"]))
   data=php_eval(r'''
 require "src/FactoryOrchestratorEvidenceCollector.php";
@@ -48,13 +48,77 @@ $transport=static function(string $method,string $url,array $headers)use(&$calls
 };
 $result=FactoryOrchestratorEvidenceCollector::run(["CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED"=>"1","CONTROLBOT_GITHUB_READ_TOKEN_FILE"=>$token,"CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"=>$evidence],$transport,200);
 $old=$dir."/old.json";file_put_contents($old,'{"old":true}');
-$tooLarge=static fn(string $method,string $url,array $headers):array=>["status"=>200,"headers"=>["x-ratelimit-remaining"=>"100"],"bytes"=>2_000_001,"json"=>[]];
+$tooLarge=static fn(string $method,string $url,array $headers):array=>["status"=>200,"headers"=>["x-ratelimit-remaining"=>"100"],"bytes"=>8_000_001,"json"=>[]];
 $failed=false;try{FactoryOrchestratorEvidenceCollector::run(["CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED"=>"1","CONTROLBOT_GITHUB_READ_TOKEN_FILE"=>$token,"CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"=>$old],$tooLarge,200);}catch(Throwable){$failed=true;}
 echo json_encode(["result"=>$result,"calls"=>$calls,"byte_failed"=>$failed,"previous"=>file_get_contents($old)],JSON_THROW_ON_ERROR),PHP_EOL;
 ''')
   self.assertEqual(data["calls"],data["result"]["requests"]);self.assertGreater(data["calls"],15)
   self.assertTrue(data["byte_failed"]);self.assertEqual('{"old":true}',data["previous"])
 
+ def test_realistic_large_github_pages_fit_within_the_download_budget(self):
+  data=php_eval(r'''
+require "src/FactoryOrchestratorEvidenceCollector.php";
+use ControlBot\Business\FactoryOrchestratorEvidenceCollector;
+$dir=sys_get_temp_dir()."/cb720-realistic-".bin2hex(random_bytes(4));mkdir($dir);$token=$dir."/token";$evidence=$dir."/evidence.json";file_put_contents($token,"read-only");chmod($token,0600);
+$issueBytes=["Factory"=>65459,"Condor"=>201188,"GrindFlow"=>191896,"brvtal"=>40021,"ControlBot"=>98851,"AutoFactory"=>20569,"FactoryRunner"=>2];
+$pullBytes=["Factory"=>168290,"Condor"=>178840,"GrindFlow"=>191396,"brvtal"=>175206,"ControlBot"=>190371,"AutoFactory"=>189392,"FactoryRunner"=>185681];
+$transport=static function(string $method,string $url,array $headers)use($issueBytes,$pullBytes):array{
+ $path=parse_url($url,PHP_URL_PATH)?:"";$json=[];$bytes=10;
+ if(str_ends_with($path,"/issues/767")){$json=["number"=>767,"user"=>["login"=>"pl0n3r"],"body"=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];$bytes=5000;}
+ elseif(preg_match('#^/repos/pl0n3r/([^/]+)/issues$#',$path,$m)===1){$bytes=$issueBytes[$m[1]];}
+ elseif(preg_match('#^/repos/pl0n3r/([^/]+)/pulls$#',$path,$m)===1){$json=[["number"=>9,"merged_at"=>"2026-10-04T20:00:00Z"]];$bytes=$pullBytes[$m[1]];}
+ return ["status"=>200,"headers"=>["x-ratelimit-remaining"=>"100"],"bytes"=>$bytes,"json"=>$json];
+};
+$result=FactoryOrchestratorEvidenceCollector::run(["CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED"=>"1","CONTROLBOT_GITHUB_READ_TOKEN_FILE"=>$token,"CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"=>$evidence],$transport,200);
+echo json_encode(["result"=>$result,"measured_main_reads"=>array_sum($issueBytes)+array_sum($pullBytes)],JSON_THROW_ON_ERROR),PHP_EOL;
+''')
+  self.assertEqual(1_897_162,data["measured_main_reads"])
+  self.assertEqual("written",data["result"]["state"])
+  self.assertGreaterEqual(data["result"]["download_bytes"],1_897_162)
+  self.assertLessEqual(data["result"]["download_bytes"],8_000_000)
+  self.assertLessEqual(data["result"]["evidence_bytes"],2_000_000)
+
+ def test_each_failure_cause_prints_an_allowlisted_code_without_secrets(self):
+  negative=scenario("transport-negative-branches")
+  self.assertEqual({"code":"http_status_403","path":"/repos/pl0n3r/Factory/issues","status":403},negative["http_diagnostic"])
+  data=php_eval(r'''
+require "src/FactoryOrchestratorEvidenceCollector.php";
+use ControlBot\Business\FactoryOrchestratorEvidenceCollector;
+$messages=[
+ "request budget exceeded.","download byte budget exceeded.","credential file invalid.","token path invalid.",
+ "evidence write failed.","github transport unavailable.","transport invalid.","github retry deferred.","rate limit low.",
+ "github response invalid.","github json invalid.","github page invalid.","github pull page invalid.","github issue invalid.",
+ "github number invalid.","labels invalid.","evidence too large.","active work signal budget exceeded.","signal budget exceeded.",
+ "method denied.","github url denied.","collector clock invalid.","github http status 403 path /repos/pl0n3r/Factory/issues"
+];
+$out=[];foreach($messages as $message)$out[]=FactoryOrchestratorEvidenceCollector::diagnosticFor(new RuntimeException($message));
+echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+''')
+  codes=[row["code"] for row in data]
+  self.assertNotIn("internal_error",codes)
+  self.assertIn("download_budget_exceeded",codes);self.assertIn("request_budget_exceeded",codes);self.assertIn("token_file_invalid",codes)
+  self.assertEqual({"code":"http_status_403","path":"/repos/pl0n3r/Factory/issues","status":403},data[-1])
+  actual=php_eval(r'''
+require "src/FactoryOrchestratorEvidenceCollector.php";
+use ControlBot\Business\FactoryOrchestratorEvidenceCollector;
+$diagnostic=null;try{FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(200,[],"sentinel-not-json");}catch(Throwable $error){$diagnostic=FactoryOrchestratorEvidenceCollector::diagnosticFor($error);}
+echo json_encode($diagnostic,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+''')
+  self.assertEqual("github_response_invalid",actual["code"]);self.assertNotIn("sentinel-not-json",json.dumps(actual))
+  env=os.environ|{"CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED":"1","CONTROLBOT_GITHUB_READ_TOKEN_FILE":"/definitely/private/sentinel-token-path","CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH":"/tmp/cb-evidence.json"}
+  r=subprocess.run(["php",str(ROOT/"scripts/orchestrator-evidence-collector.php")],cwd=ROOT,text=True,capture_output=True,env=env)
+  self.assertEqual(70,r.returncode);self.assertIn("token_file_invalid",r.stderr);self.assertNotIn("sentinel-token-path",r.stderr)
+
+ def test_closed_pull_requests_are_fetched_with_minimal_fields_or_small_pages(self):
+  d=scenario("full-pull-page");pull_urls=[url for url in d["calls"] if urlparse(url).path.endswith("/pulls")]
+  self.assertEqual(7,len(pull_urls))
+  for url in pull_urls:
+   query=parse_qs(urlparse(url).query);self.assertEqual(["10"],query.get("per_page"));self.assertEqual(["1"],query.get("page"))
+  self.assertFalse(any("page=2" in url for url in pull_urls))
+
+ def test_transport_does_not_call_deprecated_curl_close(self):
+  source=(ROOT/"scripts/orchestrator-evidence-collector.php").read_text(encoding="utf-8")
+  self.assertNotIn("curl_close(",source);self.assertIn("curl_exec(",source);self.assertIn("normalizeLiveResponse(",source)
 
  def test_transport_requires_real_bytes_and_retries_non_json_5xx(self):
   negative=scenario("transport-negative-branches")
@@ -140,12 +204,12 @@ $marker='<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","own
   d=scenario("full-pull-page");pull_urls=[url for url in d["calls"] if urlparse(url).path.endswith("/pulls")]
   self.assertEqual(7,len(pull_urls))
   for url in pull_urls:
-   query=parse_qs(urlparse(url).query);self.assertEqual(["100"],query.get("per_page"));self.assertEqual(["1"],query.get("page"))
+   query=parse_qs(urlparse(url).query);self.assertEqual(["10"],query.get("per_page"));self.assertEqual(["1"],query.get("page"))
   self.assertFalse(any("page=2" in url for url in pull_urls))
   self.assertEqual([],d["evidence"]["releases"])
   merged=[row for row in d["evidence"]["work"] if row["data"].get("status")=="merged"];self.assertEqual(7,len(merged))
   doc=(ROOT/"docs/runbooks/orchestrator-snapshot-cron.md").read_text(encoding="utf-8")
-  for phrase in ("PR fusionado", "una página reciente", "signal.state=pending", "data.status=in_review", "releases", "HTTPS-only", "2 MB", "retry 5xx", "Issue #767"): self.assertIn(phrase,doc)
+  for phrase in ("PR fusionado", "una página reciente", "signal.state=pending", "data.status=in_review", "releases", "HTTPS-only", "8 MB", "retry 5xx", "Issue #767"): self.assertIn(phrase,doc)
 
  def test_token_never_appears_in_output_logs_evidence_or_snapshot(self):
   d=scenario("canonical");blob=json.dumps(d);self.assertNotIn("sentinel-read-value",blob);self.assertTrue(all(x["authorized"] for x in d["calls"]))

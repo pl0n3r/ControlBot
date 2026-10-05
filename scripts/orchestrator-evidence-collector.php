@@ -58,8 +58,10 @@ $transport = static function (
     ]);
 
     $body = curl_exec($ch);
+    if ($body === false) {
+        throw new RuntimeException('github transport unavailable.');
+    }
     $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-    curl_close($ch);
 
     return FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(
         $status,
@@ -79,7 +81,15 @@ try {
         JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
     ), PHP_EOL;
     exit(0);
-} catch (Throwable) {
-    fwrite(STDERR, "orchestrator-evidence-collector: execution failed\n");
+} catch (Throwable $error) {
+    $diagnostic = FactoryOrchestratorEvidenceCollector::diagnosticFor($error);
+    $line = 'orchestrator-evidence-collector: '.$diagnostic['code'];
+    if (isset($diagnostic['path'])) {
+        $line .= ' path='.$diagnostic['path'];
+    }
+    if (isset($diagnostic['status'])) {
+        $line .= ' status='.$diagnostic['status'];
+    }
+    fwrite(STDERR, $line."\n");
     exit(70);
 }

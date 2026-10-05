@@ -5,13 +5,17 @@ namespace ControlBot\Business;
 
 use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 
 final class FactoryOrchestratorEvidenceCollector
 {
     private const REPOS=['Factory','Condor','GrindFlow','brvtal','ControlBot','AutoFactory','FactoryRunner'];
     private const WORKFLOW_LABELS=['estado: disponible','estado: reservado','estado: en revisión','estado: bloqueado','status: available','status: reserved','status: in review','status: blocked'];
     private const MAX_REQUESTS=40;
-    private const MAX_BYTES=2_000_000;
+    private const MAX_RESPONSE_BYTES=2_000_000;
+    private const MAX_DOWNLOAD_BYTES=8_000_000;
+    private const MAX_EVIDENCE_BYTES=2_000_000;
+    private const CLOSED_PULLS_PER_PAGE=10;
     private const MAX_SIGNALS=50;
     private const MAX_WORK_SIGNALS=24;
 
@@ -45,7 +49,7 @@ final class FactoryOrchestratorEvidenceCollector
         array $headers,
         mixed $body,
     ): array {
-        if (!is_string($body) || strlen($body) > self::MAX_BYTES) {
+        if (!is_string($body) || strlen($body) > self::MAX_RESPONSE_BYTES) {
             throw new RuntimeException('github response invalid.');
         }
         $response = [
@@ -56,11 +60,53 @@ final class FactoryOrchestratorEvidenceCollector
         if ($status !== 200) {
             return $response;
         }
-        $json = json_decode($body, true, 64, JSON_THROW_ON_ERROR);
+        try {
+            $json = json_decode($body, true, 64, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new RuntimeException('github json invalid.');
+        }
         if (!is_array($json)) {
             throw new RuntimeException('github json invalid.');
         }
         return $response + ['json' => $json];
+    }
+
+    public static function diagnosticFor(Throwable $error): array
+    {
+        $message=$error->getMessage();
+        if(preg_match('/^github http status ([1-5][0-9]{2}) path (\/[^?\s#]+)$/',$message,$matches)===1){
+            return ['code'=>'http_status_'.$matches[1],'path'=>$matches[2],'status'=>(int)$matches[1]];
+        }
+        $codes=[
+            'request budget exceeded.'=>'request_budget_exceeded',
+            'download byte budget exceeded.'=>'download_budget_exceeded',
+            'credential file invalid.'=>'token_file_invalid',
+            'token path invalid.'=>'token_file_invalid',
+            'evidence path invalid.'=>'evidence_path_unwritable',
+            'evidence directory invalid.'=>'evidence_path_unwritable',
+            'evidence write failed.'=>'evidence_path_unwritable',
+            'github transport unavailable.'=>'transport_unavailable',
+            'transport invalid.'=>'transport_unavailable',
+            'github retry deferred.'=>'rate_limited',
+            'rate limit low.'=>'rate_limited',
+            'github response invalid.'=>'github_response_invalid',
+            'github json invalid.'=>'github_response_invalid',
+            'github page invalid.'=>'github_response_invalid',
+            'github pagination exceeded.'=>'github_response_invalid',
+            'github pull page invalid.'=>'github_response_invalid',
+            'github issue invalid.'=>'github_response_invalid',
+            'github pull invalid.'=>'github_response_invalid',
+            'github number invalid.'=>'github_response_invalid',
+            'labels invalid.'=>'github_response_invalid',
+            'github read failed.'=>'github_read_failed',
+            'evidence too large.'=>'evidence_budget_exceeded',
+            'active work signal budget exceeded.'=>'signal_budget_exceeded',
+            'signal budget exceeded.'=>'signal_budget_exceeded',
+            'method denied.'=>'request_policy_denied',
+            'github url denied.'=>'request_policy_denied',
+            'collector clock invalid.'=>'clock_invalid',
+        ];
+        return ['code'=>$codes[$message]??'internal_error'];
     }
 
     public static function run(array $env,callable $transport,int $now): array
@@ -97,14 +143,14 @@ final class FactoryOrchestratorEvidenceCollector
                     throw new RuntimeException('transport invalid.');
                 }
                 $downloadBytes += $r['bytes'];
-                if ($downloadBytes > self::MAX_BYTES) {
+                if ($downloadBytes > self::MAX_DOWNLOAD_BYTES) {
                     throw new RuntimeException('download byte budget exceeded.');
                 }
                 if(isset($r['headers']['retry-after']))throw new RuntimeException('github retry deferred.');
                 $remaining=$r['headers']['x-ratelimit-remaining']??null;
                 if(is_numeric($remaining)&&(int)$remaining<5)throw new RuntimeException('rate limit low.');
                 if($r['status']>=500&&$attempt===0)continue;
-                if($r['status']!==200)throw new RuntimeException('github read failed.');
+                if($r['status']!==200)throw new RuntimeException('github http status '.$r['status'].' path '.$path);
                 if (!is_array($r['json'] ?? null)) {
                     throw new RuntimeException('github json invalid.');
                 }
@@ -124,7 +170,7 @@ final class FactoryOrchestratorEvidenceCollector
         $evidence=self::collect($get,$paged,$now);
         $json=json_encode($evidence,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
         $evidenceBytes=strlen($json);
-        if($evidenceBytes>self::MAX_BYTES)throw new RuntimeException('evidence too large.');
+        if($evidenceBytes>self::MAX_EVIDENCE_BYTES)throw new RuntimeException('evidence too large.');
         self::atomicWrite($evidencePath,$json."\n");
         return ['executed'=>true,'state'=>'written','requests'=>$requests,'download_bytes'=>$downloadBytes,'evidence_bytes'=>$evidenceBytes];
     }
@@ -135,7 +181,7 @@ final class FactoryOrchestratorEvidenceCollector
         foreach(self::REPOS as $name){
             $repo='pl0n3r/'.$name;
             $issues=$paged('/repos/'.$repo.'/issues',['state'=>'open']);
-            $closedPrs=$get('/repos/'.$repo.'/pulls',['state'=>'closed','sort'=>'updated','direction'=>'desc','per_page'=>100,'page'=>1]);
+            $closedPrs=$get('/repos/'.$repo.'/pulls',['state'=>'closed','sort'=>'updated','direction'=>'desc','per_page'=>self::CLOSED_PULLS_PER_PAGE,'page'=>1]);
             if(!array_is_list($closedPrs))throw new RuntimeException('github pull page invalid.');
             foreach($issues as $row){
                 if(!is_array($row)||array_is_list($row))throw new RuntimeException('github issue invalid.');

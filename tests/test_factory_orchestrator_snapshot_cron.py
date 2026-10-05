@@ -372,6 +372,23 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
         wrapper = SCRIPT.read_text()
         self.assertIn("failureCode()", wrapper); self.assertNotIn("getMessage()", wrapper)
 
+        unknown = subprocess.run(
+            [
+                "php",
+                "-r",
+                (
+                    "require $argv[1];"
+                    "$e=new \\ControlBot\\Business\\FactoryOrchestratorSnapshotRefreshFailure("
+                    "'secret_/private/path');echo $e->failureCode();"
+                ),
+                str(REFRESH),
+            ],
+            cwd=ROOT, text=True, capture_output=True, timeout=30, check=False,
+        )
+        self.assertEqual(0, unknown.returncode, unknown.stderr)
+        self.assertEqual("internal_error", unknown.stdout)
+        self.assertNotIn("secret", unknown.stdout.lower())
+
     def test_unwritable_or_missing_directory_is_classified_and_keeps_previous_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

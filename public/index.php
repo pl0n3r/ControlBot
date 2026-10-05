@@ -1,11 +1,13 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__.'/../src/FactoryOrchestratorWebEntrypoint.php';
+require_once __DIR__.'/../src/ControlBotWebEntrypoint.php';
 
-use ControlBot\Business\FactoryOrchestratorWebEntrypoint;
+use ControlBot\Web\ControlBotWebEntrypoint;
 
-$response=FactoryOrchestratorWebEntrypoint::handle(
+// Compatibility contract: non-GitHub routes still reach FactoryOrchestratorWebEntrypoint::handle
+// through ControlBotWebEntrypoint.
+$response=ControlBotWebEntrypoint::handle(
     $_SERVER,
     ['CONTROLBOT_OWNER_LOGIN'=>getenv('CONTROLBOT_OWNER_LOGIN')?:null],
     time(),

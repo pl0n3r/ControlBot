@@ -2,28 +2,28 @@
 
 `GitHubIntentPolicy` evalúa offline envelopes normalizados por `GitHubIntentEnvelope`. Nunca ejecuta GitHub y toda salida conserva `execution=false`.
 
-## Autoridad reutilizada
+## Binding de autoridad
 
-La policy no crea capabilities `github.*` ni un segundo modelo de autoridad. El caller aporta una capability ya definida por el servidor y:
+La capability no viene del caller. La policy mantiene un binding cerrado intent → capability canónica GitHub (`github.issue.write`, `github.pr.review`, `github.pr.merge`, `github.workflow.dispatch`, `github.release.approve`, `github.project.write`). Ese binding **no concede authority**.
 
-- `CapabilityPolicy::classify()` decide si esa capability es conocida, automática, exige backup/owner o está prohibida.
-- `CapabilityGrant` representa la autoridad existente. Su emisión ya aplica `CapabilityPolicy` y exige `owner_approval_id` cuando corresponde.
-- `CapabilityGrant::authorize()` verifica vigencia, revocación y scope exacto.
+`CapabilityPolicy` todavía no gobierna esas capabilities GitHub. Esta reparación tampoco las añade: grants `hostinger.*`, `database.*`, `config.*` u otros dominios no pueden convertirse en authority GitHub por sustitución.
 
-El scope se deriva del envelope: `project_ref` → project, `repository_ref` → resource y `type` → operation. El caller no puede sustituir esos tres campos.
+## Freshness y provenance
+
+`evidence_ref` debe existir exactamente en los `evidence_refs` validados del envelope. Sin embargo, un `observed_at` y TTL recibidos como valores crudos siguen siendo caller-controlled y no prueban provenance.
+
+Por eso V1 falla cerrado:
+
+- `evidence_ref` no vinculado → `deny / evidence_mismatch`;
+- timestamp fuera del TTL → `deny / stale_evidence`;
+- ref válido + timestamp/TTL crudos aparentemente frescos → `deny / untrusted_evidence_freshness`.
+
+No existe hoy una proyección de freshness confiable dentro del alcance de esta hoja. Una hoja futura deberá introducirla explícitamente antes de que la policy pueda consultar grants/approvals y producir `allow` o `owner_decision_required`.
 
 ## Decisiones
 
-Solo existen `allow | owner_decision_required | deny | unknown`.
-
-- envelope/tipo no reconocido → `unknown`;
-- capability desconocida → `unknown`;
-- capability prohibida, autoridad inválida/ausente, scope mismatch o evidencia stale → `deny`;
-- capability que exige owner sin grant aprobado → `owner_decision_required`;
-- grant vigente y exacto → `allow`.
-
-La evidencia debe venir ya validada por el envelope y su observación no puede superar el TTL indicado; V1 limita ese TTL a 900 s.
+El contrato de salida sigue cerrado a `allow | owner_decision_required | deny | unknown`, pero en esta versión reparada ningún contexto de freshness crudo puede llegar a `allow`. Tipos inválidos permanecen `unknown`; evidencia inválida o no confiable permanece `deny`.
 
 ## Fuera de alcance
 
-GitHub App/PAT/tokens, HTTP/API GitHub, adapters, shell/git libre, mutaciones reales, deploy, producción, DOMAIN/DEPLOY_ENABLED, gasto y datos reales.
+Añadir capabilities GitHub a `CapabilityPolicy.php`, crear una proyección de freshness confiable, GitHub App/PAT/tokens, HTTP/API GitHub, adapters, shell/git libre, mutaciones reales, deploy, producción, DOMAIN/DEPLOY_ENABLED, gasto y datos reales.

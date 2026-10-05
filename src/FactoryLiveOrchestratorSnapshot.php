@@ -193,154 +193,123 @@ final class FactoryLiveOrchestratorSnapshot
         return [$progress, 'EVIDENCED'];
     }
 
-    private static function decisions(mixed $rows, int $now): array
+    private static function decisions(mixed $rows,int $now): array
     {
-        if (!is_array($rows) || !array_is_list($rows)) {
-            throw new InvalidArgumentException('owner_decisions invalid.');
+        if(!is_array($rows)||!array_is_list($rows))throw new InvalidArgumentException('owner_decisions invalid.');
+        $out=[];
+        foreach($rows as $row){
+            self::signal($row,'owner_inbox',$now);
+            if($row['freshness']!=='unknown')$out[]=self::decisionProjection($row,$now);
         }
-        $out = [];
-        foreach ($rows as $row) {
-            self::signal($row, 'owner_inbox', $now);
-            if ($row['freshness'] !== 'unknown') {
-                $out[] = self::decisionProjection($row, $now);
-            }
-        }
-        usort($out, static fn (array $a, array $b): int => $a['id'] <=> $b['id']);
+        usort($out,static fn(array $a,array $b):int=>$a['id']<=>$b['id']);
         return $out;
     }
 
-    private static function decisionProjection(array $row, int $now): array
+    private static function decisionProjection(array $row,int $now): array
     {
-        $data = $row['data'] ?? null;
-        if (!is_array($data) || array_is_list($data)) {
-            throw new InvalidArgumentException('owner decision data invalid.');
-        }
-        $issue = self::issue($data['issue_ref'] ?? null);
-        [$fallbackRepo, $fallbackNumber] = self::decisionIdentity($issue);
-        $repo = $data['repository_ref'] ?? $fallbackRepo;
-        $number = $data['issue_number'] ?? $fallbackNumber;
-        $format = $data['format'] ?? 'legacy';
-        $validIdentity = in_array($repo, self::REPOS, true) && is_int($number) && $number > 0
-            && $repo === $fallbackRepo && $number === $fallbackNumber
-            && in_array($format, ['legacy', 'structured'], true);
-        if (!$validIdentity) {
-            throw new InvalidArgumentException('owner decision identity invalid.');
-        }
+        $data=$row['data']??null;
+        if(!is_array($data)||array_is_list($data))throw new InvalidArgumentException('owner decision data invalid.');
+        $issue=self::issue($data['issue_ref']??null);
+        [$fallbackRepo,$fallbackNumber]=self::decisionIdentity($issue);
+        $repo=$data['repository_ref']??$fallbackRepo;
+        $number=$data['issue_number']??$fallbackNumber;
+        $format=$data['format']??'legacy';
+        $valid=in_array($repo,self::REPOS,true)&&is_int($number)&&$number>0
+            &&$repo===$fallbackRepo&&$number===$fallbackNumber
+            &&in_array($format,['legacy','structured'],true);
+        if(!$valid)throw new InvalidArgumentException('owner decision identity invalid.');
 
-        $projection = [
-            'id' => self::id($row['id']), 'issue_ref' => $issue, 'repository_ref' => $repo,
-            'issue_number' => $number, 'format' => $format,
-            'title' => self::decisionText($data['title'] ?? 'Decisión pendiente', 'decision.title', 160),
-            'title_simple' => null, 'summary_simple' => null, 'explain_simple' => null,
-            'why_recommended' => null, 'blocks' => null, 'options' => [],
-            'recommendation' => null, 'safe_default' => null, 'expires_at' => null,
-            'seconds_left' => null, 'expired' => null,
-            'source_ref' => self::text($row['source_ref'], 'decision.source_ref', 240),
-            'observed_at' => $row['observed_at'], 'freshness' => $row['freshness'],
-            'age_seconds' => $now - $row['observed_at'],
+        $projection=[
+            'id'=>self::id($row['id']),'issue_ref'=>$issue,'repository_ref'=>$repo,'issue_number'=>$number,
+            'format'=>$format,'title'=>self::decisionText($data['title']??'Decisión pendiente','decision.title',160),
+            'title_simple'=>null,'summary_simple'=>null,'explain_simple'=>null,'why_recommended'=>null,
+            'blocks'=>null,'options'=>[],'recommendation'=>null,'safe_default'=>null,
+            'expires_at'=>null,'seconds_left'=>null,'expired'=>null,
+            'source_ref'=>self::text($row['source_ref'],'decision.source_ref',240),
+            'observed_at'=>$row['observed_at'],'freshness'=>$row['freshness'],
+            'age_seconds'=>$now-$row['observed_at'],
         ];
-        if ($format === 'legacy') {
-            return $projection;
-        }
+        if($format==='legacy')return $projection;
 
-        foreach (['title_simple' => 160, 'summary_simple' => 600, 'why_recommended' => 600, 'blocks' => 600] as $field => $max) {
-            $projection[$field] = self::decisionText($data[$field] ?? null, 'decision.'.$field, $max);
-        }
-        if (($data['explain_simple'] ?? null) !== null) {
-            $projection['explain_simple'] = self::decisionText(
-                $data['explain_simple'], 'decision.explain_simple', 600
-            );
-        }
-        $projection['options'] = self::decisionOptions($data['options'] ?? null);
-        $ids = array_column($projection['options'], 'id');
-        foreach (['recommendation', 'safe_default'] as $field) {
-            $value = $data[$field] ?? null;
-            if (!is_string($value) || !in_array($value, $ids, true)) {
+        foreach(['title_simple'=>160,'summary_simple'=>600,'why_recommended'=>600,'blocks'=>600] as $field=>$max)
+            $projection[$field]=self::decisionText($data[$field]??null,'decision.'.$field,$max);
+        if(($data['explain_simple']??null)!==null)
+            $projection['explain_simple']=self::decisionText($data['explain_simple'],'decision.explain_simple',600);
+        $projection['options']=self::decisionOptions($data['options']??null);
+        $ids=array_column($projection['options'],'id');
+        foreach(['recommendation','safe_default'] as $field){
+            $value=$data[$field]??null;
+            if(!is_string($value)||!in_array($value,$ids,true))
                 throw new InvalidArgumentException('decision '.$field.' invalid.');
-            }
-            $projection[$field] = $value;
+            $projection[$field]=$value;
         }
-        return self::withDecisionExpiry($projection, $data['expires_at'] ?? null, $now);
+        return self::withDecisionExpiry($projection,$data['expires_at']??null,$now);
     }
 
-    private static function withDecisionExpiry(array $projection, mixed $expiresAt, int $now): array
+    private static function withDecisionExpiry(array $projection,mixed $expiresAt,int $now): array
     {
-        if ($expiresAt === null) {
-            return $projection;
-        }
-        if (!is_string($expiresAt)
-            || preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/D', $expiresAt) !== 1
-            || ($epoch = strtotime($expiresAt)) === false) {
+        if($expiresAt===null)return $projection;
+        if(!is_string($expiresAt)
+            ||preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/D',$expiresAt)!==1
+            ||($epoch=strtotime($expiresAt))===false)
             throw new InvalidArgumentException('decision expires_at invalid.');
-        }
-        $projection['expires_at'] = $expiresAt;
-        $projection['seconds_left'] = max(0, $epoch - $now);
-        $projection['expired'] = $epoch <= $now;
+        $projection['expires_at']=$expiresAt;
+        $projection['seconds_left']=max(0,$epoch-$now);
+        $projection['expired']=$epoch<=$now;
         return $projection;
     }
 
     private static function decisionOptions(mixed $raw): array
     {
-        if (!is_array($raw) || !array_is_list($raw) || $raw === [] || count($raw) > 6) {
+        if(!is_array($raw)||!array_is_list($raw)||$raw===[]||count($raw)>6)
             throw new InvalidArgumentException('decision options invalid.');
-        }
-        $out = [];
-        $seen = [];
-        foreach ($raw as $option) {
-            $id = is_array($option) && !array_is_list($option) ? ($option['id'] ?? null) : null;
-            if (!is_string($id) || preg_match('/^[A-D]$/D', $id) !== 1
-                || isset($seen[$id]) || !is_bool($option['reversible'] ?? null)) {
+        $out=[];$seen=[];
+        foreach($raw as $option){
+            $id=is_array($option)&&!array_is_list($option)?($option['id']??null):null;
+            if(!is_string($id)||preg_match('/^[A-D]$/D',$id)!==1
+                ||isset($seen[$id])||!is_bool($option['reversible']??null))
                 throw new InvalidArgumentException('decision option invalid.');
-            }
-            $seen[$id] = true;
-            $out[] = [
-                'id' => $id,
-                'label' => self::decisionText($option['label'] ?? null, 'decision.option.label', 200),
-                'effect' => self::decisionText($option['effect'] ?? null, 'decision.option.effect', 600),
-                'pros' => self::decisionTextList($option['pros'] ?? null, 6, 300),
-                'cons' => self::decisionTextList($option['cons'] ?? null, 6, 300),
-                'risk' => self::decisionText($option['risk'] ?? null, 'decision.option.risk', 80),
-                'cost' => ($option['cost'] ?? null) === null
-                    ? null : self::decisionText($option['cost'], 'decision.option.cost', 240),
-                'reversible' => $option['reversible'],
-                'explain_simple' => ($option['explain_simple'] ?? null) === null
-                    ? null : self::decisionText($option['explain_simple'], 'decision.option.explain', 400),
+            $seen[$id]=true;
+            $out[]=[
+                'id'=>$id,'label'=>self::decisionText($option['label']??null,'decision.option.label',200),
+                'effect'=>self::decisionText($option['effect']??null,'decision.option.effect',600),
+                'pros'=>self::decisionTextList($option['pros']??null,6,300),
+                'cons'=>self::decisionTextList($option['cons']??null,6,300),
+                'risk'=>self::decisionText($option['risk']??null,'decision.option.risk',80),
+                'cost'=>($option['cost']??null)===null?null:self::decisionText($option['cost'],'decision.option.cost',240),
+                'reversible'=>$option['reversible'],
+                'explain_simple'=>($option['explain_simple']??null)===null
+                    ?null:self::decisionText($option['explain_simple'],'decision.option.explain',400),
             ];
         }
         return $out;
     }
 
-    private static function decisionTextList(mixed $raw, int $maxItems, int $maxLength): array
+    private static function decisionTextList(mixed $raw,int $maxItems,int $maxLength): array
     {
-        if (!is_array($raw) || !array_is_list($raw) || count($raw) > $maxItems) {
+        if(!is_array($raw)||!array_is_list($raw)||count($raw)>$maxItems)
             throw new InvalidArgumentException('decision list invalid.');
-        }
         return array_map(
-            static fn (mixed $value): string => self::decisionText($value, 'decision list item', $maxLength),
+            static fn(mixed $value):string=>self::decisionText($value,'decision list item',$maxLength),
             $raw
         );
     }
 
-    private static function decisionText(mixed $value, string $label, int $max): string
+    private static function decisionText(mixed $value,string $label,int $max): string
     {
-        if (!is_string($value)) {
+        if(!is_string($value))throw new InvalidArgumentException($label.' invalid.');
+        $value=trim($value);
+        if($value===''||strlen($value)>$max||preg_match('/[\\x00-\\x1f\\x7f]/',$value)===1)
             throw new InvalidArgumentException($label.' invalid.');
-        }
-        $value = trim($value);
-        if ($value === '' || strlen($value) > $max || preg_match('/[\\x00-\\x1f\\x7f]/', $value) === 1) {
-            throw new InvalidArgumentException($label.' invalid.');
-        }
         return $value;
     }
 
     private static function decisionIdentity(string $issue): array
     {
-        if (preg_match('~^github:(pl0n3r/[A-Za-z0-9_.-]+)#([1-9][0-9]*)$~D', $issue, $match) === 1) {
-            return [$match[1], (int) $match[2]];
-        }
-        if (preg_match('~^https://github\\.com/(pl0n3r/[A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)$~D', $issue, $match) === 1) {
-            return [$match[1], (int) $match[2]];
-        }
+        if(preg_match('~^github:(pl0n3r/[A-Za-z0-9_.-]+)#([1-9][0-9]*)$~D',$issue,$match)===1)
+            return [$match[1],(int)$match[2]];
+        if(preg_match('~^https://github\\.com/(pl0n3r/[A-Za-z0-9_.-]+)/issues/([1-9][0-9]*)$~D',$issue,$match)===1)
+            return [$match[1],(int)$match[2]];
         throw new InvalidArgumentException('owner decision issue invalid.');
     }
 

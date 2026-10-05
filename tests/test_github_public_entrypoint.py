@@ -72,6 +72,23 @@ class GitHubPublicEntrypointTests(unittest.TestCase):
         self.assertIn("githubprojectview::project", source)
         self.assertIn("githubglobalui::render", source)
 
+    def test_invalid_request_config_and_projection_contracts_fail_closed(self):
+        data = scenario("guards")
+        self.assertEqual(data["bad_path"]["status"], 404)
+        for key in ("bad_owner_config", "bad_max_age", "bad_clock", "missing_method"):
+            self.assertEqual(data[key]["status"], 503)
+            self.assertNotIn("factory-control", data[key]["body"])
+
+        for key in ("bad_envelope", "list_root", "tiny", "relative_path", "too_many"):
+            self.assertEqual(data[key]["status"], 200)
+            self.assertIn("state=unknown", data[key]["body"])
+            self.assertIn("freshness=unknown", data[key]["body"])
+            self.assertNotIn("factory-control", data[key]["body"])
+
+        self.assertEqual(data["invalid_row"]["status"], 200)
+        self.assertIn("state=unknown", data["invalid_row"]["body"])
+        self.assertIn("freshness=unknown", data["invalid_row"]["body"])
+
 
 if __name__ == "__main__":
     unittest.main()

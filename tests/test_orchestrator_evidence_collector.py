@@ -65,8 +65,20 @@ $transport=static function(string $method,string $url,array $headers)use(&$calls
 $result=FactoryOrchestratorEvidenceCollector::run($env,$transport,200);$old=$dir."/old.json";file_put_contents($old,'{"old":true}');$missing=static fn()=>["status"=>200,"headers"=>["x-ratelimit-remaining"=>"100"],"json"=>[]];$failed=false;try{FactoryOrchestratorEvidenceCollector::run($env|["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"=>$old],$missing,200);}catch(Throwable){$failed=true;}echo json_encode(["result"=>$result,"calls"=>$calls,"missing_failed"=>$failed,"previous"=>file_get_contents($old)],JSON_THROW_ON_ERROR),PHP_EOL;
 ''')
   self.assertEqual(data["calls"],data["result"]["requests"]);self.assertGreater(data["calls"],15);self.assertTrue(data["missing_failed"]);self.assertEqual('{"old":true}',data["previous"])
-  script=(ROOT/"scripts/orchestrator-evidence-collector.php").read_text()
-  for needle in ("CURLPROTO_HTTPS","($parts['scheme']??null)!=='https'","($parts['host']??null)!=='api.github.com'","if($status!==200)return $base;"): self.assertIn(needle,script)
+  contract=php_eval(r'''
+require "src/FactoryOrchestratorEvidenceCollector.php";
+use ControlBot\Business\FactoryOrchestratorEvidenceCollector;
+$invalid=[];$cases=[["POST","https://api.github.com/repos/x"],["GET","http://api.github.com/repos/x"],["GET","https://example.com/repos/x"],["GET","https://u:p@api.github.com/repos/x"],["GET","https://api.github.com:444/repos/x"]];
+FactoryOrchestratorEvidenceCollector::validateLiveRequest("GET","https://api.github.com/repos/x");
+foreach($cases as $case){$failed=false;try{FactoryOrchestratorEvidenceCollector::validateLiveRequest($case[0],$case[1]);}catch(Throwable){$failed=true;}$invalid[]=$failed;}
+$retry=FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(502,["x-ratelimit-remaining"=>"100"],"<html>bad gateway</html>");
+$ok=FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(200,["x-ratelimit-remaining"=>"100"],"[]");
+$badJson=false;try{FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(200,[],"not-json");}catch(Throwable){$badJson=true;}
+$badBody=false;try{FactoryOrchestratorEvidenceCollector::normalizeLiveResponse(200,[],false);}catch(Throwable){$badBody=true;}
+echo json_encode(["invalid"=>$invalid,"retry"=>$retry,"ok"=>$ok,"bad_json"=>$badJson,"bad_body"=>$badBody],JSON_THROW_ON_ERROR),PHP_EOL;
+''')
+  self.assertTrue(all(contract["invalid"]));self.assertEqual(502,contract["retry"]["status"]);self.assertNotIn("json",contract["retry"])
+  self.assertEqual([],contract["ok"]["json"]);self.assertTrue(contract["bad_json"]);self.assertTrue(contract["bad_body"])
 
  def test_kill_switch_requires_issue_767_single_exact_owner_marker(self):
   data=php_eval(r'''

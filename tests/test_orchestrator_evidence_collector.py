@@ -1,4 +1,4 @@
-import json, os, subprocess, unittest
+import json, os, subprocess, tempfile, unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -79,6 +79,39 @@ echo json_encode(["invalid"=>$invalid,"retry"=>$retry,"ok"=>$ok,"bad_json"=>$bad
 ''')
   self.assertTrue(all(contract["invalid"]));self.assertEqual(502,contract["retry"]["status"]);self.assertNotIn("json",contract["retry"])
   self.assertEqual([],contract["ok"]["json"]);self.assertTrue(contract["bad_json"]);self.assertTrue(contract["bad_body"])
+
+  with tempfile.TemporaryDirectory() as directory:
+   temp=Path(directory);token=temp/"token";evidence=temp/"evidence.json";prepend=temp/"curl_mock.php"
+   token.write_text("read-only",encoding="utf-8");os.chmod(token,0o600)
+   prepend.write_text(r'''<?php
+namespace ControlBot\Cli;
+$coverage=getenv('CONTROLBOT_PHP_COVERAGE_BOOTSTRAP');
+if(is_string($coverage)&&$coverage!==''){require $coverage;}
+function curl_init(string $url){$GLOBALS['cb_url']=$url;return new \stdClass();}
+function curl_setopt_array($handle,array $options):bool{$GLOBALS['cb_options']=$options;return true;}
+function curl_exec($handle){
+ $callback=$GLOBALS['cb_options'][\CURLOPT_HEADERFUNCTION]??null;
+ if(is_callable($callback)){$callback($handle,"x-ratelimit-remaining: 100\r\n");}
+ $path=parse_url($GLOBALS['cb_url']??'',\PHP_URL_PATH)?:'';
+ $json=str_ends_with($path,'/issues/767')
+  ?['number'=>767,'user'=>['login'=>'pl0n3r'],'body'=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->']
+  :[];
+ return json_encode($json,\JSON_THROW_ON_ERROR|\JSON_UNESCAPED_SLASHES);
+}
+function curl_getinfo($handle,int $option){return 200;}
+function curl_close($handle):void{}
+''',encoding="utf-8")
+   env=os.environ|{
+    "CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED":"1",
+    "CONTROLBOT_GITHUB_READ_TOKEN_FILE":str(token),
+    "CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH":str(evidence),
+   }
+   live=subprocess.run(
+    ["php","-d",f"auto_prepend_file={prepend}",str(ROOT/"scripts/orchestrator-evidence-collector.php")],
+    cwd=ROOT,text=True,capture_output=True,env=env,timeout=30,
+   )
+   self.assertEqual(0,live.returncode,live.stderr)
+   self.assertEqual("written",json.loads(live.stdout)["state"]);self.assertTrue(evidence.is_file())
 
  def test_kill_switch_requires_issue_767_single_exact_owner_marker(self):
   data=php_eval(r'''

@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNBOOK = ROOT / "docs" / "runbooks" / "orchestrator-snapshot-cron.md"
 PUBLIC_DOC = ROOT / "docs" / "public-orchestrator-entrypoint.md"
 ENTRYPOINT = ROOT / "src" / "FactoryOrchestratorWebEntrypoint.php"
+PRIVATE_SNAPSHOT = "$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json"
 
 
 class OrchestratorRunbookPathsTests(unittest.TestCase):
@@ -15,7 +16,7 @@ class OrchestratorRunbookPathsTests(unittest.TestCase):
         self.public_doc = PUBLIC_DOC.read_text(encoding="utf-8")
         self.entrypoint = ENTRYPOINT.read_text(encoding="utf-8")
 
-    def test_runbook_snapshot_path_matches_the_path_read_by_the_web_entrypoint(self) -> None:
+    def test_runbook_snapshot_path_matches_external_web_configuration(self) -> None:
         assignment = re.search(
             r'export CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="([^"]+)"',
             self.runbook,
@@ -23,24 +24,11 @@ class OrchestratorRunbookPathsTests(unittest.TestCase):
         self.assertIsNotNone(assignment)
         documented = assignment.group(1)
 
-        web_default = re.search(
-            r"dirname\(__DIR__\)\s*\.\s*'(/var/orchestrator-live\.json)'",
-            self.entrypoint,
-        )
-        self.assertIsNotNone(web_default)
-
-        self.assertEqual(
-            documented,
-            "$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json",
-        )
-        self.assertIn("/public_html", documented)
-        self.assertEqual(documented.split("/public_html", 1)[1], web_default.group(1))
-        self.assertIn("`var/orchestrator-live.json`", self.public_doc)
-        self.assertIn(documented, self.public_doc)
-        self.assertNotIn(
-            'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json"',
-            self.runbook,
-        )
+        self.assertEqual(documented, PRIVATE_SNAPSHOT)
+        self.assertNotIn("/public_html/", documented)
+        self.assertIn("CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH", self.entrypoint)
+        self.assertIn("dirname(__DIR__) . '/var/orchestrator-live.json'", self.entrypoint)
+        self.assertIn(PRIVATE_SNAPSHOT, self.public_doc)
 
     def test_runbook_contains_complete_cron_command_without_secrets(self) -> None:
         cron_lines = [
@@ -66,7 +54,7 @@ class OrchestratorRunbookPathsTests(unittest.TestCase):
         )
         self.assertIn("CONTROLBOT_ORCHESTRATOR_CRON_ENABLED=1", cron)
         self.assertIn(
-            'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json"',
+            'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json"',
             cron,
         )
         self.assertIn(

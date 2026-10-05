@@ -14,10 +14,11 @@ Require valid-user
 </IfModule>
 </IfModule>
 
-# Public login identifier only; password/hash remain server-side.
+# Public login identifier and non-secret snapshot location only; password/hash remain server-side.
 # If mod_env is unavailable, the application fails closed because owner_login is missing.
 <IfModule mod_env.c>
 SetEnv CONTROLBOT_OWNER_LOGIN USUARIO
+SetEnv CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH /home/u151692719/domains/control.condorapp.com.co/private/orchestrator-live.json
 </IfModule>
 
 <IfModule mod_rewrite.c>

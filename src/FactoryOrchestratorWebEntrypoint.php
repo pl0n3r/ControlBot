@@ -15,12 +15,14 @@ final class FactoryOrchestratorWebEntrypoint
     private const TTL = 10;
     private const STALE = 60;
     private const REFRESH_BUDGET = 20;
+    private const SNAPSHOT_ENV = 'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH';
 
     public static function handle(array $server, array $environment, int $now, ?string $snapshotPath = null, ?string $cachePath = null): array
     {
-        $snapshotPath ??= dirname(__DIR__) . '/var/orchestrator-live.json';
+        $source = self::snapshotSource($server, $environment, $snapshotPath);
+        $snapshotPath = $source['path'];
         $cachePath ??= rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR
-            . 'controlbot-orchestrator-live-' . hash('sha256', $snapshotPath) . '.json';
+            . 'controlbot-orchestrator-live-' . hash('sha256', $source['cache_identity']) . '.json';
         $uri = $server['REQUEST_URI'] ?? null;
         $path = is_string($uri) && $uri !== '' && strlen($uri) <= 2048 ? parse_url($uri, PHP_URL_PATH) : null;
         if (!is_string($path) || $path === '' || str_contains($path, "\0")) $path = null;
@@ -36,7 +38,9 @@ final class FactoryOrchestratorWebEntrypoint
             'ttl_seconds' => self::TTL,
             'stale_seconds' => self::STALE,
             'refresh_budget_seconds' => self::REFRESH_BUDGET,
-        ], $now, static fn (): array => self::localSnapshot($snapshotPath, $now));
+        ], $now, static fn (): array => $source['valid']
+            ? self::localSnapshot($snapshotPath, $now)
+            : self::unknown($now));
     }
 
     public static function localSnapshot(string $path, int $now): array
@@ -54,6 +58,91 @@ final class FactoryOrchestratorWebEntrypoint
         } catch (Throwable) {
             return self::unknown($now);
         }
+    }
+
+    private static function snapshotSource(array $server, array $environment, ?string $injected): array
+    {
+        if ($injected !== null) {
+            return ['path' => $injected, 'cache_identity' => $injected, 'valid' => true];
+        }
+
+        $legacy = dirname(__DIR__) . '/var/orchestrator-live.json';
+        if (!array_key_exists(self::SNAPSHOT_ENV, $environment) || $environment[self::SNAPSHOT_ENV] === null) {
+            return ['path' => $legacy, 'cache_identity' => $legacy, 'valid' => true];
+        }
+
+        $configured = $environment[self::SNAPSHOT_ENV];
+        if (!is_string($configured) || !self::validConfiguredPath($configured, $server)) {
+            $identity = is_string($configured) ? $configured : serialize($configured);
+            return [
+                'path' => is_string($configured) ? $configured : '',
+                'cache_identity' => 'invalid:' . hash('sha256', $identity),
+                'valid' => false,
+            ];
+        }
+
+        return ['path' => $configured, 'cache_identity' => $configured, 'valid' => true];
+    }
+
+    private static function validConfiguredPath(string $path, array $server): bool
+    {
+        if ($path === '' || str_contains($path, "\0") || $path[0] !== DIRECTORY_SEPARATOR) return false;
+        if (preg_match('~(?:^|/)\.\.(?:/|$)~D', $path) === 1 || self::hasSymlinkComponent($path)) return false;
+
+        $candidate = self::normalizeAbsolutePath($path);
+        if ($candidate === null) return false;
+
+        $roots = [dirname(__DIR__)];
+        $documentRoot = $server['DOCUMENT_ROOT'] ?? null;
+        if (is_string($documentRoot) && $documentRoot !== '') $roots[] = $documentRoot;
+
+        foreach ($roots as $root) {
+            $normalizedRoot = self::normalizeAbsolutePath($root);
+            if ($normalizedRoot !== null && self::within($candidate, $normalizedRoot)) return false;
+            $realRoot = realpath($root);
+            if (is_string($realRoot)) {
+                $normalizedRealRoot = self::normalizeAbsolutePath($realRoot);
+                if ($normalizedRealRoot !== null && self::within($candidate, $normalizedRealRoot)) return false;
+            }
+        }
+
+        $realCandidate = realpath($path);
+        if (is_string($realCandidate)) {
+            $normalizedRealCandidate = self::normalizeAbsolutePath($realCandidate);
+            if ($normalizedRealCandidate === null) return false;
+            foreach ($roots as $root) {
+                $realRoot = realpath($root);
+                $normalizedRoot = self::normalizeAbsolutePath(is_string($realRoot) ? $realRoot : $root);
+                if ($normalizedRoot !== null && self::within($normalizedRealCandidate, $normalizedRoot)) return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function hasSymlinkComponent(string $path): bool
+    {
+        $current = '';
+        foreach (explode('/', ltrim($path, '/')) as $component) {
+            if ($component === '') continue;
+            $current .= '/' . $component;
+            if (is_link($current)) return true;
+        }
+        return false;
+    }
+
+    private static function normalizeAbsolutePath(string $path): ?string
+    {
+        if ($path === '' || $path[0] !== DIRECTORY_SEPARATOR || str_contains($path, "\0")) return null;
+        $normalized = preg_replace('~/+~', '/', $path);
+        if (!is_string($normalized)) return null;
+        if ($normalized !== '/') $normalized = rtrim($normalized, '/');
+        return $normalized;
+    }
+
+    private static function within(string $path, string $root): bool
+    {
+        return $path === $root || str_starts_with($path, rtrim($root, '/') . '/');
     }
 
     private static function unknown(int $now): array

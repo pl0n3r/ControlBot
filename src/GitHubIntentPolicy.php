@@ -3,7 +3,6 @@ declare(strict_types=1);
 namespace ControlBot\GitHub;
 
 use ControlBot\Production\CapabilityGrant;
-use ControlBot\Production\CapabilityPolicy;
 use InvalidArgumentException;
 
 final class GitHubIntentPolicy
@@ -39,37 +38,14 @@ final class GitHubIntentPolicy
         if($now-$context['evidence_observed_at']>$context['evidence_max_age_seconds'])
             return self::result('deny','stale_evidence');
 
-        $capability=self::CAPABILITIES[$intent['type']]??null;
-        if($capability===null) return self::result('unknown','unknown_intent_capability');
+        if(!isset(self::CAPABILITIES[$intent['type']]))
+            return self::result('unknown','unknown_intent_capability');
 
-        try { $policy=CapabilityPolicy::classify($capability,$context['restrictions']); }
-        catch (\Throwable) { return self::result('deny','invalid_authority'); }
-
-        if(!$policy['known']) return self::result('unknown','unknown_capability');
-        if($policy['decision']==='forbidden') return self::result('deny','policy_forbidden');
-        if($grant===null) {
-            return self::result(
-                $policy['requires_owner_approval']?'owner_decision_required':'deny',
-                $policy['requires_owner_approval']?'owner_approval_required':'missing_authority',
-            );
-        }
-
-        try {
-            $authorized=$grant->authorize(
-                self::scope($intent,$context,$capability),
-                $now,
-                $context['restrictions'],
-            );
-        } catch (\Throwable) {
-            return self::result('deny','invalid_authority');
-        }
-        if(!($authorized['authorized']??false)) {
-            return self::result(
-                ($authorized['reason']??'')==='owner_approval_required'?'owner_decision_required':'deny',
-                (string)($authorized['reason']??'authority_denied'),
-            );
-        }
-        return self::result('allow','authorized');
+        // V1 has no trusted freshness projection. A raw ref + timestamp/TTL is
+        // caller-controlled, so it cannot authorize or escalate any GitHub intent.
+        // The grant stays in the signature for compatibility but is intentionally
+        // not consumed until a separate trusted-evidence contract exists.
+        return self::result('deny','untrusted_evidence_freshness');
     }
 
     private static function intent(array $envelope): array
@@ -99,21 +75,6 @@ final class GitHubIntentPolicy
             || !is_string($context['subject'])
             || !is_string($context['evidence_ref'])
         ) throw new InvalidArgumentException('authority invalid.');
-    }
-
-    private static function scope(array $intent,array $context,string $capability): array
-    {
-        [$owner,$repo]=explode('/',$intent['repository_ref'],2);
-        return [
-            'capability'=>$capability,
-            'project'=>substr($intent['project_ref'],strlen('controlbot:project/')),
-            'environment'=>'github',
-            'resource'=>'github:'.strtolower($owner).':'.strtolower($repo),
-            'operation'=>$intent['type'],
-            'issue'=>$context['control_issue'],
-            'run_id'=>$context['run_id'],
-            'subject'=>$context['subject'],
-        ];
     }
 
     private static function fields(array $row,array $expected): void

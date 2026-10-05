@@ -2,28 +2,33 @@
 
 `GitHubIntentPolicy` evalúa offline envelopes normalizados por `GitHubIntentEnvelope`. Nunca ejecuta GitHub y toda salida conserva `execution=false`.
 
-## Autoridad reutilizada
+## Binding de autoridad
 
-La policy no crea capabilities `github.*` ni un segundo modelo de autoridad. El caller aporta una capability ya definida por el servidor y:
+La capability ya no viene del caller. La policy deriva un nombre canónico desde el tipo de intent:
 
-- `CapabilityPolicy::classify()` decide si esa capability es conocida, automática, exige backup/owner o está prohibida.
-- `CapabilityGrant` representa la autoridad existente. Su emisión ya aplica `CapabilityPolicy` y exige `owner_approval_id` cuando corresponde.
-- `CapabilityGrant::authorize()` verifica vigencia, revocación y scope exacto.
+- Issue write → `github.issue.write`
+- PR review/merge → `github.pr.review|github.pr.merge`
+- workflow dispatch → `github.workflow.dispatch`
+- release approval → `github.release.approve`
+- project freeze/unfreeze → `github.project.write`
 
-El scope se deriva del envelope: `project_ref` → project, `repository_ref` → resource y `type` → operation. El caller no puede sustituir esos tres campos.
+Este binding **no concede authority**. `CapabilityPolicy::classify()` sigue siendo la fuente canónica y actualmente no contiene esas capabilities GitHub; por tanto la decisión es `unknown` hasta que una hoja separada y autorizada las gobierne. Grants `hostinger.*`, `database.*`, `config.*` u otras capabilities ajenas nunca pueden autorizar un intent GitHub.
+
+`CapabilityGrant::authorize()` se reutiliza únicamente si la capability canónica llega a existir en `CapabilityPolicy`; el scope sigue derivándose del envelope, no del caller.
+
+## Freshness vinculada a evidencia
+
+El contexto debe seleccionar `evidence_ref` y esa referencia debe existir exactamente dentro de los `evidence_refs` ya validados por el envelope. Solo entonces se evalúan `evidence_observed_at` y el TTL (máximo 900 s). Ref ausente/mismatch o evidencia stale fallan cerrado antes de considerar authority.
 
 ## Decisiones
 
 Solo existen `allow | owner_decision_required | deny | unknown`.
 
 - envelope/tipo no reconocido → `unknown`;
-- capability desconocida → `unknown`;
-- capability prohibida, autoridad inválida/ausente, scope mismatch o evidencia stale → `deny`;
-- capability que exige owner sin grant aprobado → `owner_decision_required`;
-- grant vigente y exacto → `allow`.
-
-La evidencia debe venir ya validada por el envelope y su observación no puede superar el TTL indicado; V1 limita ese TTL a 900 s.
+- capability GitHub canónica aún no gobernada → `unknown`;
+- evidencia no vinculada/stale, authority inválida o scope mismatch → `deny`;
+- una futura capability gobernada podrá reutilizar policy/grant/approval existentes sin crear autoridad paralela.
 
 ## Fuera de alcance
 
-GitHub App/PAT/tokens, HTTP/API GitHub, adapters, shell/git libre, mutaciones reales, deploy, producción, DOMAIN/DEPLOY_ENABLED, gasto y datos reales.
+Añadir capabilities GitHub a `CapabilityPolicy.php`, GitHub App/PAT/tokens, HTTP/API GitHub, adapters, shell/git libre, mutaciones reales, deploy, producción, DOMAIN/DEPLOY_ENABLED, gasto y datos reales.

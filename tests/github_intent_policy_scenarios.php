@@ -10,6 +10,7 @@ use ControlBot\GitHub\GitHubIntentPolicy;
 use ControlBot\Production\CapabilityGrant;
 
 const NOW=1791157800;
+const EVIDENCE='github:evidence/main-05f6cf2';
 
 function env(): array
 {
@@ -19,27 +20,26 @@ function env(): array
         'repository_ref'=>'pl0n3r/ControlBot','type'=>'issue.create',
         'params'=>['payload_ref'=>'controlbot:payload/issue-create-1'],
         'idempotency_key'=>'intent:controlbot:679:1',
-        'evidence_refs'=>['github:evidence/main-05f6cf2'],
+        'evidence_refs'=>[EVIDENCE],
     ]);
 }
 
-function ctx(int $seen=NOW-100,string $capability='hostinger.read'): array
+function ctx(int $seen=NOW-100,string $evidence=EVIDENCE): array
 {
     return [
-        'capability'=>$capability,'restrictions'=>[],
-        'control_issue'=>'pl0n3r/ControlBot#679',
+        'restrictions'=>[],'control_issue'=>'pl0n3r/ControlBot#679',
         'run_id'=>'11111111-1111-4111-8111-111111111111',
-        'subject'=>'owner:pl0n3r','evidence_observed_at'=>$seen,
-        'evidence_max_age_seconds'=>300,
+        'subject'=>'owner:pl0n3r','evidence_ref'=>$evidence,
+        'evidence_observed_at'=>$seen,'evidence_max_age_seconds'=>300,
     ];
 }
 
-function grant(string $resource='github:pl0n3r:controlbot',string $capability='hostinger.read',?string $approval=null): CapabilityGrant
+function foreignGrant(string $capability='hostinger.read',?string $approval=null): CapabilityGrant
 {
     return CapabilityGrant::issue([
         'version'=>1,'grant_id'=>'22222222-2222-4222-8222-222222222222',
         'capability'=>$capability,'project'=>'controlbot','environment'=>'github',
-        'resource'=>$resource,'operation'=>'issue.create',
+        'resource'=>'github:pl0n3r:controlbot','operation'=>'issue.create',
         'issue'=>'pl0n3r/ControlBot#679',
         'run_id'=>'11111111-1111-4111-8111-111111111111',
         'subject'=>'owner:pl0n3r','issued_at'=>'2026-10-04T23:45:00Z',
@@ -52,26 +52,41 @@ function grant(string $resource='github:pl0n3r:controlbot',string $capability='h
 $case=$argv[1]??'';
 if($case==='reuse'){
     $out=[
-        'allow'=>GitHubIntentPolicy::evaluate(env(),grant(),ctx(),NOW),
-        'owner_required'=>GitHubIntentPolicy::evaluate(env(),null,ctx(NOW-100,'database.restore'),NOW),
-        'owner_allow'=>GitHubIntentPolicy::evaluate(
+        'foreign'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(),NOW),
+        'foreign_owner'=>GitHubIntentPolicy::evaluate(
             env(),
-            grant('github:pl0n3r:controlbot','database.restore','33333333-3333-4333-8333-333333333333'),
-            ctx(NOW-100,'database.restore'),
+            foreignGrant('database.restore','33333333-3333-4333-8333-333333333333'),
+            ctx(),
             NOW,
         ),
+        'missing'=>GitHubIntentPolicy::evaluate(env(),null,ctx(),NOW),
     ];
 }elseif($case==='closed'){
-    $unknown=env(); $unknown['type']='repo.shell';
-    $ambiguous=env(); $ambiguous['evidence_refs']=['github:evidence/main-05f6cf2','github:evidence/main-05f6cf2'];
+    $unknown=env();$unknown['type']='repo.shell';
+    $ambiguous=env();$ambiguous['evidence_refs']=[EVIDENCE,EVIDENCE];
     $out=[
         'unknown'=>GitHubIntentPolicy::evaluate($unknown,null,ctx(),NOW),
-        'stale'=>GitHubIntentPolicy::evaluate(env(),grant(),ctx(NOW-1000),NOW),
-        'scope_mismatch'=>GitHubIntentPolicy::evaluate(env(),grant('github:pl0n3r:other'),ctx(),NOW),
+        'stale'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(NOW-1000),NOW),
+        'scope_mismatch'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(),NOW),
         'missing_authority'=>GitHubIntentPolicy::evaluate(env(),null,ctx(),NOW),
         'ambiguous'=>GitHubIntentPolicy::evaluate($ambiguous,null,ctx(),NOW),
     ];
+}elseif($case==='binding'){
+    $out=[
+        'hostinger'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(),NOW),
+        'database_owner'=>GitHubIntentPolicy::evaluate(
+            env(),
+            foreignGrant('database.restore','33333333-3333-4333-8333-333333333333'),
+            ctx(),
+            NOW,
+        ),
+    ];
+}elseif($case==='freshness'){
+    $out=[
+        'unbound_ref'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(NOW-100,'github:evidence/other'),NOW),
+        'stale_ref'=>GitHubIntentPolicy::evaluate(env(),foreignGrant(),ctx(NOW-1000),NOW),
+    ];
 }else{
-    fwrite(STDERR,"Unknown github intent policy scenario\n"); exit(2);
+    fwrite(STDERR,"Unknown github intent policy scenario\n");exit(2);
 }
 echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;

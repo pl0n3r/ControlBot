@@ -1,10 +1,12 @@
 # Refresco cron-ready del snapshot del Orquestador
 
-El colector `scripts/orchestrator-evidence-collector.php` hace GET read-only a GitHub y el wrapper `scripts/orchestrator-snapshot-cron.php` consume la evidencia local. El colector permanece **apagado por defecto** y el wrapper también; ambos quedan fuera de requests web.
+El colector `scripts/orchestrator-evidence-collector.php` hace GET read-only a GitHub y el wrapper `scripts/orchestrator-snapshot-cron.php` consume la evidencia local. El colector permanece apagado por defecto y el wrapper también; ambos quedan fuera de requests web.
 
-El contrato separa dos pasos: el colector obtiene evidencia y el wrapper construye/escribe `var/orchestrator-live.json`. Un fallo del wrapper nunca instala el cron, nunca cambia live y nunca amplía autoridad.
+Guardrails de transporte: el adapter es **HTTPS-only** sobre `https://api.github.com` y fuerza `CURLPROTO_HTTPS`. Un primer 5xx puede conservar body no-JSON para que el collector lo contabilice y haga un **retry 5xx** único; solo HTTP 200 exige JSON válido. Factory **Issue #767** se acepta como RUNNING únicamente con número exacto 767, autor `pl0n3r` y un único marker canónico; cualquier ambigüedad falla cerrado.
 
-## Credencial read-only fuera del repositorio
+El colector publica únicamente evidencia que los contratos actuales pueden demostrar. Para Issues con labels de workflow allowlisted conserva `signal.state=pending` y `data.labels` sin derivar un `data.status`; el consumidor los presenta como `unknown`. Los PRs abiertos usan `data.status=in_review`, los bloqueos viven solo en `blockers` y el PR fusionado reciente usa `data.status=merged`. Un **PR fusionado no equivale a release**: `releases` permanece vacío hasta disponer de provenance real de tag/release. **No fabrica `work_inventory`, ranking ni porcentajes**.
+
+## Credencial read-only fuera del repo
 
 La credencial y sus valores concretos permanecen **fuera del repositorio** y se administran únicamente en la configuración privada del servidor.
 
@@ -20,68 +22,50 @@ chmod 600 "$HOME/.controlbot/github-read-token"
 
 ## Guardrails del colector
 
-- Transporte HTTPS-only contra `api.github.com`.
-- Máximo 40 requests HTTP reales por ejecución, contando retries.
-- Máximo 2 MB por respuesta, 8 MB acumulados descargados y 2 MB para la evidencia final.
-- Factory Issue #767 solo se considera RUNNING con Issue, autor y marker exactos; cualquier ambigüedad falla cerrado.
-- Issues pueden paginar como máximo dos páginas de 100; closed PRs usan una sola página reciente de 10.
-- Ante rate-limit, retry-after, budget excedido o transporte inválido se conserva la evidencia anterior.
-- El transporte sigue siendo REST/GET-only y no publica secretos, headers ni cuerpos remotos.
+- Transporte **HTTPS-only** contra `api.github.com`; cualquier otro scheme, host, userinfo o puerto no permitido falla cerrado.
+- Máximo **40 requests HTTP reales** por ejecución, contando retries.
+- Máximo **2 MB por respuesta**, **8 MB acumulados descargados por ejecución** y **2 MB para la evidencia final**.
+- Cada respuesta debe reportar `bytes` reales; no se estiman reserializando JSON.
+- Un primer **5xx** puede hacer **retry 5xx** aunque el body no sea JSON; una respuesta HTTP 200 sí debe contener JSON válido.
+- Factory **Issue #767** solo se considera RUNNING si el payload corresponde exactamente al Issue 767, el autor es `pl0n3r`, existe un único marker y su JSON exacto es `{"version":1,"state":"RUNNING","owner":"pl0n3r"}`. Duplicados, marker inválido, autor distinto o issue distinto fallan cerrado.
+- Issues pueden paginar como máximo dos páginas de 100; closed PRs consultan solo **una página reciente de 10** y no solicitan page=2 porque únicamente se necesita el primer merge reciente.
+- Ante rate-limit, retry-after, budget excedido o transporte inválido, se conserva el archivo anterior mediante reemplazo atómico.
+- El transporte continúa siendo REST/GET-only. La reducción de la página de PRs evita ampliar la superficie a GraphQL/POST para resolver este incidente.
 
-## Diagnóstico seguro del wrapper
+## Diagnóstico seguro del CLI
 
-El wrapper ya no aplasta todos los fallos a `execution failed`. Ante error emite únicamente un código allowlisted:
+Ante fallo, el CLI emite solo un código allowlisted y, cuando existe, el path de API sin query y el estado HTTP. Nunca imprime el token, cabeceras, body de GitHub, mensaje crudo de excepción ni rutas privadas del servidor.
 
-| Código | Significado operativo |
-| --- | --- |
-| `clock_invalid` | reloj/epoch no utilizable |
-| `snapshot_target_invalid` | target no absoluto, symlink o shape no permitido |
-| `snapshot_directory_unwritable` | directorio ausente o no escribible |
-| `evidence_invalid` | evidencia ausente, ilegible o JSON inválido |
-| `snapshot_build_failed` | la evidencia no puede producir el snapshot canónico |
-| `snapshot_size_invalid` | salida fuera del budget de bytes |
-| `temp_write_failed` | no pudo crear/escribir/verificar el temporal seguro |
-| `atomic_rename_failed` | falló rename y también el fallback verificado |
-| `internal_error` | causa no clasificada; fail-closed |
+Códigos operativos:
 
-Ejemplo:
+- `download_budget_exceeded`
+- `request_budget_exceeded`
+- `token_file_invalid`
+- `evidence_path_unwritable`
+- `transport_unavailable`
+- `rate_limited`
+- `github_response_invalid`
+- `github_read_failed`
+- `evidence_budget_exceeded`
+- `signal_budget_exceeded`
+- `request_policy_denied`
+- `clock_invalid`
+- `http_status_<código>`
+- `internal_error` como fallback fail-closed para una causa no clasificada
 
-```text
-orchestrator-snapshot-cron: snapshot_directory_unwritable
-```
-
-Nunca se imprimen rutas privadas, contenido de evidencia, cookies, headers, hashes de archivos, mensajes crudos de excepción ni secretos.
-
-### Diagnóstico de entorno opcional
-
-Para una ejecución manual de diagnóstico puede habilitarse temporalmente:
-
-```sh
-export CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS=1
-```
-
-El sufijo solo puede contener señales read-only y allowlisted:
+Ejemplo seguro:
 
 ```text
-dir_exists=1 dir_writable=1 dir_owner_match=1 dir_mode=0700
+orchestrator-evidence-collector: http_status_403 path=/repos/pl0n3r/Factory/issues status=403
 ```
 
-No incluye el path. `dir_owner_match=unknown` es válido cuando el runtime no expone el UID efectivo. La variable debe permanecer ausente en operación normal.
+### Diagnóstico del wrapper del snapshot
 
-## Escritura robusta en hosting compartido
+El wrapper usa códigos cerrados adicionales: `snapshot_target_invalid`, `snapshot_directory_unwritable`, `evidence_invalid`, `snapshot_build_failed`, `snapshot_size_invalid`, `temp_write_failed` y `atomic_rename_failed`. Nunca imprime rutas ni el mensaje crudo de la excepción.
 
-La escritura conserva el enfoque fail-closed:
+`CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS=1` habilita solo una pista manual read-only: `dir_exists`, `dir_writable`, `dir_owner_match` y `dir_mode`. No incluye el path y permanece apagada por defecto.
 
-1. valida target y directorio antes de tocar el snapshot;
-2. construye el JSON en memoria y aplica el límite de tamaño;
-3. crea el temporal **en el mismo directorio** del snapshot;
-4. escribe el temporal con `LOCK_EX` y verifica bytes;
-5. solicita modo `0640`; si `chmod` falla, solo continúa cuando el modo observado ya es seguro (`0600` o `0640`);
-6. intenta `rename` como reemplazo atómico primario;
-7. si `rename` falla por una variación del hosting compartido, usa `LOCK_EX` sobre el target y verifica byte por byte el resultado;
-8. si el fallback no puede verificarse, restaura el snapshot previo cuando existe y termina con `atomic_rename_failed`.
-
-Así, una variación de `chmod` o `rename` no convierte un fallo cosmético del filesystem en caída del Orquestador, pero tampoco acepta una escritura no comprobada.
+La escritura crea el temporal en el mismo directorio, usa `LOCK_EX` y verifica bytes. Un `chmod` fallido solo se tolera si el modo observado ya es `0600` o `0640`. `rename` sigue siendo primario; si falla, el fallback escribe con `LOCK_EX`, verifica contenido/tamaño y restaura el snapshot previo cuando la verificación falla.
 
 ## Ruta canónica del snapshot
 
@@ -91,13 +75,13 @@ El repositorio desplegado vive en:
 /home/u151692719/domains/control.condorapp.com.co/public_html
 ```
 
-`FactoryOrchestratorWebEntrypoint` lee, por defecto, `var/orchestrator-live.json` relativo a esa raíz. El productor offline debe escribir en:
+`FactoryOrchestratorWebEntrypoint` lee, por defecto, `var/orchestrator-live.json` relativo a esa raíz. Por tanto, el productor offline debe escribir exactamente en:
 
 ```text
 $HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json
 ```
 
-Prepara el directorio una sola vez. `var/` está ignorado por Git y no debe ser symlink:
+Prepara el directorio una sola vez. `var/` está ignorado por Git, por lo que el despliegue que reemplaza archivos rastreados no debe pisar el snapshot. No uses enlaces simbólicos:
 
 ```sh
 SITE_ROOT="$HOME/domains/control.condorapp.com.co/public_html"
@@ -105,7 +89,7 @@ install -d -m 700 "$SITE_ROOT/var"
 test ! -L "$SITE_ROOT/var"
 ```
 
-El `.htaccess` del sitio bloquea `.json` y rutas internas; el archivo está destinado al lector PHP local, no a descarga pública.
+El `.htaccess` del sitio bloquea `.json` y rutas internas; el archivo queda destinado al lector PHP local, no a descarga pública.
 
 ## Variables y prueba manual
 
@@ -129,11 +113,13 @@ ls -ld "$(dirname "$SNAPSHOT")" "$SNAPSHOT"
 test -f "$SNAPSHOT" && echo "snapshot_age_seconds=$(( $(date +%s) - $(stat -c %Y "$SNAPSHOT") ))"
 ```
 
-Si falla, activa `CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS=1` solo para una ejecución manual, lee el código y el tuple `dir_*`, corrige el entorno y vuelve a desactivarlo. No copies rutas privadas o credenciales a Issues.
+El colector usa un máximo de 40 requests reales y un budget acumulado de **8 MB** de bytes descargados; cada respuesta individual conserva el tope de 2 MB y la evidencia serializada también está limitada a 2 MB. Cada retry consume requests y bytes reales, sin fallback estimado. Issues pueden paginar como máximo dos páginas de 100 y fallan cerrado si existiría una tercera; closed PRs consultan solo **una página reciente** de 10 porque únicamente se publica el primer merge observado y no se recorre historial. El snapshot admite como máximo 24 fronts: si el trabajo activo excede el contrato, el colector falla cerrado en vez de truncar o rankear. Ante rate-limit/error/budget excedido conserva el archivo anterior mediante reemplazo atómico.
+
+La medición read-only de #720 sobre los siete repos dio **617.986 B** en Issues y **1.279.176 B** en closed PRs con `per_page=10`: **1.897.162 B** en las 14 lecturas principales, antes de la lectura pequeña de Factory#767. En Factory, closed PRs bajó de **1.758.268 B** con 100 elementos a **168.290 B** con 10 (~10,4× menos). El límite acumulado de 8 MB conserva margen para crecimiento y un retry sin volver al fallo original, sin cambiar el modelo de evidencia ni los permisos del token.
 
 ## Cron en hPanel
 
-Configura cada 5 minutos el mismo encadenamiento `colector && wrapper`, usando PHP 8.5 y un log estable. **La línea es instalable tal cual** para este hosting y no contiene el token, solo la ruta privada del archivo de credencial:
+Configura **cada 5 minutos** el mismo encadenamiento `colector && wrapper`, usando PHP 8.5 y un log estable. La línea es instalable tal cual para este hosting y no contiene el token, solo la ruta privada del archivo de credencial:
 
 ```cron
 */5 * * * * cd "$HOME/domains/control.condorapp.com.co/public_html" && { export CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED=1 CONTROLBOT_GITHUB_READ_TOKEN_FILE="$HOME/.controlbot/github-read-token" CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH="$HOME/domains/control.condorapp.com.co/private/orchestrator-evidence.json" CONTROLBOT_ORCHESTRATOR_CRON_ENABLED=1 CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH="$HOME/domains/control.condorapp.com.co/public_html/var/orchestrator-live.json"; /opt/alt/php85/usr/bin/php scripts/orchestrator-evidence-collector.php && /opt/alt/php85/usr/bin/php scripts/orchestrator-snapshot-cron.php; } >> "$HOME/.controlbot/orchestrator-snapshot-cron.log" 2>&1
@@ -143,4 +129,4 @@ Este runbook no modifica hPanel por sí mismo, no cambia `DOMAIN`, `DEPLOY_ENABL
 
 ## Reversión
 
-Deshabilita `CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED` y `CONTROLBOT_ORCHESTRATOR_CRON_ENABLED`. Sin esas señales no hay red ni escrituras nuevas. El cambio de #726 es reversible por `revert` y no modifica el contrato de evidencia ni del snapshot.
+Deshabilita `CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED` y `CONTROLBOT_ORCHESTRATOR_CRON_ENABLED`. Sin esas señales no hay red ni escrituras nuevas.

@@ -1,5 +1,6 @@
 import json
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -24,13 +25,19 @@ def project(delivery, event, now=1_100, stale_after=300):
         {"delivery": delivery, "event": event, "now": now, "stale_after": stale_after},
         separators=(",", ":"),
     )
-    run = subprocess.run(
-        ["php", "-r", PHP, payload],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        check=True,
-    )
+    with tempfile.NamedTemporaryFile("w", suffix=".php", delete=False) as driver:
+        driver.write("<?php\n" + PHP)
+        driver_path = Path(driver.name)
+    try:
+        run = subprocess.run(
+            ["php", str(driver_path), payload],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+    finally:
+        driver_path.unlink(missing_ok=True)
     return json.loads(run.stdout)
 
 

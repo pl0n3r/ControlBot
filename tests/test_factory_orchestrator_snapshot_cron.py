@@ -284,5 +284,176 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
             self.assertEqual("atomic_rename_failed",failed["code"]); self.assertEqual("previous\n",previous.read_text())
 
 
+    def test_refresh_covers_fallback_cleanup_and_target_edge_cases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot = root / "snapshot.json"
+            snapshot.write_text("previous\n")
+
+            invalid_writer = self.refresh_case(
+                snapshot,
+                io="['rename'=>static fn($a,$b)=>false,'write_target'=>'not-callable']",
+            )
+            self.assertEqual("internal_error", invalid_writer["code"])
+            self.assertEqual("previous\n", snapshot.read_text())
+
+            short_temp = self.refresh_case(
+                snapshot,
+                io=(
+                    "['write_temp'=>static function($p,$d){"
+                    "file_put_contents($p,'x');return strlen($d);}]"
+                ),
+            )
+            self.assertEqual("temp_write_failed", short_temp["code"])
+            self.assertEqual("previous\n", snapshot.read_text())
+            self.assertEqual([], list(root.glob(".orchestrator-live-*")))
+
+            absent = root / "absent.json"
+            remove_partial = self.refresh_case(
+                absent,
+                io=(
+                    "['rename'=>static fn($a,$b)=>false,"
+                    "'write_target'=>static function($p,$d){"
+                    "file_put_contents($p,'broken');return false;}]"
+                ),
+            )
+            self.assertEqual("atomic_rename_failed", remove_partial["code"])
+            self.assertFalse(absent.exists())
+
+            mismatched = root / "mismatched.json"
+            final_verify = self.refresh_case(
+                mismatched,
+                io=(
+                    "['rename'=>static function($from,$to){"
+                    "file_put_contents($to,'x');@unlink($from);return true;}]"
+                ),
+            )
+            self.assertEqual("atomic_rename_failed", final_verify["code"])
+            self.assertEqual("x", mismatched.read_text())
+
+            self.assertEqual(
+                "snapshot_target_invalid",
+                self.refresh_case(root / "too-small.json", max_bytes=1)["code"],
+            )
+            self.assertEqual(
+                "snapshot_target_invalid",
+                self.refresh_case(root / "too-large.json", max_bytes=2_000_001)["code"],
+            )
+            self.assertEqual(
+                "snapshot_target_invalid",
+                self.refresh_case(root)["code"],
+            )
+
+            real = root / "real.json"
+            real.write_text("previous\n")
+            linked = root / "linked.json"
+            try:
+                linked.symlink_to(real)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable")
+            self.assertEqual(
+                "snapshot_target_invalid",
+                self.refresh_case(linked)["code"],
+            )
+
+    def test_refresh_detects_symlink_race_before_fallback_write(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "snapshot.json"
+            io = (
+                "['rename'=>static function($from,$to){"
+                "@unlink($to);symlink($from,$to);return false;}]"
+            )
+            result = self.refresh_case(target, io=io)
+            self.assertEqual("atomic_rename_failed", result["code"])
+            self.assertTrue(target.is_symlink())
+            target.unlink()
+
+    def test_wrapper_rejects_small_oversized_symlink_and_relative_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot = root / "snapshot.json"
+            env = base_environment()
+            env["CONTROLBOT_ORCHESTRATOR_CRON_ENABLED"] = "1"
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"] = str(snapshot)
+
+            tiny = root / "tiny.json"
+            tiny.write_text(" ")
+            env["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"] = str(tiny)
+            tiny_result = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(70, tiny_result.returncode)
+            self.assertEqual("orchestrator-snapshot-cron: evidence_invalid\n", tiny_result.stderr)
+
+            oversized = root / "oversized.json"
+            oversized.write_text('{"payload":"' + ("x" * 2_000_000) + '"}')
+            env["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"] = str(oversized)
+            oversized_result = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(70, oversized_result.returncode)
+            self.assertEqual(
+                "orchestrator-snapshot-cron: evidence_invalid\n",
+                oversized_result.stderr,
+            )
+
+            evidence = root / "evidence.json"
+            evidence.write_text(json.dumps(canonical_evidence(int(time.time()))))
+            link = root / "evidence-link.json"
+            try:
+                link.symlink_to(evidence)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable")
+            env["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"] = str(link)
+            symlink_result = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(70, symlink_result.returncode)
+            self.assertEqual(
+                "orchestrator-snapshot-cron: evidence_invalid\n",
+                symlink_result.stderr,
+            )
+
+            env["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"] = str(evidence)
+            env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"] = "relative.json"
+            relative = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(70, relative.returncode)
+            self.assertEqual(
+                "orchestrator-snapshot-cron: snapshot_target_invalid\n",
+                relative.stderr,
+            )
+
+    def test_cron_enabled_path_forwards_io_and_returns_refresh_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = Path(directory) / "snapshot.json"
+            source = ROOT / "src/FactoryOrchestratorSnapshotCron.php"
+            evidence = json.dumps(canonical_evidence(int(time.time())))
+            code = (
+                "require $argv[1];$e=json_decode($argv[2],true);"
+                "$r=\\ControlBot\\Business\\FactoryOrchestratorSnapshotCron::run("
+                "['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],"
+                "static fn()=> $e,$argv[3],(int)$argv[4],"
+                "['rename'=>static fn($a,$b)=>false]);"
+                "echo json_encode($r,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);"
+            )
+            result = subprocess.run(
+                ["php", "-r", code, str(source), evidence, str(snapshot), str(int(time.time()))],
+                cwd=ROOT, text=True, capture_output=True, timeout=30, check=False,
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["executed"])
+            self.assertEqual("refreshed", payload["state"])
+            self.assertTrue(payload["written"])
+            self.assertEqual(payload["fingerprint"], json.loads(snapshot.read_text())["fingerprint"])
+
+
 if __name__ == "__main__":
     unittest.main()

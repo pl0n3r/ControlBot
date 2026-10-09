@@ -23,8 +23,14 @@ final class FactoryAgentActivity
         foreach (self::REPOS as $index => $name) {
             $projects[] = self::project($rows[$index], 'pl0n3r/' . $name, $now);
         }
-        $complete = array_all($projects, static fn (array $row): bool => $row['freshness'] === 'current'
-            && $row['available'] !== null && $row['planned_unlockable'] !== null);
+        $complete = true;
+        foreach ($projects as $row) {
+            if ($row['freshness'] !== 'current' || $row['available'] === null
+                || $row['planned_unlockable'] === null) {
+                $complete = false;
+                break;
+            }
+        }
         $queueEmpty = $complete
             ? (array_sum(array_column($projects, 'available')) === 0
                 && array_sum(array_column($projects, 'planned_unlockable')) > 0)

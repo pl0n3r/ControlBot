@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace ControlBot\Business;
 
 require_once __DIR__ . '/UiTheme.php';
+require_once __DIR__ . '/FactoryAgentActivityUi.php';
 
 use ControlBot\Ui\UiTheme;
 use InvalidArgumentException;
@@ -16,11 +17,9 @@ final class FactoryOrchestratorLiveUi
 
     public static function render(array $view): string
     {
-        self::fields(
-            $view,
-            ['version','observed_at','source_snapshot','read_only','central','fronts','owner_decisions','fingerprint'],
-            'view',
-        );
+        $expected = ['version','observed_at','source_snapshot','read_only','central','fronts','owner_decisions','fingerprint'];
+        if (array_key_exists('agent_activity', $view)) $expected[] = 'agent_activity';
+        self::fields($view, $expected, 'view');
         if ($view['version'] !== 1 || $view['read_only'] !== true || ! is_int($view['observed_at'])) {
             throw new InvalidArgumentException('Orchestrator UI view invalid.');
         }
@@ -53,6 +52,7 @@ final class FactoryOrchestratorLiveUi
             $decisions = '<p class="empty" role="status">Sin decisiones humanas pendientes.</p>';
         }
 
+        $activity = FactoryAgentActivityUi::renderSection($view['agent_activity'] ?? null);
         $motion = self::motionSeconds($view['central']);
         return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
@@ -68,7 +68,7 @@ final class FactoryOrchestratorLiveUi
             . '<span data-filter="human">Humano</span></nav>'
             . '<section class="panel human" data-section="human"><p class="eyebrow">HUMANO</p>'
             . '<h2>Decisiones tuyas</h2><div class="human-grid">' . $decisions . '</div></section>'
-            . '<section class="stage" aria-label="Topología del orquestador">' . $central
+            . $activity . '<section class="stage" aria-label="Topología del orquestador">' . $central
             . '<div class="edges" aria-hidden="true">' . $edges . '</div>'
             . '<div class="front-grid">' . $fronts . '</div></section>'
             . '<section class="panel bus" data-section="event_bus"><p class="eyebrow">BUS VISUAL</p>'

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace ControlBot\Business;
 
 require_once __DIR__.'/WorkInventorySnapshot.php';
+require_once __DIR__.'/FactoryAgentActivity.php';
 
 use InvalidArgumentException;
 
@@ -24,7 +25,7 @@ final class FactoryLiveSnapshot
     public static function build(array $raw,int $now): array
     {
         if($now<1||array_is_list($raw))throw new InvalidArgumentException('Factory live input invalid.');
-        $allowed=[...array_keys(self::AUTHORITIES),'tool_usage','work_inventory'];
+        $allowed=[...array_keys(self::AUTHORITIES),'tool_usage','work_inventory','agent_activity'];
         foreach(array_keys($raw) as $key)
             if(!is_string($key)||!in_array($key,$allowed,true))
                 throw new InvalidArgumentException('Factory live field invalid.');
@@ -41,6 +42,8 @@ final class FactoryLiveSnapshot
         $canonical=['version'=>1,'observed_at'=>$now,'sections'=>$sections,'tool_usage'=>$tool];
         if(array_key_exists('work_inventory',$raw))
             $canonical['work_inventory']=self::workInventory($raw['work_inventory'],$now);
+        if(array_key_exists('agent_activity',$raw))
+            $canonical['agent_activity']=FactoryAgentActivity::build($raw['agent_activity'],$now);
         return $canonical+['fingerprint'=>hash('sha256',json_encode($canonical,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES))];
     }
 

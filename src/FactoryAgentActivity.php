@@ -1,19 +1,13 @@
 <?php
 declare(strict_types=1);
-
 namespace ControlBot\Business;
-
 use InvalidArgumentException;
-
 /** Read-only GitHub observations. An updated issue/PR is not an agent heartbeat. */
 final class FactoryAgentActivity
 {
-    private const REPOS = ['Factory', 'Condor', 'GrindFlow', 'brvtal', 'ControlBot', 'AutoFactory', 'FactoryRunner'];
-    private const MAX_ITEMS = 500;
-    private const FRESH = ['current', 'stale', 'unknown'];
-    private const ISSUE_STATES = ['available', 'reserved', 'in_review', 'blocked', 'planned', 'other'];
+    private const REPOS = ['Factory', 'Condor', 'GrindFlow', 'brvtal', 'ControlBot', 'AutoFactory', 'FactoryRunner']; private const MAX_ITEMS = 500;
+    private const FRESH = ['current', 'stale', 'unknown']; private const ISSUE_STATES = ['available', 'reserved', 'in_review', 'blocked', 'planned', 'other'];
     private const RUN_STATES = ['queued', 'in_progress', 'completed'];
-
     public static function build(array $rows, int $now): array
     {
         if ($now < 1 || !array_is_list($rows) || count($rows) !== count(self::REPOS)) {
@@ -38,7 +32,6 @@ final class FactoryAgentActivity
         return ['version' => 1, 'read_only' => true, 'observed_at' => $now,
             'queue_empty' => $queueEmpty, 'projects' => $projects];
     }
-
     private static function project(mixed $raw, string $repo, int $now): array
     {
         self::fields($raw, ['repository_ref', 'source_ref', 'observed_at', 'freshness',
@@ -95,7 +88,6 @@ final class FactoryAgentActivity
             'freshness' => $fresh, 'activity_state' => !$current ? strtoupper($fresh)
                 : ($signalsComplete ? 'OBSERVED' : 'UNKNOWN')];
     }
-
     private static function entries(mixed $raw, string $type, int $now): ?array
     {
         if ($raw === null) return null;
@@ -123,7 +115,6 @@ final class FactoryAgentActivity
         }
         return $items;
     }
-
     private static function fields(mixed $row, array $required, string $label): void
     {
         if (!is_array($row) || array_is_list($row)) throw new InvalidArgumentException($label . ' invalid.');

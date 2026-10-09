@@ -4,7 +4,6 @@ require __DIR__ . '/../src/FactoryAgentActivity.php';
 require __DIR__ . '/../src/FactoryAgentActivityUi.php';
 use ControlBot\Business\FactoryAgentActivity;
 use ControlBot\Business\FactoryAgentActivityUi;
-
 $repos = ['Factory','Condor','GrindFlow','brvtal','ControlBot','AutoFactory','FactoryRunner'];
 $rows = [];
 foreach ($repos as $name) {
@@ -42,20 +41,15 @@ if ($scenario === 'full') {
     $stale = FactoryAgentActivity::build($rows, 200);
     echo json_encode(['valid' => $valid, 'unknown' => $unknown, 'stale' => $stale], JSON_THROW_ON_ERROR), "\n";
 } elseif ($scenario === 'safety') {
-    $mut = $rows;
-    $mut[0]['repository_ref'] = 'pl0n3r/<script>alert(1)</script>';
+    $mut = $rows; $mut[0]['repository_ref'] = 'pl0n3r/<script>alert(1)</script>';
     $badRepo = expectReject(fn () => FactoryAgentActivity::build($mut, 200));
-    $mut = $rows;
-    $mut[0]['source_ref'] = 'https://evil.example/?token=secret';
+    $mut = $rows; $mut[0]['source_ref'] = 'https://evil.example/?token=secret';
     $badSource = expectReject(fn () => FactoryAgentActivity::build($mut, 200));
-    $mut = $rows;
-    $mut[0]['issues'][] = ['number' => 1, 'status' => 'reserved', 'updated_at' => 195];
+    $mut = $rows; $mut[0]['issues'][] = ['number' => 1, 'status' => 'reserved', 'updated_at' => 195];
     $dupe = expectReject(fn () => FactoryAgentActivity::build($mut, 200));
-    $mut = $rows;
-    $mut[0]['coordination_runs'] = null;
+    $mut = $rows; $mut[0]['coordination_runs'] = null;
     $partial = FactoryAgentActivity::build($mut, 200);
-    $mut = $rows;
-    $mut[0]['freshness'] = 'unknown';
+    $mut = $rows; $mut[0]['freshness'] = 'unknown';
     $mut[0]['source_ref'] = null;
     $mut[0]['observed_at'] = null;
     $mut[0]['issues'] = null;

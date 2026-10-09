@@ -1,10 +1,7 @@
 <?php
 declare(strict_types=1);
-
 namespace ControlBot\Business;
-
 use InvalidArgumentException;
-
 /** Private, accessible, read-only HTML; never projects raw GitHub text. */
 final class FactoryAgentActivityUi
 {
@@ -56,7 +53,6 @@ final class FactoryAgentActivityUi
             . '<p>Señales leídas de GitHub; una actualización no demuestra que un agente siga conectado.</p>'
             . $alert . '<div class="front-grid">' . $cards . '</div></section>';
     }
-
     private static function safeRepo(mixed $value): string
     {
         $allowed = ['Factory', 'Condor', 'GrindFlow', 'brvtal', 'ControlBot', 'AutoFactory', 'FactoryRunner'];
@@ -65,7 +61,6 @@ final class FactoryAgentActivityUi
         }
         return $value;
     }
-
     private static function choice(mixed $value, array $allowed): string
     {
         if (!is_string($value) || !in_array($value, $allowed, true)) {
@@ -73,7 +68,6 @@ final class FactoryAgentActivityUi
         }
         return $value;
     }
-
     private static function e(string $text): string
     {
         return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');

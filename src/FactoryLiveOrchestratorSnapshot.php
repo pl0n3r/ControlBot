@@ -30,6 +30,9 @@ final class FactoryLiveOrchestratorSnapshot
         if (array_key_exists('agent_activity', $snapshot)) {
             $out['agent_activity'] = $snapshot['agent_activity'];
         }
+        if (array_key_exists('signal_summary', $snapshot)) {
+            $out['signal_summary'] = $snapshot['signal_summary'];
+        }
         $encoded = json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         return $out + ['fingerprint' => hash('sha256', $encoded)];
     }

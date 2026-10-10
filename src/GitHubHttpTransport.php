@@ -42,6 +42,7 @@ final class GitHubHttpTransport
         $ownsInFlight = false;
         try {
             $json = $this->preflight($request);
+            foreach (['intent_id', 'project_id', 'repository_id'] as $field) $safe[$field] = $request[$field];
             $digest = hash('sha256', $request['intent_id'] . "\n" . $request['project_id'] . "\n" . $request['repository_id'] . "\n" . $request['type'] . "\n" . $request['method'] . "\n" . $request['url'] . "\n" . $json);
             $key = $request['idempotency_key'];
             if (isset($this->previous[$key])) {
@@ -164,7 +165,7 @@ final class GitHubHttpTransport
             $out[$field] = is_string($value)
                 && strlen($value) <= 128
                 && preg_match('/^[A-Za-z0-9_.:\/-]{1,128}$/D', $value)
-                && !preg_match($field === 'idempotency_key' ? '/(?:token|secret|bearer|github_pat|gh[pousr]_)/i' : '/(?:github_pat|gh[pousr]_)/i', $value)
+                && !preg_match('/(?:token|secret|bearer|github_pat|gh[pousr]_)/i', $value)
                 ? $value : null;
         }
         return $out;

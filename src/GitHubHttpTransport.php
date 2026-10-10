@@ -35,11 +35,8 @@ final class GitHubHttpTransport
     /** @return array<string, mixed> safe execution receipt (never response body/token) */
     public function dispatch(array $request): array
     {
-        $started = gmdate('Y-m-d\TH:i:s\Z');
-        $safe = self::metadata($request);
-        $digest = null;
-        $reason = 'invalid_request';
-        $ownsInFlight = false;
+        $started = gmdate('Y-m-d\TH:i:s\Z'); $safe = self::metadata($request);
+        $digest = null; $ownsInFlight = false;
         try {
             $json = $this->preflight($request);
             foreach (['intent_id', 'project_id', 'repository_id'] as $field) $safe[$field] = $request[$field];
@@ -108,7 +105,7 @@ final class GitHubHttpTransport
             $state = ($status >= 400 && $status < 500) ? 'failed' : 'ambiguous';
             return $this->remember($key, self::receipt($safe, $state, $digest, $code, $started));
         } catch (\Throwable) {
-            return self::receipt($safe, 'rejected', $digest, $reason, $started);
+            return self::receipt($safe, 'rejected', $digest, 'invalid_request', $started);
         } finally {
                 if ($ownsInFlight) {
                 unset($this->inFlight[$request['idempotency_key']]);
@@ -135,7 +132,7 @@ final class GitHubHttpTransport
         if (!preg_match('~^([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+)$~D', $r['repository_id'], $repo)) {
             throw new InvalidArgumentException('repository');
         }
-        if (preg_match('/(?:github_pat|gh[pousr]_)/i', $r['intent_id'] . $r['project_id'] . $r['repository_id'])) throw new InvalidArgumentException('identity');
+        foreach (['intent_id', 'project_id', 'repository_id'] as $field) if (preg_match('/(?:github_pat|gh[pousr]_)/i', $r[$field])) throw new InvalidArgumentException('identity');
         if (preg_match('~(?:^|/)\\.{1,2}(?:/|$)~D', $r['url']) === 1) {
             throw new InvalidArgumentException('dot_segment');
         }
@@ -153,8 +150,7 @@ final class GitHubHttpTransport
         if (strlen($json) > 8192) throw new InvalidArgumentException('body_limit');
         return $json;
     }
-    private function remember(string $key, array $receipt): array
-    {
+    private function remember(string $key, array $receipt): array {
         return $this->previous[$key] = $receipt;
     }
     private static function metadata(array $request): array

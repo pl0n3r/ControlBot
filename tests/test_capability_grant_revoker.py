@@ -27,6 +27,7 @@ class CapabilityGrantRevokerTests(unittest.TestCase):
         self.assertEqual(data["after"], {"authorized": False, "reason": "grant_consumed"})
         self.assertEqual(data["failed_after"], {"authorized": False, "reason": "grant_consumed"})
         self.assertEqual(data["replay"], data["success"])
+        self.assertEqual(data["restricted_replay"]["reason"], "idempotency_collision")
         self.assertEqual(data["calls"], 1)
     def test_expired_consumed_and_reentrant_grants_are_denied(self):
         data = scenario("deny")
@@ -64,6 +65,9 @@ class CapabilityGrantRevokerTests(unittest.TestCase):
         data = scenario("existing")
         self.assertTrue(data["read"]["authorized"])
         self.assertEqual(data["guard_read"], data["read"])
+        self.assertEqual(data["guard_strict"], {"authorized": False, "reason": "policy_denied"})
+        self.assertEqual(data["fake_strict"]["reason"], "policy_denied")
+        self.assertEqual(data["fake_calls"], 0)
         self.assertEqual(data["restricted"], {"authorized": False, "reason": "grant_expired"})
         self.assertEqual(data["scope_wrong"], {"authorized": False, "reason": "project_mismatch"})
         self.assertIsNone(data["original_revoked_at"])

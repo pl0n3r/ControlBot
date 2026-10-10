@@ -53,6 +53,7 @@ if ($scenario === 'finish') {
     $calls = 0;
     $success = $guard->execute($grant, scope($input), $now, function () use (&$calls): bool { $calls++; return true; });
     $replay = $guard->execute($grant, scope($input), $now, function () use (&$calls): bool { $calls += 100; return true; });
+    $restrictedReplay = $guard->execute($grant, scope($input), $now, function () use (&$calls): bool { $calls += 100; return true; }, ['forbidden']);
     $after = $guard->authorize($grant, scope($input), $now);
     $input2 = record([
         'grant_id' => '22222222-3333-4444-8555-666666666666',
@@ -68,7 +69,7 @@ if ($scenario === 'finish') {
     $ambiguous = $guard->execute(CapabilityGrant::issue($input3), scope($input3), $now, function (): bool { return false; });
     $out = [
         'ambiguous' => view($ambiguous), 'ambiguous_after' => $guard->authorize($ambiguous['grant'], scope($input3), $now),
-        'success' => view($success), 'replay' => view($replay), 'after' => $after,
+        'success' => view($success), 'replay' => view($replay), 'restricted_replay' => view($restrictedReplay), 'after' => $after,
         'failed' => view($failed), 'failed_after' => $guard->authorize($failed['grant'], scope($input2), $now),
         'calls' => $calls,
     ];
@@ -141,10 +142,12 @@ if ($scenario === 'finish') {
     $read = $grant->authorize(scope($input), $now);
     $restricted = $grant->authorize(scope($input), strtotime('2026-09-28T08:31:00Z'));
     $guardRead = $guard->authorize($grant, scope($input), $now);
+    $guardStrict = $guard->authorize($grant, scope($input), $now, ['forbidden']);
     $scopeWrong = $guard->authorize($grant, array_replace(scope($input), ['project' => 'condor']), $now);
+    $fakeCalls=0; $fakeStrict = $guard->execute($grant, scope($input), $now, function () use (&$fakeCalls): bool { $fakeCalls++; return true; }, ['forbidden']);
     $out = [
-        'read' => $read, 'restricted' => $restricted,
-        'guard_read' => $guardRead, 'scope_wrong' => $scopeWrong,
+        'read' => $read, 'restricted' => $restricted, 'guard_strict' => $guardStrict,
+        'guard_read' => $guardRead, 'scope_wrong' => $scopeWrong, 'fake_strict' => view($fakeStrict), 'fake_calls' => $fakeCalls,
         'original_revoked_at' => $grant->safeRecord()['revoked_at'],
     ];
 } else {

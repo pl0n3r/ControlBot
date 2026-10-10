@@ -23,7 +23,7 @@ final class CapabilityGrantRevoker
     /** @var array<string, array{grant_id:string,record_digest:string,scope_digest:string,result:array}> */
     private array $byIdempotencyKey = [];
     /** Read-only authorization path: never trust an old immutable grant after consumption. */
-    public function authorize(CapabilityGrant $grant, array $scope, int $now): array
+    public function authorize(CapabilityGrant $grant, array $scope, int $now, array $restrictions = []): array
     {
         $id = $grant->safeRecord()['grant_id'];
         if (isset($this->inFlight[$id])) {
@@ -36,16 +36,16 @@ final class CapabilityGrantRevoker
         if (isset($this->inFlightKeys[$key]) || isset($this->byIdempotencyKey[$key])) {
             return ['authorized' => false, 'reason' => 'idempotency_collision'];
         }
-        return $grant->authorize($scope, $now);
+        return $grant->authorize($scope, $now, $restrictions);
     }
     /**
-     * Execute only a caller-injected fake, return a sanitized receipt, and revoke
+     * Execute only a caller-injected fake under effective policy restrictions, and revoke
      * on success, ambiguity and failure. The callback's response/exception is NEVER
      * included in the return value or the audit record.
      *
      * @return array{status:string,reason:string,error_code?:string,grant:CapabilityGrant,audit:array}
      */
-    public function execute(CapabilityGrant $grant, array $scope, int $now, callable $fakeExecutor): array
+    public function execute(CapabilityGrant $grant, array $scope, int $now, callable $fakeExecutor, array $restrictions = []): array
     {
         // Prevent invalid/unbounded timestamps from causing failure in finally.
         if ($now < 1 || $now > 253402300799) {
@@ -57,7 +57,7 @@ final class CapabilityGrantRevoker
         $recordDigest = hash('sha256', json_encode($record, JSON_THROW_ON_ERROR));
         $stableScope = $scope;
         ksort($stableScope);
-        $scopeDigest = hash('sha256', json_encode($stableScope, JSON_THROW_ON_ERROR));
+        $scopeDigest = hash('sha256', json_encode([$stableScope, $restrictions], JSON_THROW_ON_ERROR));
         if (isset($this->inFlight[$id])) {
             return $this->denied($grant, 'grant_in_flight', $now);
         }
@@ -79,7 +79,7 @@ final class CapabilityGrantRevoker
         if (isset($this->revoked[$id])) {
             return $this->denied($this->revoked[$id], 'grant_consumed', $now);
         }
-        $authorization = $this->authorize($grant, $scope, $now);
+        $authorization = $this->authorize($grant, $scope, $now, $restrictions);
         if ($authorization['authorized'] !== true) {
             return $this->denied($grant, $authorization['reason'], $now);
         }

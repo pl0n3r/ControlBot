@@ -19,6 +19,8 @@ final class GitHubHttpTransport
         'workflow.dispatch'=> ['POST', '/actions/workflows/[A-Za-z0-9_.-]+/dispatches'],
     ];
     private array $previous = [];
+    /** In-memory same-instance guard; not a distributed ledger. */
+    private array $inFlight = [];
 
     /**
      * Sender signature: fn(string $method, string $url, ?string $json,
@@ -42,6 +44,7 @@ final class GitHubHttpTransport
         $safe = self::metadata($request);
         $digest = null;
         $reason = 'invalid_request';
+        $ownsInFlight = false;
         try {
             $json = $this->preflight($request);
             $digest = hash('sha256', $request['intent_id'] . "\n" . $request['project_id'] . "\n" . $request['repository_id'] . "\n" . $request['type'] . "\n" . $request['method'] . "\n" . $request['url'] . "\n" . $json);
@@ -53,6 +56,16 @@ final class GitHubHttpTransport
                 }
                 return self::receipt($safe, 'rejected', $digest, 'idempotency_conflict', $started);
             }
+
+            if (array_key_exists($key, $this->inFlight)) {
+                return self::receipt(
+                    $safe, 'rejected', $digest,
+                    $this->inFlight[$key] === $digest ? 'idempotency_in_flight' : 'idempotency_conflict',
+                    $started,
+                );
+            }
+            $this->inFlight[$key] = $digest;
+            $ownsInFlight = true;
 
             try {
                 $token = ($this->secretProvider)();
@@ -106,6 +119,11 @@ final class GitHubHttpTransport
             return $this->remember($key, self::receipt($safe, $state, $digest, $code, $started));
         } catch (\Throwable) {
             return self::receipt($safe, 'rejected', $digest, $reason, $started);
+        } finally {
+            // Never let a nested rejected call clear its parent's active guard.
+            if ($ownsInFlight) {
+                unset($this->inFlight[$request['idempotency_key']]);
+            }
         }
     }
 

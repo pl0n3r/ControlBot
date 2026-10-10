@@ -19,6 +19,7 @@ final class FactoryOrchestratorLiveUi
     {
         $expected = ['version','observed_at','source_snapshot','read_only','central','fronts','owner_decisions','fingerprint'];
         if (array_key_exists('agent_activity', $view)) $expected[] = 'agent_activity';
+        if (array_key_exists('signal_summary', $view)) $expected[] = 'signal_summary';
         self::fields($view, $expected, 'view');
         if ($view['version'] !== 1 || $view['read_only'] !== true || ! is_int($view['observed_at'])) {
             throw new InvalidArgumentException('Orchestrator UI view invalid.');
@@ -53,6 +54,7 @@ final class FactoryOrchestratorLiveUi
         }
 
         $activity = FactoryAgentActivityUi::renderSection($view['agent_activity'] ?? null);
+        $signalWarning = self::signalWarning($view['signal_summary'] ?? null);
         $motion = self::motionSeconds($view['central']);
         return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
@@ -68,12 +70,36 @@ final class FactoryOrchestratorLiveUi
             . '<span data-filter="human">Humano</span></nav>'
             . '<section class="panel human" data-section="human"><p class="eyebrow">HUMANO</p>'
             . '<h2>Decisiones tuyas</h2><div class="human-grid">' . $decisions . '</div></section>'
-            . $activity . '<section class="stage" aria-label="Topología del orquestador">' . $central
+            . $signalWarning . $activity . '<section class="stage" aria-label="Topología del orquestador">' . $central
             . '<div class="edges" aria-hidden="true">' . $edges . '</div>'
             . '<div class="front-grid">' . $fronts . '</div></section>'
             . '<section class="panel bus" data-section="event_bus"><p class="eyebrow">BUS VISUAL</p>'
             . '<h2>Eventos observados</h2><ol>' . $events . '</ol></section>'
             . '</main></body></html>';
+    }
+
+    private static function signalWarning(mixed $raw): string
+    {
+        if($raw===null)return '';
+        self::fields($raw,['truncated','omitted','reason'],'signal_summary');
+        self::fields($raw['omitted']??null,['blockers','owner_decisions','work'],'signal_summary.omitted');
+        if(!is_bool($raw['truncated']))throw new InvalidArgumentException('signal_summary.invalid.');
+        $sum=0;
+        foreach($raw['omitted'] as $value){
+            if(!is_int($value)||$value<0||$value>10000)
+                throw new InvalidArgumentException('signal_summary count invalid.');
+            $sum+=$value;
+        }
+        if($raw['truncated']!==($sum>0)
+            ||$raw['reason']!==($sum>0?'bounded_signal_budget':'none'))
+            throw new InvalidArgumentException('signal_summary inconsistent.');
+        if(!$raw['truncated'])return '';
+        return '<section class="panel" role="status" data-signal-truncated="true">'
+            . '<h2>Evidencia parcial: señales truncadas</h2><p>'
+            . 'Omitidas: bloqueos=' . $raw['omitted']['blockers']
+            . ', decisiones=' . $raw['omitted']['owner_decisions']
+            . ', trabajo=' . $raw['omitted']['work']
+            . '. Los totales y la cobertura completa no están verificados.</p></section>';
     }
 
     private static function central(array $central): string

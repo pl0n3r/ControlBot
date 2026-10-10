@@ -45,6 +45,7 @@ class GithubHttpTransportTests(unittest.TestCase):
         self.assertEqual(result["first"]["status"], "ambiguous")
         self.assertEqual(result["first"]["error_code"], "transport_uncertain")
         self.assertEqual(result["conflict"]["error_code"], "idempotency_conflict")
+        self.assertEqual(result["type_conflict"]["error_code"], "idempotency_conflict")
         self.assertEqual(result["bad_provider"]["error_code"], "secret_provider_failed")
 
     def test_local_fake_without_external_network(self):

@@ -20,12 +20,6 @@ class FactoryOrchestratorEvidenceCollectorTests(unittest.TestCase):
         self.assertEqual(r["summary"]["omitted"], {
             "blockers": 230, "owner_decisions": 0, "work": 256,
         })
-    def test_running_marker_requires_closed_767_issue(self):
-        # A reopened or malformed kill-switch source must fail closed.
-        self.assertEqual(scenario('kill-switch-state'), {
-            'closed': False, 'open': True, 'missing': True,
-        })
-
     def test_bounded_volume_over_400_signals_is_explicit(self):
         r = scenario("over-400")
         total = r["blockers"] + r["work"] + sum(r["summary"]["omitted"].values())

@@ -25,7 +25,7 @@ final class FactoryLiveSnapshot
     public static function build(array $raw,int $now): array
     {
         if($now<1||array_is_list($raw))throw new InvalidArgumentException('Factory live input invalid.');
-        $allowed=[...array_keys(self::AUTHORITIES),'tool_usage','work_inventory','agent_activity'];
+        $allowed=[...array_keys(self::AUTHORITIES),'tool_usage','work_inventory','agent_activity','signal_summary'];
         foreach(array_keys($raw) as $key)
             if(!is_string($key)||!in_array($key,$allowed,true))
                 throw new InvalidArgumentException('Factory live field invalid.');
@@ -44,7 +44,27 @@ final class FactoryLiveSnapshot
             $canonical['work_inventory']=self::workInventory($raw['work_inventory'],$now);
         if(array_key_exists('agent_activity',$raw))
             $canonical['agent_activity']=FactoryAgentActivity::build($raw['agent_activity'],$now);
+        if(array_key_exists('signal_summary',$raw))
+            $canonical['signal_summary']=self::signalSummary($raw['signal_summary']);
         return $canonical+['fingerprint'=>hash('sha256',json_encode($canonical,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES))];
+    }
+
+    private static function signalSummary(mixed $raw): array
+    {
+        self::fields($raw,['truncated','omitted','reason'],'signal_summary');
+        self::fields($raw['omitted'],['blockers','owner_decisions','work'],'signal_summary.omitted');
+        if(!is_bool($raw['truncated']))throw new InvalidArgumentException('signal_summary.truncated invalid.');
+        $sum=0;
+        foreach($raw['omitted'] as $count){
+            if(!is_int($count)||$count<0||$count>10000)
+                throw new InvalidArgumentException('signal_summary count invalid.');
+            $sum+=$count;
+        }
+        $truncated=$sum>0;
+        if($raw['truncated']!==$truncated
+            ||$raw['reason']!==($truncated?'bounded_signal_budget':'none'))
+            throw new InvalidArgumentException('signal_summary provenance invalid.');
+        return $raw;
     }
 
     private static function workInventory(mixed $raw,int $now): array

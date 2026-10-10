@@ -45,7 +45,8 @@ final class CapabilityGrantRevoker
      *
      * @return array{status:string,reason:string,error_code?:string,grant:CapabilityGrant,audit:array}
      */
-    public function execute(CapabilityGrant $grant, array $scope, int $now, callable $fakeExecutor, array $restrictions = []): array
+    public function execute(CapabilityGrant $grant, array $scope, int $now,
+        callable $fakeExecutor, array $restrictions = []): array
     {
         // Prevent invalid/unbounded timestamps from causing failure in finally.
         if ($now < 1 || $now > 253402300799) {
@@ -83,7 +84,6 @@ final class CapabilityGrantRevoker
         if ($authorization['authorized'] !== true) {
             return $this->denied($grant, $authorization['reason'], $now);
         }
-
         $this->inFlight[$id] = true;
         $this->inFlightKeys[$key] = $id;
         $status = 'failed';

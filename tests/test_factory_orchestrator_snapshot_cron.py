@@ -20,6 +20,7 @@ def base_environment() -> dict[str, str]:
         "CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH",
         "CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH",
         "CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS",
+        "CONTROLBOT_ORCHESTRATOR_COLLECTOR_RESULT",
     ):
         env.pop(key, None)
     return env
@@ -152,11 +153,12 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
                 timeout=30,
                 check=False,
             )
+            stale_payload = json.loads(snapshot_path.read_text())
 
         self.assertEqual(70, failed.returncode)
         self.assertEqual("stale", json.loads(failed.stdout)["state"])
         self.assertEqual("orchestrator-snapshot-cron: stale_evidence_invalid\n", failed.stderr)
-        self.assertTrue(snapshot_path.exists())
+        self.assertEqual(stale_payload["collector_failure"]["reason"], "evidence_invalid")
 
     def test_explicit_failed_collector_cannot_reuse_old_evidence_as_success(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -251,9 +253,11 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
                 timeout=30,
                 check=False,
             )
+            stale_payload = json.loads((root / "snapshot.json").read_text())
 
         self.assertEqual(70, result.returncode)
-        self.assertEqual("", result.stdout)
+        self.assertEqual(json.loads(result.stdout)["state"], "stale")
+        self.assertEqual(stale_payload["collector_failure"]["reason"], "evidence_invalid")
         self.assertEqual("orchestrator-snapshot-cron: stale_evidence_invalid\n", result.stderr)
 
 

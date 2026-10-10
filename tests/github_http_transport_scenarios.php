@@ -2,19 +2,14 @@
 declare(strict_types=1);
 require __DIR__ . '/../src/GitHubHttpTransport.php';
 use ControlBot\GitHub\GitHubHttpTransport;
-
 const FAKE_SECRET = 'fake-token-never-log-XYZ';
 function request(string $suffix = '/issues/42', string $method = 'PATCH', string $type = 'issue.update', string $id = 'intent-good-0001'): array
 {
     return [
-        'intent_id' => $id,
-        'project_id' => 'controlbot',
-        'repository_id' => 'pl0n3r/ControlBot',
-        'type' => $type,
-        'idempotency_key' => 'idempotency:' . $id,
-        'method' => $method,
-        'url' => 'https://api.github.com/repos/pl0n3r/ControlBot' . $suffix,
-        'body' => ['title' => 'offline-only'],
+        'intent_id'=>$id, 'project_id'=>'controlbot', 'repository_id'=>'pl0n3r/ControlBot',
+        'type'=>$type, 'idempotency_key'=>'idempotency:'.$id, 'method'=>$method,
+        'url'=>'https://api.github.com/repos/pl0n3r/ControlBot'.$suffix,
+        'body'=>['title'=>'offline-only'],
     ];
 }
 function response(int $status = 200, string $body = '{"ok":true}', bool $tls = true, int $redirect = 0): array
@@ -39,24 +34,10 @@ if ($scenario === 'allowlist') {
         'encoded_traversal' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/issues/%2e%2e'],
         'bad_method' => ['method'=>'POST'],
         'bad_type' => ['type'=>'repo.delete'],
-        'dot_repository_parent' => [
-            'repository_id'=>'pl0n3r/..',
-            'url'=>'https://api.github.com/repos/pl0n3r/../issues',
-            'method'=>'POST', 'type'=>'issue.create',
-        ],
-        'dot_repository_self' => [
-            'repository_id'=>'pl0n3r/.',
-            'url'=>'https://api.github.com/repos/pl0n3r/./issues',
-            'method'=>'POST', 'type'=>'issue.create',
-        ],
-        'dot_workflow_parent' => [
-            'url'=>'https://api.github.com/repos/pl0n3r/ControlBot/actions/workflows/../dispatches',
-            'method'=>'POST', 'type'=>'workflow.dispatch',
-        ],
-        'dot_workflow_self' => [
-            'url'=>'https://api.github.com/repos/pl0n3r/ControlBot/actions/workflows/./dispatches',
-            'method'=>'POST', 'type'=>'workflow.dispatch',
-        ],
+        'dot_repository_parent' => ['repository_id'=>'pl0n3r/..','url'=>'https://api.github.com/repos/pl0n3r/../issues','method'=>'POST','type'=>'issue.create'],
+        'dot_repository_self' => ['repository_id'=>'pl0n3r/.','url'=>'https://api.github.com/repos/pl0n3r/./issues','method'=>'POST','type'=>'issue.create'],
+        'dot_workflow_parent' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/actions/workflows/../dispatches','method'=>'POST','type'=>'workflow.dispatch'],
+        'dot_workflow_self' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/actions/workflows/./dispatches','method'=>'POST','type'=>'workflow.dispatch'],
     ];
     foreach ($cases as $key=>$change) {
         $bad[$key] = $transport->dispatch(array_replace(request(id:'intent-'.$key.'-001'), $change));
@@ -68,8 +49,7 @@ if ($scenario === 'allowlist') {
         static function ($method, $url, $payload, $token, $guards) use (&$calls) {
             ++$calls;
             return match($calls) {
-                1 => response(200, '{}', false),
-                2 => response(302, '', true),
+                1 => response(200, '{}', false), 2 => response(302, '', true),
                 3 => response(200, str_repeat('x', 1025)),
                 default => response(200, '{}', true, 1),
             };
@@ -77,13 +57,10 @@ if ($scenario === 'allowlist') {
         static fn()=>FAKE_SECRET,
         1024,
     );
-    $out = [
-        'tls'=>$transport->dispatch(request(id:'intent-test-tls-0001')),
+    $out = ['tls'=>$transport->dispatch(request(id:'intent-test-tls-0001')),
         'redirect'=>$transport->dispatch(request(id:'intent-test-redirect-0001')),
         'oversize'=>$transport->dispatch(request(id:'intent-test-oversize-0001')),
-        'redirect_count'=>$transport->dispatch(request(id:'intent-test-follow-0001')),
-        'calls'=>$calls,
-    ];
+        'redirect_count'=>$transport->dispatch(request(id:'intent-test-follow-0001')), 'calls'=>$calls];
 } elseif ($scenario === 'secret') {
     $calls = 0;
     $transport = new GitHubHttpTransport(
@@ -91,8 +68,7 @@ if ($scenario === 'allowlist') {
         static fn()=>FAKE_SECRET,
     );
     $req = request();
-    $first = $transport->dispatch($req);
-    $again = $transport->dispatch($req);
+    $first = $transport->dispatch($req); $again = $transport->dispatch($req);
     $other = $req; $other['body'] = ['title'=>'changed'];
     $conflict = $transport->dispatch($other);
     $badProvider = new GitHubHttpTransport(static fn()=>response(), static function () { throw new RuntimeException(FAKE_SECRET); });
@@ -109,16 +85,13 @@ if ($scenario === 'allowlist') {
     $identityCalls = 0; $identitySecrets = 0;
     $identityTransport = new GitHubHttpTransport(
         static function () use (&$identityCalls) { ++$identityCalls; return response(); },
-        static function () use (&$identitySecrets) { ++$identitySecrets; return FAKE_SECRET; },
-    );
-    $original = request(id:'intent-identity-0001');
-    $identityTransport->dispatch($original);
+        static function () use (&$identitySecrets) { ++$identitySecrets; return FAKE_SECRET; });
+    $original = request(id:'intent-identity-0001'); $identityTransport->dispatch($original);
     $anotherProject = $original; $anotherProject['project_id'] = 'different-project';
     $out['project_conflict'] = $identityTransport->dispatch($anotherProject);
     $anotherIntent = $original; $anotherIntent['intent_id'] = 'intent-identity-0002';
     $out['intent_conflict'] = $identityTransport->dispatch($anotherIntent);
-    $out['identity_calls'] = $identityCalls;
-    $out['identity_secrets'] = $identitySecrets;
+    $out['identity_calls'] = $identityCalls; $out['identity_secrets'] = $identitySecrets;
 } elseif ($scenario === 'reentrant') {
     $calls = 0; $secrets = 0; $nested = null;
     $req = request(id:'intent-reentrant-0001');
@@ -132,8 +105,7 @@ if ($scenario === 'allowlist') {
         },
         static function () use (&$secrets) { ++$secrets; return FAKE_SECRET; },
     );
-    $first = $transport->dispatch($req);
-    $again = $transport->dispatch($req);
+    $first = $transport->dispatch($req); $again = $transport->dispatch($req);
     $out = ['first'=>$first, 'again'=>$again, 'nested'=>$nested,
         'sender_calls'=>$calls, 'secret_calls'=>$secrets];
 } elseif ($scenario === 'local') {
@@ -148,8 +120,7 @@ if ($scenario === 'allowlist') {
         static fn()=>FAKE_SECRET,
     );
     $req=request('/issues','POST','issue.create');
-    $first=$transport->dispatch($req);
-    $again=$transport->dispatch($req);
+    $first=$transport->dispatch($req); $again=$transport->dispatch($req);
     $out=['first'=>$first, 'again'=>$again, 'calls'=>$calls, 'observed'=>$observed];
 } else { fwrite(STDERR, "unknown scenario\n"); exit(2); }
 echo json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

@@ -14,9 +14,12 @@ final class AutoFactoryLearningEvent
         $events=[]; foreach($batch as $raw) $events[]=self::event($raw,$now);
         $next=self::state($state,$now);
         foreach($events as $event){
-            if(isset($next['seen'][$event['eventId']])) continue;
+            // The same event ID from another installation is distinct.
+            // Hash the pair to avoid storing raw identifiers in dedup state.
+            $dedupKey=hash('sha256',$event['installationId']."\0".$event['eventId']);
+            if(isset($next['seen'][$dedupKey])) continue;
             if($event['observedAt']<$now-self::MAX_AGE_MS) continue;
-            $next['seen'][$event['eventId']]=$event['observedAt'];
+            $next['seen'][$dedupKey]=$event['observedAt'];
             $context=$event['problemCode'].':'.$event['interfaceState']; $action=$event['action'];
             $row=$next['aggregates'][$context][$action]??['samples'=>0,'successes'=>0,'durationMs'=>0,'lastAt'=>0];
             $row['samples']++; $row['successes']+=($event['outcome']==='success'?1:0);
@@ -34,7 +37,10 @@ final class AutoFactoryLearningEvent
     }
     private static function event(mixed $raw,int $now): array
     {
-        if(!is_array($raw)||array_is_list($raw)||array_keys($raw)!==self::FIELDS) throw new InvalidArgumentException('Learning event fields invalid.');
+        if(!is_array($raw)||array_is_list($raw)) throw new InvalidArgumentException('Learning event fields invalid.');
+        $keys=array_keys($raw); $required=self::FIELDS;
+        sort($keys,SORT_STRING); sort($required,SORT_STRING);
+        if($keys!==$required) throw new InvalidArgumentException('Learning event fields invalid.');
         if($raw['schemaVersion']!==1) throw new InvalidArgumentException('Learning schema invalid.');
         foreach(['eventId','installationId','extensionVersion','problemCode','interfaceState'] as $field) self::token($raw[$field],$field);
         if(!in_array($raw['browserFamily'],['chrome','safari','edge','other'],true)) throw new InvalidArgumentException('Browser invalid.');

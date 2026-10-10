@@ -125,6 +125,7 @@ if ($scenario === 'allowlist') {
         $valid = request(id:'intent-valid-'.$field.'-0001'); $valid[$field]=$value;
         $out['valid_ids'][$field] = [$transport->dispatch($valid), $transport->dispatch($valid)];
     }
-    $out['calls'] = $calls;
+    $split = request(id:'intent-with-gh'); $split['project_id']='p_safe';
+    $out['split'] = $transport->dispatch($split); $out['calls'] = $calls;
 } else { fwrite(STDERR, "unknown scenario\n"); exit(2); }
 echo json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

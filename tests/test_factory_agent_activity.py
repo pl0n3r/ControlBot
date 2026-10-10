@@ -32,7 +32,7 @@ class FactoryAgentActivityTests(unittest.TestCase):
         self.assertIsNone(incomplete['last_signal_age_seconds'])
         unknown = result['unknown']['projects'][0]
         self.assertEqual(unknown['activity_state'], 'UNKNOWN'); self.assertIsNone(unknown['available'])
-        self.assertIsNone(unknown['open_prs'])
+        self.assertIsNone(unknown['open_prs']); self.assertEqual(result['utc'], {'valid': True, 'invalid_date': True, 'invalid_leap': True, 'future': True})
     def test_private_read_only_ui_escapes_untrusted_values(self):
         result = scenario('safety')
         html = result['html']

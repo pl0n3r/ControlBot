@@ -270,9 +270,9 @@ final class FactoryOrchestratorEvidenceCollector
     {
         if(!is_string($value)||preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D',$value)!==1)
             return null;
-        $at=strtotime($value);
-        if(!is_int($at)||$at<1||$at>$now)return null;
-        return $at;
+        $date=\DateTimeImmutable::createFromFormat('!Y-m-d\\TH:i:s\\Z',$value,new \DateTimeZone('UTC'));
+        if($date===false||\DateTimeImmutable::getLastErrors()!==false||$date->format('Y-m-d\\TH:i:s\\Z')!==$value)return null;
+        $at=$date->getTimestamp();return $at>0&&$at<=$now?$at:null;
     }
 
     private static function killSwitchRunning(mixed $issue): bool

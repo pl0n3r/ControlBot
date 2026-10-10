@@ -41,6 +41,27 @@ if($scenario==='aggregate'){
   $bad=event(2); $bad['prompt']='private'; $rejected=false;
   try{AutoFactoryLearningEvent::ingest([event(1),$bad],[],$now);}catch(Throwable){$rejected=true;}
   echo json_encode(['rejected'=>$rejected],JSON_THROW_ON_ERROR),"\n";
+}elseif($scenario==='untrusted_policy'){
+  // State may be stale or malformed; reject unallowlisted actions, impossible
+  // counters and context keys too long for AutoFactory's policy validator.
+  $context='conversation-unavailable:error';
+  $row=['samples'=>20,'successes'=>19,'durationMs'=>20000,'lastAt'=>$now];
+  $bad=['samples'=>20,'successes'=>21,'durationMs'=>100,'lastAt'=>$now];
+  $malicious=['samples'=>100,'successes'=>100,'durationMs'=>0,'lastAt'=>$now];
+  $state=['aggregates'=>[$context=>[
+    'send_external_data'=>$malicious, 'retry'=>$bad, 'wait'=>$row
+  ]]];
+  $policy=AutoFactoryLearningPolicy::build($state,$now,true);
+  $invalid=['aggregates'=>[$context=>[
+    'send_external_data'=>$malicious, 'retry'=>$bad
+  ],str_repeat('x',129)=>['wait'=>$row]]];
+  $empty=AutoFactoryLearningPolicy::build($invalid,$now,true);
+  echo json_encode([
+    'selected_action'=>$policy['contexts'][$context]['action']??null,
+    'selected_rate'=>$policy['contexts'][$context]['successRate']??null,
+    'empty_contexts_json'=>json_encode($empty['contexts'],JSON_THROW_ON_ERROR),
+    'empty_policy_version'=>$empty['policyVersion'],
+  ],JSON_THROW_ON_ERROR),"\n";
 }elseif($scenario==='threshold'){
   $batch=[]; for($i=1;$i<=19;$i++) $batch[]=event($i);
   $state=AutoFactoryLearningEvent::ingest($batch,[],$now);

@@ -104,12 +104,12 @@ if ($scenario === 'stale_fallback') {
     [$directory,$path]=workspace();
     try {
         FactoryOrchestratorSnapshotRefresh::refresh(static fn():array=>evidence(),$path,220);
-        $cron=\\ControlBot\\Business\\FactoryOrchestratorSnapshotCron::class;
+        $cron=\ControlBot\Business\FactoryOrchestratorSnapshotCron::class;
         $result=$cron::run(['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],
             static function():array{throw new RuntimeException('Bearer never print this secret');},$path,1000);
         $raw=json_decode(file_get_contents($path),true,32,JSON_THROW_ON_ERROR);
         $view=FactoryOrchestratorWebEntrypoint::localSnapshot($path,1000+4*86400);
-        $html=\\ControlBot\\Business\\FactoryOrchestratorLiveUi::render($view);
+        $html=\ControlBot\Business\FactoryOrchestratorLiveUi::render($view);
         $before=file_get_contents($path);
         $failedWrite=failure(static fn():array=>$cron::run(['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],
             static function():array{throw new RuntimeException('collector offline');},$path,1200,

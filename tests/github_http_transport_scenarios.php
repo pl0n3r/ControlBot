@@ -39,6 +39,24 @@ if ($scenario === 'allowlist') {
         'encoded_traversal' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/issues/%2e%2e'],
         'bad_method' => ['method'=>'POST'],
         'bad_type' => ['type'=>'repo.delete'],
+        'dot_repository_parent' => [
+            'repository_id'=>'pl0n3r/..',
+            'url'=>'https://api.github.com/repos/pl0n3r/../issues',
+            'method'=>'POST', 'type'=>'issue.create',
+        ],
+        'dot_repository_self' => [
+            'repository_id'=>'pl0n3r/.',
+            'url'=>'https://api.github.com/repos/pl0n3r/./issues',
+            'method'=>'POST', 'type'=>'issue.create',
+        ],
+        'dot_workflow_parent' => [
+            'url'=>'https://api.github.com/repos/pl0n3r/ControlBot/actions/workflows/../dispatches',
+            'method'=>'POST', 'type'=>'workflow.dispatch',
+        ],
+        'dot_workflow_self' => [
+            'url'=>'https://api.github.com/repos/pl0n3r/ControlBot/actions/workflows/./dispatches',
+            'method'=>'POST', 'type'=>'workflow.dispatch',
+        ],
     ];
     foreach ($cases as $key=>$change) {
         $bad[$key] = $transport->dispatch(array_replace(request(id:'intent-'.$key.'-001'), $change));

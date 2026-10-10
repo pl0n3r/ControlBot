@@ -180,9 +180,10 @@ final class FactoryOrchestratorEvidenceCollector
 
     private static function collect(callable $get,callable $paged,int $now): array
     {
-        $work=[];$blockers=[];$decisions=[];
+        $work=[];$blockers=[];$decisions=[];$agentActivity=[];
         foreach(self::REPOS as $name){
             $repo='pl0n3r/'.$name;
+            $activityIssues=[];$activityPrs=[];$activityValid=true;
             $issues=$paged('/repos/'.$repo.'/issues',['state'=>'open']);
             $closedPrs=$get('/repos/'.$repo.'/pulls',['state'=>'closed','sort'=>'updated','direction'=>'desc','per_page'=>self::CLOSED_PULLS_PER_PAGE,'page'=>1]);
             if(!array_is_list($closedPrs))throw new RuntimeException('github pull page invalid.');
@@ -190,10 +191,24 @@ final class FactoryOrchestratorEvidenceCollector
                 if(!is_array($row)||array_is_list($row))throw new RuntimeException('github issue invalid.');
                 $number=self::positive($row['number']??null);
                 if(isset($row['pull_request'])){
+                    $activityTime=self::activityTimestamp($row['updated_at']??null,$now);
+                    if($activityTime===null)$activityValid=false;
+                    else $activityPrs[]=['number'=>$number,'updated_at'=>$activityTime];
                     self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'in_review'],$now));
                     continue;
                 }
                 $labels=self::labels($row['labels']??[]);$workflowLabels=self::workflowLabels($labels);
+                $state='other';
+                foreach(['available'=>['estado: disponible','status: available'],
+                    'reserved'=>['estado: reservado','status: reserved'],
+                    'in_review'=>['estado: en revisión','status: in review'],
+                    'blocked'=>['estado: bloqueado','status: blocked'],
+                    'planned'=>['estado: planificado','status: planned']] as $candidate=>$names){
+                    if(array_intersect($names,$labels)) $state=$candidate;
+                }
+                $activityTime=self::activityTimestamp($row['updated_at']??null,$now);
+                if($activityTime===null)$activityValid=false;
+                else $activityIssues[]=['number'=>$number,'status'=>$state,'updated_at'=>$activityTime];
                 if(in_array('estado: bloqueado',$workflowLabels,true)||in_array('status: blocked',$workflowLabels,true))
                     self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now));
                 elseif($workflowLabels!==[])
@@ -216,11 +231,48 @@ final class FactoryOrchestratorEvidenceCollector
                 self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],$now));
                 break;
             }
+            $coordination=null;
+            try {
+                $runs=$get('/repos/'.$repo.'/actions/runs',['per_page'=>20,'page'=>1]);
+                if(is_array($runs)&&!array_is_list($runs)&&is_array($runs['workflow_runs']??null)
+                    &&array_is_list($runs['workflow_runs'])){
+                    $coordination=[];
+                    foreach($runs['workflow_runs'] as $run){
+                        if(!is_array($run)||($run['name']??null)!=='Coordinación')continue;
+                        $status=$run['status']??null;
+                        if(!in_array($status,['queued','in_progress','completed'],true)){
+                            $coordination=null;break;
+                        }
+                        $runAt=self::activityTimestamp($run['updated_at']??null,$now);
+                        if($runAt===null){$coordination=null;break;}
+                        $coordination[]=['id'=>self::positive($run['id']??null),
+                            'status'=>$status,'updated_at'=>$runAt];
+                    }
+                }
+            } catch(Throwable) {
+                // Missing run permissions may not fabricate an empty or successful run list.
+                $coordination=null;
+            }
+            $agentActivity[]=['repository_ref'=>$repo,
+                'source_ref'=>$activityValid?'https://api.github.com/repos/'.$repo.'/issues':null,
+                'observed_at'=>$activityValid?$now:null,'freshness'=>$activityValid?'current':'unknown',
+                'issues'=>$activityValid?$activityIssues:null,'pull_requests'=>$activityValid?$activityPrs:null,
+                'coordination_runs'=>$activityValid?$coordination:null,'planned_unlockable'=>null];
         }
         $factory767=$get('/repos/pl0n3r/Factory/issues/767');
         if(!self::killSwitchRunning($factory767))
             self::append($blockers,self::signal('blocker:factory-767','github_project_snapshot','blocked','pl0n3r/Factory',767,['issue_ref'=>'github:pl0n3r/Factory#767'],$now));
-        return ['owner_decisions'=>$decisions,'releases'=>[],'blockers'=>$blockers,'work'=>$work];
+        return ['owner_decisions'=>$decisions,'releases'=>[],'blockers'=>$blockers,'work'=>$work,
+            'agent_activity'=>$agentActivity];
+    }
+
+    private static function activityTimestamp(mixed $value,int $now): ?int
+    {
+        if(!is_string($value)||preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D',$value)!==1)
+            return null;
+        $date=\DateTimeImmutable::createFromFormat('!Y-m-d\\TH:i:s\\Z',$value,new \DateTimeZone('UTC'));
+        if($date===false||\DateTimeImmutable::getLastErrors()!==false||$date->format('Y-m-d\\TH:i:s\\Z')!==$value)return null;
+        $at=$date->getTimestamp();return $at>0&&$at<=$now?$at:null;
     }
 
     private static function killSwitchRunning(mixed $issue): bool

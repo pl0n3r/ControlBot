@@ -27,6 +27,9 @@ final class FactoryLiveOrchestratorSnapshot
             'version' => 1, 'observed_at' => $now, 'source_snapshot' => $snapshot['fingerprint'],
             'read_only' => true, 'central' => $central, 'fronts' => $fronts, 'owner_decisions' => $decisions,
         ];
+        if (array_key_exists('agent_activity', $snapshot)) {
+            $out['agent_activity'] = $snapshot['agent_activity'];
+        }
         $encoded = json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         return $out + ['fingerprint' => hash('sha256', $encoded)];
     }

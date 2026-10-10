@@ -285,7 +285,7 @@ final class FactoryOrchestratorEvidenceCollector
         if (!is_array($issue) || array_is_list($issue)) {
             return false;
         }
-        if (($issue['number'] ?? null) !== 767) {
+        if (($issue['number'] ?? null) !== 767 || ($issue['state'] ?? null) !== 'closed') {
             return false;
         }
         if (($issue['user']['login'] ?? null) !== 'pl0n3r') {

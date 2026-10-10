@@ -7,7 +7,7 @@ $scenario=$argv[1]??'';$calls=[];$recentPulls=$scenario==='recent-pulls';
 function issue(int $n,array $labels=[]):array{return ['number'=>$n,'title'=>'Issue '.$n,'labels'=>array_map(fn($x)=>['name'=>$x],$labels)];}
 $transport=static function(string $method,string $url,array $headers)use(&$calls,$recentPulls):array{
  $calls[]=['method'=>$method,'url'=>$url,'authorized'=>isset($headers['Authorization'])&&str_starts_with($headers['Authorization'],'Bearer ')];$path=parse_url($url,PHP_URL_PATH)?:'';$json=[];
- if(str_ends_with($path,'/issues/767'))$json=['number'=>767,'user'=>['login'=>'pl0n3r'],'body'=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
+ if(str_ends_with($path,'/issues/767'))$json=['number'=>767,'state'=>'closed','user'=>['login'=>'pl0n3r'],'body'=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
  elseif(str_ends_with($path,'/issues'))$json=[issue(10,['estado: disponible']),issue(11,['estado: bloqueado']),issue(12,['decisión: dueño']),['number'=>13,'title'=>'PR 13','labels'=>[],'pull_request'=>[]]];
  elseif(str_ends_with($path,'/pulls')){
   if($recentPulls){$json=[];for($i=0;$i<100;$i++)$json[]=['number'=>900-$i,'merged_at'=>$i===0?'2026-10-04T20:00:00Z':null];}
@@ -34,7 +34,7 @@ if($scenario==='full-pull-page'){
  $fullCalls=[];
  $full=static function(string $method,string $url,array $headers)use(&$fullCalls):array{
   $fullCalls[]=$url;$path=parse_url($url,PHP_URL_PATH)?:'';$json=[];
-  if(str_ends_with($path,'/issues/767'))$json=['number'=>767,'user'=>['login'=>'pl0n3r'],'body'=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
+  if(str_ends_with($path,'/issues/767'))$json=['number'=>767,'state'=>'closed','user'=>['login'=>'pl0n3r'],'body'=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
   elseif(str_ends_with($path,'/issues'))$json=[];
   elseif(str_ends_with($path,'/pulls')){$json=[['number'=>1,'merged_at'=>'2026-10-04T20:00:00Z']];for($i=2;$i<=100;$i++)$json[]=['number'=>$i,'merged_at'=>null];}
   return ['status'=>200,'headers'=>['x-ratelimit-remaining'=>'100'],'bytes'=>strlen(json_encode($json,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES)),'json'=>$json];
@@ -45,7 +45,7 @@ if($scenario==='over-400'){
  $transportMany=static function(string $method,string $url,array $headers):array{
   $path=parse_url($url,PHP_URL_PATH)?:'';$json=[];
   if(str_ends_with($path,'/issues/767'))
-   $json=['number'=>767,'user'=>['login'=>'pl0n3r'],
+   $json=['number'=>767,'state'=>'closed','user'=>['login'=>'pl0n3r'],
     'body'=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
   elseif(str_ends_with($path,'/issues')){
    for($i=1;$i<=80;$i++)$json[]=issue($i,
@@ -60,6 +60,24 @@ if($scenario==='over-400'){
   'blockers'=>count($evidence['blockers']),'work'=>count($evidence['work']),
   'view_summary'=>$view['signal_summary']??null,
   'fronts'=>count($view['fronts'])],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+ exit;
+}
+if($scenario==='kill-switch-state'){
+ $out=[];
+ foreach(['closed','open',null] as $state){
+  $case=static function(string $method,string $url,array $headers)use($transport,$state):array{
+   $response=$transport($method,$url,$headers);
+   if(str_ends_with(parse_url($url,PHP_URL_PATH)?:'','/issues/767')){
+    if($state===null)unset($response['json']['state']);
+    else $response['json']['state']=$state;
+    $response['bytes']=strlen(json_encode($response['json'],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
+   }
+   return $response;
+  };
+  [, $evidence]=runCollector($case);
+  $out[$state??'missing']=in_array('blocker:factory-767',array_column($evidence['blockers'],'id'),true);
+ }
+ echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
  exit;
 }
 if($scenario==='failure'){$dir=sys_get_temp_dir().'/cb685-fail-'.bin2hex(random_bytes(4));mkdir($dir);$credential=$dir.'/credential';$evidence=$dir.'/evidence.json';file_put_contents($credential,'sentinel-read-value');chmod($credential,0600);file_put_contents($evidence,'{"old":true}');$bad=static fn()=>['status'=>429,'headers'=>['retry-after'=>'60','x-ratelimit-remaining'=>'0'],'bytes'=>0];$failed=false;try{FactoryOrchestratorEvidenceCollector::run(['CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED'=>'1','CONTROLBOT_GITHUB_READ_TOKEN_FILE'=>$credential,'CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH'=>$evidence],$bad,200);}catch(Throwable){$failed=true;}echo json_encode(['failed'=>$failed,'previous'=>file_get_contents($evidence)]);exit;}

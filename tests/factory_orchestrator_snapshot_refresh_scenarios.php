@@ -116,12 +116,10 @@ if ($scenario === 'stale_fallback') {
             ['tempnam'=>static fn():false=>false]));
         echo json_encode([
             'status'=>$result['state'],'reason'=>$raw['collector_failure']['reason'],
-            'last_success_at'=>$raw['collector_failure']['last_success_at'],
-            'detected_at'=>$raw['collector_failure']['detected_at'],
+            'last_success_at'=>$raw['collector_failure']['last_success_at'],'detected_at'=>$raw['collector_failure']['detected_at'],
             'old_view_state'=>$view['central']['activity_state'],'old_view_fronts'=>count($view['fronts']),
             'visible_stale'=>str_contains($html,'data-collector-stale="true"'),
-            'visible_last_success'=>str_contains($html,'Último éxito:'),
-            'no_old_work'=>!str_contains($html,'work:controlbot-660'),
+            'visible_last_success'=>str_contains($html,'Último éxito:'),'no_old_work'=>!str_contains($html,'work:controlbot-660'),
             'bad_write_error'=>$failedWrite,'bad_write_preserved'=>$before===file_get_contents($path),
             'mode'=>sprintf('%04o',fileperms($path)&0777),
         ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;

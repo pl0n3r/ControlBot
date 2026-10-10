@@ -21,7 +21,9 @@ class GithubHttpTransportTests(unittest.TestCase):
         result = scenario("allowlist")
         self.assertEqual(result["sender_calls"], 0)
         self.assertEqual(result["secret_calls"], 0)
-        self.assertEqual(len(result["receipts"]), 9)
+        self.assertEqual(len(result["receipts"]), 13)
+        for name in ("dot_repository_parent", "dot_repository_self", "dot_workflow_parent", "dot_workflow_self"):
+            self.assertIn(name, result["receipts"])
         for receipt in result["receipts"].values():
             self.assertEqual(receipt["status"], "rejected")
             self.assertEqual(receipt["error_code"], "invalid_request")

@@ -21,7 +21,13 @@ class AutoFactoryLearningTests(unittest.TestCase):
     def test_rejects_whole_batch_when_private_or_unknown_field_exists(self):
         self.assertTrue(scenario('atomic')['rejected'])
     def test_requires_twenty_samples(self):
-        self.assertEqual(scenario('threshold')['contexts'],[])
+        self.assertEqual(scenario('threshold')['contexts'],{})
+    def test_policy_never_promotes_unlisted_actions_or_invalid_counts(self):
+        d = scenario('untrusted_policy')
+        self.assertEqual(d['selected_action'], 'wait')
+        self.assertEqual(d['selected_rate'], .95)
+        self.assertEqual(d['empty_contexts_json'], '{}')
+        self.assertEqual(d['empty_policy_version'], 0)
     def test_expires_raw_dedup_evidence_after_thirty_days(self):
         d=scenario('expiry'); self.assertEqual(d['seen'],[])
 if __name__=='__main__': unittest.main()

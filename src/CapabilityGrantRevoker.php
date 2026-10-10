@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 namespace ControlBot\Production;
+
 use InvalidArgumentException;
 use Throwable;
 
@@ -115,8 +116,12 @@ final class CapabilityGrantRevoker
                 'at' => gmdate('Y-m-d\TH:i:s\Z', $now),
             ],
         ];
-        if ($status === 'failed') $result['error_code'] = 'fake_execution_failed';
-        if ($status === 'ambiguous') $result['error_code'] = 'fake_execution_unconfirmed';
+        if ($status === 'failed') {
+            $result['error_code'] = 'fake_execution_failed';
+        }
+        if ($status === 'ambiguous') {
+            $result['error_code'] = 'fake_execution_unconfirmed';
+        }
         $this->byIdempotencyKey[$key] = [
             'grant_id' => $id, 'record_digest' => $recordDigest,
             'scope_digest' => $scopeDigest, 'result' => $result,

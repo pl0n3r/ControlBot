@@ -98,6 +98,44 @@ if ($scenario === 'success') {
     exit;
 }
 
+if ($scenario === 'stale_fallback') {
+    require_once __DIR__ . '/../src/FactoryOrchestratorSnapshotCron.php';
+    require_once __DIR__ . '/../src/FactoryOrchestratorLiveUi.php';
+    [$directory, $path] = workspace();
+    try {
+        FactoryOrchestratorSnapshotRefresh::refresh(static fn (): array => evidence(), $path, 220);
+        $result = \ControlBot\Business\FactoryOrchestratorSnapshotCron::run(
+            ['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED' => '1'],
+            static function (): array { throw new RuntimeException('Bearer never print this secret'); },
+            $path, 1000
+        );
+        $raw = json_decode(file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
+        $view = FactoryOrchestratorWebEntrypoint::localSnapshot($path, 1000 + 4 * 86400);
+        $html = \ControlBot\Business\FactoryOrchestratorLiveUi::render($view);
+        $before = file_get_contents($path);
+        $failedWrite = failure(static fn (): array => \ControlBot\Business\FactoryOrchestratorSnapshotCron::run(
+            ['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED' => '1'],
+            static function (): array { throw new RuntimeException('collector offline'); },
+            $path, 1200, ['tempnam' => static fn (): false => false]
+        ));
+        echo json_encode([
+            'status' => $result['state'],
+            'reason' => $raw['collector_failure']['reason'],
+            'last_success_at' => $raw['collector_failure']['last_success_at'],
+            'detected_at' => $raw['collector_failure']['detected_at'],
+            'old_view_state' => $view['central']['activity_state'],
+            'old_view_fronts' => count($view['fronts']),
+            'visible_stale' => str_contains($html, 'data-collector-stale="true"'),
+            'visible_last_success' => str_contains($html, 'Último éxito:'),
+            'no_old_work' => !str_contains($html, 'work:controlbot-660'),
+            'bad_write_error' => $failedWrite,
+            'bad_write_preserved' => $before === file_get_contents($path),
+            'mode' => sprintf('%04o', fileperms($path) & 0777),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
+    } finally { cleanupWorkspace($directory); }
+    exit;
+}
+
 if ($scenario === 'fail_closed') {
     [$directory, $path] = workspace();
     try {

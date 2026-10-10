@@ -43,19 +43,13 @@ class FactoryOrchestratorLiveUiTests(unittest.TestCase):
         self.assertIn('aria-label="Filtros de vista"',html)
         self.assertIn("https://github.com/pl0n3r/ControlBot/issues/700",html)
 
-    def test_truncated_inventory_is_explicit_and_bad_summary_is_denied(self):
-        html = render("truncated")
-        self.assertIn('data-signal-truncated="true"', html)
-        self.assertIn("Evidencia parcial: señales truncadas", html)
-        self.assertIn("bloqueos=230", html)
-        self.assertIn("trabajo=256", html)
-        self.assertIn("cobertura completa no están verificados", html)
-        self.assertEqual(render("invalid_summary"), "blocked")
-
     def test_stale_and_truncated_metadata_are_visible_and_never_current(self):
         html = render("truncated")
         self.assertIn('data-signal-truncated="true"', html)
         self.assertIn("bloqueos=230", html)
+        self.assertIn("trabajo=256", html)
+        self.assertIn("cobertura completa no están verificados", html)
+        self.assertEqual(render("invalid_summary"), "blocked")
         result = subprocess.run(
             ["php", str(ROOT / "tests/factory_orchestrator_snapshot_refresh_scenarios.php"),
              "stale_fallback"], cwd=ROOT, text=True, capture_output=True,

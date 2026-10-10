@@ -51,6 +51,13 @@ class GithubHttpTransportTests(unittest.TestCase):
         self.assertEqual(result["bad_provider"]["error_code"], "secret_provider_failed")
 
     def test_local_fake_without_external_network(self):
+        reentrant = scenario("reentrant")
+        self.assertEqual(reentrant["sender_calls"], 1)
+        self.assertEqual(reentrant["secret_calls"], 1)
+        self.assertEqual(reentrant["nested"]["status"], "rejected")
+        self.assertEqual(reentrant["nested"]["error_code"], "idempotency_in_flight")
+        self.assertEqual(reentrant["first"], reentrant["again"])
+        self.assertEqual(reentrant["first"]["status"], "executed")
         result = scenario("local")
         self.assertEqual(result["calls"], 1)
         self.assertEqual(result["first"], result["again"])

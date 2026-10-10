@@ -104,6 +104,21 @@ if ($scenario === 'allowlist') {
     $sameRoute->dispatch($firstType);
     $secondType = $firstType; $secondType['type'] = 'issue.release';
     $out['type_conflict'] = $sameRoute->dispatch($secondType);
+    // Replaying the same route/payload under another identity must not return
+    // a receipt belonging to a different project or intent.
+    $identityCalls = 0; $identitySecrets = 0;
+    $identityTransport = new GitHubHttpTransport(
+        static function () use (&$identityCalls) { ++$identityCalls; return response(); },
+        static function () use (&$identitySecrets) { ++$identitySecrets; return FAKE_SECRET; },
+    );
+    $original = request(id:'intent-identity-0001');
+    $identityTransport->dispatch($original);
+    $anotherProject = $original; $anotherProject['project_id'] = 'different-project';
+    $out['project_conflict'] = $identityTransport->dispatch($anotherProject);
+    $anotherIntent = $original; $anotherIntent['intent_id'] = 'intent-identity-0002';
+    $out['intent_conflict'] = $identityTransport->dispatch($anotherIntent);
+    $out['identity_calls'] = $identityCalls;
+    $out['identity_secrets'] = $identitySecrets;
 } elseif ($scenario === 'reentrant') {
     $calls = 0; $secrets = 0; $nested = null;
     $req = request(id:'intent-reentrant-0001');

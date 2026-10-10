@@ -130,6 +130,11 @@ final class GitHubHttpTransport
         if (!preg_match('~^([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+)$~D', $r['repository_id'], $repo)) {
             throw new InvalidArgumentException('repository');
         }
+        // Reject raw dot-segments before token lookup or transport: an HTTP
+        // adapter could normalize these into a different repository/path.
+        if (preg_match('~(?:^|/)\\.{1,2}(?:/|$)~D', $r['url']) === 1) {
+            throw new InvalidArgumentException('dot_segment');
+        }
         if (!isset(self::ROUTES[$r['type']]) || $r['method'] !== self::ROUTES[$r['type']][0]) {
             throw new InvalidArgumentException('method');
         }

@@ -20,6 +20,7 @@ final class FactoryOrchestratorLiveUi
         $expected = ['version','observed_at','source_snapshot','read_only','central','fronts','owner_decisions','fingerprint'];
         if (array_key_exists('agent_activity', $view)) $expected[] = 'agent_activity';
         if (array_key_exists('signal_summary', $view)) $expected[] = 'signal_summary';
+        if (array_key_exists('collector_failure', $view)) $expected[] = 'collector_failure';
         self::fields($view, $expected, 'view');
         if ($view['version'] !== 1 || $view['read_only'] !== true || ! is_int($view['observed_at'])) {
             throw new InvalidArgumentException('Orchestrator UI view invalid.');
@@ -55,6 +56,7 @@ final class FactoryOrchestratorLiveUi
 
         $activity = FactoryAgentActivityUi::renderSection($view['agent_activity'] ?? null);
         $signalWarning = self::signalWarning($view['signal_summary'] ?? null);
+        $collectorWarning = self::collectorWarning($view['collector_failure'] ?? null);
         $motion = self::motionSeconds($view['central']);
         return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
@@ -70,12 +72,32 @@ final class FactoryOrchestratorLiveUi
             . '<span data-filter="human">Humano</span></nav>'
             . '<section class="panel human" data-section="human"><p class="eyebrow">HUMANO</p>'
             . '<h2>Decisiones tuyas</h2><div class="human-grid">' . $decisions . '</div></section>'
-            . $signalWarning . $activity . '<section class="stage" aria-label="Topología del orquestador">' . $central
+            . $collectorWarning . $signalWarning . $activity . '<section class="stage" aria-label="Topología del orquestador">' . $central
             . '<div class="edges" aria-hidden="true">' . $edges . '</div>'
             . '<div class="front-grid">' . $fronts . '</div></section>'
             . '<section class="panel bus" data-section="event_bus"><p class="eyebrow">BUS VISUAL</p>'
             . '<h2>Eventos observados</h2><ol>' . $events . '</ol></section>'
             . '</main></body></html>';
+    }
+
+    private static function collectorWarning(mixed $raw): string
+    {
+        if($raw===null)return '';
+        self::fields($raw,['freshness','reason','last_success_at','detected_at'],'collector_failure');
+        $reasons=['evidence_invalid','snapshot_build_failed','snapshot_size_invalid',
+            'temp_write_failed','atomic_rename_failed','snapshot_directory_unwritable',
+            'snapshot_target_invalid','internal_error','collector_failed'];
+        if(($raw['freshness']??null)!=='stale'||!in_array($raw['reason']??null,$reasons,true)
+            ||!is_int($raw['detected_at'])||$raw['detected_at']<1)
+            throw new InvalidArgumentException('collector_failure invalid.');
+        $last=$raw['last_success_at'];
+        if($last!==null&&(!is_int($last)||$last<1||$last>$raw['detected_at']))
+            throw new InvalidArgumentException('collector_failure last success invalid.');
+        $label=$last===null?'UNKNOWN':gmdate('Y-m-d H:i:s', $last).' UTC';
+        return '<section class="panel" role="status" data-collector-stale="true">'
+            . '<h2>STALE — colecta fallida</h2><p>Motivo: ' . self::e($raw['reason'])
+            . ' · Último éxito: ' . self::e($label)
+            . '. El estado anterior no se considera actividad actual.</p></section>';
     }
 
     private static function signalWarning(mixed $raw): string

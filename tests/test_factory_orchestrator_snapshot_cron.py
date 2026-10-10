@@ -154,9 +154,32 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
             )
 
         self.assertEqual(70, failed.returncode)
-        self.assertEqual("", failed.stdout)
-        self.assertEqual("orchestrator-snapshot-cron: evidence_invalid\n", failed.stderr)
-        self.assertFalse(snapshot_path.exists())
+        self.assertEqual("stale", json.loads(failed.stdout)["state"])
+        self.assertEqual("orchestrator-snapshot-cron: stale_evidence_invalid\n", failed.stderr)
+        self.assertTrue(snapshot_path.exists())
+
+    def test_explicit_failed_collector_cannot_reuse_old_evidence_as_success(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evidence_path = root / "evidence.json"
+            snapshot_path = root / "snapshot.json"
+            evidence_path.write_text(json.dumps(canonical_evidence(int(time.time()))))
+            env = base_environment() | {
+                "CONTROLBOT_ORCHESTRATOR_CRON_ENABLED": "1",
+                "CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH": str(evidence_path),
+                "CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH": str(snapshot_path),
+                "CONTROLBOT_ORCHESTRATOR_COLLECTOR_RESULT": "failed",
+            }
+            result = subprocess.run(
+                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            payload = json.loads(snapshot_path.read_text())
+        self.assertEqual(result.returncode, 70)
+        self.assertEqual(json.loads(result.stdout)["state"], "stale")
+        self.assertEqual(payload["collector_failure"]["reason"], "collector_failed")
+        self.assertEqual(payload["sections"]["work"][0]["freshness"], "unknown")
+        self.assertNotIn("Bearer", result.stderr)
 
     def test_runbook_keeps_token_cron_hosting_and_live_activation_outside_repository_values(self) -> None:
         runbook = RUNBOOK.read_text()
@@ -231,7 +254,7 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
 
         self.assertEqual(70, result.returncode)
         self.assertEqual("", result.stdout)
-        self.assertEqual("orchestrator-snapshot-cron: evidence_invalid\n", result.stderr)
+        self.assertEqual("orchestrator-snapshot-cron: stale_evidence_invalid\n", result.stderr)
 
 
     def test_each_failure_cause_prints_an_allowlisted_code_without_paths_or_secrets(self) -> None:
@@ -258,7 +281,7 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
                 "CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH":str(snapshot),
                 "CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS":"1"}
             cli=subprocess.run(["php",str(SCRIPT)],cwd=ROOT,env=env,text=True,capture_output=True,timeout=30,check=False)
-            self.assertRegex(cli.stderr,r"^orchestrator-snapshot-cron: evidence_invalid dir_exists=1 dir_writable=1 dir_owner_match=(?:0|1|unknown) dir_mode=[0-7]{4}\n$")
+            self.assertRegex(cli.stderr,r"^orchestrator-snapshot-cron: stale_evidence_invalid dir_exists=1 dir_writable=1 dir_owner_match=(?:0|1|unknown) dir_mode=[0-7]{4}\n$")
             direct=subprocess.run(["php","-r","require $argv[1];$o=[(new \\ControlBot\\Business\\FactoryOrchestratorSnapshotRefreshFailure('secret'))->failureCode()];foreach([[0,'/tmp/x'],[1,'relative']] as [$n,$p]){try{\\ControlBot\\Business\\FactoryOrchestratorSnapshotCron::run(['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],static fn()=>[],$p,$n);$o[]='ok';}catch(\\ControlBot\\Business\\FactoryOrchestratorSnapshotRefreshFailure $e){$o[]=$e->failureCode();}}echo json_encode($o);",str(ROOT/"src/FactoryOrchestratorSnapshotCron.php")],cwd=ROOT,text=True,capture_output=True,timeout=30,check=False)
             self.assertEqual(["internal_error","clock_invalid","snapshot_target_invalid"],json.loads(direct.stdout))
             env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"]=str(root/"missing"/"snapshot.json"); missing=subprocess.run(["php",str(SCRIPT)],cwd=ROOT,env=env,text=True,capture_output=True,timeout=30,check=False)
@@ -319,12 +342,12 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
             def cli(path: Path, target: str|None=None):
                 env["CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"]=str(path); env["CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH"]=target or str(snapshot)
                 return subprocess.run(["php",str(SCRIPT)],cwd=ROOT,env=env,text=True,capture_output=True,timeout=30,check=False)
-            tiny=root/"tiny.json"; tiny.write_text(" "); self.assertEqual("orchestrator-snapshot-cron: evidence_invalid\n",cli(tiny).stderr)
-            oversized=root/"oversized.json"; oversized.write_text('{"payload":"'+("x"*2_000_000)+'"}'); self.assertEqual("orchestrator-snapshot-cron: evidence_invalid\n",cli(oversized).stderr)
+            tiny=root/"tiny.json"; tiny.write_text(" "); self.assertEqual("orchestrator-snapshot-cron: stale_evidence_invalid\n",cli(tiny).stderr)
+            oversized=root/"oversized.json"; oversized.write_text('{"payload":"'+("x"*2_000_000)+'"}'); self.assertEqual("orchestrator-snapshot-cron: stale_evidence_invalid\n",cli(oversized).stderr)
             evidence=root/"evidence.json"; evidence.write_text(json.dumps(canonical_evidence(int(time.time())))); link=root/"evidence-link.json"
             try: link.symlink_to(evidence)
             except (OSError,NotImplementedError): self.skipTest("symlinks unavailable")
-            self.assertEqual("orchestrator-snapshot-cron: evidence_invalid\n",cli(link).stderr); link.unlink()
+            self.assertEqual("orchestrator-snapshot-cron: stale_evidence_invalid\n",cli(link).stderr); link.unlink()
             self.assertEqual("orchestrator-snapshot-cron: snapshot_target_invalid\n",cli(evidence,"relative.json").stderr)
             source=ROOT/"src/FactoryOrchestratorSnapshotCron.php"; code=("require $argv[1];$e=json_decode($argv[2],true);$r=\\ControlBot\\Business\\FactoryOrchestratorSnapshotCron::run(['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],static fn()=> $e,$argv[3],(int)$argv[4],['rename'=>static fn($a,$b)=>false]);echo json_encode($r);")
             run=subprocess.run(["php","-r",code,str(source),json.dumps(canonical_evidence(int(time.time()))),str(snapshot),str(int(time.time()))],cwd=ROOT,text=True,capture_output=True,timeout=30,check=False)

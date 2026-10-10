@@ -1,10 +1,8 @@
 <?php
 declare(strict_types=1);
 namespace ControlBot\GitHub;
-
 use Closure;
 use InvalidArgumentException;
-
 /** Offline-only GitHub HTTPS transport boundary. The injected sender is a fake. */
 final class GitHubHttpTransport
 {
@@ -19,9 +17,7 @@ final class GitHubHttpTransport
         'workflow.dispatch'=> ['POST', '/actions/workflows/[A-Za-z0-9_.-]+/dispatches'],
     ];
     private array $previous = [];
-    /** In-memory same-instance guard; not a distributed ledger. */
     private array $inFlight = [];
-
     /**
      * Sender signature: fn(string $method, string $url, ?string $json,
      *                       string $token, array $guards): array.
@@ -36,7 +32,6 @@ final class GitHubHttpTransport
             throw new InvalidArgumentException('invalid_response_limit');
         }
     }
-
     /** @return array<string, mixed> safe execution receipt (never response body/token) */
     public function dispatch(array $request): array
     {
@@ -56,7 +51,6 @@ final class GitHubHttpTransport
                 }
                 return self::receipt($safe, 'rejected', $digest, 'idempotency_conflict', $started);
             }
-
             if (array_key_exists($key, $this->inFlight)) {
                 return self::receipt(
                     $safe, 'rejected', $digest,
@@ -66,7 +60,6 @@ final class GitHubHttpTransport
             }
             $this->inFlight[$key] = $digest;
             $ownsInFlight = true;
-
             try {
                 $token = ($this->secretProvider)();
                 if (!is_string($token) || $token === '' || strlen($token) > 4096) {
@@ -75,7 +68,6 @@ final class GitHubHttpTransport
             } catch (\Throwable) {
                 return $this->remember($key, self::receipt($safe, 'failed', $digest, 'secret_provider_failed', $started));
             }
-
             $guards = [
                 'verify_tls_peer' => true,
                 'verify_tls_host' => true,
@@ -120,22 +112,19 @@ final class GitHubHttpTransport
         } catch (\Throwable) {
             return self::receipt($safe, 'rejected', $digest, $reason, $started);
         } finally {
-            // Never let a nested rejected call clear its parent's active guard.
-            if ($ownsInFlight) {
+                if ($ownsInFlight) {
                 unset($this->inFlight[$request['idempotency_key']]);
             }
         }
     }
-
     private function preflight(array $r): string
     {
         $required = ['intent_id', 'project_id', 'repository_id', 'type', 'idempotency_key', 'method', 'url', 'body'];
         $keys = array_keys($r); sort($keys); sort($required);
         if ($keys !== $required) throw new InvalidArgumentException('fields');
         foreach (['intent_id', 'project_id', 'repository_id', 'type', 'idempotency_key', 'method', 'url'] as $field) {
-            if (!is_string($r[$field]) || $r[$field] === '' || strlen($r[$field]) > 512) {
+            if (!is_string($r[$field]) || $r[$field] === '' || strlen($r[$field]) > 512)
                 throw new InvalidArgumentException('fields');
-            }
         }
         if (!preg_match('/^[A-Za-z0-9:._-]{8,120}$/D', $r['idempotency_key'])
             || preg_match('/(?:token|secret|bearer|github_pat|ghp_)/i', $r['idempotency_key'])) {
@@ -148,34 +137,27 @@ final class GitHubHttpTransport
         if (!preg_match('~^([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+)$~D', $r['repository_id'], $repo)) {
             throw new InvalidArgumentException('repository');
         }
-        // Reject raw dot-segments before token lookup or transport: an HTTP
-        // adapter could normalize these into a different repository/path.
         if (preg_match('~(?:^|/)\\.{1,2}(?:/|$)~D', $r['url']) === 1) {
             throw new InvalidArgumentException('dot_segment');
         }
         if (!isset(self::ROUTES[$r['type']]) || $r['method'] !== self::ROUTES[$r['type']][0]) {
             throw new InvalidArgumentException('method');
         }
-        // No userinfo, ports, queries, fragments, IP literals, encoded slashes or alternate hosts.
         $prefix = 'https://api.github.com/repos/' . $repo[1] . '/' . $repo[2];
         $pattern = '~^' . preg_quote($prefix, '~') . self::ROUTES[$r['type']][1] . '$~D';
         if (preg_match($pattern, $r['url']) !== 1) {
             throw new InvalidArgumentException('url');
         }
-        if ($r['body'] !== null && !is_array($r['body'])) {
+        if ($r['body'] !== null && !is_array($r['body']))
             throw new InvalidArgumentException('body');
-        }
         $json = json_encode($r['body'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         if (strlen($json) > 8192) throw new InvalidArgumentException('body_limit');
         return $json;
     }
-
     private function remember(string $key, array $receipt): array
     {
-        $this->previous[$key] = $receipt;
-        return $receipt;
+        return $this->previous[$key] = $receipt;
     }
-
     private static function metadata(array $request): array
     {
         $out = [];
@@ -189,16 +171,11 @@ final class GitHubHttpTransport
         }
         return $out;
     }
-
-    private static function receipt(
-        array $safe, string $state, ?string $digest, ?string $code, string $started, ?string $evidence = null,
-    ): array {
+    private static function receipt(array $safe, string $state, ?string $digest,
+        ?string $code, string $started, ?string $evidence = null): array {
         $result = $safe + [
-            'status' => $state,
-            'request_digest' => $digest,
-            'evidence_ref' => $evidence,
-            'started_at' => $started,
-            'finished_at' => gmdate('Y-m-d\TH:i:s\Z'),
+            'status' => $state, 'request_digest' => $digest, 'evidence_ref' => $evidence,
+            'started_at' => $started, 'finished_at' => gmdate('Y-m-d\TH:i:s\Z'),
         ];
         if ($code !== null) $result['error_code'] = $code;
         return $result;

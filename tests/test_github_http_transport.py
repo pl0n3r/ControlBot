@@ -56,7 +56,10 @@ class GithubHttpTransportTests(unittest.TestCase):
         self.assertEqual(reentrant["first"], reentrant["again"])
         self.assertEqual(reentrant["first"]["status"], "executed")
         result = scenario("local")
-        self.assertEqual(result["calls"], 3)
+        self.assertEqual(result["calls"], 4)
+        self.assertEqual(result["split"]["status"], "executed")
+        self.assertEqual(result["split"]["intent_id"], "intent-with-gh")
+        self.assertEqual(result["split"]["project_id"], "p_safe")
         for field, value in (("intent_id", "intent-token-0001"), ("project_id", "project-secret-sample")):
             self.assertEqual(result["valid_ids"][field][0][field], value)
             self.assertEqual(result["valid_ids"][field][0], result["valid_ids"][field][1])

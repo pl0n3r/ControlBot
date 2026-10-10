@@ -89,7 +89,7 @@ try {
     );
     echo json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
     if (($result['state'] ?? null) === 'stale') {
-        fwrite(STDERR, 'orchestrator-snapshot-cron: stale_' . $result['reason'] . PHP_EOL);
+        fwrite(STDERR, 'orchestrator-snapshot-cron: stale_' . $result['reason'] . $diagnostics($snapshotPath) . PHP_EOL);
         exit(70);
     }
     exit(0);

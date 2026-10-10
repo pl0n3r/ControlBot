@@ -46,7 +46,10 @@ final class CapabilityGrantRevoker
      * @return array{status:string,reason:string,error_code?:string,grant:CapabilityGrant,audit:array}
      */
     public function execute(
-        CapabilityGrant $grant, array $scope, int $now, callable $fakeExecutor,
+        CapabilityGrant $grant,
+        array $scope,
+        int $now,
+        callable $fakeExecutor,
         array $restrictions = []
     ): array {
         // Prevent invalid/unbounded timestamps from causing failure in finally.

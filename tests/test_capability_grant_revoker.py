@@ -39,15 +39,12 @@ class CapabilityGrantRevokerTests(unittest.TestCase):
         self.assertEqual(data["consumed"]["reason"], "grant_consumed")
         self.assertEqual(data["success"]["status"], "executed")
         self.assertEqual(data["calls"], 1)
-        # Distinct grant IDs with the *same* idempotency key must be excluded
-        # even during the parent callback (before the receipt is written).
+        # Distinct grant IDs with the same idempotency key cannot re-enter.
         nested = scenario("inflight_key")
         self.assertEqual(nested["a"]["status"], "executed")
         self.assertEqual(nested["b_inflight"]["status"], "rejected")
         self.assertEqual(nested["b_inflight"]["reason"], "idempotency_collision")
-        self.assertEqual(nested["b_authorize"], {
-            "authorized": False, "reason": "idempotency_collision",
-        })
+        self.assertEqual(nested["b_authorize"], {"authorized": False, "reason": "idempotency_collision"})
         self.assertEqual(nested["b_after"]["reason"], "idempotency_collision")
         self.assertEqual(nested["separate"]["status"], "executed")
         self.assertEqual(nested["calls"], 2)  # A and independent C; never B

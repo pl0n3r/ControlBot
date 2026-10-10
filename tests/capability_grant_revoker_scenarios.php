@@ -29,7 +29,6 @@ function record(array $changes = []): array
         'revoked_at' => null,
     ], $changes);
 }
-
 function scope(array $record): array
 {
     $fields = ['capability', 'project', 'environment', 'resource', 'operation', 'issue', 'run_id', 'subject'];
@@ -48,11 +47,11 @@ function view(array $result): array
 $input = record();
 $grant = CapabilityGrant::issue($input);
 $guard = new CapabilityGrantRevoker();
-
 if ($scenario === 'finish') {
     $calls = 0;
-    $success = $guard->execute($grant, scope($input), $now, function () use (&$calls): bool { $calls++; return true; });
-    $replay = $guard->execute($grant, scope($input), $now, function () use (&$calls): bool { $calls += 100; return true; });
+    $input = record(['backup_receipt_id' => '22222222-3333-4444-8555-666666666666']); $grant = CapabilityGrant::issue($input);
+    $success = $guard->execute($grant, scope($input), $now, function () use (&$calls): bool { $calls++; return true; }, ['automatic', 'backup_required']);
+    $replay = $guard->execute($grant, scope($input), $now, function () use (&$calls): bool { $calls += 100; return true; }, ['backup_required', 'automatic', 'automatic']);
     $restrictedReplay = $guard->execute($grant, scope($input), $now, function () use (&$calls): bool { $calls += 100; return true; }, ['forbidden']);
     $after = $guard->authorize($grant, scope($input), $now);
     $input2 = record([

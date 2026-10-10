@@ -5,7 +5,6 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-
 def scenario(name: str) -> dict:
     result = subprocess.run(
         ["php", str(ROOT / "tests" / "capability_grant_revoker_scenarios.php"), name],
@@ -26,6 +25,7 @@ class CapabilityGrantRevokerTests(unittest.TestCase):
         self.assertEqual(data["failed"]["revoked_at"], "2026-09-28T08:10:00Z")
         self.assertEqual(data["after"], {"authorized": False, "reason": "grant_consumed"})
         self.assertEqual(data["failed_after"], {"authorized": False, "reason": "grant_consumed"})
+        # Reordered/duplicated restrictions do not change the effective policy.
         self.assertEqual(data["replay"], data["success"])
         self.assertEqual(data["restricted_replay"]["reason"], "idempotency_collision")
         self.assertEqual(data["calls"], 1)
@@ -71,6 +71,5 @@ class CapabilityGrantRevokerTests(unittest.TestCase):
         self.assertEqual(data["restricted"], {"authorized": False, "reason": "grant_expired"})
         self.assertEqual(data["scope_wrong"], {"authorized": False, "reason": "project_mismatch"})
         self.assertIsNone(data["original_revoked_at"])
-
 if __name__ == "__main__":
     unittest.main()

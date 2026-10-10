@@ -45,9 +45,10 @@ final class CapabilityGrantRevoker
      *
      * @return array{status:string,reason:string,error_code?:string,grant:CapabilityGrant,audit:array}
      */
-    public function execute(CapabilityGrant $grant, array $scope, int $now,
-        callable $fakeExecutor, array $restrictions = []): array
-    {
+    public function execute(
+        CapabilityGrant $grant, array $scope, int $now, callable $fakeExecutor,
+        array $restrictions = []
+    ): array {
         // Prevent invalid/unbounded timestamps from causing failure in finally.
         if ($now < 1 || $now > 253402300799) {
             throw new InvalidArgumentException('now inválido.');
@@ -58,7 +59,8 @@ final class CapabilityGrantRevoker
         $recordDigest = hash('sha256', json_encode($record, JSON_THROW_ON_ERROR));
         $stableScope = $scope;
         ksort($stableScope);
-        $scopeDigest = hash('sha256', json_encode([$stableScope, $restrictions], JSON_THROW_ON_ERROR));
+        $effectivePolicy = CapabilityPolicy::classify($record['capability'], $restrictions)['decision'];
+        $scopeDigest = hash('sha256', json_encode([$stableScope, $effectivePolicy], JSON_THROW_ON_ERROR));
         if (isset($this->inFlight[$id])) {
             return $this->denied($grant, 'grant_in_flight', $now);
         }
@@ -74,7 +76,7 @@ final class CapabilityGrantRevoker
                 || !hash_equals($entry['scope_digest'], $scopeDigest)) {
                 return $this->denied($grant, 'idempotency_collision', $now);
             }
-            // Same key/grant/scope: replay the previous receipt, never the effect.
+            // Same key/grant/scope/policy: replay the receipt, never the effect.
             return $entry['result'];
         }
         if (isset($this->revoked[$id])) {

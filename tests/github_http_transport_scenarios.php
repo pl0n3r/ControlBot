@@ -104,6 +104,23 @@ if ($scenario === 'allowlist') {
     $sameRoute->dispatch($firstType);
     $secondType = $firstType; $secondType['type'] = 'issue.release';
     $out['type_conflict'] = $sameRoute->dispatch($secondType);
+} elseif ($scenario === 'reentrant') {
+    $calls = 0; $secrets = 0; $nested = null;
+    $req = request(id:'intent-reentrant-0001');
+    $transport = null;
+    $transport = new GitHubHttpTransport(
+        static function ($method, $url, $payload, $token, $guards) use (&$transport, &$calls, &$nested, $req) {
+            ++$calls;
+            // The nested dispatch is identical and must not call this sender.
+            $nested = $transport->dispatch($req);
+            return response(200, '{"ok":true}');
+        },
+        static function () use (&$secrets) { ++$secrets; return FAKE_SECRET; },
+    );
+    $first = $transport->dispatch($req);
+    $again = $transport->dispatch($req);
+    $out = ['first'=>$first, 'again'=>$again, 'nested'=>$nested,
+        'sender_calls'=>$calls, 'secret_calls'=>$secrets];
 } elseif ($scenario === 'local') {
     $calls = 0; $observed = [];
     $transport = new GitHubHttpTransport(

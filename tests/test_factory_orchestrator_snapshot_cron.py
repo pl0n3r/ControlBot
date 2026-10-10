@@ -163,25 +163,21 @@ class FactoryOrchestratorSnapshotCronTests(unittest.TestCase):
     def test_explicit_failed_collector_cannot_reuse_old_evidence_as_success(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            evidence_path = root / "evidence.json"
-            snapshot_path = root / "snapshot.json"
-            evidence_path.write_text(json.dumps(canonical_evidence(int(time.time()))))
+            evidence, snapshot = root / "evidence.json", root / "snapshot.json"
+            evidence.write_text(json.dumps(canonical_evidence(int(time.time()))))
             env = base_environment() | {
                 "CONTROLBOT_ORCHESTRATOR_CRON_ENABLED": "1",
-                "CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH": str(evidence_path),
-                "CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH": str(snapshot_path),
+                "CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH": str(evidence),
+                "CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH": str(snapshot),
                 "CONTROLBOT_ORCHESTRATOR_COLLECTOR_RESULT": "failed",
             }
-            result = subprocess.run(
-                ["php", str(SCRIPT)], cwd=ROOT, env=env, text=True,
-                capture_output=True, timeout=30, check=False,
-            )
-            payload = json.loads(snapshot_path.read_text())
-        self.assertEqual(result.returncode, 70)
-        self.assertEqual(json.loads(result.stdout)["state"], "stale")
+            run = subprocess.run(["php", str(SCRIPT)], cwd=ROOT, env=env,
+                                 text=True, capture_output=True, timeout=30)
+            payload = json.loads(snapshot.read_text())
+        self.assertEqual((run.returncode, json.loads(run.stdout)["state"]), (70, "stale"))
         self.assertEqual(payload["collector_failure"]["reason"], "collector_failed")
         self.assertEqual(payload["sections"]["work"][0]["freshness"], "unknown")
-        self.assertNotIn("Bearer", result.stderr)
+        self.assertNotIn("Bearer", run.stderr)
 
     def test_runbook_keeps_token_cron_hosting_and_live_activation_outside_repository_values(self) -> None:
         runbook = RUNBOOK.read_text()

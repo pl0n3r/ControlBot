@@ -1,0 +1,17 @@
+# GitHub HTTPS transport: offline, fail-closed boundary
+
+Issue: ControlBot #764. This implementation is **build-ahead only**. No real GitHub transport adapter, token, credential, network request, webhook, rollout or go-live is part of this change.
+
+`ControlBot\GitHub\GitHubHttpTransport` accepts an injected **local fake/stub sender** and a secret-provider callback. The production caller must separately obtain trusted execution authority; this class does **not** bypass `GitHubIntentPolicy` and cannot authorize an intent. Do not inject a live network sender until a separately reviewed and approved issue adds an adapter.
+
+The request has exactly these keys: `intent_id`, `project_id`, `repository_id` (`owner/repo`), `type`, `idempotency_key`, `method`, `url`, `body` (array or null). Only `https://api.github.com` and typed routes under the **matching** repository are accepted. Currently supported combinations: issue.create (POST issues), issue.update/close (PATCH issue), issue.reserve/release (POST issue comments), pr.review (POST review), pr.merge (PUT merge), workflow.dispatch (POST workflow dispatch). Other operations, URLs with query strings, redirects, alternate ports, hosts, schemes and percent-encoded paths are rejected before the token provider or sender is called. An actual adapter, if separately approved, **must enforce** the provided guards at the socket/HTTP layer, including verified peer+hostname TLS, zero redirects, 2s connect and 5s total timeout, and bounded streaming (max 64 KiB by default; 1 MiB absolute cap). A sender assertion alone cannot attest a real TLS connection.
+
+The injected sender returns `status_code` (integer), `body` (string), `tls_verified` (boolean), `redirect_count` (integer). Failures are fail-closed: invalid URL/type/method → `rejected`, TLS failure → `failed`, any redirect → `rejected`, oversized body → `failed`, unknown HTTP or thrown transport error → `ambiguous`. No exception messages, authorization headers, tokens, or response bodies enter receipts, logs or evidence. Evidence of a successful fake response uses the explicitly marked `stub:sha256:` prefix; it is **not** evidence of production delivery.
+
+The receipt schema contains `intent_id`, `project_id`, `repository_id`, `type`, `status`, `idempotency_key`, `request_digest`, `evidence_ref`, `started_at`, `finished_at`, plus `error_code` on error. Within one instance, repeated identical idempotency keys return the prior receipt without a second send; reuse with changed payload returns `idempotency_conflict`. This is an in-memory **fake-only** behavior, not distributed crash-safe deduplication. A production executor will need persistent idempotency and trustworthy HTTP/reconciliation evidence before any activation.
+
+Tests (no external network, no secrets):
+
+```bash
+python3 -m unittest tests/test_github_http_transport.py
+```

@@ -45,20 +45,13 @@ function view(): array {
     ];
 }
 
-if($scenario==='truncated'){
+if(in_array($scenario,['truncated','invalid_summary'],true)){
     $v=view();
-    $v['signal_summary']=['truncated'=>true,'omitted'=>
-        ['blockers'=>230,'owner_decisions'=>0,'work'=>256],
-        'reason'=>'bounded_signal_budget'];
-    echo FactoryOrchestratorLiveUi::render($v);
-    exit;
-}
-if($scenario==='invalid_summary'){
-    $v=view();
-    $v['signal_summary']=['truncated'=>false,'omitted'=>
-        ['blockers'=>230,'owner_decisions'=>0,'work'=>256],
-        'reason'=>'none'];
-    try{FactoryOrchestratorLiveUi::render($v);echo 'unsafe';}
+    $valid=$scenario==='truncated';
+    $v['signal_summary']=['truncated'=>$valid,
+        'omitted'=>['blockers'=>230,'owner_decisions'=>0,'work'=>256],
+        'reason'=>$valid?'bounded_signal_budget':'none'];
+    try{echo FactoryOrchestratorLiveUi::render($v);}
     catch(Throwable){echo 'blocked';}
     exit;
 }

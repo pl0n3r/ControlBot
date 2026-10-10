@@ -39,6 +39,21 @@ class FactoryOrchestratorSnapshotRefreshTests(unittest.TestCase):
         self.assertNotIn("api.github.com", source)
         self.assertNotIn("curl_", source)
 
+    def test_failed_collector_writes_stale_preserving_last_success(self) -> None:
+        result = scenario("stale_fallback")
+        self.assertEqual(result["status"], "stale")
+        self.assertEqual(result["reason"], "evidence_invalid")
+        self.assertEqual(result["last_success_at"], 220)
+        self.assertEqual(result["detected_at"], 1000)
+        self.assertEqual(result["old_view_state"], "UNKNOWN")
+        self.assertEqual(result["old_view_fronts"], 0)
+        self.assertTrue(result["visible_stale"])
+        self.assertTrue(result["visible_last_success"])
+        self.assertTrue(result["no_old_work"])
+        self.assertTrue(result["bad_write_preserved"])
+        self.assertEqual(result["bad_write_error"], "Snapshot refresh failed.")
+        self.assertEqual(result["mode"], "0640")
+
     def test_failed_collection_preserves_fail_closed_state_without_partial_snapshot_or_secret_echo(self) -> None:
         data = scenario("fail_closed")
         self.assertTrue(data["collection_preserved"])

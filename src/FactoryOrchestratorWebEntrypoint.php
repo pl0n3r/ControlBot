@@ -53,7 +53,11 @@ final class FactoryOrchestratorWebEntrypoint
             if (!is_string($raw) || strlen($raw) !== $size) return self::unknown($now);
             $snapshot = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
             $observed = is_array($snapshot) && !array_is_list($snapshot) ? ($snapshot['observed_at'] ?? null) : null;
-            if (!is_int($observed) || $observed < 1 || $observed > $now || $now - $observed > self::MAX_AGE) return self::unknown($now);
+            if (!is_int($observed) || $observed < 1 || $observed > $now) return self::unknown($now);
+            // A stale failure marker remains visible even after the 300s freshness
+            // window. Full fingerprint and allowlist validation happens in build().
+            if ($now - $observed > self::MAX_AGE && !array_key_exists('collector_failure', $snapshot))
+                return self::unknown($now);
             return FactoryLiveOrchestratorSnapshot::build($snapshot, $now);
         } catch (Throwable) {
             return self::unknown($now);

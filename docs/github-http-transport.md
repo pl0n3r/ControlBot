@@ -10,8 +10,4 @@ The injected sender returns `status_code` (integer), `body` (string), `tls_verif
 
 The receipt schema contains `intent_id`, `project_id`, `repository_id`, `type`, `status`, `idempotency_key`, `request_digest`, `evidence_ref`, `started_at`, `finished_at`, plus `error_code` on error. Within one instance, repeated identical idempotency keys return the prior receipt without a second send; reuse with changed payload returns `idempotency_conflict`. A reentrant dispatch with the same key while a first fake send is still in flight fails closed with `idempotency_in_flight` before secret lookup or sender invocation. An `inFlight` guard is cleaned in `finally`, and a rejected nested call cannot clear its parent's guard. This is an in-memory **fake-only** behavior, not distributed crash-safe deduplication. A production executor will need persistent idempotency and trustworthy HTTP/reconciliation evidence before any activation.
 
-Tests (no external network, no secrets):
-
-```bash
-python3 -m unittest tests/test_github_http_transport.py
-```
+Tests (no external network or secrets): `python3 -m unittest tests/test_github_http_transport.py`.

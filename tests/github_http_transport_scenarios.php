@@ -81,6 +81,11 @@ if ($scenario === 'allowlist') {
     $out = ['first'=>$first, 'again'=>$again, 'conflict'=>$conflict,
         'bad_provider'=>$badProvider->dispatch(request(id:'intent-provider-0001')),
         'calls'=>$calls];
+    $sameRoute = new GitHubHttpTransport(static fn()=>response(), static fn()=>FAKE_SECRET);
+    $firstType = request('/issues/42/comments', 'POST', 'issue.reserve', 'intent-type-change-0001');
+    $sameRoute->dispatch($firstType);
+    $secondType = $firstType; $secondType['type'] = 'issue.release';
+    $out['type_conflict'] = $sameRoute->dispatch($secondType);
 } elseif ($scenario === 'local') {
     $calls = 0; $observed = [];
     $transport = new GitHubHttpTransport(

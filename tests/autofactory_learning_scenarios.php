@@ -52,13 +52,14 @@ if($scenario==='aggregate'){
     'send_external_data'=>$malicious, 'retry'=>$bad, 'wait'=>$row
   ]]];
   $policy=AutoFactoryLearningPolicy::build($state,$now,true);
+  $selected=(array)$policy['contexts'];
   $invalid=['aggregates'=>[$context=>[
     'send_external_data'=>$malicious, 'retry'=>$bad
   ],str_repeat('x',129)=>['wait'=>$row]]];
   $empty=AutoFactoryLearningPolicy::build($invalid,$now,true);
   echo json_encode([
-    'selected_action'=>$policy['contexts'][$context]['action']??null,
-    'selected_rate'=>$policy['contexts'][$context]['successRate']??null,
+    'selected_action'=>$selected[$context]['action']??null,
+    'selected_rate'=>$selected[$context]['successRate']??null,
     'empty_contexts_json'=>json_encode($empty['contexts'],JSON_THROW_ON_ERROR),
     'empty_policy_version'=>$empty['policyVersion'],
   ],JSON_THROW_ON_ERROR),"\n";

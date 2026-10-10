@@ -52,6 +52,23 @@ class FactoryOrchestratorLiveUiTests(unittest.TestCase):
         self.assertIn("cobertura completa no están verificados", html)
         self.assertEqual(render("invalid_summary"), "blocked")
 
+    def test_stale_and_truncated_metadata_are_visible_and_never_current(self):
+        html = render("truncated")
+        self.assertIn('data-signal-truncated="true"', html)
+        self.assertIn("bloqueos=230", html)
+        result = subprocess.run(
+            ["php", str(ROOT / "tests/factory_orchestrator_snapshot_refresh_scenarios.php"),
+             "stale_fallback"], cwd=ROOT, text=True, capture_output=True,
+            timeout=30, check=True,
+        )
+        import json
+        stale = json.loads(result.stdout)
+        self.assertTrue(stale["visible_stale"])
+        self.assertTrue(stale["visible_last_success"])
+        self.assertTrue(stale["no_old_work"])
+        self.assertEqual(stale["old_view_state"], "UNKNOWN")
+        self.assertEqual(stale["old_view_fronts"], 0)
+
     def test_stale_and_unknown_are_visually_distinct_and_never_green(self):
         full=render("full")
         self.assertIn("state-stale",full)

@@ -25,8 +25,8 @@ class CapabilityGrantRevokerTests(unittest.TestCase):
         self.assertEqual(data["failed"]["revoked_at"], "2026-09-28T08:10:00Z")
         self.assertEqual(data["after"], {"authorized": False, "reason": "grant_consumed"})
         self.assertEqual(data["failed_after"], {"authorized": False, "reason": "grant_consumed"})
-        # Reordered/duplicated restrictions do not change the effective policy.
-        self.assertEqual(data["replay"], data["success"])
+        # Equivalent policy and reordered grant fields must replay one receipt.
+        self.assertEqual(data["replay"], data["success"], "same grant fields regardless of order")
         self.assertEqual(data["restricted_replay"]["reason"], "idempotency_collision")
         self.assertEqual(data["calls"], 1)
     def test_expired_consumed_and_reentrant_grants_are_denied(self):

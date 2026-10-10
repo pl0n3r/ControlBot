@@ -57,6 +57,7 @@ final class CapabilityGrantRevoker
             throw new InvalidArgumentException('now inválido.');
         }
         $record = $grant->safeRecord();
+        ksort($record, SORT_STRING);
         $id = $record['grant_id'];
         $key = $record['idempotency_key'];
         $recordDigest = hash('sha256', json_encode($record, JSON_THROW_ON_ERROR));
@@ -67,8 +68,7 @@ final class CapabilityGrantRevoker
         if (isset($this->inFlight[$id])) {
             return $this->denied($grant, 'grant_in_flight', $now);
         }
-        // Lock the idempotency key as well as the grant ID while a fake callback
-        // is running. A different grant must not re-enter on the same key.
+        // Lock both grant ID and idempotency key before the fake callback.
         if (isset($this->inFlightKeys[$key])) {
             return $this->denied($grant, 'idempotency_collision', $now);
         }

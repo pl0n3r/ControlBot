@@ -11,6 +11,13 @@ class AutoFactoryLearningTests(unittest.TestCase):
         self.assertEqual(d['again']['aggregates'][key]['retry']['samples'],20)
         self.assertEqual(d['policy']['contexts'][key]['action'],'retry')
         self.assertGreaterEqual(d['policy']['contexts'][key]['confidence'],.80)
+    def test_dedup_is_installation_scoped_and_fields_can_be_reordered(self):
+        d = scenario('installation_replay')
+        self.assertEqual(d['samples'], 2)
+        self.assertEqual(d['seen_count'], 2)
+        self.assertEqual(d['replay_samples'], 2)
+        self.assertEqual(d['replay_seen_count'], 2)
+        self.assertFalse(d['raw_ids_stored'])
     def test_rejects_whole_batch_when_private_or_unknown_field_exists(self):
         self.assertTrue(scenario('atomic')['rejected'])
     def test_requires_twenty_samples(self):

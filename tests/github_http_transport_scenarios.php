@@ -36,6 +36,7 @@ if ($scenario === 'allowlist') {
         'bad_type' => ['type'=>'repo.delete'],
         'credential_like_intent' => ['intent_id'=>'ghp_not-real-identity-001'],
         'credential_like_key' => ['idempotency_key'=>'idempotency:gho_not-real-key-001'],
+        'invalid_word_id' => ['intent_id'=>'intent-token-0001','url'=>'http://api.github.com/repos/pl0n3r/ControlBot/issues/42'],
         'dot_repository_parent' => ['repository_id'=>'pl0n3r/..','url'=>'https://api.github.com/repos/pl0n3r/../issues','method'=>'POST','type'=>'issue.create'],
         'dot_repository_self' => ['repository_id'=>'pl0n3r/.','url'=>'https://api.github.com/repos/pl0n3r/./issues','method'=>'POST','type'=>'issue.create'],
         'dot_workflow_parent' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/actions/workflows/../dispatches','method'=>'POST','type'=>'workflow.dispatch'],

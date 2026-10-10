@@ -5,7 +5,7 @@ final class AutoFactoryLearningPolicy
 {
     private const MIN_SAMPLES=20;
     private const MIN_CONFIDENCE=0.80;
-    public static function build(array $state,int $now): array
+    public static function build(array $state,int $now,bool $enabled=false): array
     {
         $contexts=[];
         foreach(($state['aggregates']??[]) as $context=>$actions){
@@ -21,6 +21,6 @@ final class AutoFactoryLearningPolicy
             if($best!==null){unset($best['averageDurationMs']);$contexts[$context]=$best;}
         }
         ksort($contexts);
-        return ['schemaVersion'=>1,'policyVersion'=>$contexts===[]?0:$now,'issuedAt'=>$now,'expiresAt'=>$now+86400000,'enabled'=>false,'rollbackVersion'=>0,'contexts'=>$contexts];
+        return ['schemaVersion'=>1,'policyVersion'=>$contexts===[]?0:$now,'issuedAt'=>$now,'expiresAt'=>$now+86400000,'enabled'=>$enabled,'rollbackVersion'=>0,'contexts'=>$contexts];
     }
 }

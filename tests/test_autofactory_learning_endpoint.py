@@ -8,6 +8,6 @@ class EndpointTests(unittest.TestCase):
   d=run('disabled');self.assertTrue(d['blocked']);self.assertFalse(d['contract']['enabled'])
  def test_requires_authenticated_profile(self): self.assertTrue(run('auth')['blocked'])
  def test_contract_is_scoped_and_can_return_conditional_policy(self):
-  d=run('enabled');self.assertEqual(d['schemaVersion'],1);self.assertFalse(d['enabled'])
+  d=run('enabled');self.assertEqual(d['schemaVersion'],1);self.assertTrue(d['enabled'])
   c=run('disabled')['contract'];self.assertEqual(c['writeScope'],'autofactory.learning.write');self.assertEqual(c['readScope'],'autofactory.learning.read')
 if __name__=='__main__':unittest.main()

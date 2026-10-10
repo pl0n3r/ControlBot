@@ -16,7 +16,7 @@ final class AutoFactoryLearningEndpoint
     public static function snapshot(array $state,int $now,bool $authenticated,bool $gateEnabled=false,int $afterVersion=0): array
     {
         self::authorize($authenticated,$gateEnabled);
-        $policy=AutoFactoryLearningPolicy::build($state,$now);
+        $policy=AutoFactoryLearningPolicy::build($state,$now,$gateEnabled);
         if($afterVersion>0&&$policy['policyVersion']<=$afterVersion) return ['notModified'=>true,'policyVersion'=>$policy['policyVersion']];
         return $policy;
     }

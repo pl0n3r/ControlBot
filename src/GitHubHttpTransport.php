@@ -69,11 +69,8 @@ final class GitHubHttpTransport
                 return $this->remember($key, self::receipt($safe, 'failed', $digest, 'secret_provider_failed', $started));
             }
             $guards = [
-                'verify_tls_peer' => true,
-                'verify_tls_host' => true,
-                'follow_redirects' => false,
-                'connect_timeout_seconds' => 2,
-                'timeout_seconds' => 5,
+                'verify_tls_peer' => true, 'verify_tls_host' => true,
+                'follow_redirects' => false, 'connect_timeout_seconds' => 2, 'timeout_seconds' => 5,
                 'max_response_bytes' => $this->maxResponseBytes,
             ];
             try {
@@ -127,7 +124,7 @@ final class GitHubHttpTransport
                 throw new InvalidArgumentException('fields');
         }
         if (!preg_match('/^[A-Za-z0-9:._-]{8,120}$/D', $r['idempotency_key'])
-            || preg_match('/(?:token|secret|bearer|github_pat|ghp_)/i', $r['idempotency_key'])) {
+            || preg_match('/(?:token|secret|bearer|github_pat|gh[pousr]_)/i', $r['idempotency_key'])) {
             throw new InvalidArgumentException('idempotency');
         }
         if (!preg_match('/^[A-Za-z0-9_.:-]{1,128}$/D', $r['intent_id'])
@@ -137,6 +134,7 @@ final class GitHubHttpTransport
         if (!preg_match('~^([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+)$~D', $r['repository_id'], $repo)) {
             throw new InvalidArgumentException('repository');
         }
+        if (preg_match('/(?:github_pat|gh[pousr]_)/i', $r['intent_id'] . $r['project_id'] . $r['repository_id'])) throw new InvalidArgumentException('identity');
         if (preg_match('~(?:^|/)\\.{1,2}(?:/|$)~D', $r['url']) === 1) {
             throw new InvalidArgumentException('dot_segment');
         }
@@ -166,7 +164,7 @@ final class GitHubHttpTransport
             $out[$field] = is_string($value)
                 && strlen($value) <= 128
                 && preg_match('/^[A-Za-z0-9_.:\/-]{1,128}$/D', $value)
-                && !preg_match('/(?:token|secret|bearer|github_pat|ghp_)/i', $value)
+                && !preg_match($field === 'idempotency_key' ? '/(?:token|secret|bearer|github_pat|gh[pousr]_)/i' : '/(?:github_pat|gh[pousr]_)/i', $value)
                 ? $value : null;
         }
         return $out;

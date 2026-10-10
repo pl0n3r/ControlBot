@@ -44,7 +44,7 @@ final class GitHubHttpTransport
         $reason = 'invalid_request';
         try {
             $json = $this->preflight($request);
-            $digest = hash('sha256', $request['method'] . "\n" . $request['url'] . "\n" . $json);
+            $digest = hash('sha256', $request['intent_id'] . "\n" . $request['project_id'] . "\n" . $request['repository_id'] . "\n" . $request['type'] . "\n" . $request['method'] . "\n" . $request['url'] . "\n" . $json);
             $key = $request['idempotency_key'];
             if (isset($this->previous[$key])) {
                 $cached = $this->previous[$key];

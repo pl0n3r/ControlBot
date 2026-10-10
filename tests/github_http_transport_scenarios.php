@@ -34,14 +34,14 @@ if ($scenario === 'allowlist') {
         'encoded_traversal' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/issues/%2e%2e'],
         'bad_method' => ['method'=>'POST'],
         'bad_type' => ['type'=>'repo.delete'],
+        'credential_like_intent' => ['intent_id'=>'ghp_not-real-identity-001'],
+        'credential_like_key' => ['idempotency_key'=>'idempotency:gho_not-real-key-001'],
         'dot_repository_parent' => ['repository_id'=>'pl0n3r/..','url'=>'https://api.github.com/repos/pl0n3r/../issues','method'=>'POST','type'=>'issue.create'],
         'dot_repository_self' => ['repository_id'=>'pl0n3r/.','url'=>'https://api.github.com/repos/pl0n3r/./issues','method'=>'POST','type'=>'issue.create'],
         'dot_workflow_parent' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/actions/workflows/../dispatches','method'=>'POST','type'=>'workflow.dispatch'],
         'dot_workflow_self' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/actions/workflows/./dispatches','method'=>'POST','type'=>'workflow.dispatch'],
     ];
-    foreach ($cases as $key=>$change) {
-        $bad[$key] = $transport->dispatch(array_replace(request(id:'intent-'.$key.'-001'), $change));
-    }
+    foreach ($cases as $key=>$change) $bad[$key] = $transport->dispatch(array_replace(request(id:'intent-'.$key.'-001'), $change));
     $out = ['receipts'=>$bad, 'sender_calls'=>$calls, 'secret_calls'=>$secrets];
 } elseif ($scenario === 'closed') {
     $calls=0;
@@ -80,8 +80,6 @@ if ($scenario === 'allowlist') {
     $sameRoute->dispatch($firstType);
     $secondType = $firstType; $secondType['type'] = 'issue.release';
     $out['type_conflict'] = $sameRoute->dispatch($secondType);
-    // Replaying the same route/payload under another identity must not return
-    // a receipt belonging to a different project or intent.
     $identityCalls = 0; $identitySecrets = 0;
     $identityTransport = new GitHubHttpTransport(
         static function () use (&$identityCalls) { ++$identityCalls; return response(); },
@@ -122,5 +120,10 @@ if ($scenario === 'allowlist') {
     $req=request('/issues','POST','issue.create');
     $first=$transport->dispatch($req); $again=$transport->dispatch($req);
     $out=['first'=>$first, 'again'=>$again, 'calls'=>$calls, 'observed'=>$observed];
+    foreach (['intent_id'=>'intent-token-0001', 'project_id'=>'project-secret-sample'] as $field=>$value) {
+        $valid = request(id:'intent-valid-'.$field.'-0001'); $valid[$field]=$value;
+        $out['valid_ids'][$field] = [$transport->dispatch($valid), $transport->dispatch($valid)];
+    }
+    $out['calls'] = $calls;
 } else { fwrite(STDERR, "unknown scenario\n"); exit(2); }
 echo json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

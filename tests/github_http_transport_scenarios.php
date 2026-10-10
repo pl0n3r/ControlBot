@@ -1,0 +1,100 @@
+<?php
+declare(strict_types=1);
+require __DIR__ . '/../src/GitHubHttpTransport.php';
+use ControlBot\GitHub\GitHubHttpTransport;
+
+const FAKE_SECRET = 'fake-token-never-log-XYZ';
+function request(string $suffix = '/issues/42', string $method = 'PATCH', string $type = 'issue.update', string $id = 'intent-good-0001'): array
+{
+    return [
+        'intent_id' => $id,
+        'project_id' => 'controlbot',
+        'repository_id' => 'pl0n3r/ControlBot',
+        'type' => $type,
+        'idempotency_key' => 'idempotency:' . $id,
+        'method' => $method,
+        'url' => 'https://api.github.com/repos/pl0n3r/ControlBot' . $suffix,
+        'body' => ['title' => 'offline-only'],
+    ];
+}
+function response(int $status = 200, string $body = '{"ok":true}', bool $tls = true, int $redirect = 0): array
+{
+    return ['status_code'=>$status, 'body'=>$body, 'tls_verified'=>$tls, 'redirect_count'=>$redirect];
+}
+$scenario = $argv[1] ?? '';
+if ($scenario === 'allowlist') {
+    $calls = 0; $secrets = 0;
+    $transport = new GitHubHttpTransport(
+        static function () use (&$calls) { ++$calls; return response(); },
+        static function () use (&$secrets) { ++$secrets; return FAKE_SECRET; },
+    );
+    $bad = [];
+    $cases = [
+        'outside_host' => ['url'=>'https://evil.example/repos/pl0n3r/ControlBot/issues/42'],
+        'http' => ['url'=>'http://api.github.com/repos/pl0n3r/ControlBot/issues/42'],
+        'user_info' => ['url'=>'https://api.github.com@evil.example/repos/pl0n3r/ControlBot/issues/42'],
+        'foreign_repo' => ['url'=>'https://api.github.com/repos/stranger/repo/issues/42'],
+        'untyped_path' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/hooks'],
+        'query' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/issues/42?x=1'],
+        'encoded_traversal' => ['url'=>'https://api.github.com/repos/pl0n3r/ControlBot/issues/%2e%2e'],
+        'bad_method' => ['method'=>'POST'],
+        'bad_type' => ['type'=>'repo.delete'],
+    ];
+    foreach ($cases as $key=>$change) {
+        $bad[$key] = $transport->dispatch(array_replace(request(id:'intent-'.$key.'-001'), $change));
+    }
+    $out = ['receipts'=>$bad, 'sender_calls'=>$calls, 'secret_calls'=>$secrets];
+} elseif ($scenario === 'closed') {
+    $calls=0;
+    $transport = new GitHubHttpTransport(
+        static function ($method, $url, $payload, $token, $guards) use (&$calls) {
+            ++$calls;
+            return match($calls) {
+                1 => response(200, '{}', false),
+                2 => response(302, '', true),
+                3 => response(200, str_repeat('x', 1025)),
+                default => response(200, '{}', true, 1),
+            };
+        },
+        static fn()=>FAKE_SECRET,
+        1024,
+    );
+    $out = [
+        'tls'=>$transport->dispatch(request(id:'intent-test-tls-0001')),
+        'redirect'=>$transport->dispatch(request(id:'intent-test-redirect-0001')),
+        'oversize'=>$transport->dispatch(request(id:'intent-test-oversize-0001')),
+        'redirect_count'=>$transport->dispatch(request(id:'intent-test-follow-0001')),
+        'calls'=>$calls,
+    ];
+} elseif ($scenario === 'secret') {
+    $calls = 0;
+    $transport = new GitHubHttpTransport(
+        static function () use (&$calls) { ++$calls; throw new RuntimeException('debug '.FAKE_SECRET); },
+        static fn()=>FAKE_SECRET,
+    );
+    $req = request();
+    $first = $transport->dispatch($req);
+    $again = $transport->dispatch($req);
+    $other = $req; $other['body'] = ['title'=>'changed'];
+    $conflict = $transport->dispatch($other);
+    $badProvider = new GitHubHttpTransport(static fn()=>response(), static function () { throw new RuntimeException(FAKE_SECRET); });
+    $out = ['first'=>$first, 'again'=>$again, 'conflict'=>$conflict,
+        'bad_provider'=>$badProvider->dispatch(request(id:'intent-provider-0001')),
+        'calls'=>$calls];
+} elseif ($scenario === 'local') {
+    $calls = 0; $observed = [];
+    $transport = new GitHubHttpTransport(
+        static function ($method,$url,$payload,$token,$guards) use (&$calls,&$observed) {
+            ++$calls;
+            $observed = ['method'=>$method, 'url'=>$url, 'guards'=>$guards,
+                'token_is_fake'=>$token === FAKE_SECRET];
+            return response(201, '{"number":42}');
+        },
+        static fn()=>FAKE_SECRET,
+    );
+    $req=request('/issues','POST','issue.create');
+    $first=$transport->dispatch($req);
+    $again=$transport->dispatch($req);
+    $out=['first'=>$first, 'again'=>$again, 'calls'=>$calls, 'observed'=>$observed];
+} else { fwrite(STDERR, "unknown scenario\n"); exit(2); }
+echo json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;

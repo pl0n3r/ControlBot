@@ -16,7 +16,7 @@ class GithubHttpTransportTests(unittest.TestCase):
         result = scenario("allowlist")
         self.assertEqual(result["sender_calls"], 0)
         self.assertEqual(result["secret_calls"], 0)
-        self.assertEqual(len(result["receipts"]), 13)
+        self.assertEqual(len(result["receipts"]), 15)
         for name in ("dot_repository_parent", "dot_repository_self", "dot_workflow_parent", "dot_workflow_self"):
             self.assertIn(name, result["receipts"])
         for receipt in result["receipts"].values():
@@ -55,7 +55,11 @@ class GithubHttpTransportTests(unittest.TestCase):
         self.assertEqual(reentrant["first"], reentrant["again"])
         self.assertEqual(reentrant["first"]["status"], "executed")
         result = scenario("local")
-        self.assertEqual(result["calls"], 1)
+        self.assertEqual(result["calls"], 3)
+        for field, value in (("intent_id", "intent-token-0001"), ("project_id", "project-secret-sample")):
+            self.assertEqual(result["valid_ids"][field][0][field], value)
+            self.assertEqual(result["valid_ids"][field][0], result["valid_ids"][field][1])
+            self.assertEqual(result["valid_ids"][field][0]["status"], "executed")
         self.assertEqual(result["first"], result["again"])
         self.assertEqual(result["first"]["status"], "executed")
         self.assertTrue(result["first"]["evidence_ref"].startswith("stub:sha256:"))

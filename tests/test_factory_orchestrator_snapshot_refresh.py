@@ -19,6 +19,14 @@ def scenario(name: str) -> dict:
 
 
 class FactoryOrchestratorSnapshotRefreshTests(unittest.TestCase):
+    def test_refresh_rejects_symlinked_parent_dotdot_and_served_tree_but_allows_private_dir(self) -> None:
+        data = scenario("symlink_parent")
+        self.assertEqual("snapshot_target_invalid", data["alias_error"])
+        self.assertEqual("snapshot_target_invalid", data["dotdot_error"])
+        self.assertEqual("snapshot_target_invalid", data["public_error"])
+        self.assertTrue(data["nothing_in_served"])
+        self.assertTrue(data["private_ok"])
+
     def test_refresh_writes_valid_snapshot_atomically_with_size_and_freshness_bounds(self) -> None:
         data = scenario("success")
         self.assertTrue(data["written"])

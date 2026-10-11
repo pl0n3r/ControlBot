@@ -139,7 +139,28 @@ final class FactoryOrchestratorSnapshotRefresh
         if (!is_dir($directory) || !is_writable($directory)) {
             throw self::failure('snapshot_directory_unwritable');
         }
+        if (self::escapesPrivateRoot($snapshotPath, $directory)) {
+            throw self::failure('snapshot_target_invalid');
+        }
         return $directory;
+    }
+
+    /**
+     * El productor nunca debe escribir hacia el árbol servido: rechaza `..` léxicos, el directorio
+     * destino como enlace simbólico y cualquier ruta cuyo directorio real caiga bajo un segmento
+     * `public`. Se permiten enlaces en ancestros del hosting (p. ej. /home -> /home1), porque lo que
+     * importa es adónde termina realmente la escritura.
+     */
+    private static function escapesPrivateRoot(string $snapshotPath, string $directory): bool
+    {
+        if (preg_match('#(^|/)\.\.(/|$)#', $snapshotPath) === 1 || is_link($directory)) {
+            return true;
+        }
+        $real = realpath($directory);
+        if ($real === false) {
+            return true;
+        }
+        return preg_match('#(^|/)public(/|$)#', $real) === 1;
     }
 
     private static function replaceWithLock(string $snapshotPath, string $encoded, int $bytes, array $io): bool

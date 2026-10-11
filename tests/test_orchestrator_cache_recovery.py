@@ -1,0 +1,51 @@
+"""Offline PHP regressions for a corrupt, derived orchestrator cache (#769)."""
+import json
+import subprocess
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SCENARIOS = ROOT / "tests/orchestrator_cache_recovery_scenarios.php"
+
+
+def scenario(name):
+    proc = subprocess.run(["php", str(SCENARIOS), name], cwd=ROOT,
+                          text=True, capture_output=True, check=True, timeout=30)
+    return json.loads(proc.stdout)
+
+
+class OrchestratorCacheRecoveryTests(unittest.TestCase):
+    def test_corrupt_json_recovers_from_valid_source(self):
+        result = scenario("corrupt-json")
+        self.assertEqual(["refreshed", "fresh"], result["statuses"])
+        self.assertEqual(1, result["calls"])
+        self.assertEqual("UNKNOWN", result["payload"])
+        self.assertTrue(result["persisted"])
+
+    def test_invalid_cache_and_invalid_source_fail_closed(self):
+        result = scenario("invalid-sources")
+        self.assertEqual({"invalid-json": True, "bad-shape": True,
+                          "forged-fingerprint": True}, result["rejected"])
+        self.assertEqual("refreshed", result["recovered"])
+        self.assertEqual("refreshed", result["future"])
+        self.assertEqual(5, result["calls"])
+        self.assertRegex(result["fingerprint"], r"^[0-9a-f]{64}$")
+
+    def test_valid_ttl_stale_and_atomic_replacement_unchanged(self):
+        result = scenario("ttl-stale")
+        self.assertEqual(["refreshed", "fresh", "stale", "stale", "stale"], result["statuses"])
+        self.assertEqual(2, result["calls"])
+        self.assertEqual(21, result["age"])
+        self.assertEqual(0, result["temp"])
+        self.assertTrue(result["read_only"])
+
+    def test_two_requests_recover_without_false_green(self):
+        result = scenario("two-requests")
+        self.assertEqual(["refreshed", "fresh"], result["statuses"])
+        self.assertEqual(["UNKNOWN", "UNKNOWN"], result["activity"])
+        self.assertEqual(1, result["calls"])
+        self.assertEqual(3, result["age"])
+
+
+if __name__ == "__main__":
+    unittest.main()

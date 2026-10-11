@@ -16,10 +16,17 @@ final class FactoryOrchestratorLiveCache
         if ($path === '' || $path[0] !== '/' || $ttl < 1 || $stale < $ttl || $budget < 1 || $stale > 86400) {
             throw new InvalidArgumentException('cache policy invalid');
         }
-        $cached = self::read($path);
+        // A damaged derived cache must never prevent a canonical refresh.
+        try {
+            $cached = self::read($path);
+            if ($cached !== null && $now < $cached['cached_at']) {
+                $cached = null;
+            }
+        } catch (Throwable) {
+            $cached = null;
+        }
         if ($cached !== null) {
             $age = $now - $cached['cached_at'];
-            if ($age < 0) throw new RuntimeException('cache clock invalid');
             if ($age <= $ttl) return self::result('fresh', $cached, $age);
             if ($age <= $stale && $now < $cached['next_refresh_at']) return self::result('stale', $cached, $age);
         }
@@ -60,6 +67,12 @@ final class FactoryOrchestratorLiveCache
             || ($payload['version'] ?? null) !== 1 || ($payload['read_only'] ?? null) !== true
             || !is_string($payload['fingerprint'] ?? null)
             || preg_match('/^[0-9a-f]{64}$/D', $payload['fingerprint']) !== 1) {
+            throw new InvalidArgumentException('payload invalid');
+        }
+        $body = $payload;
+        unset($body['fingerprint']);
+        $encoded = json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        if (!hash_equals(hash('sha256', $encoded), $payload['fingerprint'])) {
             throw new InvalidArgumentException('payload invalid');
         }
         return $payload;

@@ -75,7 +75,7 @@ final class FactoryOrchestratorFieldSafety
         }
 
         $fronts = $view['fronts'] ?? null;
-        if (!is_array($fronts) || !array_is_list($fronts)) {
+        if (!is_array($fronts) || !array_is_list($fronts) || count($fronts) > 24) {
             throw new InvalidArgumentException('fronts invalid');
         }
         foreach ($fronts as $front) {

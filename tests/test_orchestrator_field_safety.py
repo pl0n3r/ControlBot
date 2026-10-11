@@ -51,8 +51,8 @@ class FieldSafetyTests(unittest.TestCase):
 
     def test_projection_shapes_and_legacy_fail_closed(self):
         report = self.report("shape")
-        self.assertEqual(18, report["total"])
-        self.assertEqual(4, report["positives"])
+        self.assertEqual(20, report["total"])
+        self.assertEqual(5, report["positives"])
         self.assertEqual([], report["unexpected"])
         for name, accepted in report["cases"].items():
             self.assertEqual(name.startswith("valid_"), accepted, name)
@@ -61,6 +61,11 @@ class FieldSafetyTests(unittest.TestCase):
         cases = self.report("shape")["cases"]
         self.assertTrue(cases["valid_fronts_24"])
         self.assertFalse(cases["bad_fronts_25"])
+
+    def test_decision_cardinality_100_is_valid_and_101_fails_closed(self):
+        cases = self.report("shape")["cases"]
+        self.assertTrue(cases["valid_decisions_100"])
+        self.assertFalse(cases["bad_decisions_101"])
 
     def test_guard_is_pure_without_runtime_io(self):
         report = self.report()

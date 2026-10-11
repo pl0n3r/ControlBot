@@ -42,6 +42,20 @@ if (($argv[1] ?? '') === 'shape') {
                 ['id' => 'front-'.$i, 'source_ref' => 'synthetic-source'], range(1, 25));
             return $v;
         },
+        'valid_decisions_100' => static function (array $v): array {
+            $prototype = $v['owner_decisions'][0];
+            $v['owner_decisions'] = array_map(static function (int $i) use ($prototype): array {
+                $row = $prototype; $row['id'] = 'decision-'.$i; return $row;
+            }, range(1, 100));
+            return $v;
+        },
+        'bad_decisions_101' => static function (array $v): array {
+            $prototype = $v['owner_decisions'][0];
+            $v['owner_decisions'] = array_map(static function (int $i) use ($prototype): array {
+                $row = $prototype; $row['id'] = 'decision-'.$i; return $row;
+            }, range(1, 101));
+            return $v;
+        },
         'bad_central_list' => static function (array $v): array { $v['central'] = []; return $v; },
         'bad_central_pii' => static function (array $v): array { $v['central']['source_ref'] = 'reader@example.test'; return $v; },
         'bad_fronts_object' => static function (array $v): array { $v['fronts'] = ['x' => $v['fronts'][0]]; return $v; },
@@ -58,7 +72,7 @@ if (($argv[1] ?? '') === 'shape') {
     ];
     $result = [];
     foreach ($changes as $name => $modify) $result[$name] = accepts($modify(validProjection()));
-    $positives = ['valid_empty_collections', 'valid_central_unknown', 'valid_legacy', 'valid_fronts_24'];
+    $positives = ['valid_empty_collections', 'valid_central_unknown', 'valid_legacy', 'valid_fronts_24', 'valid_decisions_100'];
     $unexpected = array_keys(array_filter($result, static fn(bool $actual, string $name): bool => $actual !== in_array($name, $positives, true), ARRAY_FILTER_USE_BOTH));
     echo json_encode(['total'=>count($result), 'positives'=>count($positives), 'unexpected'=>$unexpected, 'cases'=>$result], JSON_THROW_ON_ERROR), PHP_EOL;
     exit($unexpected ? 1 : 0);

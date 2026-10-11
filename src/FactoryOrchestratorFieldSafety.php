@@ -88,7 +88,7 @@ final class FactoryOrchestratorFieldSafety
         }
 
         $decisions = $view['owner_decisions'] ?? null;
-        if (!is_array($decisions) || !array_is_list($decisions)) {
+        if (!is_array($decisions) || !array_is_list($decisions) || count($decisions) > 100) {
             throw new InvalidArgumentException('decisions invalid');
         }
         foreach ($decisions as $decision) {

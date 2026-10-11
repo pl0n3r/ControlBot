@@ -1,10 +1,7 @@
 <?php
 declare(strict_types=1);
-
 require __DIR__ . '/../src/FactoryOrchestratorLiveCache.php';
-
 use ControlBot\Business\FactoryOrchestratorLiveCache;
-
 function view(int $now = 220): array
 {
     $body = [
@@ -21,8 +18,7 @@ function view(int $now = 220): array
 function seal(array $body): array
 {
     unset($body['fingerprint']);
-    return $body + ['fingerprint' => hash('sha256',
-        json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES))];
+    return $body + ['fingerprint' => hash('sha256', json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES))];
 }
 
 function temporaryCache(): array
@@ -34,8 +30,14 @@ function temporaryCache(): array
 
 function clean(string $dir): void
 {
-    foreach (glob($dir . '/*') ?: [] as $path) @unlink($path);
-    @rmdir($dir);
+    foreach (glob($dir . '/*') ?: [] as $path) @unlink($path); @rmdir($dir);
+}
+function failClosed(string $path, int $now): bool
+{
+    try { FactoryOrchestratorLiveCache::remember($path, $now, 10, 60, 20,
+        static function (): array { throw new RuntimeException('source down'); }); }
+    catch (RuntimeException $e) { return $e->getMessage() === 'snapshot unavailable'; }
+    return false;
 }
 
 $scenario = $argv[1] ?? '';
@@ -43,8 +45,7 @@ $scenario = $argv[1] ?? '';
 try {
     if ($scenario === 'corrupt-json') {
         file_put_contents($path, '{invalid-json');
-        $calls = 0;
-        $load = static function () use (&$calls): array { $calls++; return view(); };
+        $calls = 0; $load = static function () use (&$calls): array { $calls++; return view(); };
         $a = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, $load);
         $b = FactoryOrchestratorLiveCache::remember($path, 222, 10, 60, 20, $load);
         echo json_encode(['statuses' => [$a['status'], $b['status']], 'calls' => $calls,
@@ -70,8 +71,7 @@ try {
                     }
                     $payload = seal($payload);
                 }
-                $cachedAt = $case === 'reversed-window' ? 220 : 210;
-                $next = $case === 'reversed-window' ? 219 : 230;
+                $cachedAt = $case === 'mismatched-time' ? 210 : 220; $next = $case === 'reversed-window' ? 219 : 230;
                 file_put_contents($path, json_encode(['cached_at' => $cachedAt, 'next_refresh_at' => $next, 'payload' => $payload], JSON_THROW_ON_ERROR));
             }
             try { FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20,
@@ -80,15 +80,12 @@ try {
             } catch (RuntimeException $e) { $rejects[$case] = $e->getMessage() === 'snapshot unavailable'; }
         }
         $payload = view(); $payload['fingerprint'] = str_repeat('f', 64);
-        file_put_contents($path, json_encode(['cached_at' => 210, 'next_refresh_at' => 230, 'payload' => $payload], JSON_THROW_ON_ERROR));
-        $recovered = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20,
-            static function () use (&$calls): array { $calls++; return view(); });
+        file_put_contents($path, json_encode(['cached_at' => 220, 'next_refresh_at' => 230, 'payload' => $payload], JSON_THROW_ON_ERROR));
+        $recovered = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static function () use (&$calls): array { $calls++; return view(); });
         file_put_contents($path, json_encode(['cached_at' => 225, 'next_refresh_at' => 240, 'payload' => view()], JSON_THROW_ON_ERROR));
-        $future = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20,
-            static function () use (&$calls): array { $calls++; return view(); });
-        echo json_encode(['rejected' => $rejects, 'calls' => $calls,
-            'recovered' => $recovered['status'], 'future' => $future['status'],
-            'fingerprint' => $recovered['payload']['fingerprint']], JSON_THROW_ON_ERROR), PHP_EOL;
+        $future = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static function () use (&$calls): array { $calls++; return view(); });
+        echo json_encode(['rejected' => $rejects, 'calls' => $calls, 'recovered' => $recovered['status'],
+            'future' => $future['status'], 'fingerprint' => $recovered['payload']['fingerprint']], JSON_THROW_ON_ERROR), PHP_EOL;
         exit;
     }
     if ($scenario === 'ttl-stale') {
@@ -97,19 +94,15 @@ try {
         $times = [220, 225, 231, 241, 242]; $rows = [];
         foreach ($times as $now) $rows[] = FactoryOrchestratorLiveCache::remember($path, $now, 10, 60, 20, $load);
         echo json_encode(['statuses' => array_column($rows, 'status'), 'calls' => $calls,
-            'age' => $rows[3]['age_seconds'], 'temp' => count(glob($dir . '/.orchestrator-*') ?: []),
-            'read_only' => $rows[4]['payload']['read_only']], JSON_THROW_ON_ERROR), PHP_EOL;
+            'age' => $rows[3]['age_seconds'], 'temp' => count(glob($dir . '/.orchestrator-*') ?: []), 'read_only' => $rows[4]['payload']['read_only']], JSON_THROW_ON_ERROR), PHP_EOL;
         exit;
     }
     if ($scenario === 'two-requests') {
-        $malformed = view();
-        $malformed['central'] = ['activity_state' => 'ACTIVE'];
-        $malformed = seal($malformed);
+        $malformed = view(); $malformed['central'] = ['activity_state' => 'ACTIVE']; $malformed = seal($malformed);
         file_put_contents($path, json_encode(['cached_at' => 210, 'next_refresh_at' => 230, 'payload' => $malformed], JSON_THROW_ON_ERROR));
         $calls = 0;
         $load = static function () use (&$calls): array { $calls++; return view(); };
-        $first = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, $load);
-        $second = FactoryOrchestratorLiveCache::remember($path, 223, 10, 60, 20, $load);
+        $first = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, $load); $second = FactoryOrchestratorLiveCache::remember($path, 223, 10, 60, 20, $load);
         echo json_encode(['statuses' => [$first['status'], $second['status']], 'calls' => $calls,
             'activity' => [$first['payload']['central']['activity_state'], $second['payload']['central']['activity_state']], 'age' => $second['age_seconds']], JSON_THROW_ON_ERROR), PHP_EOL;
         exit;
@@ -119,44 +112,43 @@ try {
         $body['central'] = ['activity_state'=>'ACTIVE','available'=>0,'reserved'=>1,'blocked'=>0,
             'source_ref'=>'synthetic','observed_at'=>220,'freshness'=>'current','age_seconds'=>0];
         $option = ['id'=>'A','label'=>'Approve','effect'=>'Apply change','pros'=>[], 'cons'=>[], 'risk'=>'low','cost'=>null,'reversible'=>true,'explain_simple'=>null];
-        $d = [
-            'id'=>'dec-1','issue_ref'=>'https://github.com/pl0n3r/Factory/issues/1',
+        $d = ['id'=>'dec-1','issue_ref'=>'https://github.com/pl0n3r/Factory/issues/1',
             'repository_ref'=>'pl0n3r/Factory','issue_number'=>1,'format'=>'structured',
             'title'=>'Decision','title_simple'=>'Decision','summary_simple'=>'Summary',
             'explain_simple'=>null,'why_recommended'=>'Safe','blocks'=>'Release',
             'options'=>[$option],'recommendation'=>'A','safe_default'=>'A',
             'expires_at'=>null,'seconds_left'=>null,'expired'=>null,
             'source_ref'=>'synthetic','observed_at'=>220,'freshness'=>'current','age_seconds'=>0];
-        $body['owner_decisions'] = [$d];
-        $rich = seal($body);
+        $body['owner_decisions'] = [$d]; $rich = seal($body);
         $first = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => $rich);
         $second = FactoryOrchestratorLiveCache::remember($path, 221, 10, 60, 20, static function (): array { throw new RuntimeException('should not refresh'); });
         foreach (['title_simple','summary_simple','explain_simple','why_recommended','blocks','recommendation','safe_default','expires_at','seconds_left','expired'] as $key) $d[$key] = null;
         $d['format'] = 'legacy'; $d['options'] = [];
-        $body['owner_decisions'] = [$d];
-        $legacy = FactoryOrchestratorLiveCache::remember($path, 240, 10, 60, 20, static fn (): array => seal($body));
-        $bad = $rich; $bad['owner_decisions'][0]['options'][0]['reversible'] = 'yes';
-        $bad = seal($bad);
-        file_put_contents($path, json_encode(['cached_at'=>240,'next_refresh_at'=>250,'payload'=>$bad], JSON_THROW_ON_ERROR));
-        $blocked = false;
-        try { FactoryOrchestratorLiveCache::remember($path, 241, 10, 60, 20, static function (): array { throw new RuntimeException('source down'); }); }
-        catch (RuntimeException $e) { $blocked = $e->getMessage() === 'snapshot unavailable'; }
+        $body['owner_decisions'] = [$d]; unlink($path);
+        $legacy = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => seal($body));
+        $bad = $rich; $bad['owner_decisions'][0]['options'][0]['reversible'] = 'yes'; $bad = seal($bad);
+        file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>$bad], JSON_THROW_ON_ERROR));
+        $blocked = failClosed($path, 221);
+        $invalidOptions = [];
+        foreach (['pros','cons','cost','explain_simple','decision_explain'] as $key) {
+            $invalid = $rich;
+            if ($key === 'decision_explain') $invalid['owner_decisions'][0]['explain_simple'] = 4;
+            else $invalid['owner_decisions'][0]['options'][0][$key] = in_array($key, ['pros','cons'], true) ? [4] : 4;
+            file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($invalid)], JSON_THROW_ON_ERROR));
+            $invalidOptions[$key] = failClosed($path, 221);
+        }
         $badExpiry = $rich; $badExpiry['owner_decisions'][0]['seconds_left'] = -1; $badExpiry = seal($badExpiry);
         file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>$badExpiry], JSON_THROW_ON_ERROR));
-        $expiryBlocked = false;
-        try { FactoryOrchestratorLiveCache::remember($path, 221, 10, 60, 20, static function (): array { throw new RuntimeException('source down'); }); }
-        catch (RuntimeException $e) { $expiryBlocked = $e->getMessage() === 'snapshot unavailable'; }
+        $expiryBlocked = failClosed($path, 221);
         echo json_encode(['statuses'=>[$first['status'],$second['status'],$legacy['status']],
             'formats'=>[$first['payload']['owner_decisions'][0]['format'],$legacy['payload']['owner_decisions'][0]['format']],
-            'blocked'=>$blocked,'expiry_blocked'=>$expiryBlocked], JSON_THROW_ON_ERROR), PHP_EOL;
+            'blocked'=>$blocked,'expiry_blocked'=>$expiryBlocked,'invalid_options'=>$invalidOptions], JSON_THROW_ON_ERROR), PHP_EOL;
         exit;
     }
     if ($scenario === 'agent-parity') {
         $bad = view(); $bad['agent_activity'] = [];
         file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($bad)], JSON_THROW_ON_ERROR));
-        $rejected = false;
-        try { FactoryOrchestratorLiveCache::remember($path, 221, 10, 60, 20, static function (): array { throw new RuntimeException('source down'); }); }
-        catch (RuntimeException $e) { $rejected = $e->getMessage() === 'snapshot unavailable'; }
+        $rejected = failClosed($path, 221);
         $valid = view(); $valid['agent_activity'] = null; $valid = seal($valid);
         $fresh = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => $valid);
         echo json_encode(['rejected'=>$rejected, 'valid'=>$fresh['status']], JSON_THROW_ON_ERROR), PHP_EOL; exit;

@@ -185,6 +185,7 @@ final class FactoryOrchestratorLiveCache
                 }
                 if ($d['options'] !== []) throw new InvalidArgumentException('legacy options invalid');
             } else {
+                if ($d['explain_simple'] !== null && !self::text($d['explain_simple'])) throw new InvalidArgumentException('decision explain invalid');
                 foreach (['title_simple','summary_simple','why_recommended','blocks'] as $key) {
                     if (!self::text($d[$key])) throw new InvalidArgumentException('decision text invalid');
                 }
@@ -206,9 +207,13 @@ final class FactoryOrchestratorLiveCache
                         || !self::text($option['label']) || !self::text($option['effect'])
                         || !self::text($option['risk']) || !is_array($option['pros'])
                         || !array_is_list($option['pros']) || !is_array($option['cons'])
-                        || !array_is_list($option['cons'])) {
+                        || !array_is_list($option['cons'])
+                        || ($option['cost'] !== null && !self::text($option['cost']))
+                        || ($option['explain_simple'] !== null && !self::text($option['explain_simple']))) {
                         throw new InvalidArgumentException('option invalid');
                     }
+                    foreach (['pros','cons'] as $kind) foreach ($option[$kind] as $item)
+                        if (!self::text($item)) throw new InvalidArgumentException('option list item invalid');
                     $ids[] = $option['id'];
                 }
                 if (!$ids || !in_array($d['recommendation'], $ids, true)

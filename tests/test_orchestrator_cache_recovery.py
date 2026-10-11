@@ -37,6 +37,9 @@ class OrchestratorCacheRecoveryTests(unittest.TestCase):
         self.assertEqual(["structured", "legacy"], projection["formats"])
         self.assertTrue(projection["blocked"])
         self.assertTrue(projection["expiry_blocked"])
+        self.assertEqual({"pros": True, "cons": True, "cost": True,
+                          "explain_simple": True, "decision_explain": True},
+                         projection["invalid_options"])
         agent = scenario("agent-parity")
         self.assertTrue(agent["rejected"])
         self.assertEqual("refreshed", agent["valid"])

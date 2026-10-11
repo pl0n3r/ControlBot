@@ -65,6 +65,18 @@ function failure(callable $operation): string
     }
 }
 
+function failureCode(callable $operation): string
+{
+    try {
+        $operation();
+        return 'NO_FAILURE';
+    } catch (\ControlBot\Business\FactoryOrchestratorSnapshotRefreshFailure $error) {
+        return $error->failureCode();
+    } catch (Throwable $error) {
+        return 'OTHER:' . $error->getMessage();
+    }
+}
+
 if ($scenario === 'success') {
     [$directory, $path] = workspace();
     try {
@@ -93,6 +105,38 @@ if ($scenario === 'success') {
             'temporary_count' => count(glob($directory . DIRECTORY_SEPARATOR . '.orchestrator-live-*') ?: []),
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
     } finally {
+        cleanupWorkspace($directory);
+    }
+    exit;
+}
+
+if ($scenario === 'symlink_parent') {
+    [$directory, $path] = workspace();
+    try {
+        $served = $directory . DIRECTORY_SEPARATOR . 'public';
+        $private = $directory . DIRECTORY_SEPARATOR . 'private';
+        mkdir($served, 0700);
+        mkdir($private, 0700);
+        symlink($served, $private . DIRECTORY_SEPARATOR . 'alias');
+        $try = static fn (string $target): string => failureCode(
+            static fn (): array => FactoryOrchestratorSnapshotRefresh::refresh(static fn (): array => evidence(), $target, 220)
+        );
+        $aliasFailure = $try($private . DIRECTORY_SEPARATOR . 'alias' . DIRECTORY_SEPARATOR . 'orchestrator-live.json');
+        $dotdotFailure = $try($private . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . 'orchestrator-live.json');
+        $publicFailure = $try($served . DIRECTORY_SEPARATOR . 'orchestrator-live.json');
+        $ok = FactoryOrchestratorSnapshotRefresh::refresh(static fn (): array => evidence(), $private . DIRECTORY_SEPARATOR . 'orchestrator-live.json', 220);
+        echo json_encode([
+            'alias_error' => $aliasFailure,
+            'dotdot_error' => $dotdotFailure,
+            'public_error' => $publicFailure,
+            'nothing_in_served' => glob($served . DIRECTORY_SEPARATOR . '*') === [],
+            'private_ok' => $ok['written'] ?? false,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
+    } finally {
+        @unlink($private . DIRECTORY_SEPARATOR . 'alias');
+        foreach (glob($private . DIRECTORY_SEPARATOR . '*') ?: [] as $f) { @unlink($f); }
+        @rmdir($private);
+        @rmdir($served);
         cleanupWorkspace($directory);
     }
     exit;

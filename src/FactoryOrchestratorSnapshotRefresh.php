@@ -151,10 +151,7 @@ final class FactoryOrchestratorSnapshotRefresh
             return true;
         }
         $real = realpath($directory);
-        if ($real === false) {
-            return true;
-        }
-        return preg_match('#(^|/)(?:public|public_html)(/|$)#', $real) === 1;
+        return $real === false || preg_match('#(^|/)(?:public|public_html)(/|$)#', $real) === 1;
     }
 
     private static function replaceWithLock(string $snapshotPath, string $encoded, int $bytes, array $io): bool

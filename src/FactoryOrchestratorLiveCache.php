@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace ControlBot\Business;
 
+require_once __DIR__ . '/FactoryAgentActivityUi.php';
+
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -89,6 +91,7 @@ final class FactoryOrchestratorLiveCache
             'central','fronts','owner_decisions','fingerprint'];
         if (array_key_exists('agent_activity', $view)) $keys[] = 'agent_activity';
         self::fields($view, $keys);
+        FactoryAgentActivityUi::renderSection($view['agent_activity'] ?? null);
         if (!is_int($view['observed_at']) || $view['observed_at'] < 1
             || !self::digest($view['source_snapshot'])
             || !is_array($view['fronts']) || !array_is_list($view['fronts'])
@@ -185,6 +188,14 @@ final class FactoryOrchestratorLiveCache
                 foreach (['title_simple','summary_simple','why_recommended','blocks'] as $key) {
                     if (!self::text($d[$key])) throw new InvalidArgumentException('decision text invalid');
                 }
+                if ($d['expires_at'] === null) {
+                    if ($d['seconds_left'] !== null || $d['expired'] !== null) throw new InvalidArgumentException('decision expiry invalid');
+                } else {
+                    $epoch = is_string($d['expires_at']) && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D', $d['expires_at']) === 1
+                        ? strtotime($d['expires_at']) : false;
+                    if ($epoch === false || $d['seconds_left'] !== max(0, $epoch - $view['observed_at'])
+                        || $d['expired'] !== ($epoch <= $view['observed_at'])) throw new InvalidArgumentException('decision expiry invalid');
+                }
                 $ids = [];
                 foreach ($d['options'] as $option) {
                     self::fields($option, ['id','label','effect','pros','cons','risk',
@@ -208,27 +219,17 @@ final class FactoryOrchestratorLiveCache
         }
     }
 
-    private static function digest(mixed $value): bool
-    {
-        return is_string($value) && preg_match('/^[0-9a-f]{64}$/D', $value) === 1;
-    }
+    private static function digest(mixed $value): bool { return is_string($value) && preg_match('/^[0-9a-f]{64}$/D', $value) === 1; }
 
-    private static function text(mixed $value): bool
-    {
-        return is_string($value) && $value !== '';
-    }
+    private static function text(mixed $value): bool { return is_string($value) && $value !== ''; }
 
     private static function fields(mixed $row, array $expected): void
     {
         if (!is_array($row) || array_is_list($row)) {
             throw new InvalidArgumentException('projection fields invalid');
         }
-        $actual = array_keys($row);
-        sort($actual);
-        sort($expected);
-        if ($actual !== $expected) {
-            throw new InvalidArgumentException('projection keys invalid');
-        }
+        $actual = array_keys($row); sort($actual); sort($expected);
+        if ($actual !== $expected) throw new InvalidArgumentException('projection keys invalid');
     }
 
     private static function write(string $path, array $record): void

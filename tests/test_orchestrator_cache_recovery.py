@@ -36,6 +36,10 @@ class OrchestratorCacheRecoveryTests(unittest.TestCase):
         self.assertEqual(["refreshed", "fresh", "refreshed"], projection["statuses"])
         self.assertEqual(["structured", "legacy"], projection["formats"])
         self.assertTrue(projection["blocked"])
+        self.assertTrue(projection["expiry_blocked"])
+        agent = scenario("agent-parity")
+        self.assertTrue(agent["rejected"])
+        self.assertEqual("refreshed", agent["valid"])
 
     def test_valid_ttl_stale_and_atomic_replacement_unchanged(self):
         result = scenario("ttl-stale")

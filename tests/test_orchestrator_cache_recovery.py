@@ -43,6 +43,10 @@ class OrchestratorCacheRecoveryTests(unittest.TestCase):
         agent = scenario("agent-parity")
         self.assertTrue(agent["rejected"])
         self.assertEqual("refreshed", agent["valid"])
+        compat = scenario("interop-766")
+        self.assertEqual({"signal_summary": ["refreshed", "fresh"],
+                          "collector_failure": ["refreshed", "fresh"]}, compat["valid"])
+        self.assertEqual({"signal_summary": True, "collector_failure": True}, compat["invalid"])
 
     def test_valid_ttl_stale_and_atomic_replacement_unchanged(self):
         result = scenario("ttl-stale")

@@ -1,18 +1,13 @@
 <?php
 declare(strict_types=1);
-
 namespace ControlBot\Business;
-
 require_once __DIR__ . '/FactoryAgentActivityUi.php';
-
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
-
 final class FactoryOrchestratorLiveCache
 {
     private const MAX_BYTES = 2000000;
-
     public static function remember(string $path, int $now, int $ttl, int $stale, int $budget, callable $refresh): array
     {
         if ($path === '' || $path[0] !== '/' || $ttl < 1 || $stale < $ttl || $budget < 1 || $stale > 86400) {
@@ -21,12 +16,8 @@ final class FactoryOrchestratorLiveCache
         // A damaged derived cache must never prevent a canonical refresh.
         try {
             $cached = self::read($path);
-            if ($cached !== null && $now < $cached['cached_at']) {
-                $cached = null;
-            }
-        } catch (Throwable) {
-            $cached = null;
-        }
+            if ($cached !== null && $now < $cached['cached_at']) $cached = null;
+        } catch (Throwable) { $cached = null; }
         if ($cached !== null) {
             $age = $now - $cached['cached_at'];
             if ($age <= $ttl) return self::result('fresh', $cached, $age);
@@ -49,7 +40,6 @@ final class FactoryOrchestratorLiveCache
             throw new RuntimeException('snapshot unavailable', 0, $error);
         }
     }
-
     private static function read(string $path): ?array
     {
         if (!is_file($path)) return null;
@@ -64,7 +54,6 @@ final class FactoryOrchestratorLiveCache
             || $row['next_refresh_at'] < $row['cached_at']) throw new RuntimeException('cache timestamps invalid');
         return $row;
     }
-
     private static function payload(mixed $payload): array
     {
         if (!is_array($payload) || array_is_list($payload)
@@ -77,12 +66,9 @@ final class FactoryOrchestratorLiveCache
         $body = $payload;
         unset($body['fingerprint']);
         $encoded = json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-        if (!hash_equals(hash('sha256', $encoded), $payload['fingerprint'])) {
-            throw new InvalidArgumentException('payload invalid');
-        }
+        if (!hash_equals(hash('sha256', $encoded), $payload['fingerprint'])) throw new InvalidArgumentException('payload invalid');
         return $payload;
     }
-
 
     /** Reject a self-consistent digest when the cached projection is not a valid v1 view. */
     private static function projection(array $view): void
@@ -90,6 +76,27 @@ final class FactoryOrchestratorLiveCache
         $keys = ['version','observed_at','source_snapshot','read_only',
             'central','fronts','owner_decisions','fingerprint'];
         if (array_key_exists('agent_activity', $view)) $keys[] = 'agent_activity';
+        if (array_key_exists('signal_summary', $view)) {
+            $keys[] = 'signal_summary'; $s = $view['signal_summary'];
+            self::fields($s, ['truncated','omitted','reason']); self::fields($s['omitted'] ?? null, ['blockers','owner_decisions','work']);
+            $sum = 0;
+            foreach ($s['omitted'] as $count) {
+                if (!is_int($count) || $count < 0 || $count > 10000) throw new InvalidArgumentException('signal count invalid');
+                $sum += $count;
+            }
+            if (!is_bool($s['truncated']) || $s['truncated'] !== ($sum > 0) || $s['reason'] !== ($sum > 0 ? 'bounded_signal_budget' : 'none')) throw new InvalidArgumentException('signal summary invalid');
+        }
+        if (array_key_exists('collector_failure', $view)) {
+            $keys[] = 'collector_failure'; $f = $view['collector_failure'];
+            self::fields($f, ['freshness','reason','last_success_at','detected_at']);
+            $causes = ['evidence_invalid','snapshot_build_failed','snapshot_size_invalid','temp_write_failed',
+                'atomic_rename_failed','snapshot_directory_unwritable','snapshot_target_invalid','internal_error','collector_failed'];
+            if ($f['freshness'] !== 'stale' || !in_array($f['reason'], $causes, true)
+                || !is_int($f['detected_at']) || $f['detected_at'] < 1 || $f['detected_at'] > $view['observed_at']
+                || ($f['last_success_at'] !== null && (!is_int($f['last_success_at'])
+                    || $f['last_success_at'] < 1 || $f['last_success_at'] > $f['detected_at'])))
+                throw new InvalidArgumentException('collector failure invalid');
+        }
         self::fields($view, $keys);
         FactoryAgentActivityUi::renderSection($view['agent_activity'] ?? null);
         if (!is_int($view['observed_at']) || $view['observed_at'] < 1
@@ -101,7 +108,6 @@ final class FactoryOrchestratorLiveCache
                 && $view['agent_activity'] !== null && !is_array($view['agent_activity']))) {
             throw new InvalidArgumentException('projection invalid');
         }
-
         $c = $view['central'];
         self::fields($c, ['activity_state','available','reserved','blocked',
             'source_ref','observed_at','freshness','age_seconds']);
@@ -132,11 +138,8 @@ final class FactoryOrchestratorLiveCache
             $state = $freshness === 'stale' ? 'STALE'
                 : ($c['reserved'] > 0 ? 'ACTIVE' : ($c['available'] > 0
                     ? 'READY' : ($c['blocked'] > 0 ? 'BLOCKED' : 'IDLE')));
-            if ($c['activity_state'] !== $state) {
-                throw new InvalidArgumentException('central status inconsistent');
-            }
+            if ($c['activity_state'] !== $state) throw new InvalidArgumentException('central status inconsistent');
         }
-
         $repos = ['pl0n3r/Factory','pl0n3r/Condor','pl0n3r/GrindFlow',
             'pl0n3r/brvtal','pl0n3r/ControlBot','pl0n3r/AutoFactory','pl0n3r/FactoryRunner'];
         foreach ($view['fronts'] as $front) {
@@ -217,26 +220,18 @@ final class FactoryOrchestratorLiveCache
                     $ids[] = $option['id'];
                 }
                 if (!$ids || !in_array($d['recommendation'], $ids, true)
-                    || !in_array($d['safe_default'], $ids, true)) {
-                    throw new InvalidArgumentException('decision recommendation invalid');
-                }
+                    || !in_array($d['safe_default'], $ids, true)) throw new InvalidArgumentException('decision recommendation invalid');
             }
         }
     }
-
     private static function digest(mixed $value): bool { return is_string($value) && preg_match('/^[0-9a-f]{64}$/D', $value) === 1; }
-
     private static function text(mixed $value): bool { return is_string($value) && $value !== ''; }
-
     private static function fields(mixed $row, array $expected): void
     {
-        if (!is_array($row) || array_is_list($row)) {
-            throw new InvalidArgumentException('projection fields invalid');
-        }
+        if (!is_array($row) || array_is_list($row)) throw new InvalidArgumentException('projection fields invalid');
         $actual = array_keys($row); sort($actual); sort($expected);
         if ($actual !== $expected) throw new InvalidArgumentException('projection keys invalid');
     }
-
     private static function write(string $path, array $record): void
     {
         $dir = dirname($path);
@@ -244,8 +239,7 @@ final class FactoryOrchestratorLiveCache
         $raw = json_encode($record, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         if (strlen($raw) > self::MAX_BYTES) throw new RuntimeException('cache too large');
         $tmp = tempnam($dir, '.orchestrator-');
-        if (!is_string($tmp)) throw new RuntimeException('cache temp unavailable');
-        try {
+        if (!is_string($tmp)) throw new RuntimeException('cache temp unavailable'); try {
             if (file_put_contents($tmp, $raw, LOCK_EX) !== strlen($raw) || !rename($tmp, $path)) {
                 throw new RuntimeException('cache write failed');
             }
@@ -253,7 +247,6 @@ final class FactoryOrchestratorLiveCache
             if (is_file($tmp)) @unlink($tmp);
         }
     }
-
     private static function result(string $status, array $record, int $age): array
     {
         return ['status' => $status, 'payload' => $record['payload'], 'age_seconds' => $age];

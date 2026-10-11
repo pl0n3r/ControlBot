@@ -194,8 +194,10 @@ try {
             'front_email'=>['fronts',0,'id','viewer@example.test'],
             'front_sensitive'=>['fronts',0,'source_ref','api_key=PRIVATE'],
             'front_pii'=>['fronts',0,'source_ref','viewer@example.test'],
+            'front_international_pii'=>['fronts',0,'source_ref','é@example.test'],
             'decision_sensitive'=>['owner_decisions',0,'id','secret-123'],
             'decision_email'=>['owner_decisions',0,'source_ref','viewer@example.test'],
+            'decision_international_pii'=>['owner_decisions',0,'source_ref','é@example.test'],
             'decision_token'=>['owner_decisions',0,'source_ref','bearer-private'],
         ];
         foreach ($cases as $key=>$spec) {

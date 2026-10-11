@@ -104,7 +104,7 @@ final class FactoryOrchestratorFieldSafety
                 continue; // The existing cache validator checks the legacy/structured discriminant.
             }
             foreach (['title_simple'=>160, 'summary_simple'=>600,
-                'why_recommended'=>600, 'blocks'=>600] as $key=>$limit) {
+                'why_recommended'=>600, 'blocks'=>600] as $key => $limit) {
                 self::decisionText($decision[$key] ?? null, $limit);
             }
             if (($decision['explain_simple'] ?? null) !== null) {
@@ -119,10 +119,10 @@ final class FactoryOrchestratorFieldSafety
                 if (!is_array($option) || array_is_list($option)) {
                     throw new InvalidArgumentException('option invalid');
                 }
-                foreach (['label'=>200, 'effect'=>600, 'risk'=>80] as $key=>$limit) {
+                foreach (['label'=>200, 'effect'=>600, 'risk'=>80] as $key => $limit) {
                     self::decisionText($option[$key] ?? null, $limit);
                 }
-                foreach (['cost'=>240, 'explain_simple'=>400] as $key=>$limit) {
+                foreach (['cost'=>240, 'explain_simple'=>400] as $key => $limit) {
                     if (($option[$key] ?? null) !== null) {
                         self::decisionText($option[$key], $limit);
                     }

@@ -8,8 +8,12 @@ use Throwable;
 final class FactoryOrchestratorLiveCache
 {
     private const MAX_BYTES = 2000000;
-    private const PUBLIC_SENSITIVE = '/(?:password|passwd|secret|token|cookie|authorization|bearer|private[_ -]?key|api[_ -]?key|dsn)/i';
-    private const PUBLIC_PII = '/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?(?=(?:[0-9(). -]*[0-9]){10})[0-9][0-9(). -]{7,}[0-9])/i';
+    private const PUBLIC_SENSITIVE =
+        '/(?:password|passwd|secret|token|cookie|authorization|bearer' .
+        '|private[_ -]?key|api[_ -]?key|dsn)/i';
+    private const PUBLIC_PII =
+        '/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}' .
+        '|\+?(?=(?:[0-9(). -]*[0-9]){10})[0-9][0-9(). -]{7,}[0-9])/i';
     public static function remember(string $path, int $now, int $ttl, int $stale, int $budget, callable $refresh): array
     {
         if ($path === '' || $path[0] !== '/' || $ttl < 1 || $stale < $ttl || $budget < 1 || $stale > 86400) {
@@ -238,6 +242,7 @@ final class FactoryOrchestratorLiveCache
     }
     private static function publicSafe(string $value, int $max): bool {
         return $value !== '' && $value === trim($value) && strlen($value) <= $max
+            && !str_contains($value, '@')
             && preg_match('/[\x00-\x1f\x7f]/', $value) !== 1
             && preg_match(self::PUBLIC_SENSITIVE, $value) !== 1
             && preg_match(self::PUBLIC_PII, $value) !== 1;

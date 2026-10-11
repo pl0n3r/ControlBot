@@ -106,15 +106,14 @@ try {
         $legacy = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => seal($body));
         $bad = $rich; $bad['owner_decisions'][0]['options'][0]['reversible'] = 'yes'; $bad = seal($bad); file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>$bad], JSON_THROW_ON_ERROR));
         $blocked = failClosed($path, 221);
-        $invalidOptions = []; foreach (['pros','cons','cost','explain_simple','decision_explain'] as $key) {
+        $invalidOptions = []; foreach (['pros','cons','cost','explain_simple','decision_explain','effect_length','pros_length','pros_control'] as $key) {
             $invalid = $rich;
             if ($key === 'decision_explain') $invalid['owner_decisions'][0]['explain_simple'] = 4;
+            elseif ($key === 'effect_length') $invalid['owner_decisions'][0]['options'][0]['effect'] = str_repeat('x',601); elseif ($key === 'pros_length') $invalid['owner_decisions'][0]['options'][0]['pros'] = array_fill(0,7,'valid'); elseif ($key === 'pros_control') $invalid['owner_decisions'][0]['options'][0]['pros'] = ["hello\nworld"];
             else $invalid['owner_decisions'][0]['options'][0][$key] = in_array($key, ['pros','cons'], true) ? [4] : 4;
-            file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($invalid)], JSON_THROW_ON_ERROR));
-            $invalidOptions[$key] = failClosed($path, 221);
+            file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($invalid)], JSON_THROW_ON_ERROR)); $invalidOptions[$key] = failClosed($path, 221);
         }
-        $badExpiry = $rich; $badExpiry['owner_decisions'][0]['seconds_left'] = -1; $badExpiry = seal($badExpiry);
-        file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>$badExpiry], JSON_THROW_ON_ERROR)); $expiryBlocked = failClosed($path, 221);
+        $badExpiry = $rich; $badExpiry['owner_decisions'][0]['seconds_left'] = -1; $badExpiry = seal($badExpiry); file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>$badExpiry], JSON_THROW_ON_ERROR)); $expiryBlocked = failClosed($path, 221);
         $badIssue = $rich; $badIssue['owner_decisions'][0]['issue_ref'] = 'https://github.com/pl0n3r/ControlBot/issues/9';
         file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($badIssue)], JSON_THROW_ON_ERROR)); $issueBlocked = failClosed($path, 221); echo json_encode(['statuses'=>[$first['status'],$second['status'],$legacy['status']],
             'formats'=>[$first['payload']['owner_decisions'][0]['format'],$legacy['payload']['owner_decisions'][0]['format']],

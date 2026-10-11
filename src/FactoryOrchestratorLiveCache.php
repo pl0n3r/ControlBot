@@ -205,7 +205,7 @@ final class FactoryOrchestratorLiveCache
                         || !self::text($option['label']) || !self::text($option['effect'])
                         || !self::text($option['risk']) || !is_array($option['pros'])
                         || !array_is_list($option['pros']) || !is_array($option['cons'])
-                        || !array_is_list($option['cons'])
+                        || !array_is_list($option['cons']) || count($option['pros']) > 6 || count($option['cons']) > 6
                         || ($option['cost'] !== null && !self::text($option['cost']))
                         || ($option['explain_simple'] !== null && !self::text($option['explain_simple']))) {
                         throw new InvalidArgumentException('option invalid');
@@ -224,7 +224,7 @@ final class FactoryOrchestratorLiveCache
         if (is_string($ref) && preg_match('~^github:(pl0n3r/[A-Za-z0-9_.-]+)#([1-9][0-9]*)$~D', $ref, $m) === 1) return 'https://github.com/'.$m[1].'/issues/'.$m[2];
         throw new InvalidArgumentException('issue_ref invalid'); }
     private static function digest(mixed $value): bool { return is_string($value) && preg_match('/^[0-9a-f]{64}$/D', $value) === 1; }
-    private static function text(mixed $value): bool { return is_string($value) && $value !== ''; }
+    private static function text(mixed $value): bool { return is_string($value) && trim($value) !== '' && strlen(trim($value)) <= 600 && preg_match('/[\x00-\x1f\x7f]/', trim($value)) !== 1; }
     private static function fields(mixed $row, array $expected): void {
         if (!is_array($row) || array_is_list($row)) throw new InvalidArgumentException('projection fields invalid'); $actual = array_keys($row); sort($actual); sort($expected);
         if ($actual !== $expected) throw new InvalidArgumentException('projection keys invalid'); }

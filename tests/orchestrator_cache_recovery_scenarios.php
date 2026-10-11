@@ -127,14 +127,14 @@ try {
         echo json_encode(['rejected'=>$rejected, 'valid'=>$fresh['status']], JSON_THROW_ON_ERROR), PHP_EOL; exit;
     }
     if ($scenario === 'interop-766') {
-        $signal = ['truncated'=>true,'omitted'=>['blockers'=>1,'owner_decisions'=>0,'work'=>0],'reason'=>'bounded_signal_budget'];
-        $failure = ['freshness'=>'stale','reason'=>'collector_failed','last_success_at'=>210,'detected_at'=>220]; $valid = []; $invalid = [];
+        $signal = ['truncated'=>true,'omitted'=>['blockers'=>1,'owner_decisions'=>0,'work'=>0],'reason'=>'bounded_signal_budget']; $failure = ['freshness'=>'stale','reason'=>'collector_failed','last_success_at'=>210,'detected_at'=>220]; $valid = []; $invalid = [];
         foreach (['signal_summary'=>$signal,'collector_failure'=>$failure] as $key=>$value) {
-            $body = view(); $body[$key] = $value; $body = seal($body); $first = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => $body);
-            $hit = FactoryOrchestratorLiveCache::remember($path, 223, 10, 60, 20, static function (): array { throw new RuntimeException('unexpected refresh'); }); $valid[$key] = [$first['status'],$hit['status']];
+            $body = view(); $body[$key] = $value; $body = seal($body); $first = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => $body); $hit = FactoryOrchestratorLiveCache::remember($path, 223, 10, 60, 20, static function (): array { throw new RuntimeException('unexpected refresh'); }); $valid[$key] = [$first['status'],$hit['status']];
             if ($key === 'signal_summary') $value['omitted']['blockers'] = -1; else $value['reason'] = 'unexpected';
             $body[$key] = $value; file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($body)], JSON_THROW_ON_ERROR));
-            $invalid[$key] = failClosed($path, 221); unlink($path);
+            $invalid[$key] = failClosed($path, 221);
+            if ($key === 'collector_failure') { $other = view(); $other[$key] = $failure; $other[$key]['detected_at'] = 219;
+                file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($other)], JSON_THROW_ON_ERROR)); $invalid['collector_time'] = failClosed($path, 221); } unlink($path);
         }
         echo json_encode(['valid'=>$valid,'invalid'=>$invalid], JSON_THROW_ON_ERROR), PHP_EOL; exit;
     }

@@ -91,7 +91,7 @@ final class FactoryOrchestratorLiveCache
             $causes = ['evidence_invalid','snapshot_build_failed','snapshot_size_invalid','temp_write_failed',
                 'atomic_rename_failed','snapshot_directory_unwritable','snapshot_target_invalid','internal_error','collector_failed'];
             if ($f['freshness'] !== 'stale' || !in_array($f['reason'], $causes, true)
-                || !is_int($f['detected_at']) || $f['detected_at'] < 1 || $f['detected_at'] > $view['observed_at']
+                || !is_int($f['detected_at']) || $f['detected_at'] < 1 || $f['detected_at'] !== $view['observed_at']
                 || ($f['last_success_at'] !== null && (!is_int($f['last_success_at'])
                     || $f['last_success_at'] < 1 || $f['last_success_at'] > $f['detected_at'])))
                 throw new InvalidArgumentException('collector failure invalid');

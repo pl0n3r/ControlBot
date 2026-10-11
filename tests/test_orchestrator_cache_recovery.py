@@ -68,5 +68,30 @@ class OrchestratorCacheRecoveryTests(unittest.TestCase):
         self.assertTrue(result["link_rejected"])
 
 
+
+    def test_public_ids_are_canonical_and_bounded(self):
+        data = scenario("public-id-bounds")
+        self.assertTrue(all(data.values()), data)
+
+    def test_signed_hostile_ids_and_refs_fail_closed(self):
+        data = scenario("hostile-public-refs")
+        self.assertTrue(data["canonical"])
+        self.assertTrue(all(data["rejected"].values()), data)
+
+    def test_long_decision_text_and_stale_contract_remain_valid(self):
+        data = scenario("rich-decision-stale")
+        self.assertTrue(data["valid"])
+        self.assertEqual(600, data["rich_length"])
+        self.assertEqual(("fresh", "stale"), (data["fresh"], data["stale"]))
+        self.assertTrue(data["expired"])
+
+    def test_combined_ui_contract_offline_no_live_effects(self):
+        data = scenario("combined-offline")
+        self.assertTrue(data["valid"])
+        self.assertTrue(data["read_only"])
+        self.assertEqual(("front-1", "decision-1", "fresh"),
+                         (data["front_id"], data["decision_id"], data["status"]))
+        self.assertRegex(data["fingerprint"], r"^[0-9a-f]{64}$")
+
 if __name__ == "__main__":
     unittest.main()

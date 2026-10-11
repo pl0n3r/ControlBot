@@ -25,10 +25,11 @@ class OrchestratorCacheRecoveryTests(unittest.TestCase):
     def test_invalid_cache_and_invalid_source_fail_closed(self):
         result = scenario("invalid-sources")
         self.assertEqual({"invalid-json": True, "bad-shape": True,
-                          "forged-fingerprint": True}, result["rejected"])
+                          "forged-fingerprint": True, "consistent-partial": True,
+                          "impossible-central": True}, result["rejected"])
         self.assertEqual("refreshed", result["recovered"])
         self.assertEqual("refreshed", result["future"])
-        self.assertEqual(5, result["calls"])
+        self.assertEqual(7, result["calls"])
         self.assertRegex(result["fingerprint"], r"^[0-9a-f]{64}$")
 
     def test_valid_ttl_stale_and_atomic_replacement_unchanged(self):

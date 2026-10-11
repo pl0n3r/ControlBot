@@ -9,7 +9,11 @@ function view(int $now = 220): array
 {
     $body = [
         'version' => 1, 'observed_at' => $now, 'source_snapshot' => str_repeat('a', 64),
-        'read_only' => true, 'central' => ['activity_state' => 'UNKNOWN'],
+        'read_only' => true, 'central' => [
+            'activity_state' => 'UNKNOWN', 'available' => null, 'reserved' => null,
+            'blocked' => null, 'source_ref' => null, 'observed_at' => null,
+            'freshness' => 'unknown', 'age_seconds' => null,
+        ],
         'fronts' => [], 'owner_decisions' => [],
     ];
     return $body + ['fingerprint' => hash('sha256', json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES))];
@@ -44,12 +48,28 @@ try {
     }
     if ($scenario === 'invalid-sources') {
         $calls = 0; $rejects = [];
-        foreach (['invalid-json', 'bad-shape', 'forged-fingerprint'] as $case) {
+        foreach (['invalid-json', 'bad-shape', 'forged-fingerprint',
+            'consistent-partial', 'impossible-central'] as $case) {
             if ($case === 'invalid-json') file_put_contents($path, '{invalid-json');
             else {
                 $payload = view();
                 if ($case === 'bad-shape') $payload['version'] = 2;
-                else $payload['fingerprint'] = str_repeat('f', 64);
+                elseif ($case === 'forged-fingerprint') $payload['fingerprint'] = str_repeat('f', 64);
+                else {
+                    if ($case === 'consistent-partial') $payload['central'] = ['activity_state' => 'ACTIVE'];
+                    else {
+                        $payload['central'] = [
+                            'activity_state' => 'ACTIVE', 'available' => 0, 'reserved' => 0,
+                            'blocked' => 0, 'source_ref' => 'synthetic', 'observed_at' => 220,
+                            'freshness' => 'current', 'age_seconds' => 0,
+                        ];
+                    }
+                    $body = $payload;
+                    unset($body['fingerprint']);
+                    $payload['fingerprint'] = hash(
+                        'sha256', json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+                    );
+                }
                 file_put_contents($path, json_encode(['cached_at' => 210, 'next_refresh_at' => 230, 'payload' => $payload], JSON_THROW_ON_ERROR));
             }
             try {
@@ -83,8 +103,15 @@ try {
         exit;
     }
     if ($scenario === 'two-requests') {
+        $malformed = view();
+        $malformed['central'] = ['activity_state' => 'ACTIVE'];
+        $body = $malformed;
+        unset($body['fingerprint']);
+        $malformed['fingerprint'] = hash(
+            'sha256', json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+        );
         file_put_contents($path, json_encode(['cached_at' => 210, 'next_refresh_at' => 230,
-            'payload' => ['version' => 1, 'read_only' => true, 'fingerprint' => str_repeat('a', 64), 'central' => ['activity_state' => 'ACTIVE']]], JSON_THROW_ON_ERROR));
+            'payload' => $malformed], JSON_THROW_ON_ERROR));
         $calls = 0;
         $load = static function () use (&$calls): array { $calls++; return view(); };
         $first = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, $load);

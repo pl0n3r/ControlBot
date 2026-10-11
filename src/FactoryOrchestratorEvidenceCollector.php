@@ -16,8 +16,9 @@ final class FactoryOrchestratorEvidenceCollector
     private const MAX_DOWNLOAD_BYTES=8_000_000;
     private const MAX_EVIDENCE_BYTES=2_000_000;
     private const CLOSED_PULLS_PER_PAGE=10;
-    private const MAX_SIGNALS=50;
-    private const MAX_WORK_SIGNALS=24;
+    // Bounded rendered details; larger inventories are counted, not fatal.
+    private const MAX_VISIBLE_SIGNALS=50;
+    private const MAX_VISIBLE_WORK_SIGNALS=24;
     private const MAX_DECISION_BODY_BYTES=65_536;
     private const MAX_DECISION_OPTIONS=6;
     private const DECISION_OPTION_IDS=['A','B','C','D'];
@@ -181,6 +182,7 @@ final class FactoryOrchestratorEvidenceCollector
     private static function collect(callable $get,callable $paged,int $now): array
     {
         $work=[];$blockers=[];$decisions=[];$agentActivity=[];
+        $omitted=['blockers'=>0,'owner_decisions'=>0,'work'=>0];
         foreach(self::REPOS as $name){
             $repo='pl0n3r/'.$name;
             $activityIssues=[];$activityPrs=[];$activityValid=true;
@@ -194,7 +196,7 @@ final class FactoryOrchestratorEvidenceCollector
                     $activityTime=self::activityTimestamp($row['updated_at']??null,$now);
                     if($activityTime===null)$activityValid=false;
                     else $activityPrs[]=['number'=>$number,'updated_at'=>$activityTime];
-                    self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'in_review'],$now));
+                    self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'status'=>'in_review'],$now),$omitted['work']);
                     continue;
                 }
                 $labels=self::labels($row['labels']??[]);$workflowLabels=self::workflowLabels($labels);
@@ -210,9 +212,9 @@ final class FactoryOrchestratorEvidenceCollector
                 if($activityTime===null)$activityValid=false;
                 else $activityIssues[]=['number'=>$number,'status'=>$state,'updated_at'=>$activityTime];
                 if(in_array('estado: bloqueado',$workflowLabels,true)||in_array('status: blocked',$workflowLabels,true))
-                    self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now));
+                    self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now),$omitted['blockers']);
                 elseif($workflowLabels!==[])
-                    self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now));
+                    self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now),$omitted['work']);
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))
                     self::append($decisions,self::signal(
                         'decision:'.strtolower($name).'-'.$number,
@@ -222,13 +224,13 @@ final class FactoryOrchestratorEvidenceCollector
                         $number,
                         self::ownerDecisionData($row,$repo,$number),
                         $now,
-                    ));
+                    ),$omitted['owner_decisions']);
             }
             foreach($closedPrs as $pr){
                 if(!is_array($pr)||array_is_list($pr))throw new RuntimeException('github pull invalid.');
                 if(($pr['merged_at']??null)===null)continue;
                 $n=self::positive($pr['number']??null);
-                self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],$now));
+                self::appendWork($work,self::signal('work:'.strtolower($name).'-pr-'.$n,'github_project_snapshot','healthy',$repo,$n,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$n,'status'=>'merged'],$now),$omitted['work']);
                 break;
             }
             $coordination=null;
@@ -261,9 +263,12 @@ final class FactoryOrchestratorEvidenceCollector
         }
         $factory767=$get('/repos/pl0n3r/Factory/issues/767');
         if(!self::killSwitchRunning($factory767))
-            self::append($blockers,self::signal('blocker:factory-767','github_project_snapshot','blocked','pl0n3r/Factory',767,['issue_ref'=>'github:pl0n3r/Factory#767'],$now));
+            self::append($blockers,self::signal('blocker:factory-767','github_project_snapshot','blocked','pl0n3r/Factory',767,['issue_ref'=>'github:pl0n3r/Factory#767'],$now),$omitted['blockers']);
+        $truncated=array_sum($omitted)>0;
         return ['owner_decisions'=>$decisions,'releases'=>[],'blockers'=>$blockers,'work'=>$work,
-            'agent_activity'=>$agentActivity];
+            'agent_activity'=>$agentActivity,
+            'signal_summary'=>['truncated'=>$truncated,'omitted'=>$omitted,
+                'reason'=>$truncated?'bounded_signal_budget':'none']];
     }
 
     private static function activityTimestamp(mixed $value,int $now): ?int
@@ -280,7 +285,7 @@ final class FactoryOrchestratorEvidenceCollector
         if (!is_array($issue) || array_is_list($issue)) {
             return false;
         }
-        if (($issue['number'] ?? null) !== 767) {
+        if (($issue['number'] ?? null) !== 767 || ($issue['state'] ?? null) !== 'closed') {
             return false;
         }
         if (($issue['user']['login'] ?? null) !== 'pl0n3r') {
@@ -389,10 +394,10 @@ final class FactoryOrchestratorEvidenceCollector
         return $valid?$value:null;
     }
 
-    private static function appendWork(array &$rows,array $row): void
-    {if(count($rows)>=self::MAX_WORK_SIGNALS)throw new RuntimeException('active work signal budget exceeded.');$rows[]=$row;}
-    private static function append(array &$rows,array $row): void
-    {if(count($rows)>=self::MAX_SIGNALS)throw new RuntimeException('signal budget exceeded.');$rows[]=$row;}
+    private static function appendWork(array &$rows,array $row,int &$omitted): void
+    {if(count($rows)<self::MAX_VISIBLE_WORK_SIGNALS)$rows[]=$row;else $omitted++;}
+    private static function append(array &$rows,array $row,int &$omitted): void
+    {if(count($rows)<self::MAX_VISIBLE_SIGNALS)$rows[]=$row;else $omitted++;}
     private static function signal(string $id,string $authority,string $state,string $repo,int $n,array $data,int $now): array
     {return ['id'=>$id,'authority'=>$authority,'state'=>$state,'source_ref'=>'github:'.$repo.'#'.$n,'observed_at'=>$now,'freshness'=>'current','data'=>$data];}
     private static function labels(mixed $raw): array

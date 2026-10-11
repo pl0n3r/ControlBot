@@ -115,7 +115,9 @@ if ($scenario === 'symlink_parent') {
     try {
         $served = $directory . DIRECTORY_SEPARATOR . 'public';
         $private = $directory . DIRECTORY_SEPARATOR . 'private';
+        $servedHtml = $directory . DIRECTORY_SEPARATOR . 'public_html';
         mkdir($served, 0700);
+        mkdir($servedHtml, 0700);
         mkdir($private, 0700);
         symlink($served, $private . DIRECTORY_SEPARATOR . 'alias');
         $try = static fn (string $target): string => failureCode(
@@ -124,12 +126,15 @@ if ($scenario === 'symlink_parent') {
         $aliasFailure = $try($private . DIRECTORY_SEPARATOR . 'alias' . DIRECTORY_SEPARATOR . 'orchestrator-live.json');
         $dotdotFailure = $try($private . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . 'orchestrator-live.json');
         $publicFailure = $try($served . DIRECTORY_SEPARATOR . 'orchestrator-live.json');
+        $publicHtmlFailure = $try($servedHtml . DIRECTORY_SEPARATOR . 'orchestrator-live.json');
         $ok = FactoryOrchestratorSnapshotRefresh::refresh(static fn (): array => evidence(), $private . DIRECTORY_SEPARATOR . 'orchestrator-live.json', 220);
         echo json_encode([
             'alias_error' => $aliasFailure,
             'dotdot_error' => $dotdotFailure,
             'public_error' => $publicFailure,
-            'nothing_in_served' => glob($served . DIRECTORY_SEPARATOR . '*') === [],
+            'public_html_error' => $publicHtmlFailure,
+            'nothing_in_served' => glob($served . DIRECTORY_SEPARATOR . '*') === []
+                && glob($servedHtml . DIRECTORY_SEPARATOR . '*') === [],
             'private_ok' => $ok['written'] ?? false,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
     } finally {
@@ -137,8 +142,38 @@ if ($scenario === 'symlink_parent') {
         foreach (glob($private . DIRECTORY_SEPARATOR . '*') ?: [] as $f) { @unlink($f); }
         @rmdir($private);
         @rmdir($served);
+        @rmdir($servedHtml);
         cleanupWorkspace($directory);
     }
+    exit;
+}
+
+if ($scenario === 'stale_fallback') {
+    require_once __DIR__.'/../src/FactoryOrchestratorSnapshotCron.php';
+    require_once __DIR__.'/../src/FactoryOrchestratorLiveUi.php';
+    [$directory,$path]=workspace();
+    try {
+        FactoryOrchestratorSnapshotRefresh::refresh(static fn():array=>evidence(),$path,220);
+        $cron=\ControlBot\Business\FactoryOrchestratorSnapshotCron::class;
+        $result=$cron::run(['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],
+            static function():array{throw new RuntimeException('Bearer never print this secret');},$path,1000);
+        $raw=json_decode(file_get_contents($path),true,32,JSON_THROW_ON_ERROR);
+        $view=FactoryOrchestratorWebEntrypoint::localSnapshot($path,1000+4*86400);
+        $html=\ControlBot\Business\FactoryOrchestratorLiveUi::render($view);
+        $before=file_get_contents($path);
+        $failedWrite=failure(static fn():array=>$cron::run(['CONTROLBOT_ORCHESTRATOR_CRON_ENABLED'=>'1'],
+            static function():array{throw new RuntimeException('collector offline');},$path,1200,
+            ['tempnam'=>static fn():false=>false]));
+        echo json_encode([
+            'status'=>$result['state'],'reason'=>$raw['collector_failure']['reason'],
+            'last_success_at'=>$raw['collector_failure']['last_success_at'],'detected_at'=>$raw['collector_failure']['detected_at'],
+            'old_view_state'=>$view['central']['activity_state'],'old_view_fronts'=>count($view['fronts']),
+            'visible_stale'=>str_contains($html,'data-collector-stale="true"'),
+            'visible_last_success'=>str_contains($html,'Último éxito:'),'no_old_work'=>!str_contains($html,'work:controlbot-660'),
+            'bad_write_error'=>$failedWrite,'bad_write_preserved'=>$before===file_get_contents($path),
+            'mode'=>sprintf('%04o',fileperms($path)&0777),
+        ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL;
+    } finally {cleanupWorkspace($directory);}
     exit;
 }
 

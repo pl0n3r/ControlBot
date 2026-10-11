@@ -23,6 +23,7 @@ if ($enabled !== '1') {
 $evidencePath = getenv('CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH') ?: '';
 $snapshotPath = getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH') ?: '';
 $diagnosticsEnabled = (getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_DIAGNOSTICS') ?: '') === '1';
+$collectorResult = getenv('CONTROLBOT_ORCHESTRATOR_COLLECTOR_RESULT') ?: '';
 
 $diagnostics = static function (string $path) use ($diagnosticsEnabled): string {
     if (!$diagnosticsEnabled || $path === '' || !str_starts_with($path, DIRECTORY_SEPARATOR)) {
@@ -50,21 +51,17 @@ $diagnostics = static function (string $path) use ($diagnosticsEnabled): string 
     );
 };
 
-if (
-    $evidencePath === ''
-    || !str_starts_with($evidencePath, DIRECTORY_SEPARATOR)
-    || is_link($evidencePath)
-    || !is_file($evidencePath)
-) {
-    fwrite(STDERR, 'orchestrator-snapshot-cron: evidence_invalid' . $diagnostics($snapshotPath) . PHP_EOL);
-    exit(70);
-}
 if ($snapshotPath === '' || !str_starts_with($snapshotPath, DIRECTORY_SEPARATOR)) {
     fwrite(STDERR, "orchestrator-snapshot-cron: snapshot_target_invalid\n");
     exit(70);
 }
 
-$collector = static function () use ($evidencePath): array {
+$collector = static function () use ($evidencePath, $collectorResult): array {
+    if ($collectorResult !== '' && $collectorResult !== 'ok')
+        throw new FactoryOrchestratorSnapshotRefreshFailure('collector_failed');
+    if ($evidencePath === '' || !str_starts_with($evidencePath, DIRECTORY_SEPARATOR)
+        || is_link($evidencePath) || !is_file($evidencePath))
+        throw new RuntimeException('Injected evidence invalid.');
     clearstatcache(true, $evidencePath);
     $size = filesize($evidencePath);
     if (!is_int($size) || $size < 2 || $size > 2_000_000) {
@@ -91,6 +88,10 @@ try {
         time()
     );
     echo json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL;
+    if (($result['state'] ?? null) === 'stale') {
+        fwrite(STDERR, 'orchestrator-snapshot-cron: stale_' . $result['reason'] . $diagnostics($snapshotPath) . PHP_EOL);
+        exit(70);
+    }
     exit(0);
 } catch (FactoryOrchestratorSnapshotRefreshFailure $exception) {
     fwrite(STDERR, 'orchestrator-snapshot-cron: ' . $exception->failureCode() . $diagnostics($snapshotPath) . PHP_EOL);

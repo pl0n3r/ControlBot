@@ -13,7 +13,7 @@ final class FactoryOrchestratorSnapshotRefreshFailure extends RuntimeException
     private const CODES = [
         'snapshot_target_invalid', 'snapshot_directory_unwritable', 'evidence_invalid',
         'snapshot_build_failed', 'snapshot_size_invalid', 'temp_write_failed',
-        'atomic_rename_failed', 'clock_invalid', 'internal_error',
+        'atomic_rename_failed', 'clock_invalid', 'internal_error', 'collector_failed',
     ];
     private string $failureCode;
 
@@ -48,6 +48,8 @@ final class FactoryOrchestratorSnapshotRefresh
             $directory = self::targetDirectory($snapshotPath, $now, $maxBytes);
             try {
                 $evidence = $collector();
+            } catch (FactoryOrchestratorSnapshotRefreshFailure $exception) {
+                throw $exception;
             } catch (Throwable $exception) {
                 throw self::failure('evidence_invalid', $exception);
             }
@@ -143,12 +145,6 @@ final class FactoryOrchestratorSnapshotRefresh
         return $directory;
     }
 
-    /**
-     * El productor nunca debe escribir hacia el árbol servido: rechaza `..` léxicos, el directorio
-     * destino como enlace simbólico y cualquier ruta cuyo directorio real caiga bajo un segmento
-     * `public`. Se permiten enlaces en ancestros del hosting (p. ej. /home -> /home1), porque lo que
-     * importa es adónde termina realmente la escritura.
-     */
     private static function escapesPrivateRoot(string $snapshotPath, string $directory): bool
     {
         if (preg_match('#(^|/)\.\.(/|$)#', $snapshotPath) === 1 || is_link($directory)) {
@@ -158,7 +154,7 @@ final class FactoryOrchestratorSnapshotRefresh
         if ($real === false) {
             return true;
         }
-        return preg_match('#(^|/)public(/|$)#', $real) === 1;
+        return preg_match('#(^|/)(?:public|public_html)(/|$)#', $real) === 1;
     }
 
     private static function replaceWithLock(string $snapshotPath, string $encoded, int $bytes, array $io): bool

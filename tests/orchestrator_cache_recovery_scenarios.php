@@ -121,6 +121,54 @@ try {
             'age' => $second['age_seconds']], JSON_THROW_ON_ERROR), PHP_EOL;
         exit;
     }
+    if ($scenario === 'decision-contract') {
+        $body = view();
+        $body['central'] = [
+            'activity_state'=>'ACTIVE','available'=>0,'reserved'=>1,'blocked'=>0,
+            'source_ref'=>'synthetic','observed_at'=>220,'freshness'=>'current','age_seconds'=>0,
+        ];
+        $option = ['id'=>'A','label'=>'Approve','effect'=>'Apply change','pros'=>[],
+            'cons'=>[],'risk'=>'low','cost'=>null,'reversible'=>true,'explain_simple'=>null];
+        $d = [
+            'id'=>'dec-1','issue_ref'=>'https://github.com/pl0n3r/Factory/issues/1',
+            'repository_ref'=>'pl0n3r/Factory','issue_number'=>1,'format'=>'structured',
+            'title'=>'Decision','title_simple'=>'Decision','summary_simple'=>'Summary',
+            'explain_simple'=>null,'why_recommended'=>'Safe','blocks'=>'Release',
+            'options'=>[$option],'recommendation'=>'A','safe_default'=>'A',
+            'expires_at'=>null,'seconds_left'=>null,'expired'=>null,
+            'source_ref'=>'synthetic','observed_at'=>220,'freshness'=>'current','age_seconds'=>0,
+        ];
+        $seal = static function (array $body): array {
+            unset($body['fingerprint']);
+            return $body + ['fingerprint'=>hash('sha256',
+                json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES))];
+        };
+        $body['owner_decisions'] = [$d];
+        $rich = $seal($body);
+        $first = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => $rich);
+        $second = FactoryOrchestratorLiveCache::remember($path, 221, 10, 60, 20,
+            static function (): array { throw new RuntimeException('should not refresh'); });
+        foreach (['title_simple','summary_simple','explain_simple','why_recommended',
+            'blocks','recommendation','safe_default','expires_at','seconds_left','expired'] as $key) $d[$key] = null;
+        $d['format'] = 'legacy'; $d['options'] = [];
+        $body['owner_decisions'] = [$d];
+        $legacy = FactoryOrchestratorLiveCache::remember($path, 240, 10, 60, 20,
+            static fn (): array => $seal($body));
+        $bad = $rich; $bad['owner_decisions'][0]['options'][0]['reversible'] = 'yes';
+        $bad = $seal($bad);
+        file_put_contents($path, json_encode(['cached_at'=>240,'next_refresh_at'=>250,
+            'payload'=>$bad], JSON_THROW_ON_ERROR));
+        $blocked = false;
+        try {
+            FactoryOrchestratorLiveCache::remember($path, 241, 10, 60, 20,
+                static function (): array { throw new RuntimeException('source down'); });
+        } catch (RuntimeException $e) { $blocked = $e->getMessage() === 'snapshot unavailable'; }
+        echo json_encode(['statuses'=>[$first['status'],$second['status'],$legacy['status']],
+            'formats'=>[$first['payload']['owner_decisions'][0]['format'],
+                $legacy['payload']['owner_decisions'][0]['format']], 'blocked'=>$blocked],
+            JSON_THROW_ON_ERROR), PHP_EOL;
+        exit;
+    }
     fwrite(STDERR, "unknown case\n"); exit(2);
 } finally {
     clean($dir);

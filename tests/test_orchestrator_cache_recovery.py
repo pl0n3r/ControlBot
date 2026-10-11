@@ -31,6 +31,10 @@ class OrchestratorCacheRecoveryTests(unittest.TestCase):
         self.assertEqual("refreshed", result["future"])
         self.assertEqual(7, result["calls"])
         self.assertRegex(result["fingerprint"], r"^[0-9a-f]{64}$")
+        projection = scenario("decision-contract")
+        self.assertEqual(["refreshed", "fresh", "refreshed"], projection["statuses"])
+        self.assertEqual(["structured", "legacy"], projection["formats"])
+        self.assertTrue(projection["blocked"])
 
     def test_valid_ttl_stale_and_atomic_replacement_unchanged(self):
         result = scenario("ttl-stale")

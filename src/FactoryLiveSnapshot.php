@@ -25,7 +25,7 @@ final class FactoryLiveSnapshot
     public static function build(array $raw,int $now): array
     {
         if($now<1||array_is_list($raw))throw new InvalidArgumentException('Factory live input invalid.');
-        $allowed=[...array_keys(self::AUTHORITIES),'tool_usage','work_inventory','agent_activity'];
+        $allowed=[...array_keys(self::AUTHORITIES),'tool_usage','work_inventory','agent_activity','signal_summary','collector_failure'];
         foreach(array_keys($raw) as $key)
             if(!is_string($key)||!in_array($key,$allowed,true))
                 throw new InvalidArgumentException('Factory live field invalid.');
@@ -44,7 +44,44 @@ final class FactoryLiveSnapshot
             $canonical['work_inventory']=self::workInventory($raw['work_inventory'],$now);
         if(array_key_exists('agent_activity',$raw))
             $canonical['agent_activity']=FactoryAgentActivity::build($raw['agent_activity'],$now);
+        if(array_key_exists('signal_summary',$raw))
+            $canonical['signal_summary']=self::signalSummary($raw['signal_summary']);
+        if(array_key_exists('collector_failure',$raw))
+            $canonical['collector_failure']=self::collectorFailure($raw['collector_failure'],$now);
         return $canonical+['fingerprint'=>hash('sha256',json_encode($canonical,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES))];
+    }
+
+    private static function collectorFailure(mixed $raw,int $now): array
+    {
+        self::fields($raw,['freshness','reason','last_success_at','detected_at'],'collector_failure');
+        $reasons=['evidence_invalid','snapshot_build_failed','snapshot_size_invalid',
+            'temp_write_failed','atomic_rename_failed','snapshot_directory_unwritable',
+            'snapshot_target_invalid','internal_error','collector_failed'];
+        if($raw['freshness']!=='stale'||!in_array($raw['reason'],$reasons,true)
+            ||!is_int($raw['detected_at'])||$raw['detected_at']!==$now)
+            throw new InvalidArgumentException('collector_failure fields invalid.');
+        $last=$raw['last_success_at'];
+        if($last!==null&&(!is_int($last)||$last<1||$last>$now))
+            throw new InvalidArgumentException('collector_failure last success invalid.');
+        return $raw;
+    }
+
+    private static function signalSummary(mixed $raw): array
+    {
+        self::fields($raw,['truncated','omitted','reason'],'signal_summary');
+        self::fields($raw['omitted'],['blockers','owner_decisions','work'],'signal_summary.omitted');
+        if(!is_bool($raw['truncated']))throw new InvalidArgumentException('signal_summary.truncated invalid.');
+        $sum=0;
+        foreach($raw['omitted'] as $count){
+            if(!is_int($count)||$count<0||$count>10000)
+                throw new InvalidArgumentException('signal_summary count invalid.');
+            $sum+=$count;
+        }
+        $truncated=$sum>0;
+        if($raw['truncated']!==$truncated
+            ||$raw['reason']!==($truncated?'bounded_signal_budget':'none'))
+            throw new InvalidArgumentException('signal_summary provenance invalid.');
+        return $raw;
     }
 
     private static function workInventory(mixed $raw,int $now): array

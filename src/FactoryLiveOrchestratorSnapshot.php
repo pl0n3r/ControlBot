@@ -30,6 +30,12 @@ final class FactoryLiveOrchestratorSnapshot
         if (array_key_exists('agent_activity', $snapshot)) {
             $out['agent_activity'] = $snapshot['agent_activity'];
         }
+        if (array_key_exists('signal_summary', $snapshot)) {
+            $out['signal_summary'] = $snapshot['signal_summary'];
+        }
+        if (array_key_exists('collector_failure', $snapshot)) {
+            $out['collector_failure'] = $snapshot['collector_failure'];
+        }
         $encoded = json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         return $out + ['fingerprint' => hash('sha256', $encoded)];
     }
@@ -63,6 +69,23 @@ final class FactoryLiveOrchestratorSnapshot
         if (! hash_equals(hash('sha256', $encoded), $fingerprint)) {
             throw new InvalidArgumentException('FactoryLiveSnapshot fingerprint mismatch.');
         }
+        if (array_key_exists('collector_failure', $snapshot)) {
+            self::collectorFailure($snapshot['collector_failure'], $snapshot['observed_at'], $now);
+        }
+    }
+
+    private static function collectorFailure(mixed $raw, int $observed, int $now): void
+    {
+        self::fields($raw,['freshness','reason','last_success_at','detected_at'],'collector_failure');
+        $causes=['evidence_invalid','snapshot_build_failed','snapshot_size_invalid',
+            'temp_write_failed','atomic_rename_failed','snapshot_directory_unwritable',
+            'snapshot_target_invalid','internal_error','collector_failed'];
+        if(($raw['freshness']??null)!=='stale'||!in_array($raw['reason']??null,$causes,true)
+            ||($raw['detected_at']??null)!==$observed||$observed>$now)
+            throw new InvalidArgumentException('collector_failure invalid.');
+        $last=$raw['last_success_at']??null;
+        if($last!==null&&(!is_int($last)||$last<1||$last>$observed))
+            throw new InvalidArgumentException('collector_failure timestamp invalid.');
     }
 
     private static function central(mixed $inventory, int $now): array

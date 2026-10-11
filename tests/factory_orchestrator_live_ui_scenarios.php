@@ -45,6 +45,16 @@ function view(): array {
     ];
 }
 
+if(in_array($scenario,['truncated','invalid_summary'],true)){
+    $v=view();
+    $valid=$scenario==='truncated';
+    $v['signal_summary']=['truncated'=>$valid,
+        'omitted'=>['blockers'=>230,'owner_decisions'=>0,'work'=>256],
+        'reason'=>$valid?'bounded_signal_budget':'none'];
+    try{echo FactoryOrchestratorLiveUi::render($v);}
+    catch(Throwable){echo 'blocked';}
+    exit;
+}
 if($scenario==='full'){
     echo FactoryOrchestratorLiveUi::render(view());
     exit;

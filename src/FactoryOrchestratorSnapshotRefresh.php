@@ -13,7 +13,7 @@ final class FactoryOrchestratorSnapshotRefreshFailure extends RuntimeException
     private const CODES = [
         'snapshot_target_invalid', 'snapshot_directory_unwritable', 'evidence_invalid',
         'snapshot_build_failed', 'snapshot_size_invalid', 'temp_write_failed',
-        'atomic_rename_failed', 'clock_invalid', 'internal_error',
+        'atomic_rename_failed', 'clock_invalid', 'internal_error', 'collector_failed',
     ];
     private string $failureCode;
 
@@ -48,6 +48,8 @@ final class FactoryOrchestratorSnapshotRefresh
             $directory = self::targetDirectory($snapshotPath, $now, $maxBytes);
             try {
                 $evidence = $collector();
+            } catch (FactoryOrchestratorSnapshotRefreshFailure $exception) {
+                throw $exception;
             } catch (Throwable $exception) {
                 throw self::failure('evidence_invalid', $exception);
             }

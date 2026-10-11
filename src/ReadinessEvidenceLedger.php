@@ -57,9 +57,16 @@ final class ReadinessEvidenceLedger
             $rows[$area] = self::row($area, $result, 'current', $reason, $source, $revision, $observed);
         }
         ksort($rows, SORT_STRING);
+        $hasUnknown = false;
+        foreach ($rows as $row) {
+            if ($row['result'] === 'UNKNOWN') {
+                $hasUnknown = true;
+                break;
+            }
+        }
         return [
             'version' => 1, 'observed_at' => $now, 'signals' => array_values($rows),
-            'has_unknown_or_stale' => array_any($rows, static fn (array $row): bool => $row['result'] === 'UNKNOWN'),
+            'has_unknown_or_stale' => $hasUnknown,
             'authorizes_live' => false,
         ];
     }

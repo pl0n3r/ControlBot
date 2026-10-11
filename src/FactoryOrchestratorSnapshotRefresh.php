@@ -139,7 +139,19 @@ final class FactoryOrchestratorSnapshotRefresh
         if (!is_dir($directory) || !is_writable($directory)) {
             throw self::failure('snapshot_directory_unwritable');
         }
+        if (self::escapesPrivateRoot($snapshotPath, $directory)) {
+            throw self::failure('snapshot_target_invalid');
+        }
         return $directory;
+    }
+
+    private static function escapesPrivateRoot(string $snapshotPath, string $directory): bool
+    {
+        if (preg_match('#(^|/)\.\.(/|$)#', $snapshotPath) === 1 || is_link($directory)) {
+            return true;
+        }
+        $real = realpath($directory);
+        return $real === false || preg_match('#(^|/)(?:public|public_html)(/|$)#', $real) === 1;
     }
 
     private static function replaceWithLock(string $snapshotPath, string $encoded, int $bytes, array $io): bool

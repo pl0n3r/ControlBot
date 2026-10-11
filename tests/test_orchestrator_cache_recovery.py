@@ -37,6 +37,7 @@ class OrchestratorCacheRecoveryTests(unittest.TestCase):
         self.assertEqual(["structured", "legacy"], projection["formats"])
         self.assertTrue(projection["blocked"])
         self.assertTrue(projection["expiry_blocked"])
+        self.assertTrue(projection["issue_blocked"])
         self.assertEqual({"pros": True, "cons": True, "cost": True,
                           "explain_simple": True, "decision_explain": True},
                          projection["invalid_options"])
@@ -62,6 +63,8 @@ class OrchestratorCacheRecoveryTests(unittest.TestCase):
         self.assertEqual(["UNKNOWN", "UNKNOWN"], result["activity"])
         self.assertEqual(1, result["calls"])
         self.assertEqual(3, result["age"])
+        self.assertEqual("refreshed", result["link_valid"])
+        self.assertTrue(result["link_rejected"])
 
 
 if __name__ == "__main__":

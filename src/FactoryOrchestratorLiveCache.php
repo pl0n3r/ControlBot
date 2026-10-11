@@ -69,7 +69,6 @@ final class FactoryOrchestratorLiveCache
         if (!hash_equals(hash('sha256', $encoded), $payload['fingerprint'])) throw new InvalidArgumentException('payload invalid');
         return $payload;
     }
-
     /** Reject a self-consistent digest when the cached projection is not a valid v1 view. */
     private static function projection(array $view): void
     {
@@ -112,22 +111,16 @@ final class FactoryOrchestratorLiveCache
         self::fields($c, ['activity_state','available','reserved','blocked',
             'source_ref','observed_at','freshness','age_seconds']);
         $freshness = $c['freshness'];
-        if (!in_array($freshness, ['current','stale','unknown'], true)) {
-            throw new InvalidArgumentException('central freshness invalid');
-        }
+        if (!in_array($freshness, ['current','stale','unknown'], true)) throw new InvalidArgumentException('central freshness invalid');
         if ($freshness === 'unknown') {
             if ($c !== [
                 'activity_state'=>'UNKNOWN','available'=>null,'reserved'=>null,
                 'blocked'=>null,'source_ref'=>null,'observed_at'=>null,
                 'freshness'=>'unknown','age_seconds'=>null,
-            ]) {
-                throw new InvalidArgumentException('central unknown invalid');
-            }
+            ]) throw new InvalidArgumentException('central unknown invalid');
         } else {
             foreach (['available','reserved','blocked'] as $count) {
-                if (!is_int($c[$count]) || $c[$count] < 0) {
-                    throw new InvalidArgumentException('central count invalid');
-                }
+                if (!is_int($c[$count]) || $c[$count] < 0) throw new InvalidArgumentException('central count invalid');
             }
             if (!is_string($c['source_ref']) || $c['source_ref'] === ''
                 || !is_int($c['observed_at']) || $c['observed_at'] < 1
@@ -143,6 +136,7 @@ final class FactoryOrchestratorLiveCache
         $repos = ['pl0n3r/Factory','pl0n3r/Condor','pl0n3r/GrindFlow',
             'pl0n3r/brvtal','pl0n3r/ControlBot','pl0n3r/AutoFactory','pl0n3r/FactoryRunner'];
         foreach ($view['fronts'] as $front) {
+            self::issueHref($front['issue_ref'] ?? null);
             self::fields($front, ['id','repository_ref','issue_ref','status',
                 'progress_percent','progress_state','source_ref','observed_at','freshness','age_seconds']);
             if (!self::text($front['id']) || !self::text($front['issue_ref'])
@@ -164,6 +158,7 @@ final class FactoryOrchestratorLiveCache
             }
         }
         foreach ($view['owner_decisions'] as $d) {
+            if (self::issueHref($d['issue_ref'] ?? null) !== 'https://github.com/'.($d['repository_ref'] ?? '').'/issues/'.($d['issue_number'] ?? '')) throw new InvalidArgumentException('decision identity invalid');
             self::fields($d, ['id','issue_ref','repository_ref','issue_number',
                 'format','title','title_simple','summary_simple','explain_simple',
                 'why_recommended','blocks','options','recommendation','safe_default',
@@ -224,14 +219,15 @@ final class FactoryOrchestratorLiveCache
             }
         }
     }
+    private static function issueHref(mixed $ref): string {
+        if (is_string($ref) && preg_match('~^https://github\.com/pl0n3r/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*$~D', $ref) === 1) return $ref;
+        if (is_string($ref) && preg_match('~^github:(pl0n3r/[A-Za-z0-9_.-]+)#([1-9][0-9]*)$~D', $ref, $m) === 1) return 'https://github.com/'.$m[1].'/issues/'.$m[2];
+        throw new InvalidArgumentException('issue_ref invalid'); }
     private static function digest(mixed $value): bool { return is_string($value) && preg_match('/^[0-9a-f]{64}$/D', $value) === 1; }
     private static function text(mixed $value): bool { return is_string($value) && $value !== ''; }
-    private static function fields(mixed $row, array $expected): void
-    {
-        if (!is_array($row) || array_is_list($row)) throw new InvalidArgumentException('projection fields invalid');
-        $actual = array_keys($row); sort($actual); sort($expected);
-        if ($actual !== $expected) throw new InvalidArgumentException('projection keys invalid');
-    }
+    private static function fields(mixed $row, array $expected): void {
+        if (!is_array($row) || array_is_list($row)) throw new InvalidArgumentException('projection fields invalid'); $actual = array_keys($row); sort($actual); sort($expected);
+        if ($actual !== $expected) throw new InvalidArgumentException('projection keys invalid'); }
     private static function write(string $path, array $record): void
     {
         $dir = dirname($path);

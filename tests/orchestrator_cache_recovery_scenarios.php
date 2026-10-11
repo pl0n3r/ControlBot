@@ -80,13 +80,16 @@ try {
         file_put_contents($path, json_encode(['cached_at' => 210, 'next_refresh_at' => 230, 'payload' => $malformed], JSON_THROW_ON_ERROR));
         $calls = 0; $load = static function () use (&$calls): array { $calls++; return view(); };
         $first = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, $load); $second = FactoryOrchestratorLiveCache::remember($path, 223, 10, 60, 20, $load);
-        echo json_encode(['statuses' => [$first['status'], $second['status']], 'calls' => $calls,
-            'activity' => [$first['payload']['central']['activity_state'], $second['payload']['central']['activity_state']], 'age' => $second['age_seconds']], JSON_THROW_ON_ERROR), PHP_EOL;
-        exit;
+        $front = ['id'=>'front-1','repository_ref'=>'pl0n3r/Factory','issue_ref'=>'github:pl0n3r/Factory#1',
+            'status'=>'available','progress_percent'=>null,'progress_state'=>'UNKNOWN','source_ref'=>'synthetic','observed_at'=>220,'freshness'=>'current','age_seconds'=>0];
+        $linked = view(); $linked['fronts'] = [$front]; unlink($path); $linkValid = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => seal($linked))['status'];
+        $linked['fronts'][0]['issue_ref'] = 'nota-no-github'; file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($linked)], JSON_THROW_ON_ERROR)); $linkRejected = failClosed($path, 221);
+        echo json_encode(['statuses'=>[$first['status'],$second['status']],'calls'=>$calls,
+            'activity'=>[$first['payload']['central']['activity_state'],$second['payload']['central']['activity_state']],
+            'age'=>$second['age_seconds'],'link_valid'=>$linkValid,'link_rejected'=>$linkRejected], JSON_THROW_ON_ERROR), PHP_EOL; exit;
     }
     if ($scenario === 'decision-contract') {
-        $body = view();
-        $body['central'] = ['activity_state'=>'ACTIVE','available'=>0,'reserved'=>1,'blocked'=>0,
+        $body = view(); $body['central'] = ['activity_state'=>'ACTIVE','available'=>0,'reserved'=>1,'blocked'=>0,
             'source_ref'=>'synthetic','observed_at'=>220,'freshness'=>'current','age_seconds'=>0];
         $option = ['id'=>'A','label'=>'Approve','effect'=>'Apply change','pros'=>[], 'cons'=>[], 'risk'=>'low','cost'=>null,'reversible'=>true,'explain_simple'=>null];
         $d = ['id'=>'dec-1','issue_ref'=>'https://github.com/pl0n3r/Factory/issues/1','repository_ref'=>'pl0n3r/Factory',
@@ -101,11 +104,9 @@ try {
         $d['format'] = 'legacy'; $d['options'] = [];
         $body['owner_decisions'] = [$d]; unlink($path);
         $legacy = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => seal($body));
-        $bad = $rich; $bad['owner_decisions'][0]['options'][0]['reversible'] = 'yes'; $bad = seal($bad);
-        file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>$bad], JSON_THROW_ON_ERROR));
+        $bad = $rich; $bad['owner_decisions'][0]['options'][0]['reversible'] = 'yes'; $bad = seal($bad); file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>$bad], JSON_THROW_ON_ERROR));
         $blocked = failClosed($path, 221);
-        $invalidOptions = [];
-        foreach (['pros','cons','cost','explain_simple','decision_explain'] as $key) {
+        $invalidOptions = []; foreach (['pros','cons','cost','explain_simple','decision_explain'] as $key) {
             $invalid = $rich;
             if ($key === 'decision_explain') $invalid['owner_decisions'][0]['explain_simple'] = 4;
             else $invalid['owner_decisions'][0]['options'][0][$key] = in_array($key, ['pros','cons'], true) ? [4] : 4;
@@ -113,16 +114,15 @@ try {
             $invalidOptions[$key] = failClosed($path, 221);
         }
         $badExpiry = $rich; $badExpiry['owner_decisions'][0]['seconds_left'] = -1; $badExpiry = seal($badExpiry);
-        file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>$badExpiry], JSON_THROW_ON_ERROR));
-        $expiryBlocked = failClosed($path, 221);
-        echo json_encode(['statuses'=>[$first['status'],$second['status'],$legacy['status']],
+        file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>$badExpiry], JSON_THROW_ON_ERROR)); $expiryBlocked = failClosed($path, 221);
+        $badIssue = $rich; $badIssue['owner_decisions'][0]['issue_ref'] = 'https://github.com/pl0n3r/ControlBot/issues/9';
+        file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($badIssue)], JSON_THROW_ON_ERROR)); $issueBlocked = failClosed($path, 221); echo json_encode(['statuses'=>[$first['status'],$second['status'],$legacy['status']],
             'formats'=>[$first['payload']['owner_decisions'][0]['format'],$legacy['payload']['owner_decisions'][0]['format']],
-            'blocked'=>$blocked,'expiry_blocked'=>$expiryBlocked,'invalid_options'=>$invalidOptions], JSON_THROW_ON_ERROR), PHP_EOL;
+            'blocked'=>$blocked,'expiry_blocked'=>$expiryBlocked,'issue_blocked'=>$issueBlocked,'invalid_options'=>$invalidOptions], JSON_THROW_ON_ERROR), PHP_EOL;
         exit;
     }
     if ($scenario === 'agent-parity') {
-        $bad = view(); $bad['agent_activity'] = [];
-        file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($bad)], JSON_THROW_ON_ERROR));
+        $bad = view(); $bad['agent_activity'] = []; file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($bad)], JSON_THROW_ON_ERROR));
         $rejected = failClosed($path, 221); $valid = view(); $valid['agent_activity'] = null; $valid = seal($valid); $fresh = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => $valid);
         echo json_encode(['rejected'=>$rejected, 'valid'=>$fresh['status']], JSON_THROW_ON_ERROR), PHP_EOL; exit;
     }

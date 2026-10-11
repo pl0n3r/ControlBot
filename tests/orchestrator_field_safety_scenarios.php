@@ -27,6 +27,33 @@ function accepts(array $view): bool
     catch (InvalidArgumentException) { return false; }
 }
 
+if (($argv[1] ?? '') === 'shape') {
+    $changes = [
+        'valid_empty_collections' => static function (array $v): array { $v['fronts'] = []; $v['owner_decisions'] = []; return $v; },
+        'valid_central_unknown' => static function (array $v): array { $v['central']['source_ref'] = null; return $v; },
+        'valid_legacy' => static function (array $v): array { $v['owner_decisions'][0]['format'] = 'legacy'; $v['owner_decisions'][0]['options'] = []; return $v; },
+        'bad_central_list' => static function (array $v): array { $v['central'] = []; return $v; },
+        'bad_central_pii' => static function (array $v): array { $v['central']['source_ref'] = 'reader@example.test'; return $v; },
+        'bad_fronts_object' => static function (array $v): array { $v['fronts'] = ['x' => $v['fronts'][0]]; return $v; },
+        'bad_front_list' => static function (array $v): array { $v['fronts'][0] = []; return $v; },
+        'bad_decisions_object' => static function (array $v): array { $v['owner_decisions'] = ['x' => $v['owner_decisions'][0]]; return $v; },
+        'bad_decision_scalar' => static function (array $v): array { $v['owner_decisions'][0] = 'invalid'; return $v; },
+        'bad_structured_options_empty' => static function (array $v): array { $v['owner_decisions'][0]['options'] = []; return $v; },
+        'bad_structured_options_seven' => static function (array $v): array { $v['owner_decisions'][0]['options'] = array_fill(0, 7, $v['owner_decisions'][0]['options'][0]); return $v; },
+        'bad_option_scalar' => static function (array $v): array { $v['owner_decisions'][0]['options'][0] = 'invalid'; return $v; },
+        'bad_option_pros_object' => static function (array $v): array { $v['owner_decisions'][0]['options'][0]['pros'] = ['x' => 'Good']; return $v; },
+        'bad_option_cons_seven' => static function (array $v): array { $v['owner_decisions'][0]['options'][0]['cons'] = array_fill(0, 7, 'Tradeoff'); return $v; },
+        'bad_option_explain_control' => static function (array $v): array { $v['owner_decisions'][0]['options'][0]['explain_simple'] = "bad\ncontrol"; return $v; },
+        'bad_required_title_null' => static function (array $v): array { $v['owner_decisions'][0]['title'] = null; return $v; },
+    ];
+    $result = [];
+    foreach ($changes as $name => $modify) $result[$name] = accepts($modify(validProjection()));
+    $positives = ['valid_empty_collections', 'valid_central_unknown', 'valid_legacy'];
+    $unexpected = array_keys(array_filter($result, static fn(bool $actual, string $name): bool => $actual !== in_array($name, $positives, true), ARRAY_FILTER_USE_BOTH));
+    echo json_encode(['total'=>count($result), 'positives'=>count($positives), 'unexpected'=>$unexpected, 'cases'=>$result], JSON_THROW_ON_ERROR), PHP_EOL;
+    exit($unexpected ? 1 : 0);
+}
+
 $cases = [];
 $base = validProjection();
 $cases['valid_projection'] = accepts($base);

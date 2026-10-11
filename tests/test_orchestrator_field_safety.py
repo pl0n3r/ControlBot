@@ -8,12 +8,12 @@ import unittest
 
 class FieldSafetyTests(unittest.TestCase):
     @staticmethod
-    def report():
+    def report(scenario=None):
         php = shutil.which("php")
         if not php:
             raise AssertionError("Real PHP CLI is mandatory for acceptance")
         file = Path(__file__).with_name("orchestrator_field_safety_scenarios.php")
-        result = subprocess.run([php, str(file)], capture_output=True, text=True, timeout=12)
+        result = subprocess.run([php, str(file)] + ([scenario] if scenario else []), capture_output=True, text=True, timeout=12)
         if result.returncode:
             raise AssertionError(f"PHP scenarios failed: {result.stderr}")
         return json.loads(result.stdout)
@@ -48,6 +48,14 @@ class FieldSafetyTests(unittest.TestCase):
             "pros_seven", "pros_control",
         ):
             self.assertFalse(cases[name], name)
+
+    def test_projection_shapes_and_legacy_fail_closed(self):
+        report = self.report("shape")
+        self.assertEqual(16, report["total"])
+        self.assertEqual(3, report["positives"])
+        self.assertEqual([], report["unexpected"])
+        for name, accepted in report["cases"].items():
+            self.assertEqual(name.startswith("valid_"), accepted, name)
 
     def test_guard_is_pure_without_runtime_io(self):
         report = self.report()

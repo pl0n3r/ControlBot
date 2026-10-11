@@ -58,6 +58,8 @@ final class FactoryOrchestratorLiveCache
             throw new RuntimeException('cache invalid');
         }
         $row['payload'] = self::payload($row['payload'] ?? null);
+        if ($row['cached_at'] !== $row['payload']['observed_at']
+            || $row['next_refresh_at'] < $row['cached_at']) throw new RuntimeException('cache timestamps invalid');
         return $row;
     }
 

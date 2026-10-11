@@ -26,10 +26,11 @@ class OrchestratorCacheRecoveryTests(unittest.TestCase):
         result = scenario("invalid-sources")
         self.assertEqual({"invalid-json": True, "bad-shape": True,
                           "forged-fingerprint": True, "consistent-partial": True,
-                          "impossible-central": True}, result["rejected"])
+                          "impossible-central": True, "mismatched-time": True,
+                          "reversed-window": True}, result["rejected"])
         self.assertEqual("refreshed", result["recovered"])
         self.assertEqual("refreshed", result["future"])
-        self.assertEqual(7, result["calls"])
+        self.assertEqual(9, result["calls"])
         self.assertRegex(result["fingerprint"], r"^[0-9a-f]{64}$")
         projection = scenario("decision-contract")
         self.assertEqual(["refreshed", "fresh", "refreshed"], projection["statuses"])

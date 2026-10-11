@@ -16,7 +16,14 @@ function view(int $now = 220): array
         ],
         'fronts' => [], 'owner_decisions' => [],
     ];
-    return $body + ['fingerprint' => hash('sha256', json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES))];
+    return seal($body);
+}
+
+function seal(array $body): array
+{
+    unset($body['fingerprint']);
+    return $body + ['fingerprint' => hash('sha256',
+        json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES))];
 }
 
 function temporaryCache(): array
@@ -49,7 +56,7 @@ try {
     if ($scenario === 'invalid-sources') {
         $calls = 0; $rejects = [];
         foreach (['invalid-json', 'bad-shape', 'forged-fingerprint',
-            'consistent-partial', 'impossible-central'] as $case) {
+            'consistent-partial', 'impossible-central', 'mismatched-time', 'reversed-window'] as $case) {
             if ($case === 'invalid-json') file_put_contents($path, '{invalid-json');
             else {
                 $payload = view();
@@ -57,20 +64,19 @@ try {
                 elseif ($case === 'forged-fingerprint') $payload['fingerprint'] = str_repeat('f', 64);
                 else {
                     if ($case === 'consistent-partial') $payload['central'] = ['activity_state' => 'ACTIVE'];
-                    else {
+                    elseif ($case === 'impossible-central') {
                         $payload['central'] = [
                             'activity_state' => 'ACTIVE', 'available' => 0, 'reserved' => 0,
                             'blocked' => 0, 'source_ref' => 'synthetic', 'observed_at' => 220,
                             'freshness' => 'current', 'age_seconds' => 0,
                         ];
                     }
-                    $body = $payload;
-                    unset($body['fingerprint']);
-                    $payload['fingerprint'] = hash(
-                        'sha256', json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-                    );
+                    $payload = seal($payload);
                 }
-                file_put_contents($path, json_encode(['cached_at' => 210, 'next_refresh_at' => 230, 'payload' => $payload], JSON_THROW_ON_ERROR));
+                $cachedAt = $case === 'reversed-window' ? 220 : 210;
+                $next = $case === 'reversed-window' ? 219 : 230;
+                file_put_contents($path, json_encode(['cached_at' => $cachedAt, 'next_refresh_at' => $next,
+                    'payload' => $payload], JSON_THROW_ON_ERROR));
             }
             try {
                 FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20,
@@ -105,11 +111,7 @@ try {
     if ($scenario === 'two-requests') {
         $malformed = view();
         $malformed['central'] = ['activity_state' => 'ACTIVE'];
-        $body = $malformed;
-        unset($body['fingerprint']);
-        $malformed['fingerprint'] = hash(
-            'sha256', json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-        );
+        $malformed = seal($malformed);
         file_put_contents($path, json_encode(['cached_at' => 210, 'next_refresh_at' => 230,
             'payload' => $malformed], JSON_THROW_ON_ERROR));
         $calls = 0;
@@ -138,13 +140,8 @@ try {
             'expires_at'=>null,'seconds_left'=>null,'expired'=>null,
             'source_ref'=>'synthetic','observed_at'=>220,'freshness'=>'current','age_seconds'=>0,
         ];
-        $seal = static function (array $body): array {
-            unset($body['fingerprint']);
-            return $body + ['fingerprint'=>hash('sha256',
-                json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES))];
-        };
         $body['owner_decisions'] = [$d];
-        $rich = $seal($body);
+        $rich = seal($body);
         $first = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20, static fn (): array => $rich);
         $second = FactoryOrchestratorLiveCache::remember($path, 221, 10, 60, 20,
             static function (): array { throw new RuntimeException('should not refresh'); });
@@ -153,9 +150,9 @@ try {
         $d['format'] = 'legacy'; $d['options'] = [];
         $body['owner_decisions'] = [$d];
         $legacy = FactoryOrchestratorLiveCache::remember($path, 240, 10, 60, 20,
-            static fn (): array => $seal($body));
+            static fn (): array => seal($body));
         $bad = $rich; $bad['owner_decisions'][0]['options'][0]['reversible'] = 'yes';
-        $bad = $seal($bad);
+        $bad = seal($bad);
         file_put_contents($path, json_encode(['cached_at'=>240,'next_refresh_at'=>250,
             'payload'=>$bad], JSON_THROW_ON_ERROR));
         $blocked = false;

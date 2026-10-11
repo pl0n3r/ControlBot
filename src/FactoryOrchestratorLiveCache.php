@@ -8,6 +8,12 @@ use Throwable;
 final class FactoryOrchestratorLiveCache
 {
     private const MAX_BYTES = 2000000;
+    private const PUBLIC_SENSITIVE =
+        '/(?:password|passwd|secret|token|cookie|authorization|bearer' .
+        '|private[_ -]?key|api[_ -]?key|dsn)/i';
+    private const PUBLIC_PII =
+        '/(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}' .
+        '|\+?(?=(?:[0-9(). -]*[0-9]){10})[0-9][0-9(). -]{7,}[0-9])/i';
     public static function remember(string $path, int $now, int $ttl, int $stale, int $budget, callable $refresh): array
     {
         if ($path === '' || $path[0] !== '/' || $ttl < 1 || $stale < $ttl || $budget < 1 || $stale > 86400) {
@@ -122,7 +128,7 @@ final class FactoryOrchestratorLiveCache
             foreach (['available','reserved','blocked'] as $count) {
                 if (!is_int($c[$count]) || $c[$count] < 0) throw new InvalidArgumentException('central count invalid');
             }
-            if (!is_string($c['source_ref']) || $c['source_ref'] === ''
+            if (!self::sourceRef($c['source_ref'])
                 || !is_int($c['observed_at']) || $c['observed_at'] < 1
                 || $c['observed_at'] > $view['observed_at']
                 || $c['age_seconds'] !== $view['observed_at'] - $c['observed_at']) {
@@ -139,8 +145,8 @@ final class FactoryOrchestratorLiveCache
             self::issueHref($front['issue_ref'] ?? null);
             self::fields($front, ['id','repository_ref','issue_ref','status',
                 'progress_percent','progress_state','source_ref','observed_at','freshness','age_seconds']);
-            if (!self::text($front['id']) || !self::text($front['issue_ref'])
-                || !self::text($front['source_ref'])
+            if (!self::publicId($front['id']) || !self::text($front['issue_ref'])
+                || !self::sourceRef($front['source_ref'])
                 || !in_array($front['repository_ref'], $repos, true)
                 || !in_array($front['freshness'], ['current','stale'], true)
                 || !in_array($front['status'],
@@ -164,8 +170,8 @@ final class FactoryOrchestratorLiveCache
                 'why_recommended','blocks','options','recommendation','safe_default',
                 'expires_at','seconds_left','expired','source_ref','observed_at',
                 'freshness','age_seconds']);
-            if (!self::text($d['id']) || !self::text($d['issue_ref'])
-                || !self::text($d['source_ref']) || !self::text($d['title'])
+            if (!self::publicId($d['id']) || !self::text($d['issue_ref'])
+                || !self::sourceRef($d['source_ref']) || !self::text($d['title'])
                 || !in_array($d['repository_ref'], $repos, true)
                 || !is_int($d['issue_number']) || $d['issue_number'] < 1
                 || !in_array($d['format'], ['legacy','structured'], true)
@@ -224,6 +230,23 @@ final class FactoryOrchestratorLiveCache
         if (is_string($ref) && preg_match('~^github:(pl0n3r/[A-Za-z0-9_.-]+)#([1-9][0-9]*)$~D', $ref, $m) === 1) return 'https://github.com/'.$m[1].'/issues/'.$m[2];
         throw new InvalidArgumentException('issue_ref invalid'); }
     private static function digest(mixed $value): bool { return is_string($value) && preg_match('/^[0-9a-f]{64}$/D', $value) === 1; }
+    /** Match the producer's public identity grammar (3..161 ASCII bytes). */
+    private static function publicId(mixed $value): bool {
+        return is_string($value)
+            && preg_match('/^[a-z][a-z0-9._:\/#-]{2,160}$/D', $value) === 1
+            && self::publicSafe($value, 161);
+    }
+    /** Source references are public labels, not unrestricted rich decision text. */
+    private static function sourceRef(mixed $value): bool {
+        return is_string($value) && self::publicSafe($value, 240);
+    }
+    private static function publicSafe(string $value, int $max): bool {
+        return $value !== '' && $value === trim($value) && strlen($value) <= $max
+            && !str_contains($value, '@')
+            && preg_match('/[\x00-\x1f\x7f]/', $value) !== 1
+            && preg_match(self::PUBLIC_SENSITIVE, $value) !== 1
+            && preg_match(self::PUBLIC_PII, $value) !== 1;
+    }
     private static function text(mixed $value): bool { return is_string($value) && trim($value) !== '' && strlen(trim($value)) <= 600 && preg_match('/[\x00-\x1f\x7f]/', trim($value)) !== 1; }
     private static function fields(mixed $row, array $expected): void {
         if (!is_array($row) || array_is_list($row)) throw new InvalidArgumentException('projection fields invalid'); $actual = array_keys($row); sort($actual); sort($expected);

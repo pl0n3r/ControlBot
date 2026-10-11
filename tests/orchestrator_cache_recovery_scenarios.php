@@ -26,6 +26,41 @@ function failClosed(string $path, int $now): bool
     catch (RuntimeException $e) { return $e->getMessage() === 'snapshot unavailable'; }
     return false;
 }
+
+/** Synthetic only: preserve canonical producer/renderer boundaries. */
+function publicFixture(): array
+{
+    $v = view();
+    $v['fronts'] = [['id'=>'front-1','repository_ref'=>'pl0n3r/Factory',
+        'issue_ref'=>'github:pl0n3r/Factory#1','status'=>'available',
+        'progress_percent'=>null,'progress_state'=>'UNKNOWN','source_ref'=>'public-snapshot',
+        'observed_at'=>220,'freshness'=>'current','age_seconds'=>0]];
+    $v['owner_decisions'] = [['id'=>'decision-1',
+        'issue_ref'=>'https://github.com/pl0n3r/Factory/issues/1',
+        'repository_ref'=>'pl0n3r/Factory','issue_number'=>1,'format'=>'legacy',
+        'title'=>'Decision','title_simple'=>null,'summary_simple'=>null,
+        'explain_simple'=>null,'why_recommended'=>null,'blocks'=>null,'options'=>[],
+        'recommendation'=>null,'safe_default'=>null,'expires_at'=>null,
+        'seconds_left'=>null,'expired'=>null,'source_ref'=>'public-snapshot',
+        'observed_at'=>220,'freshness'=>'current','age_seconds'=>0]];
+    return $v;
+}
+function publicAccepted(string $path, array $body): bool
+{
+    @unlink($path);
+    try {
+        $result = FactoryOrchestratorLiveCache::remember($path, 220, 10, 60, 20,
+            static fn (): array => seal($body));
+        return $result['status'] === 'refreshed' && $result['payload']['read_only'] === true;
+    } catch (Throwable) { return false; }
+}
+function publicCacheRejected(string $path, array $body): bool
+{
+    file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,
+        'payload'=>seal($body)], JSON_THROW_ON_ERROR));
+    return failClosed($path, 221);
+}
+
 $scenario = $argv[1] ?? '';
 [$dir, $path] = temporaryCache();
 try {
@@ -136,6 +171,77 @@ try {
                 file_put_contents($path, json_encode(['cached_at'=>220,'next_refresh_at'=>240,'payload'=>seal($other)], JSON_THROW_ON_ERROR)); $invalid['collector_time'] = failClosed($path, 221); } unlink($path);
         }
         echo json_encode(['valid'=>$valid,'invalid'=>$invalid], JSON_THROW_ON_ERROR), PHP_EOL; exit;
+    }
+    if ($scenario === 'public-id-bounds') {
+        $v = publicFixture();
+        $base = publicAccepted($path, $v);
+        $v['fronts'][0]['id'] = 'a' . str_repeat('b', 160);
+        $max = publicAccepted($path, $v);
+        $v['fronts'][0]['id'] .= 'c';
+        $over = !publicAccepted($path, $v) && publicCacheRejected($path, $v);
+        $v = publicFixture(); $v['owner_decisions'][0]['id'] = 'a' . str_repeat('z', 240);
+        $decisionOver = !publicAccepted($path, $v) && publicCacheRejected($path, $v);
+        $v = publicFixture(); $v['fronts'][0]['source_ref'] = str_repeat('s', 240);
+        $refMax = publicAccepted($path, $v);
+        $v['fronts'][0]['source_ref'] .= 'x';
+        $refOver = !publicAccepted($path, $v) && publicCacheRejected($path, $v);
+        echo json_encode(compact('base','max','over','decisionOver','refMax','refOver'),JSON_THROW_ON_ERROR),PHP_EOL;
+        exit;
+    }
+    if ($scenario === 'hostile-public-refs') {
+        $rejected = [];
+        $cases = [
+            'front_email'=>['fronts',0,'id','viewer@example.test'],
+            'front_sensitive'=>['fronts',0,'source_ref','api_key=PRIVATE'],
+            'front_pii'=>['fronts',0,'source_ref','viewer@example.test'],
+            'front_international_pii'=>['fronts',0,'source_ref','é@example.test'],
+            'decision_sensitive'=>['owner_decisions',0,'id','secret-123'],
+            'decision_email'=>['owner_decisions',0,'source_ref','viewer@example.test'],
+            'decision_international_pii'=>['owner_decisions',0,'source_ref','é@example.test'],
+            'decision_token'=>['owner_decisions',0,'source_ref','bearer-private'],
+        ];
+        foreach ($cases as $key=>$spec) {
+            $v = publicFixture(); [$field,$index,$name,$value] = $spec;
+            $v[$field][$index][$name] = $value;
+            $rejected[$key] = !publicAccepted($path,$v) && publicCacheRejected($path,$v);
+        }
+        $v = publicFixture();
+        $v['central']=['activity_state'=>'IDLE','available'=>0,'reserved'=>0,
+            'blocked'=>0,'source_ref'=>'viewer@example.test','observed_at'=>220,
+            'freshness'=>'current','age_seconds'=>0];
+        $rejected['central_pii'] = !publicAccepted($path,$v) && publicCacheRejected($path,$v);
+        echo json_encode(['rejected'=>$rejected,'canonical'=>publicAccepted($path,publicFixture())],JSON_THROW_ON_ERROR),PHP_EOL;
+        exit;
+    }
+    if ($scenario === 'rich-decision-stale') {
+        $v = publicFixture(); $d = &$v['owner_decisions'][0];
+        $d['format']='structured'; $d['title_simple']='Decision';
+        $d['summary_simple']=str_repeat('s',600); $d['why_recommended']='Safe';
+        $d['blocks']='Nothing'; $d['recommendation']='A'; $d['safe_default']='A';
+        $d['options']=[['id'=>'A','label'=>'Accept','effect'=>'Review','pros'=>['Useful'],
+            'cons'=>['Limited'],'risk'=>'low','cost'=>null,'reversible'=>true,
+            'explain_simple'=>null]];
+        unset($d);
+        $valid = publicAccepted($path,$v);
+        $fresh = FactoryOrchestratorLiveCache::remember($path, 223, 10, 60, 20,
+            static function (): array { throw new RuntimeException('unexpected refresh'); });
+        $stale = FactoryOrchestratorLiveCache::remember($path, 231, 10, 60, 20,
+            static function (): array { throw new RuntimeException('unexpected refresh'); });
+        $expired = failClosed($path, 282);
+        echo json_encode(['valid'=>$valid,'rich_length'=>strlen($fresh['payload']['owner_decisions'][0]['summary_simple']),
+            'fresh'=>$fresh['status'],'stale'=>$stale['status'],'expired'=>$expired],JSON_THROW_ON_ERROR),PHP_EOL;
+        exit;
+    }
+    if ($scenario === 'combined-offline') {
+        $v = publicFixture();
+        $valid = publicAccepted($path,$v);
+        $read = FactoryOrchestratorLiveCache::remember($path,221,10,60,20,
+            static function (): array { throw new RuntimeException('no network'); });
+        echo json_encode(['valid'=>$valid,'read_only'=>$read['payload']['read_only'],
+            'front_id'=>$read['payload']['fronts'][0]['id'],
+            'decision_id'=>$read['payload']['owner_decisions'][0]['id'],
+            'status'=>$read['status'],'fingerprint'=>$read['payload']['fingerprint']],JSON_THROW_ON_ERROR),PHP_EOL;
+        exit;
     }
     fwrite(STDERR, "unknown case\n"); exit(2);
 } finally {

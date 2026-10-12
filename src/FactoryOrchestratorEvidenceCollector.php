@@ -294,6 +294,9 @@ final class FactoryOrchestratorEvidenceCollector
         if (!is_string($issue['body'] ?? null)) {
             return false;
         }
+        // A second malformed or truncated header is still a duplicate: fail closed.
+        $headers=preg_match_all('/<!--\\s*factory-unattended-kill-switch\\b/i',$issue['body']);
+        if($headers!==1)return false;
         $count=preg_match_all('/<!--\s*factory-unattended-kill-switch\s+(\{.*?\})\s*-->/s',$issue['body'],$matches);
         if($count!==1)return false;
         try{$marker=json_decode($matches[1][0],true,8,JSON_THROW_ON_ERROR);}catch(\Throwable){return false;}

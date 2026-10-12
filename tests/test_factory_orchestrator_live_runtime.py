@@ -29,7 +29,7 @@ class FactoryOrchestratorLiveRuntimeTests(unittest.TestCase):
 
     def test_cache_accepts_bounded_blocker_explanations(self):
         outcomes = scenario("blocker-schema")
-        for name in ("empty", "unknown", "declared"):
+        for name in ("empty", "unknown", "declared", "short_declared"):
             with self.subTest(name=name):
                 self.assertTrue(outcomes[name], f"Expected safe cache projection: {name}")
 

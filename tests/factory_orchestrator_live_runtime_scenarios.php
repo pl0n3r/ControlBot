@@ -78,6 +78,7 @@ if ($scenario === 'blocker-schema') {
     ]);
     $cases = [
         'empty'=>[], 'unknown'=>[$unknown], 'declared'=>[$declared],
+        'short_declared'=>[array_replace($declared, ['cause'=>'CI', 'next_action'=>'QA'])],
         'bad_type'=>'not an array',
         'too_many'=>array_fill(0, 51, $unknown),
         'wrong_source'=>[array_replace($unknown, ['source_ref'=>'github:pl0n3r/Factory#753'])],

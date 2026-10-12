@@ -277,7 +277,7 @@ final class FactoryOrchestratorLiveCache
             }
             foreach (['cause', 'next_action'] as $field) {
                 $text = $row[$field];
-                if (!is_string($text) || strlen($text) < 5 || strlen($text) > 160
+                if (!is_string($text) || strlen($text) > 160
                     || !self::publicSafe($text, 160)
                     || preg_match('/[<>]/', $text) === 1) {
                     throw new InvalidArgumentException('blocker text unsafe');

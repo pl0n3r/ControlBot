@@ -190,6 +190,47 @@ $marker='<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","own
   self.assertFalse(data["valid"])
   for key in ("wrong_number","wrong_author","duplicate","paused","open","missing"): self.assertTrue(data[key],key)
 
+ def test_kill_switch_rejects_malformed_duplicate_headers(self):
+  data=php_eval(r'''
+require "src/FactoryOrchestratorEvidenceCollector.php";
+use ControlBot\Business\FactoryOrchestratorEvidenceCollector;
+function isBlocked(array $factory):bool {
+ $dir=sys_get_temp_dir()."/cb781-kill-".bin2hex(random_bytes(4));mkdir($dir);
+ $token=$dir."/token";$evidence=$dir."/evidence.json";file_put_contents($token,"test-only");chmod($token,0600);
+ $transport=static function(string $method,string $url,array $headers)use($factory):array{
+  $path=parse_url($url,PHP_URL_PATH)?:"";$json=str_ends_with($path,"/issues/767")?$factory:[];
+  return ["status"=>200,"headers"=>["x-ratelimit-remaining"=>"100"],
+   "bytes"=>strlen(json_encode($json,JSON_THROW_ON_ERROR)),"json"=>$json];
+ };
+ FactoryOrchestratorEvidenceCollector::run(
+  ["CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED"=>"1",
+   "CONTROLBOT_GITHUB_READ_TOKEN_FILE"=>$token,
+   "CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH"=>$evidence],$transport,200);
+ $out=json_decode(file_get_contents($evidence),true,64,JSON_THROW_ON_ERROR);
+ foreach($out["blockers"] as $row)if(($row["id"]??null)==="blocker:factory-767")return true;
+ return false;
+}
+$valid='<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->';
+$cases=[
+ "valid"=>$valid,
+ "unrelated_comment"=>$valid."\n<!-- ordinary-note -->",
+ "valid_plus_truncated"=>$valid."\n<!-- factory-unattended-kill-switch {broken -->",
+ "valid_plus_open_header"=>$valid."\n<!-- factory-unattended-kill-switch",
+ "valid_plus_uppercase"=>$valid."\n<!-- FACTORY-UNATTENDED-KILL-SWITCH {broken -->",
+ "only_malformed"=>'<!-- factory-unattended-kill-switch {bad -->',
+];
+$out=[];foreach($cases as $name=>$body){
+ $factory=["number"=>767,"state"=>"closed","user"=>["login"=>"pl0n3r"],"body"=>$body];
+ $out[$name]=isBlocked($factory);
+}
+echo json_encode($out,JSON_THROW_ON_ERROR),PHP_EOL;
+''')
+  self.assertFalse(data["valid"])
+  self.assertFalse(data["unrelated_comment"])
+  for name in ("valid_plus_truncated", "valid_plus_open_header",
+               "valid_plus_uppercase", "only_malformed"):
+   self.assertTrue(data[name],name)
+
  def test_work_evidence_preserves_allowlisted_labels_without_parallel_status_derivation(self):
   d=scenario("canonical")
   available=next(row for row in d["evidence"]["work"] if row["id"].endswith("-10"))

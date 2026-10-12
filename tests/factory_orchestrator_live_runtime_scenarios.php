@@ -62,4 +62,57 @@ if ($scenario === 'cache') {
     @unlink($path); @rmdir($dir);
     echo json_encode(['statuses'=>array_column($rows,'status'),'calls'=>$calls,'age'=>$rows[3]['age_seconds']], JSON_THROW_ON_ERROR), PHP_EOL; exit;
 }
+if ($scenario === 'blocker-schema') {
+    // A self-consistent digest is not proof that an injected projection is safe.
+    $ref = 'github:pl0n3r/ControlBot#753';
+    $unknown = [
+        'issue_ref'=>$ref, 'source_ref'=>$ref, 'observed_at'=>200,
+        'freshness'=>'current', 'cause'=>'UNKNOWN', 'actor'=>'UNKNOWN',
+        'next_action'=>'UNKNOWN', 'blocked_at'=>null, 'age_seconds'=>null,
+        'mvp_impact'=>null, 'evidence_status'=>'UNKNOWN',
+    ];
+    $declared = array_replace($unknown, [
+        'cause'=>'Verificacion CI pendiente', 'actor'=>'agent',
+        'next_action'=>'Repetir pruebas sintéticas', 'blocked_at'=>180,
+        'age_seconds'=>40, 'mvp_impact'=>true, 'evidence_status'=>'DECLARED',
+    ]);
+    $cases = [
+        'empty'=>[], 'unknown'=>[$unknown], 'declared'=>[$declared],
+        'short_declared'=>[array_replace($declared, ['cause'=>'CI', 'next_action'=>'QA'])],
+        'safe_mention'=>[array_replace($declared, ['cause'=>'Revisar @QA', 'next_action'=>'Consultar a @QA'])],
+        'email_sensitive'=>[array_replace($declared, ['cause'=>'Contactar a persona@example.com'])],
+        'bad_type'=>'not an array',
+        'too_many'=>array_fill(0, 51, $unknown),
+        'wrong_source'=>[array_replace($unknown, ['source_ref'=>'github:pl0n3r/Factory#753'])],
+        'cross_repo'=>[array_replace($unknown, [
+            'issue_ref'=>'github:outsider/repo#753', 'source_ref'=>'github:outsider/repo#753',
+        ])],
+        'future'=>[array_replace($declared, ['blocked_at'=>221, 'age_seconds'=>-1])],
+        'wrong_age'=>[array_replace($declared, ['age_seconds'=>41])],
+        'sensitive'=>[array_replace($declared, ['cause'=>'password visible'])],
+        'forged_unknown'=>[array_replace($unknown, ['cause'=>'Acceso autorizado'])],
+        'extra_key'=>[array_replace($unknown, ['author'=>'untrusted'])],
+        'duplicated'=>[$unknown, $unknown],
+    ];
+    $accepted = [];
+    foreach ($cases as $label=>$rows) {
+        $projection = view();
+        $projection['blocker_explanations'] = $rows;
+        $copy = $projection; unset($copy['fingerprint']);
+        $projection['fingerprint'] = hash('sha256', json_encode($copy, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+        $dir = dirx(); $path = $dir.'/cache.json';
+        try {
+            $cached = FactoryOrchestratorLiveCache::remember(
+                $path, 220, 10, 60, 20, static fn (): array => $projection
+            );
+            $accepted[$label] = $cached['status'] === 'refreshed'
+                && $cached['payload']['blocker_explanations'] === $rows;
+        } catch (Throwable) {
+            $accepted[$label] = false;
+        } finally {
+            @unlink($path); @rmdir($dir);
+        }
+    }
+    echo json_encode($accepted, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), PHP_EOL; exit;
+}
 fwrite(STDERR, "scenario invalid\n"); exit(2);

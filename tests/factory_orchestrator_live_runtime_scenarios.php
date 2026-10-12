@@ -79,6 +79,8 @@ if ($scenario === 'blocker-schema') {
     $cases = [
         'empty'=>[], 'unknown'=>[$unknown], 'declared'=>[$declared],
         'short_declared'=>[array_replace($declared, ['cause'=>'CI', 'next_action'=>'QA'])],
+        'safe_mention'=>[array_replace($declared, ['cause'=>'Revisar @QA', 'next_action'=>'Consultar a @QA'])],
+        'email_sensitive'=>[array_replace($declared, ['cause'=>'Contactar a persona@example.com'])],
         'bad_type'=>'not an array',
         'too_many'=>array_fill(0, 51, $unknown),
         'wrong_source'=>[array_replace($unknown, ['source_ref'=>'github:pl0n3r/Factory#753'])],

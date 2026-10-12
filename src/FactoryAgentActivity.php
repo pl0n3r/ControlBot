@@ -64,6 +64,9 @@ final class FactoryAgentActivity
         $current = $fresh === 'current';
         $available = $current && $issues !== null ? count(array_filter($issues, static fn ($x) => $x['status'] === 'available')) : null;
         $reserved = $current && $issues !== null ? count(array_filter($issues, static fn ($x) => in_array($x['status'], ['reserved', 'in_review'], true))) : null;
+        // Planned is a distinct non-dispatchable category, not an unlockable lease.
+        $plannedCount = $current && $issues !== null ? count(array_filter($issues, static fn ($x) => $x['status'] === 'planned')) : null;
+        $blockedCount = $current && $issues !== null ? count(array_filter($issues, static fn ($x) => $x['status'] === 'blocked')) : null;
         $openPrs = $current && $prs !== null ? count($prs) : null;
         $planned = $current ? $planned : null;
         $signalsComplete = $current && $issues !== null && $prs !== null && $runs !== null;
@@ -80,7 +83,8 @@ final class FactoryAgentActivity
         $queueEmpty = $available !== null && $planned !== null
             ? ($available === 0 && $planned > 0) : null;
         return ['repository_ref' => $repo, 'available' => $available, 'reserved' => $reserved,
-            'open_prs' => $openPrs, 'planned_unlockable' => $planned, 'queue_empty' => $queueEmpty,
+            'open_prs' => $openPrs, 'planned' => $plannedCount, 'blocked' => $blockedCount,
+            'planned_unlockable' => $planned, 'queue_empty' => $queueEmpty,
             'last_signal_at' => $last['at'] ?? null,
             'last_signal_age_seconds' => $last === null ? null : $now - $last['at'],
             'last_signal_kind' => $last['kind'] ?? null, 'source_ref' => $source,

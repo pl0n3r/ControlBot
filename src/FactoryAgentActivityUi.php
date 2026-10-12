@@ -37,6 +37,8 @@ final class FactoryAgentActivityUi
                 . '<h3>' . self::e($repo) . '</h3>'
                 . '<p>Disponibles: ' . $count($project['available'] ?? null) . '</p>'
                 . '<p>Reservados: ' . $count($project['reserved'] ?? null) . '</p>'
+                . '<p>Planificados (no despachables): ' . $count($project['planned'] ?? null) . '</p>'
+                . '<p>Bloqueados: ' . $count($project['blocked'] ?? null) . '</p>'
                 . '<p>PR abiertos: ' . $count($project['open_prs'] ?? null) . '</p>'
                 . '<p>Última señal GitHub: ' . $age($project['last_signal_age_seconds'] ?? null)
                 . ' (' . self::e($lastKind ?? 'UNKNOWN') . ')</p>'

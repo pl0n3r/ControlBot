@@ -231,7 +231,11 @@ final class FactoryLiveOrchestratorSnapshot
             if(($row['freshness']??null)!=='current'||($row['state']??null)!=='blocked')
                 continue;
             $data=$row['data']??null;
-            if(!is_array($data)||array_is_list($data))throw new InvalidArgumentException('blocker data invalid.');
+            if(!is_array($data))throw new InvalidArgumentException('blocker data invalid.');
+            // Legacy generic signals are allowed to carry an empty payload.
+            // They cannot prove labels or an Issue identity: omit explanation.
+            if($data===[])continue;
+            if(array_is_list($data))throw new InvalidArgumentException('blocker data invalid.');
             // Legacy signals may lack issue identity, issue labels and use
             // non-Issue source refs. Do not infer a real explained blocker.
             // Check presence before interpreting new-schema-only fields.

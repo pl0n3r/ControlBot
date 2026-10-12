@@ -10,7 +10,7 @@ use Throwable;
 final class FactoryOrchestratorEvidenceCollector
 {
     private const REPOS=['Factory','Condor','GrindFlow','brvtal','ControlBot','AutoFactory','FactoryRunner'];
-    private const WORKFLOW_LABELS=['estado: disponible','estado: reservado','estado: en revisión','estado: bloqueado','status: available','status: reserved','status: in review','status: blocked'];
+    private const WORKFLOW_LABELS=['estado: disponible','estado: reservado','estado: en revisión','estado: bloqueado','estado: planificado','status: available','status: reserved','status: in review','status: blocked','status: planned'];
     private const MAX_REQUESTS=40;
     private const MAX_RESPONSE_BYTES=2_000_000;
     private const MAX_DOWNLOAD_BYTES=8_000_000;
@@ -200,20 +200,24 @@ final class FactoryOrchestratorEvidenceCollector
                     continue;
                 }
                 $labels=self::labels($row['labels']??[]);$workflowLabels=self::workflowLabels($labels);
-                $state='other';
+                // Equivalent ES/EN aliases count once; contradictory workflow states
+                // must never be resolved by label order.
+                $matches=[];
                 foreach(['available'=>['estado: disponible','status: available'],
                     'reserved'=>['estado: reservado','status: reserved'],
                     'in_review'=>['estado: en revisión','status: in review'],
                     'blocked'=>['estado: bloqueado','status: blocked'],
                     'planned'=>['estado: planificado','status: planned']] as $candidate=>$names){
-                    if(array_intersect($names,$labels)) $state=$candidate;
+                    if(array_intersect($names,$workflowLabels))$matches[]=$candidate;
                 }
+                $conflicting=count($matches)>1;
+                $state=count($matches)===1?$matches[0]:'other';
                 $activityTime=self::activityTimestamp($row['updated_at']??null,$now);
-                if($activityTime===null)$activityValid=false;
-                else $activityIssues[]=['number'=>$number,'status'=>$state,'updated_at'=>$activityTime];
+                if($activityTime===null||$conflicting)$activityValid=false;
+                elseif($activityValid)$activityIssues[]=['number'=>$number,'status'=>$state,'updated_at'=>$activityTime];
                 if(in_array('estado: bloqueado',$workflowLabels,true)||in_array('status: blocked',$workflowLabels,true))
                     self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now),$omitted['blockers']);
-                elseif($workflowLabels!==[])
+                elseif($workflowLabels!==[]&&!$conflicting&&$state!=='planned')
                     self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now),$omitted['work']);
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))
                     self::append($decisions,self::signal(
@@ -404,7 +408,7 @@ final class FactoryOrchestratorEvidenceCollector
     private static function signal(string $id,string $authority,string $state,string $repo,int $n,array $data,int $now): array
     {return ['id'=>$id,'authority'=>$authority,'state'=>$state,'source_ref'=>'github:'.$repo.'#'.$n,'observed_at'=>$now,'freshness'=>'current','data'=>$data];}
     private static function labels(mixed $raw): array
-    {if(!is_array($raw)||!array_is_list($raw))throw new RuntimeException('labels invalid.');$out=[];foreach($raw as $x){$v=is_array($x)?($x['name']??null):$x;if(is_string($v))$out[]=mb_strtolower(trim($v));}return $out;}
+    {if(!is_array($raw)||!array_is_list($raw))throw new RuntimeException('labels invalid.');$out=[];foreach($raw as $x){$v=is_array($x)&&!array_is_list($x)?($x['name']??null):$x;if(!is_string($v)||trim($v)==='')throw new RuntimeException('labels invalid.');$out[]=mb_strtolower(trim($v));}return $out;}
     private static function workflowLabels(array $labels): array
     {
         $out=[];

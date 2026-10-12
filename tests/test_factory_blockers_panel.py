@@ -82,6 +82,14 @@ class FactoryBlockersPanelTests(unittest.TestCase):
         self.assertTrue(bad["failed"])
         self.assertFalse(bad["artifact_written"])
 
+    def test_declared_blocker_cannot_postdate_source_observation(self):
+        valid = scenario("grounded")
+        self.assertFalse(valid["failed"])
+        self.assertTrue(any(row["evidence_status"] == "DECLARED" for row in valid["blockers"]))
+        forged = scenario("after-source-observation")
+        self.assertTrue(forged["failed"])
+        self.assertTrue(forged["artifact_written"])
+
     def test_private_html_escaping_and_deterministic_ranking(self):
         a, b = scenario("grounded"), scenario("grounded")
         refs_a = [row["issue_ref"] for row in a["blockers"]]

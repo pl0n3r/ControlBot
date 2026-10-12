@@ -50,6 +50,11 @@ try{
  'CONTROLBOT_GITHUB_READ_TOKEN_FILE'=>$token,'CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH'=>$file],$transport,$now);
  $raw=json_decode(file_get_contents($file),true,64,JSON_THROW_ON_ERROR);
  if($mode==='malformed-labels')$raw['blockers'][0]['data']['labels']='estado: bloqueado';
+if($mode==='after-source-observation'){
+ // Synthetic signed-source contradiction: the declared event follows its observation.
+ $raw['blockers'][0]['observed_at']=$now-3600;
+ $raw['blockers'][0]['data']['blocker_evidence']['blocked_at']=$now-1800;
+}
  $view=Source::fromInjectedEvidence($raw,$now);
  $html=Ui::render($view);
  echo json_encode(['failed'=>false,'result'=>$result,'blockers'=>$view['blocker_explanations']??null,

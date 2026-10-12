@@ -27,6 +27,28 @@ class FactoryOrchestratorLiveRuntimeTests(unittest.TestCase):
         self.assertRegex(payload["snapshot"]["fingerprint"], r"^[0-9a-f]{64}$")
         self.assertTrue((ROOT / "public" / "index.php").is_file())
 
+    def test_cache_accepts_bounded_blocker_explanations(self):
+        outcomes = scenario("blocker-schema")
+        for name in ("empty", "unknown", "declared", "short_declared", "safe_mention"):
+            with self.subTest(name=name):
+                self.assertTrue(outcomes[name], f"Expected safe cache projection: {name}")
+
+    def test_cache_rejects_forged_or_invalid_blocker_explanations(self):
+        outcomes = scenario("blocker-schema")
+        for name in ("email_sensitive", "bad_type", "too_many", "wrong_source", "cross_repo",
+                     "future", "wrong_age", "sensitive", "forged_unknown",
+                     "extra_key", "duplicated"):
+            with self.subTest(name=name):
+                self.assertFalse(outcomes[name], f"Unsafe cache projection accepted: {name}")
+
+    def test_cache_rejects_blocked_at_after_source_observation(self):
+        # A valid signed fingerprint does not prove the row's chronology.
+        # Source observed_at=200, view observed_at=220: blocked_at=210 is impossible.
+        outcomes = scenario("blocker-schema")
+        self.assertFalse(outcomes["after_source_observation"])
+        self.assertTrue(outcomes["declared"])  # blocked_at=180, age=40
+        self.assertTrue(outcomes["on_source_observation"])  # blocked_at=200, age=20
+
     def test_cache_ttl_and_stale_fallback_bound_refresh_rate_without_daemon(self):
         result = scenario("cache")
         self.assertEqual(result["statuses"], ["refreshed","fresh","stale","stale","stale"])

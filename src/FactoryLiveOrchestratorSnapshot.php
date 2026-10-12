@@ -270,6 +270,9 @@ final class FactoryLiveOrchestratorSnapshot
                 $next=self::text($declared['next_action'],'blocker.action',160);
                 $actor=$declared['actor'];
                 $blockedAt=self::time($declared['blocked_at'],'blocker.blocked_at',$now);
+                // A blocker cannot begin after the observation that reports it.
+                if($blockedAt>$row['observed_at'])
+                    throw new InvalidArgumentException('blocker chronology invalid.');
                 $impact=$declared['mvp_impact'];
             }
             $result[]=[

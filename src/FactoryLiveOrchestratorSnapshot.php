@@ -232,14 +232,14 @@ final class FactoryLiveOrchestratorSnapshot
                 continue;
             $data=$row['data']??null;
             if(!is_array($data)||array_is_list($data))throw new InvalidArgumentException('blocker data invalid.');
+            // Legacy signals may lack issue identity, issue labels and use
+            // non-Issue source refs. Do not infer a real explained blocker.
+            // Check presence before interpreting new-schema-only fields.
+            // An explicit malformed labels field is still rejected below.
+            if(!array_key_exists('labels',$data))continue;
             $ref=self::issue($data['issue_ref']??null);
             $source=self::text($row['source_ref']??null,'blocker.source_ref',240);
             if($source!==$ref)throw new InvalidArgumentException('blocker provenance mismatch.');
-            // Snapshots legacy can contain a blocked signal without the
-            // workflow labels added by this panel. Without proof of the
-            // blocked label it must NOT appear as an explained blocker.
-            // Explicit malformed labels still fail closed below.
-            if(!array_key_exists('labels',$data))continue;
             $labels=$data['labels'];
             if(!is_array($labels)||!array_is_list($labels))throw new InvalidArgumentException('blocker labels invalid.');
             $states=[

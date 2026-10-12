@@ -88,6 +88,9 @@ if ($scenario === 'blocker-schema') {
             'issue_ref'=>'github:outsider/repo#753', 'source_ref'=>'github:outsider/repo#753',
         ])],
         'future'=>[array_replace($declared, ['blocked_at'=>221, 'age_seconds'=>-1])],
+        // Signed, self-consistent cache state can still describe an impossible timeline.
+        'after_source_observation'=>[array_replace($declared, ['blocked_at'=>210, 'age_seconds'=>10])],
+        'on_source_observation'=>[array_replace($declared, ['blocked_at'=>200, 'age_seconds'=>20])],
         'wrong_age'=>[array_replace($declared, ['age_seconds'=>41])],
         'sensitive'=>[array_replace($declared, ['cause'=>'password visible'])],
         'forged_unknown'=>[array_replace($unknown, ['cause'=>'Acceso autorizado'])],

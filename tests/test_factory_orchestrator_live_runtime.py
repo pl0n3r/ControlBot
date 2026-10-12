@@ -41,6 +41,14 @@ class FactoryOrchestratorLiveRuntimeTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertFalse(outcomes[name], f"Unsafe cache projection accepted: {name}")
 
+    def test_cache_rejects_blocked_at_after_source_observation(self):
+        # A valid signed fingerprint does not prove the row's chronology.
+        # Source observed_at=200, view observed_at=220: blocked_at=210 is impossible.
+        outcomes = scenario("blocker-schema")
+        self.assertFalse(outcomes["after_source_observation"])
+        self.assertTrue(outcomes["declared"])  # blocked_at=180, age=40
+        self.assertTrue(outcomes["on_source_observation"])  # blocked_at=200, age=20
+
     def test_cache_ttl_and_stale_fallback_bound_refresh_rate_without_daemon(self):
         result = scenario("cache")
         self.assertEqual(result["statuses"], ["refreshed","fresh","stale","stale","stale"])

@@ -29,13 +29,13 @@ class FactoryOrchestratorLiveRuntimeTests(unittest.TestCase):
 
     def test_cache_accepts_bounded_blocker_explanations(self):
         outcomes = scenario("blocker-schema")
-        for name in ("empty", "unknown", "declared", "short_declared"):
+        for name in ("empty", "unknown", "declared", "short_declared", "safe_mention"):
             with self.subTest(name=name):
                 self.assertTrue(outcomes[name], f"Expected safe cache projection: {name}")
 
     def test_cache_rejects_forged_or_invalid_blocker_explanations(self):
         outcomes = scenario("blocker-schema")
-        for name in ("bad_type", "too_many", "wrong_source", "cross_repo",
+        for name in ("email_sensitive", "bad_type", "too_many", "wrong_source", "cross_repo",
                      "future", "wrong_age", "sensitive", "forged_unknown",
                      "extra_key", "duplicated"):
             with self.subTest(name=name):

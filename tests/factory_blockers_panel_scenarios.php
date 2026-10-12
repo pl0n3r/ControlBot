@@ -49,6 +49,7 @@ try{
  $result=Collector::run(['CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED'=>'1',
  'CONTROLBOT_GITHUB_READ_TOKEN_FILE'=>$token,'CONTROLBOT_ORCHESTRATOR_EVIDENCE_PATH'=>$file],$transport,$now);
  $raw=json_decode(file_get_contents($file),true,64,JSON_THROW_ON_ERROR);
+ if($mode==='malformed-labels')$raw['blockers'][0]['data']['labels']='estado: bloqueado';
  $view=Source::fromInjectedEvidence($raw,$now);
  $html=Ui::render($view);
  echo json_encode(['failed'=>false,'result'=>$result,'blockers'=>$view['blocker_explanations']??null,

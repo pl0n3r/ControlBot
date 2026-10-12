@@ -48,6 +48,23 @@ class FactoryBlockersPanelTests(unittest.TestCase):
         self.assertNotIn("No es bloqueo real", view["html"])
         self.assertNotIn("Estado contradictorio", view["html"])
 
+    def test_legacy_blocked_signal_without_labels_does_not_break_other_panels(self):
+        # Historical canonical snapshots predate the opt-in label evidence of #753.
+        legacy = ROOT / "tests/factory_owner_decisions_inbox_scenarios.php"
+        for kind in ("structured", "hostile"):
+            with self.subTest(kind=kind):
+                p = subprocess.run(["php", str(legacy), kind], cwd=ROOT,
+                                   capture_output=True, text=True, timeout=30)
+                self.assertEqual(p.returncode, 0, p.stderr)
+                result = json.loads(p.stdout)
+                self.assertTrue(result["view"]["owner_decisions"])
+                self.assertEqual(result["view"]["blocker_explanations"], [])
+
+    def test_explicit_malformed_blocker_labels_still_fail_closed(self):
+        sample = scenario("malformed-labels")
+        self.assertTrue(sample["failed"])
+        self.assertFalse(sample["artifact_written"] is False)  # original collector evidence remains
+
     def test_missing_provenance_and_invalid_time_fail_closed(self):
         for mode in ("no-provenance", "invalid-time", "unsafe", "duplicate"):
             with self.subTest(mode=mode):

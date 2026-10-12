@@ -271,7 +271,7 @@ final class FactoryOrchestratorLiveCache
                 || !is_bool($row['mvp_impact'])
                 || !is_int($row['blocked_at']) || $row['blocked_at'] < 1
                 || $row['blocked_at'] > $now
-                // Causal ordering: a blocker cannot predate its own source observation.
+                // Causal ordering: a declared blocker must exist by its source observation.
                 || $row['blocked_at'] > $row['observed_at']
                 || !is_int($row['age_seconds'])
                 || $row['age_seconds'] !== $now - $row['blocked_at']) {

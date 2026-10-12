@@ -81,15 +81,61 @@ class ReadmeContractAdoptionTests(unittest.TestCase):
         self.assertNotIn("GREEN", status)
         self.assertNotIn("DEGRADED", status)
 
-    def test_consumer_workflow_uses_factory_v1(self) -> None:
+    def test_readme_caller_only_on_document_changes(self) -> None:
+        """F2B: solo cambios documentales disparan el validador Factory v1."""
         workflow = self.read(".github/workflows/readme-contract.yml")
+        expected_paths = [
+            "- 'README.md'",
+            "- 'readme/**'",
+            "- '.github/workflows/readme-contract.yml'",
+        ]
+
+        def event_paths(source: str, event: str, next_event: str) -> list[str]:
+            section = source.split(f"  {event}:\n", 1)[1].split(
+                f"\n  {next_event}:\n", 1
+            )[0]
+            self.assertIn("    branches: [main]", section)
+            self.assertEqual(section.count("    paths:\n"), 1)
+            return [line.strip() for line in section.splitlines()
+                    if line.strip().startswith("- ")]
+
+        self.assertIn("  workflow_dispatch:\n", workflow)
+        self.assertIn(
+            "    types: [opened, synchronize, reopened, ready_for_review]",
+            workflow,
+        )
+        self.assertEqual(workflow.count("    paths:\n"), 2)
+        for event, following in (
+            ("pull_request", "push"),
+            ("push", "workflow_dispatch"),
+        ):
+            with self.subTest(event=event):
+                self.assertEqual(event_paths(workflow, event, following),
+                                 expected_paths)
+
+        # Negativos: un filtro global, una ruta ausente o extras deben
+        # hacer fallar el contrato sin cambiar permisos ni el reusable.
+        variants = (
+            workflow.replace("- 'readme/**'", "- '**'", 1),
+            workflow.replace("- 'README.md'\n", "", 1),
+            workflow.replace("- '.github/workflows/readme-contract.yml'",
+                             "- 'src/**'", 1),
+        )
+        for variant in variants:
+            with self.subTest(variant=variant):
+                self.assertNotEqual(
+                    event_paths(variant, "pull_request", "push"),
+                    expected_paths,
+                )
+
         self.assertIn(
             "uses: pl0n3r/factory/.github/workflows/readme.yml@v1",
             workflow,
         )
         self.assertIn("readme_path: README.md", workflow)
         self.assertIn("metadata_path: readme/project.json", workflow)
-        self.assertIn("contents: read", workflow)
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertNotIn("contents: write", workflow)
         self.assertNotIn("readme.yml@main", workflow)
 
     def test_work_queue_links_canonical_roadmap(self) -> None:

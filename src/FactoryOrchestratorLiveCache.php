@@ -80,6 +80,10 @@ final class FactoryOrchestratorLiveCache
     {
         $keys = ['version','observed_at','source_snapshot','read_only',
             'central','fronts','owner_decisions','fingerprint'];
+        if (array_key_exists('blocker_explanations', $view)) {
+            $keys[] = 'blocker_explanations';
+            self::blockerExplanations($view['blocker_explanations'], $view['observed_at'] ?? null);
+        }
         if (array_key_exists('agent_activity', $view)) $keys[] = 'agent_activity';
         if (array_key_exists('signal_summary', $view)) {
             $keys[] = 'signal_summary'; $s = $view['signal_summary'];
@@ -225,6 +229,63 @@ final class FactoryOrchestratorLiveCache
             }
         }
     }
+    /**
+     * Accepts the opt-in #753 projection without trusting its SHA as authority.
+     * Legacy cache payloads do not contain this field and remain unchanged.
+     */
+    private static function blockerExplanations(mixed $rows, mixed $now): void
+    {
+        if (!is_int($now) || $now < 1 || !is_array($rows)
+            || !array_is_list($rows) || count($rows) > 50) {
+            throw new InvalidArgumentException('blocker projection invalid');
+        }
+        $seen = [];
+        foreach ($rows as $row) {
+            self::fields($row, [
+                'issue_ref', 'source_ref', 'observed_at', 'freshness',
+                'cause', 'actor', 'next_action', 'blocked_at',
+                'age_seconds', 'mvp_impact', 'evidence_status',
+            ]);
+            $ref = $row['issue_ref'];
+            if (!is_string($ref) || preg_match(
+                '~^github:pl0n3r/(?:Factory|Condor|GrindFlow|brvtal|ControlBot|AutoFactory|FactoryRunner)#[1-9][0-9]*$~D',
+                $ref
+            ) !== 1 || isset($seen[$ref]) || $row['source_ref'] !== $ref
+                || $row['freshness'] !== 'current'
+                || !is_int($row['observed_at']) || $row['observed_at'] < 1
+                || $row['observed_at'] > $now) {
+                throw new InvalidArgumentException('blocker identity invalid');
+            }
+            $seen[$ref] = true;
+            if ($row['evidence_status'] === 'UNKNOWN') {
+                if ($row['cause'] !== 'UNKNOWN' || $row['actor'] !== 'UNKNOWN'
+                    || $row['next_action'] !== 'UNKNOWN'
+                    || $row['blocked_at'] !== null || $row['age_seconds'] !== null
+                    || $row['mvp_impact'] !== null) {
+                    throw new InvalidArgumentException('unknown blocker evidence inconsistent');
+                }
+                continue;
+            }
+            if ($row['evidence_status'] !== 'DECLARED'
+                || !in_array($row['actor'], ['owner','agent','external'], true)
+                || !is_bool($row['mvp_impact'])
+                || !is_int($row['blocked_at']) || $row['blocked_at'] < 1
+                || $row['blocked_at'] > $now
+                || !is_int($row['age_seconds'])
+                || $row['age_seconds'] !== $now - $row['blocked_at']) {
+                throw new InvalidArgumentException('declared blocker evidence inconsistent');
+            }
+            foreach (['cause', 'next_action'] as $field) {
+                $text = $row[$field];
+                if (!is_string($text) || strlen($text) < 5 || strlen($text) > 160
+                    || !self::publicSafe($text, 160)
+                    || preg_match('/[<>]/', $text) === 1) {
+                    throw new InvalidArgumentException('blocker text unsafe');
+                }
+            }
+        }
+    }
+
     private static function issueHref(mixed $ref): string {
         if (is_string($ref) && preg_match('~^https://github\.com/pl0n3r/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*$~D', $ref) === 1) return $ref;
         if (is_string($ref) && preg_match('~^github:(pl0n3r/[A-Za-z0-9_.-]+)#([1-9][0-9]*)$~D', $ref, $m) === 1) return 'https://github.com/'.$m[1].'/issues/'.$m[2];

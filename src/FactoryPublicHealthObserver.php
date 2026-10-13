@@ -168,7 +168,7 @@ final class FactoryPublicHealthObserver
         $oversized = false;
         $started = microtime(true);
         try {
-            curl_setopt_array($ch, [
+            if (!curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => false,
                 CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_MAXREDIRS => 0,
@@ -188,7 +188,9 @@ final class FactoryPublicHealthObserver
                     }
                     return strlen($chunk);
                 },
-            ]);
+            ])) {
+                throw new InvalidArgumentException('transport options unavailable');
+            }
             $success = curl_exec($ch);
             $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
             $elapsed = (int) round((microtime(true) - $started) * 1000);

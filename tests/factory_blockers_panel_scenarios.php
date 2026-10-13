@@ -25,7 +25,7 @@ $issues=[
  blocker(14,['status: blocked'],evidence('Dependencia por verificar','Verificar dependencia','external',false,'2026-10-10T05:00:00Z')),
 ];
 // 53 señales bloqueadas por repo: 50 UNKNOWN llegan antes de un MVP tardío.
-if(in_array($mode,['topk-late','topk-reversed','topk-hostile'],true)){
+if(in_array($mode,['topk-late','topk-reversed','topk-hostile','topk-stop'],true)){
  $issues=[];
  for($n=100;$n<150;$n++)$issues[]=blocker($n,['estado: bloqueado']);
  $issues[]=blocker(999,['estado: bloqueado'],
@@ -50,11 +50,11 @@ if($mode==='unsafe')$issues[0]['body']='<!-- factory-blocker-evidence '.json_enc
 if($mode==='duplicate')$issues[0]['body'].="\n<!-- factory-blocker-evidence {bad -->";
 if($mode==='invalid-page')$issues=array_fill(0,100,blocker(30,['estado: bloqueado']));
 $calls=[];
-$transport=static function(string $method,string $url,array $headers)use(&$calls,$issues):array {
+$transport=static function(string $method,string $url,array $headers)use(&$calls,$issues,$mode):array {
  $path=parse_url($url,PHP_URL_PATH)?:'';
  $query=[];parse_str(parse_url($url,PHP_URL_QUERY)?:'',$query);
  $calls[]=['method'=>$method,'url'=>$path,'page'=>$query['page']??null];
- if(str_ends_with($path,'/issues/767'))$json=['number'=>767,'state'=>'closed','user'=>['login'=>'pl0n3r'],'body'=>'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
+ if(str_ends_with($path,'/issues/767'))$json=['number'=>767,'state'=>$mode==='topk-stop'?'open':'closed','user'=>['login'=>'pl0n3r'],'body'=>$mode==='topk-stop'?'<!-- factory-unattended-kill-switch {"version":1,"state":"PAUSED","owner":"pl0n3r"} -->':'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
  elseif(str_ends_with($path,'/issues'))$json=$issues;
  elseif(str_ends_with($path,'/pulls'))$json=[];
  elseif(str_ends_with($path,'/actions/runs'))$json=['workflow_runs'=>[]];

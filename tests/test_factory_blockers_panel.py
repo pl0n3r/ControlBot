@@ -68,6 +68,27 @@ class FactoryBlockersPanelTests(unittest.TestCase):
                     for row in reordered["blockers"]
                 ))
 
+    def test_topk_keeps_global_kill_switch_blocker(self):
+        # A stopped global guard is not ordinary declarative MVP evidence.
+        # This only exercises the fake GitHub transport, not Factory #767.
+        normal = scenario("topk-late")
+        stopped = scenario("topk-stop")
+        self.assertFalse(normal["failed"], normal)
+        self.assertFalse(stopped["failed"], stopped)
+        ref = "github:pl0n3r/Factory#767"
+        self.assertFalse(any(r["issue_ref"] == ref for r in normal["source"]))
+        self.assertEqual(len(stopped["source"]), 50)
+        self.assertEqual(len(stopped["blockers"]), 50)
+        self.assertEqual(stopped["source"][0]["id"], "blocker:factory-767")
+        self.assertEqual(stopped["blockers"][0]["issue_ref"], ref)
+        self.assertEqual(stopped["blockers"][0]["evidence_status"], "UNKNOWN")
+        self.assertIsNone(stopped["blockers"][0]["mvp_impact"])
+        self.assertEqual(
+            stopped["summary"]["omitted"]["blockers"],
+            normal["summary"]["omitted"]["blockers"] + 1,
+        )
+        self.assertTrue(stopped["summary"]["truncated"])
+
     def test_real_blockers_show_grounded_cause_owner_age_and_next_action(self):
         view = scenario("grounded")
         self.assertFalse(view["failed"])

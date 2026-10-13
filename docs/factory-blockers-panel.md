@@ -44,3 +44,10 @@ por presupuesto y se muestra explícitamente en la UI; **no** implica que
 el panel pueda presentar todos los Issues ni que los marcadores acrediten
 salud de producción. No se incrementa el número de consultas API ni se
 cambian permisos, acciones, tokens o límites de evidencia.
+
+La señal sintética `blocker:factory-767` tiene prioridad de seguridad sobre
+el top-K, únicamente cuando el colector no verifica un kill switch RUNNING.
+Se proyecta como bloqueo `UNKNOWN` —sin inventar causa o impacto MVP— y
+se contabiliza el elemento ordinario desplazado. Con el guard RUNNING, la
+señal no aparece. La regresión utiliza un transporte GitHub estrictamente
+sintético y no modifica Factory #767.

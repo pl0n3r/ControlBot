@@ -267,7 +267,7 @@ final class FactoryOrchestratorEvidenceCollector
         }
         $factory767=$get('/repos/pl0n3r/Factory/issues/767');
         if(!self::killSwitchRunning($factory767))
-            self::appendBlocker($blockers,self::signal('blocker:factory-767','github_project_snapshot','blocked','pl0n3r/Factory',767,['issue_ref'=>'github:pl0n3r/Factory#767'],$now),$omitted['blockers']);
+            self::appendBlocker($blockers,self::signal('blocker:factory-767','github_project_snapshot','blocked','pl0n3r/Factory',767,['issue_ref'=>'github:pl0n3r/Factory#767','labels'=>['estado: bloqueado']],$now),$omitted['blockers']);
         $truncated=array_sum($omitted)>0;
         return ['owner_decisions'=>$decisions,'releases'=>[],'blockers'=>$blockers,'work'=>$work,
             'agent_activity'=>$agentActivity,
@@ -449,6 +449,11 @@ final class FactoryOrchestratorEvidenceCollector
     {
         $rows[]=$row;
         usort($rows,static function(array $a,array $b):int {
+            // The canonical Factory kill-switch alert must never be evicted by the
+            // normal top-K budget, even when 50+ Issues declare MVP impact.
+            $stopA=($a['id']??null)==='blocker:factory-767';
+            $stopB=($b['id']??null)==='blocker:factory-767';
+            if($stopA!==$stopB)return ($stopB?1:0)<=>($stopA?1:0);
             $ea=$a['data']['blocker_evidence']??null;
             $eb=$b['data']['blocker_evidence']??null;
             $ia=is_array($ea)&&($ea['mvp_impact']??null)===true?1:0;

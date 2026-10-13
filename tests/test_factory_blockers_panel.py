@@ -76,7 +76,7 @@ class FactoryBlockersPanelTests(unittest.TestCase):
         self.assertFalse(normal["failed"], normal)
         self.assertFalse(stopped["failed"], stopped)
         ref = "github:pl0n3r/Factory#767"
-        self.assertFalse(any(r["issue_ref"] == ref for r in normal["source"]))
+        self.assertFalse(any(r["data"]["issue_ref"] == ref for r in normal["source"]))
         self.assertEqual(len(stopped["source"]), 50)
         self.assertEqual(len(stopped["blockers"]), 50)
         self.assertEqual(stopped["source"][0]["id"], "blocker:factory-767")
@@ -130,7 +130,14 @@ class FactoryBlockersPanelTests(unittest.TestCase):
                 self.assertEqual(p.returncode, 0, p.stderr)
                 result = json.loads(p.stdout)
                 self.assertTrue(result["view"]["owner_decisions"])
-                self.assertEqual(result["view"]["blocker_explanations"], [])
+                # Legacy blockers lack new labels; only the fail-closed
+                # global-stop sentinel is projected, without inferred cause.
+                projected = result["view"]["blocker_explanations"]
+                self.assertEqual(len(projected), 1)
+                self.assertEqual(projected[0]["issue_ref"],
+                                 "github:pl0n3r/Factory#767")
+                self.assertEqual(projected[0]["evidence_status"], "UNKNOWN")
+                self.assertIsNone(projected[0]["mvp_impact"])
 
     def test_explicit_malformed_blocker_labels_still_fail_closed(self):
         sample = scenario("malformed-labels")

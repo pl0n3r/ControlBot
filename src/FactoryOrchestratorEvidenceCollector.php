@@ -217,9 +217,10 @@ final class FactoryOrchestratorEvidenceCollector
                 elseif($activityValid)$activityIssues[]=['number'=>$number,'status'=>$state,'updated_at'=>$activityTime];
                 // Factory #767 is canonicalized once below after reading its
                 // global kill-switch state; never count an Issue-derived copy.
-                if($state==='blocked'&&!$conflicting
-                    && !($name==='Factory' && $number===767))
-                    self::appendBlocker($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels,'blocker_evidence'=>self::blockerEvidence($row['body']??null,$now)],$now),$omitted['blockers']);
+                if($state==='blocked'&&!$conflicting){
+                    if(!($name==='Factory' && $number===767))
+                        self::appendBlocker($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels,'blocker_evidence'=>self::blockerEvidence($row['body']??null,$now)],$now),$omitted['blockers']);
+                }
                 elseif($workflowLabels!==[]&&!$conflicting&&$state!=='planned')
                     self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now),$omitted['work']);
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))

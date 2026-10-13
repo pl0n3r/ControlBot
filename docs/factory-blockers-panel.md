@@ -25,3 +25,22 @@ El colector solo usa GET HTTPS de la allowlist existente y presupuesto de API, s
 `python3 -m unittest tests.test_orchestrator_evidence_collector tests.test_factory_orchestrator_live_ui`
 
 Los cuatro tests AC abarcan orden determinista, siete repos, exclusión planificada/contradictoria, evidencia declarada, timestamps inválidos, duplicados y regresión de privacidad. Ante un fallo se revierte el PR sin tocar reserva ajena. CI, Sonar, coordinación V3, roles y `Validar` exact-HEAD gobiernan la fusión.
+
+## Selección de bloqueos con límite de 50 (#791)
+
+El **colector** conserva los 50 mejores registros mientras recorre las páginas
+GitHub, en lugar de conservar los primeros 50 que devolvió la API. Compara:
+(1) `mvp_impact=true` con marcador `factory-blocker-evidence` válido;
+(2) `blocked_at` declarado, UTC válido y más antiguo primero;
+(3) `issue_ref` canónica para un desempate determinista. Una evidencia
+`UNKNOWN`, futura, contradictoria o inválida no recibe impacto MVP
+implícito ni una edad inventada. El snapshot reordena con la misma regla.
+
+En memoria se mantienen a lo sumo 51 registros durante una inserción y **50**
+al publicar. `signal_summary.omitted.blockers` cuenta las señales que no
+caben en ese top-K, tanto si fueron descartadas al llegar como si fueron
+desplazadas después. `truncated` sigue representando pérdida de señales
+por presupuesto y se muestra explícitamente en la UI; **no** implica que
+el panel pueda presentar todos los Issues ni que los marcadores acrediten
+salud de producción. No se incrementa el número de consultas API ni se
+cambian permisos, acciones, tokens o límites de evidencia.

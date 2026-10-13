@@ -70,6 +70,42 @@ if ($mode === 'stale') {
 if ($mode === 'ui_escape') {
     $rows[0]['endpoint'] = 'https://condor.example.org/<script>alert(1)</script>';
 }
+if (str_starts_with($mode, 'invalid-ui-')) {
+    switch ($mode) {
+        case 'invalid-ui-reachable-reason':
+            $rows[0]['reason'] = 'http_non_success';
+            break;
+        case 'invalid-ui-reachable-timestamp':
+            $rows[0]['observed_at'] = null;
+            break;
+        case 'invalid-ui-unreachable-success':
+            $rows[1]['http_status'] = 200;
+            break;
+        case 'invalid-ui-stale-no-evidence':
+            $rows = Observer::age($rows, 1800000500);
+            $rows[0]['observed_at'] = null;
+            break;
+        case 'invalid-ui-stale-too-recent':
+            $rows = Observer::age($rows, 1800000500);
+            $rows[0]['source_age_seconds'] = 0;
+            break;
+        case 'invalid-ui-unknown-reason':
+            $rows = Observer::collect($approved, [], $resolver, $request, 1800000000);
+            $rows[0]['reason'] = 'http_success';
+            break;
+        default:
+            throw new RuntimeException('unknown synthetic mode');
+    }
+    $rejected = false;
+    try {
+        Ui::renderSection($rows);
+    } catch (InvalidArgumentException) {
+        $rejected = true;
+    }
+    echo json_encode(['rejected' => $rejected, 'requests' => $requests],
+        JSON_THROW_ON_ERROR), "\n";
+    exit;
+}
 $html = Ui::renderSection($rows);
 $answer = [
     'rows' => $rows,

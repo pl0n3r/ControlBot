@@ -65,6 +65,41 @@ final class FactoryPublicHealthUi
                     || $row['endpoint'] === 'UNKNOWN' && $row['observed_at'] !== null)) {
                 throw new InvalidArgumentException('public health unknown inconsistency');
             }
+            // UI must not turn contradictory or incomplete evidence into
+            // a credible health observation, even when handed an external snapshot.
+            if ($row['status'] === 'reachable'
+                && ($row['reason'] !== 'http_success'
+                    || $row['observed_at'] === null
+                    || $row['source_age_seconds'] === null
+                    || $row['latency_ms'] === null)) {
+                throw new InvalidArgumentException('public health success evidence mismatch');
+            }
+            if ($row['status'] === 'unreachable'
+                && ($row['reason'] !== 'http_non_success'
+                    || $row['http_status'] === null
+                    || ($row['http_status'] >= 200 && $row['http_status'] < 300)
+                    || $row['observed_at'] === null
+                    || $row['source_age_seconds'] === null
+                    || $row['latency_ms'] === null)) {
+                throw new InvalidArgumentException('public health failure evidence mismatch');
+            }
+            if ($row['status'] === 'stale'
+                && ($row['reason'] !== 'evidence_stale'
+                    || $row['observed_at'] === null
+                    || $row['source_age_seconds'] === null
+                    || $row['source_age_seconds'] <= 300
+                    || $row['http_status'] === null)) {
+                throw new InvalidArgumentException('public health stale evidence mismatch');
+            }
+            if ($row['status'] === 'unknown'
+                && ($row['endpoint'] !== 'UNKNOWN'
+                    || $row['source_age_seconds'] !== null
+                    || !in_array($row['reason'], [
+                        'no_public_endpoint', 'endpoint_not_allowlisted',
+                        'endpoint_unsafe', 'probe_failed',
+                    ], true))) {
+                throw new InvalidArgumentException('public health unknown evidence mismatch');
+            }
             $code = $row['http_status'] === null ? 'UNKNOWN' : (string) $row['http_status'];
             $latency = $row['latency_ms'] === null ? 'UNKNOWN' : $row['latency_ms'] . ' ms';
             $when = $row['observed_at'] === null ? 'UNKNOWN'

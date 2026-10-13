@@ -28,6 +28,19 @@ def scenario(name: str) -> dict:
 
 
 class OrchestratorPublicHealthTests(unittest.TestCase):
+    def test_ui_rejects_contradictory_health_evidence(self):
+        for kind in (
+            "invalid-ui-reachable-reason",
+            "invalid-ui-reachable-timestamp",
+            "invalid-ui-unreachable-success",
+            "invalid-ui-stale-no-evidence",
+            "invalid-ui-stale-too-recent",
+            "invalid-ui-unknown-reason",
+        ):
+            with self.subTest(kind=kind):
+                outcome = scenario(kind)
+                self.assertTrue(outcome["rejected"], kind)
+
     def test_four_repos_show_grounded_code_latency_timestamp_and_freshness(self):
         result = scenario("normal")
         rows = result["rows"]

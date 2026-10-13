@@ -21,6 +21,7 @@ final class FactoryOrchestratorLiveUi
         if (array_key_exists('agent_activity', $view)) $expected[] = 'agent_activity';
         if (array_key_exists('signal_summary', $view)) $expected[] = 'signal_summary';
         if (array_key_exists('collector_failure', $view)) $expected[] = 'collector_failure';
+        if (array_key_exists('blocker_explanations', $view)) $expected[] = 'blocker_explanations';
         self::fields($view, $expected, 'view');
         if ($view['version'] !== 1 || $view['read_only'] !== true || ! is_int($view['observed_at'])) {
             throw new InvalidArgumentException('Orchestrator UI view invalid.');
@@ -57,6 +58,7 @@ final class FactoryOrchestratorLiveUi
         $activity = FactoryAgentActivityUi::renderSection($view['agent_activity'] ?? null);
         $signalWarning = self::signalWarning($view['signal_summary'] ?? null);
         $collectorWarning = self::collectorWarning($view['collector_failure'] ?? null);
+        $blockerPanel = self::blockerPanel($view['blocker_explanations'] ?? null);
         $motion = self::motionSeconds($view['central']);
         return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
@@ -72,12 +74,54 @@ final class FactoryOrchestratorLiveUi
             . '<span data-filter="human">Humano</span></nav>'
             . '<section class="panel human" data-section="human"><p class="eyebrow">HUMANO</p>'
             . '<h2>Decisiones tuyas</h2><div class="human-grid">' . $decisions . '</div></section>'
-            . $collectorWarning . $signalWarning . $activity . '<section class="stage" aria-label="Topología del orquestador">' . $central
+            . $collectorWarning . $signalWarning . $activity . $blockerPanel . '<section class="stage" aria-label="Topología del orquestador">' . $central
             . '<div class="edges" aria-hidden="true">' . $edges . '</div>'
             . '<div class="front-grid">' . $fronts . '</div></section>'
             . '<section class="panel bus" data-section="event_bus"><p class="eyebrow">BUS VISUAL</p>'
             . '<h2>Eventos observados</h2><ol>' . $events . '</ol></section>'
             . '</main></body></html>';
+    }
+
+    /** Grounded read-only Issue declarations; UNKNOWN never becomes an action. */
+    private static function blockerPanel(mixed $rows): string
+    {
+        if($rows===null)return '';
+        if(!is_array($rows)||!array_is_list($rows)||count($rows)>50)
+            throw new InvalidArgumentException('blocker panel invalid.');
+        $html='';
+        foreach($rows as $row){
+            self::fields($row,['issue_ref','source_ref','observed_at','freshness','cause',
+                'actor','next_action','blocked_at','age_seconds','mvp_impact','evidence_status'],'blocker row');
+            $ref=$row['issue_ref'];
+            if(!is_string($ref)||preg_match('~^github:pl0n3r/(?:Factory|Condor|GrindFlow|brvtal|ControlBot|AutoFactory|FactoryRunner)#[1-9][0-9]*$~D',$ref)!==1
+                ||$row['source_ref']!==$ref||$row['freshness']!=='current'
+                ||!is_int($row['observed_at'])||$row['observed_at']<1
+                ||!in_array($row['actor'],['owner','agent','external','UNKNOWN'],true)
+                ||!in_array($row['evidence_status'],['DECLARED','UNKNOWN'],true))
+                throw new InvalidArgumentException('blocker identity invalid.');
+            $unknown=$row['evidence_status']==='UNKNOWN';
+            if(!is_string($row['cause'])||!is_string($row['next_action'])
+                ||($unknown&&($row['cause']!=='UNKNOWN'||$row['next_action']!=='UNKNOWN'
+                    ||$row['actor']!=='UNKNOWN'||$row['blocked_at']!==null
+                    ||$row['age_seconds']!==null||$row['mvp_impact']!==null))
+                ||(!$unknown&&(!is_int($row['blocked_at'])||!is_int($row['age_seconds'])
+                    ||$row['blocked_at']<1||$row['age_seconds']<0||!is_bool($row['mvp_impact']))))
+                throw new InvalidArgumentException('blocker evidence inconsistent.');
+            $age=$unknown?'UNKNOWN':(string)$row['age_seconds'].'s';
+            $impact=($row['mvp_impact']===true)?'MVP declarado':'impacto MVP: UNKNOWN';
+            $html.='<article class="front blocker-explanation">'
+                .'<h3>'.self::e($ref).'</h3><p>Causa: '.self::e($row['cause']).'</p>'
+                .'<p>Responsable declarado: '.self::e($row['actor']).'</p>'
+                .'<p>Bloqueado desde: '.self::e($unknown?'UNKNOWN':gmdate('Y-m-d H:i:s',$row['blocked_at']).' UTC').'</p>'
+                .'<p>Antigüedad: '.self::e($age).'</p>'
+                .'<p>Siguiente acción declarada: '.self::e($row['next_action']).'</p>'
+                .'<small>Fuente: '.self::e($ref).' · '.self::e($row['evidence_status'])
+                .' · '.self::e($impact).' · read-only</small></article>';
+        }
+        return '<section class="panel" data-section="blockers_explained">'
+            .'<h2>Bloqueos explicados</h2><p>Evidencia declarada en el Issue; no equivale a aprobación ni identidad del último editor.</p>'
+            .($html===''?'<p role="status">UNKNOWN — sin inventario confirmado de bloqueos.</p>':'<div class="front-grid">'.$html.'</div>')
+            .'</section>';
     }
 
     private static function collectorWarning(mixed $raw): string

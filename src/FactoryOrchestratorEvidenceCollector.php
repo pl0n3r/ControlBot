@@ -215,8 +215,8 @@ final class FactoryOrchestratorEvidenceCollector
                 $activityTime=self::activityTimestamp($row['updated_at']??null,$now);
                 if($activityTime===null||$conflicting)$activityValid=false;
                 elseif($activityValid)$activityIssues[]=['number'=>$number,'status'=>$state,'updated_at'=>$activityTime];
-                if(in_array('estado: bloqueado',$workflowLabels,true)||in_array('status: blocked',$workflowLabels,true))
-                    self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now),$omitted['blockers']);
+                if($state==='blocked'&&!$conflicting)
+                    self::append($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels,'blocker_evidence'=>self::blockerEvidence($row['body']??null,$now)],$now),$omitted['blockers']);
                 elseif($workflowLabels!==[]&&!$conflicting&&$state!=='planned')
                     self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now),$omitted['work']);
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))
@@ -273,6 +273,42 @@ final class FactoryOrchestratorEvidenceCollector
             'agent_activity'=>$agentActivity,
             'signal_summary'=>['truncated'=>$truncated,'omitted'=>$omitted,
                 'reason'=>$truncated?'bounded_signal_budget':'none']];
+    }
+
+    /**
+     * Untrusted Issue body is only a declaration, never authority to act.
+     * Absent, duplicate, noncanonical or sensitive evidence stays UNKNOWN.
+     */
+    private static function blockerEvidence(mixed $body,int $now): ?array
+    {
+        if(!is_string($body)||strlen($body)>65_536)return null;
+        $heads=preg_match_all('/<!--\s*factory-blocker-evidence\b/i',$body);
+        if($heads!==1)return null;
+        $count=preg_match_all('/<!--\s*factory-blocker-evidence\s+(\{.*?\})\s*-->/s',$body,$match);
+        if($count!==1)return null;
+        try{$value=json_decode($match[1][0],true,8,JSON_THROW_ON_ERROR);}
+        catch(\Throwable){return null;}
+        if(!is_array($value)||array_is_list($value))return null;
+        $keys=array_keys($value);sort($keys);
+        if($keys!==['actor','blocked_at','cause','mvp_impact','next_action','version']
+            ||($value['version']??null)!==1||!is_bool($value['mvp_impact'])
+            ||!in_array($value['actor'],['owner','agent','external'],true))
+            return null;
+        $at=self::activityTimestamp($value['blocked_at']??null,$now);
+        if($at===null)return null;
+        foreach(['cause','next_action'] as $field){
+            $text=$value[$field]??null;
+            if(!is_string($text)||trim($text)!==$text
+                ||mb_strlen($text)<5||mb_strlen($text)>160
+                ||preg_match('/[\x00-\x1f\x7f<>]/u',$text)===1
+                ||preg_match('/(?:password|secret|token|cookie|bearer|dsn|api[_ -]?key)/i',$text)===1
+                ||preg_match('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i',$text)===1
+                ||preg_match('/\+?(?=(?:[0-9(). -]*[0-9]){10})[0-9][0-9(). -]{7,}/',$text)===1)
+                return null;
+        }
+        return ['cause'=>$value['cause'],'actor'=>$value['actor'],
+            'next_action'=>$value['next_action'],'blocked_at'=>$at,
+            'mvp_impact'=>$value['mvp_impact'],'provenance'=>'declared_issue_body'];
     }
 
     private static function activityTimestamp(mixed $value,int $now): ?int

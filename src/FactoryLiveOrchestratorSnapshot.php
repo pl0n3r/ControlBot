@@ -23,9 +23,11 @@ final class FactoryLiveOrchestratorSnapshot
         $central = self::central($snapshot['work_inventory'] ?? null, $now);
         $fronts = self::fronts($snapshot['sections']['work'], $now);
         $decisions = self::decisions($snapshot['sections']['owner_decisions'], $now);
+        $blockerExplanations = self::blockerExplanations($snapshot['sections']['blockers'], $now);
         $out = [
             'version' => 1, 'observed_at' => $now, 'source_snapshot' => $snapshot['fingerprint'],
             'read_only' => true, 'central' => $central, 'fronts' => $fronts, 'owner_decisions' => $decisions,
+            'blocker_explanations' => $blockerExplanations,
         ];
         if (array_key_exists('agent_activity', $snapshot)) {
             $out['agent_activity'] = $snapshot['agent_activity'];
@@ -217,6 +219,76 @@ final class FactoryLiveOrchestratorSnapshot
         }
         self::text($data['progress_evidence'], 'progress_evidence', 240);
         return [$progress, 'EVIDENCED'];
+    }
+
+    private static function blockerExplanations(mixed $rows,int $now): array
+    {
+        if(!is_array($rows)||!array_is_list($rows)||count($rows)>50)
+            throw new InvalidArgumentException('blocker evidence invalid.');
+        $result=[];
+        foreach($rows as $row){
+            self::signal($row,'github_project_snapshot',$now);
+            if(($row['freshness']??null)!=='current'||($row['state']??null)!=='blocked')
+                continue;
+            $data=$row['data']??null;
+            if(!is_array($data))throw new InvalidArgumentException('blocker data invalid.');
+            // Legacy generic signals are allowed to carry an empty payload.
+            // They cannot prove labels or an Issue identity: omit explanation.
+            if($data===[])continue;
+            if(array_is_list($data))throw new InvalidArgumentException('blocker data invalid.');
+            // Legacy signals may lack issue identity, issue labels and use
+            // non-Issue source refs. Do not infer a real explained blocker.
+            // Check presence before interpreting new-schema-only fields.
+            // An explicit malformed labels field is still rejected below.
+            if(!array_key_exists('labels',$data))continue;
+            $ref=self::issue($data['issue_ref']??null);
+            $source=self::text($row['source_ref']??null,'blocker.source_ref',240);
+            if($source!==$ref)throw new InvalidArgumentException('blocker provenance mismatch.');
+            $labels=$data['labels'];
+            if(!is_array($labels)||!array_is_list($labels))throw new InvalidArgumentException('blocker labels invalid.');
+            $states=[
+                'blocked'=>['estado: bloqueado','status: blocked'],
+                'available'=>['estado: disponible','status: available'],
+                'planned'=>['estado: planificado','status: planned'],
+                'reserved'=>['estado: reservado','status: reserved'],
+                'in_review'=>['estado: en revisión','status: in review'],
+            ];
+            $present=[];
+            foreach($states as $state=>$names){
+                if(array_intersect($names,$labels))$present[]=$state;
+            }
+            if($present!==['blocked'])continue; // Never count planned/ambiguous as a real blocker.
+            $declared=$data['blocker_evidence']??null;
+            $cause='UNKNOWN';$actor='UNKNOWN';$next='UNKNOWN';$blockedAt=null;$impact=null;
+            if($declared!==null){
+                self::fields($declared,['cause','actor','next_action','blocked_at','mvp_impact','provenance'],'blocker declared evidence');
+                if(($declared['provenance']??null)!=='declared_issue_body'
+                    ||!in_array($declared['actor']??null,['owner','agent','external'],true)
+                    ||!is_bool($declared['mvp_impact']??null))
+                    throw new InvalidArgumentException('blocker declared metadata invalid.');
+                $cause=self::text($declared['cause'],'blocker.cause',160);
+                $next=self::text($declared['next_action'],'blocker.action',160);
+                $actor=$declared['actor'];
+                $blockedAt=self::time($declared['blocked_at'],'blocker.blocked_at',$now);
+                // A blocker cannot begin after the observation that reports it.
+                if($blockedAt>$row['observed_at'])
+                    throw new InvalidArgumentException('blocker chronology invalid.');
+                $impact=$declared['mvp_impact'];
+            }
+            $result[]=[
+                'issue_ref'=>$ref,'source_ref'=>$source,'observed_at'=>$row['observed_at'],
+                'freshness'=>'current','cause'=>$cause,'actor'=>$actor,'next_action'=>$next,
+                'blocked_at'=>$blockedAt,'age_seconds'=>$blockedAt===null?null:$now-$blockedAt,
+                'mvp_impact'=>$impact,'evidence_status'=>$blockedAt===null?'UNKNOWN':'DECLARED',
+            ];
+        }
+        usort($result,static function(array $a,array $b):int{
+            $impact=($b['mvp_impact']===true?1:0)<=>($a['mvp_impact']===true?1:0);
+            if($impact!==0)return $impact;
+            $age=($b['age_seconds']??-1)<=>($a['age_seconds']??-1);
+            return $age!==0?$age:strcmp($a['issue_ref'],$b['issue_ref']);
+        });
+        return $result;
     }
 
     private static function decisions(mixed $rows,int $now): array

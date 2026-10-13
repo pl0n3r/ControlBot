@@ -127,7 +127,7 @@ final class FactoryPublicHealthObserver
         // Exact HTTPS origin and an ordinary path only. No credentials, ports,
         // query, fragment, IP literals, backslashes, unicode or percent escapes.
         if (strlen($url) > 240 || preg_match(
-            '~^https://([a-z0-9.-]+)(/[a-zA-Z0-9/_~.-]*)?$~D',
+            '#^https://([a-z0-9.-]+)(/[a-zA-Z0-9/_~.-]*)?$#D',
             $url, $m
         ) !== 1) {
             return null;

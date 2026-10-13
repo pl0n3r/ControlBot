@@ -5,6 +5,7 @@ namespace ControlBot\Business;
 
 require_once __DIR__ . '/UiTheme.php';
 require_once __DIR__ . '/FactoryAgentActivityUi.php';
+require_once __DIR__ . '/FactoryPublicHealthUi.php';
 
 use ControlBot\Ui\UiTheme;
 use InvalidArgumentException;
@@ -22,6 +23,7 @@ final class FactoryOrchestratorLiveUi
         if (array_key_exists('signal_summary', $view)) $expected[] = 'signal_summary';
         if (array_key_exists('collector_failure', $view)) $expected[] = 'collector_failure';
         if (array_key_exists('blocker_explanations', $view)) $expected[] = 'blocker_explanations';
+        if (array_key_exists('public_health', $view)) $expected[] = 'public_health';
         self::fields($view, $expected, 'view');
         if ($view['version'] !== 1 || $view['read_only'] !== true || ! is_int($view['observed_at'])) {
             throw new InvalidArgumentException('Orchestrator UI view invalid.');
@@ -59,6 +61,7 @@ final class FactoryOrchestratorLiveUi
         $signalWarning = self::signalWarning($view['signal_summary'] ?? null);
         $collectorWarning = self::collectorWarning($view['collector_failure'] ?? null);
         $blockerPanel = self::blockerPanel($view['blocker_explanations'] ?? null);
+        $healthPanel = FactoryPublicHealthUi::renderSection($view['public_health'] ?? null);
         $motion = self::motionSeconds($view['central']);
         return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
@@ -74,7 +77,7 @@ final class FactoryOrchestratorLiveUi
             . '<span data-filter="human">Humano</span></nav>'
             . '<section class="panel human" data-section="human"><p class="eyebrow">HUMANO</p>'
             . '<h2>Decisiones tuyas</h2><div class="human-grid">' . $decisions . '</div></section>'
-            . $collectorWarning . $signalWarning . $activity . $blockerPanel . '<section class="stage" aria-label="Topología del orquestador">' . $central
+            . $collectorWarning . $signalWarning . $activity . $blockerPanel . $healthPanel . '<section class="stage" aria-label="Topología del orquestador">' . $central
             . '<div class="edges" aria-hidden="true">' . $edges . '</div>'
             . '<div class="front-grid">' . $fronts . '</div></section>'
             . '<section class="panel bus" data-section="event_bus"><p class="eyebrow">BUS VISUAL</p>'

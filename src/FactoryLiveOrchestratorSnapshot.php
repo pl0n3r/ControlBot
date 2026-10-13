@@ -282,16 +282,17 @@ final class FactoryLiveOrchestratorSnapshot
                 'mvp_impact'=>$impact,'evidence_status'=>$blockedAt===null?'UNKNOWN':'DECLARED',
             ];
         }
-        usort($result,static function(array $a,array $b):int{
+        usort($result, static function (array $a, array $b): int {
             // Project the synthetic global-stop signal above ordinary blockers.
             // Unknown cause/impact remain UNKNOWN; this is not declarative MVP evidence.
-            $stopA=$a['issue_ref']==='github:pl0n3r/Factory#767';
-            $stopB=$b['issue_ref']==='github:pl0n3r/Factory#767';
-            if($stopA!==$stopB)return ($stopB?1:0)<=>($stopA?1:0);
-            $impact=($b['mvp_impact']===true?1:0)<=>($a['mvp_impact']===true?1:0);
-            if($impact!==0)return $impact;
-            $age=($b['age_seconds']??-1)<=>($a['age_seconds']??-1);
-            return $age!==0?$age:strcmp($a['issue_ref'],$b['issue_ref']);
+            $stopA = $a['issue_ref'] === 'github:pl0n3r/Factory#767';
+            $stopB = $b['issue_ref'] === 'github:pl0n3r/Factory#767';
+            if ($stopA !== $stopB) return ($stopB ? 1 : 0) <=> ($stopA ? 1 : 0);
+            $impact = ($b['mvp_impact'] === true ? 1 : 0)
+                <=> ($a['mvp_impact'] === true ? 1 : 0);
+            if ($impact !== 0) return $impact;
+            $age = ($b['age_seconds'] ?? -1) <=> ($a['age_seconds'] ?? -1);
+            return $age !== 0 ? $age : strcmp($a['issue_ref'], $b['issue_ref']);
         });
         return $result;
     }

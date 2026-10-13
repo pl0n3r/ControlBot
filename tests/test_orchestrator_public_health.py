@@ -29,6 +29,9 @@ def scenario(name: str) -> dict:
 
 class OrchestratorPublicHealthTests(unittest.TestCase):
     def test_ui_rejects_contradictory_health_evidence(self):
+        self._assert_ui_rejects_contradictory_health_evidence()
+
+    def _assert_ui_rejects_contradictory_health_evidence(self):
         for kind in (
             "invalid-ui-reachable-reason",
             "invalid-ui-reachable-timestamp",
@@ -106,6 +109,8 @@ class OrchestratorPublicHealthTests(unittest.TestCase):
         self.assertNotIn("curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true)", source)
 
     def test_read_only_private_ui_does_not_persist_body_cookies_or_secrets(self):
+        # AC-04 must exercise malformed cross-field evidence as well as escaping.
+        self._assert_ui_rejects_contradictory_health_evidence()
         result = scenario("ui_escape")
         self.assertEqual(result["has_cards"], 4)
         self.assertTrue(result["has_unknown_gate"])

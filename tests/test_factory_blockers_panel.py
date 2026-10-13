@@ -89,6 +89,43 @@ class FactoryBlockersPanelTests(unittest.TestCase):
         )
         self.assertTrue(stopped["summary"]["truncated"])
 
+    def test_factory_stop_sentinel_is_unique_with_blocked_issue_767(self):
+        # Synthetic Factory #767 is open, blocked, and declares MVP impact;
+        # it must not compete with its own canonical stop-sentinel.
+        stopped = scenario("topk-stop")
+        duplicate = scenario("topk-stop-duplicate")
+        self.assertFalse(stopped["failed"], stopped)
+        self.assertFalse(duplicate["failed"], duplicate)
+        expected_ref = "github:pl0n3r/Factory#767"
+        rows = duplicate["source"]
+        view = duplicate["blockers"]
+        self.assertEqual(len(rows), 50)
+        self.assertEqual(len(view), 50)
+        self.assertEqual(
+            sum(row["id"] == "blocker:factory-767" for row in rows), 1
+        )
+        self.assertEqual(
+            sum(row["issue_ref"] == expected_ref for row in view), 1
+        )
+        self.assertEqual(rows[0]["id"], "blocker:factory-767")
+        self.assertEqual(view[0]["issue_ref"], expected_ref)
+        self.assertEqual(view[0]["evidence_status"], "UNKNOWN")
+        self.assertIsNone(view[0]["mvp_impact"])
+        # The duplicate in Issues never consumes a second top-K slot or
+        # changes the total count of omitted *distinct* blockers.
+        self.assertEqual(duplicate["summary"], stopped["summary"])
+        self.assertEqual(
+            [row["id"] for row in rows],
+            [row["id"] for row in stopped["source"]],
+        )
+        self.assertEqual(
+            duplicate["summary"]["omitted"]["blockers"], 7 * 53 + 1 - 50
+        )
+        self.assertEqual(
+            duplicate["summary"]["omitted"]["work"],
+            stopped["summary"]["omitted"]["work"],
+        )
+
     def test_real_blockers_show_grounded_cause_owner_age_and_next_action(self):
         view = scenario("grounded")
         self.assertFalse(view["failed"])

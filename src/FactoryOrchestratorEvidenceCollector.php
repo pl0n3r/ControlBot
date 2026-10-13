@@ -228,14 +228,14 @@ final class FactoryOrchestratorEvidenceCollector
                             [
                                 'issue_ref'=>'github:'.$repo.'#'.$number,
                                 'labels'=>$workflowLabels,
-                                'blocker_evidence'=>self::blockerEvidence($row['body']??null,$now),
+                                'blocker_evidence'=>self::blockerEvidence($row['body'] ?? null, $now),
                             ],
                             $now,
                         );
                         self::appendBlocker($blockers, $blocker, $omitted['blockers']);
                     }
                 }
-                elseif($workflowLabels!==[]&&!$conflicting&&$state!=='planned')
+                elseif ($workflowLabels !== [] && !$conflicting && $state !== 'planned')
                     self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now),$omitted['work']);
                 if(in_array('decisión: dueño',$labels,true)||in_array('decision: owner',$labels,true))
                     self::append($decisions,self::signal(
@@ -476,7 +476,7 @@ final class FactoryOrchestratorEvidenceCollector
      * declarado, antigüedad acreditada y referencia canónica estable.
      * Sólo se mantienen 51 elementos como máximo durante cada inserción.
      */
-    private static function appendBlocker(array &$rows,array $row,int &$omitted): void
+    private static function appendBlocker(array &$rows, array $row, int &$omitted): void
     {
         $rows[]=$row;
         usort($rows, static function (array $a, array $b): int {

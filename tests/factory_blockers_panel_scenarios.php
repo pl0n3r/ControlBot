@@ -25,7 +25,7 @@ $issues=[
  blocker(14,['status: blocked'],evidence('Dependencia por verificar','Verificar dependencia','external',false,'2026-10-10T05:00:00Z')),
 ];
 // 53 señales bloqueadas por repo: 50 UNKNOWN llegan antes de un MVP tardío.
-if(in_array($mode,['topk-late','topk-reversed','topk-hostile','topk-stop'],true)){
+if(in_array($mode,['topk-late','topk-reversed','topk-hostile','topk-stop','topk-stop-duplicate'],true)){
  $issues=[];
  for($n=100;$n<150;$n++)$issues[]=blocker($n,['estado: bloqueado']);
  $issues[]=blocker(999,['estado: bloqueado'],
@@ -54,8 +54,16 @@ $transport=static function(string $method,string $url,array $headers)use(&$calls
  $path=parse_url($url,PHP_URL_PATH)?:'';
  $query=[];parse_str(parse_url($url,PHP_URL_QUERY)?:'',$query);
  $calls[]=['method'=>$method,'url'=>$path,'page'=>$query['page']??null];
- if(str_ends_with($path,'/issues/767'))$json=['number'=>767,'state'=>$mode==='topk-stop'?'open':'closed','user'=>['login'=>'pl0n3r'],'body'=>$mode==='topk-stop'?'<!-- factory-unattended-kill-switch {"version":1,"state":"PAUSED","owner":"pl0n3r"} -->':'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
- elseif(str_ends_with($path,'/issues'))$json=$issues;
+ if(str_ends_with($path,'/issues/767'))$json=['number'=>767,'state'=>in_array($mode,['topk-stop','topk-stop-duplicate'],true)?'open':'closed','user'=>['login'=>'pl0n3r'],'body'=>in_array($mode,['topk-stop','topk-stop-duplicate'],true)?'<!-- factory-unattended-kill-switch {"version":1,"state":"PAUSED","owner":"pl0n3r"} -->':'<!-- factory-unattended-kill-switch {"version":1,"state":"RUNNING","owner":"pl0n3r"} -->'];
+ elseif(str_ends_with($path,'/issues')){
+  $json=$issues;
+  // Factory #767 may arrive in the paginated Issue list AND as global stop.
+  // Only the synthetic stop sentinel may represent it in the blocker top-K.
+  if($mode==='topk-stop-duplicate'&&$path==='/repos/pl0n3r/Factory/issues')
+   $json[]=blocker(767,['estado: bloqueado'],
+    evidence('Bloqueo duplicado declarado','Investigar duplicado del guard',
+     'agent',true,'2026-10-01T08:00:00Z'));
+ }
  elseif(str_ends_with($path,'/pulls'))$json=[];
  elseif(str_ends_with($path,'/actions/runs'))$json=['workflow_runs'=>[]];
  else throw new RuntimeException('GET URL unsupported.');

@@ -217,9 +217,23 @@ final class FactoryOrchestratorEvidenceCollector
                 elseif($activityValid)$activityIssues[]=['number'=>$number,'status'=>$state,'updated_at'=>$activityTime];
                 // Factory #767 is canonicalized once below after reading its
                 // global kill-switch state; never count an Issue-derived copy.
-                if($state==='blocked'&&!$conflicting){
-                    if(!($name==='Factory' && $number===767))
-                        self::appendBlocker($blockers,self::signal('blocker:'.strtolower($name).'-'.$number,'github_project_snapshot','blocked',$repo,$number,['issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels,'blocker_evidence'=>self::blockerEvidence($row['body']??null,$now)],$now),$omitted['blockers']);
+                if ($state === 'blocked' && !$conflicting) {
+                    if (!($name === 'Factory' && $number === 767)) {
+                        $blocker = self::signal(
+                            'blocker:'.strtolower($name).'-'.$number,
+                            'github_project_snapshot',
+                            'blocked',
+                            $repo,
+                            $number,
+                            [
+                                'issue_ref'=>'github:'.$repo.'#'.$number,
+                                'labels'=>$workflowLabels,
+                                'blocker_evidence'=>self::blockerEvidence($row['body']??null,$now),
+                            ],
+                            $now,
+                        );
+                        self::appendBlocker($blockers, $blocker, $omitted['blockers']);
+                    }
                 }
                 elseif($workflowLabels!==[]&&!$conflicting&&$state!=='planned')
                     self::appendWork($work,self::signal('work:'.strtolower($name).'-'.$number,'github_project_snapshot','pending',$repo,$number,['repository_ref'=>$repo,'issue_ref'=>'github:'.$repo.'#'.$number,'labels'=>$workflowLabels],$now),$omitted['work']);
@@ -270,8 +284,21 @@ final class FactoryOrchestratorEvidenceCollector
                 'coordination_runs'=>$activityValid?$coordination:null,'planned_unlockable'=>null];
         }
         $factory767=$get('/repos/pl0n3r/Factory/issues/767');
-        if(!self::killSwitchRunning($factory767))
-            self::appendBlocker($blockers,self::signal('blocker:factory-767','github_project_snapshot','blocked','pl0n3r/Factory',767,['issue_ref'=>'github:pl0n3r/Factory#767','labels'=>['estado: bloqueado']],$now),$omitted['blockers']);
+        if (!self::killSwitchRunning($factory767)) {
+            $stop = self::signal(
+                'blocker:factory-767',
+                'github_project_snapshot',
+                'blocked',
+                'pl0n3r/Factory',
+                767,
+                [
+                    'issue_ref'=>'github:pl0n3r/Factory#767',
+                    'labels'=>['estado: bloqueado'],
+                ],
+                $now,
+            );
+            self::appendBlocker($blockers, $stop, $omitted['blockers']);
+        }
         $truncated=array_sum($omitted)>0;
         return ['owner_decisions'=>$decisions,'releases'=>[],'blockers'=>$blockers,'work'=>$work,
             'agent_activity'=>$agentActivity,
@@ -452,25 +479,25 @@ final class FactoryOrchestratorEvidenceCollector
     private static function appendBlocker(array &$rows,array $row,int &$omitted): void
     {
         $rows[]=$row;
-        usort($rows,static function(array $a,array $b):int {
+        usort($rows, static function (array $a, array $b): int {
             // The canonical Factory kill-switch alert must never be evicted by the
             // normal top-K budget, even when 50+ Issues declare MVP impact.
-            $stopA=($a['id']??null)==='blocker:factory-767';
-            $stopB=($b['id']??null)==='blocker:factory-767';
-            if($stopA!==$stopB)return ($stopB?1:0)<=>($stopA?1:0);
-            $ea=$a['data']['blocker_evidence']??null;
-            $eb=$b['data']['blocker_evidence']??null;
-            $ia=is_array($ea)&&($ea['mvp_impact']??null)===true?1:0;
-            $ib=is_array($eb)&&($eb['mvp_impact']??null)===true?1:0;
-            if($ia!==$ib)return $ib<=>$ia;
-            $ta=is_array($ea)&&is_int($ea['blocked_at']??null)
-                ?$ea['blocked_at']:PHP_INT_MAX;
-            $tb=is_array($eb)&&is_int($eb['blocked_at']??null)
-                ?$eb['blocked_at']:PHP_INT_MAX;
-            if($ta!==$tb)return $ta<=>$tb;
-            return strcmp($a['data']['issue_ref'],$b['data']['issue_ref']);
+            $stopA = ($a['id'] ?? null) === 'blocker:factory-767';
+            $stopB = ($b['id'] ?? null) === 'blocker:factory-767';
+            if ($stopA !== $stopB) return ($stopB ? 1 : 0) <=> ($stopA ? 1 : 0);
+            $ea = $a['data']['blocker_evidence'] ?? null;
+            $eb = $b['data']['blocker_evidence'] ?? null;
+            $ia = is_array($ea) && ($ea['mvp_impact'] ?? null) === true ? 1 : 0;
+            $ib = is_array($eb) && ($eb['mvp_impact'] ?? null) === true ? 1 : 0;
+            if ($ia !== $ib) return $ib <=> $ia;
+            $ta = is_array($ea) && is_int($ea['blocked_at'] ?? null)
+                ? $ea['blocked_at'] : PHP_INT_MAX;
+            $tb = is_array($eb) && is_int($eb['blocked_at'] ?? null)
+                ? $eb['blocked_at'] : PHP_INT_MAX;
+            if ($ta !== $tb) return $ta <=> $tb;
+            return strcmp($a['data']['issue_ref'], $b['data']['issue_ref']);
         });
-        if(count($rows)>self::MAX_VISIBLE_SIGNALS){
+        if (count($rows) > self::MAX_VISIBLE_SIGNALS) {
             array_pop($rows);
             $omitted++;
         }

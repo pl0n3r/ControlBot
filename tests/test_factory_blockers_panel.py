@@ -17,6 +17,57 @@ def scenario(name):
 
 
 class FactoryBlockersPanelTests(unittest.TestCase):
+    def test_topk_keeps_late_mvp_blocker(self):
+        view = scenario("topk-late")
+        self.assertFalse(view["failed"], view)
+        blockers = view["blockers"]
+        self.assertEqual(len(blockers), 50)
+        # Cada repositorio entrega 50 UNKNOWN antes del MVP tardío (#999).
+        mvp = [row for row in blockers if row["mvp_impact"] is True]
+        self.assertEqual(len(mvp), 7)
+        self.assertEqual(len({row["issue_ref"] for row in mvp}), 7)
+        self.assertTrue(all(row["issue_ref"].endswith("#999") for row in mvp))
+        self.assertTrue(all(row["evidence_status"] == "DECLARED" for row in mvp))
+        self.assertIn("Bloqueo critico MVP", view["html"])
+        self.assertTrue(all(call["method"] == "GET" for call in view["calls"]))
+
+    def test_topk_remains_bounded_and_reports_omission(self):
+        view = scenario("topk-late")
+        self.assertFalse(view["failed"], view)
+        self.assertEqual(len(view["source"]), 50)
+        self.assertEqual(len(view["blockers"]), 50)
+        summary = view["summary"]
+        # Por repo: 50 UNKNOWN + 1 impacto true + 1 false + 1 futuro
+        # (53 señales); la etiqueta contradictoria no es un bloqueo real.
+        self.assertTrue(summary["truncated"])
+        self.assertEqual(summary["omitted"]["blockers"], 7 * 53 - 50)
+        self.assertEqual(summary["omitted"]["owner_decisions"], 0)
+        self.assertEqual(summary["omitted"]["work"], 0)
+        self.assertEqual(summary["reason"], "bounded_signal_budget")
+        self.assertIn("Omitidas: bloqueos=321", view["html"])
+
+    def test_topk_is_order_independent_and_fail_closed(self):
+        baseline = scenario("topk-late")
+        self.assertFalse(baseline["failed"], baseline)
+        expected = [row["issue_ref"] for row in baseline["blockers"]]
+        for mode in ("topk-reversed", "topk-hostile"):
+            with self.subTest(mode=mode):
+                reordered = scenario(mode)
+                self.assertFalse(reordered["failed"], reordered)
+                self.assertEqual(
+                    [row["issue_ref"] for row in reordered["blockers"]],
+                    expected,
+                )
+                self.assertEqual(reordered["summary"], baseline["summary"])
+                self.assertFalse(any(
+                    row["issue_ref"].endswith("#996")  # etiquetas contradictorias
+                    for row in reordered["blockers"]
+                ))
+                self.assertFalse(any(
+                    row["issue_ref"].endswith("#997") and row["mvp_impact"] is True
+                    for row in reordered["blockers"]
+                ))
+
     def test_real_blockers_show_grounded_cause_owner_age_and_next_action(self):
         view = scenario("grounded")
         self.assertFalse(view["failed"])

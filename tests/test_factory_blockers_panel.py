@@ -17,6 +17,115 @@ def scenario(name):
 
 
 class FactoryBlockersPanelTests(unittest.TestCase):
+    def test_topk_keeps_late_mvp_blocker(self):
+        view = scenario("topk-late")
+        self.assertFalse(view["failed"], view)
+        blockers = view["blockers"]
+        self.assertEqual(len(blockers), 50)
+        # Cada repositorio entrega 50 UNKNOWN antes del MVP tardío (#999).
+        mvp = [row for row in blockers if row["mvp_impact"] is True]
+        self.assertEqual(len(mvp), 7)
+        self.assertEqual(len({row["issue_ref"] for row in mvp}), 7)
+        self.assertTrue(all(row["issue_ref"].endswith("#999") for row in mvp))
+        self.assertTrue(all(row["evidence_status"] == "DECLARED" for row in mvp))
+        self.assertIn("Bloqueo critico MVP", view["html"])
+        self.assertTrue(all(call["method"] == "GET" for call in view["calls"]))
+
+    def test_topk_remains_bounded_and_reports_omission(self):
+        view = scenario("topk-late")
+        self.assertFalse(view["failed"], view)
+        self.assertEqual(len(view["source"]), 50)
+        self.assertEqual(len(view["blockers"]), 50)
+        summary = view["summary"]
+        # Por repo: 50 UNKNOWN + 1 impacto true + 1 false + 1 futuro
+        # (53 señales); la etiqueta contradictoria no es un bloqueo real.
+        self.assertTrue(summary["truncated"])
+        self.assertEqual(summary["omitted"]["blockers"], 7 * 53 - 50)
+        self.assertEqual(summary["omitted"]["owner_decisions"], 0)
+        self.assertEqual(summary["omitted"]["work"], 0)
+        self.assertEqual(summary["reason"], "bounded_signal_budget")
+        self.assertIn("Omitidas: bloqueos=321", view["html"])
+
+    def test_topk_is_order_independent_and_fail_closed(self):
+        baseline = scenario("topk-late")
+        self.assertFalse(baseline["failed"], baseline)
+        expected = [row["issue_ref"] for row in baseline["blockers"]]
+        for mode in ("topk-reversed", "topk-hostile"):
+            with self.subTest(mode=mode):
+                reordered = scenario(mode)
+                self.assertFalse(reordered["failed"], reordered)
+                self.assertEqual(
+                    [row["issue_ref"] for row in reordered["blockers"]],
+                    expected,
+                )
+                self.assertEqual(reordered["summary"], baseline["summary"])
+                self.assertFalse(any(
+                    row["issue_ref"].endswith("#996")  # etiquetas contradictorias
+                    for row in reordered["blockers"]
+                ))
+                self.assertFalse(any(
+                    row["issue_ref"].endswith("#997") and row["mvp_impact"] is True
+                    for row in reordered["blockers"]
+                ))
+
+    def test_topk_keeps_global_kill_switch_blocker(self):
+        # A stopped global guard is not ordinary declarative MVP evidence.
+        # This only exercises the fake GitHub transport, not Factory #767.
+        normal = scenario("topk-late")
+        stopped = scenario("topk-stop")
+        self.assertFalse(normal["failed"], normal)
+        self.assertFalse(stopped["failed"], stopped)
+        ref = "github:pl0n3r/Factory#767"
+        self.assertFalse(any(r["data"]["issue_ref"] == ref for r in normal["source"]))
+        self.assertEqual(len(stopped["source"]), 50)
+        self.assertEqual(len(stopped["blockers"]), 50)
+        self.assertEqual(stopped["source"][0]["id"], "blocker:factory-767")
+        self.assertEqual(stopped["blockers"][0]["issue_ref"], ref)
+        self.assertEqual(stopped["blockers"][0]["evidence_status"], "UNKNOWN")
+        self.assertIsNone(stopped["blockers"][0]["mvp_impact"])
+        self.assertEqual(
+            stopped["summary"]["omitted"]["blockers"],
+            normal["summary"]["omitted"]["blockers"] + 1,
+        )
+        self.assertTrue(stopped["summary"]["truncated"])
+
+    def test_factory_stop_sentinel_is_unique_with_blocked_issue_767(self):
+        # Synthetic Factory #767 is open, blocked, and declares MVP impact;
+        # it must not compete with its own canonical stop-sentinel.
+        stopped = scenario("topk-stop")
+        duplicate = scenario("topk-stop-duplicate")
+        self.assertFalse(stopped["failed"], stopped)
+        self.assertFalse(duplicate["failed"], duplicate)
+        expected_ref = "github:pl0n3r/Factory#767"
+        rows = duplicate["source"]
+        view = duplicate["blockers"]
+        self.assertEqual(len(rows), 50)
+        self.assertEqual(len(view), 50)
+        self.assertEqual(
+            sum(row["id"] == "blocker:factory-767" for row in rows), 1
+        )
+        self.assertEqual(
+            sum(row["issue_ref"] == expected_ref for row in view), 1
+        )
+        self.assertEqual(rows[0]["id"], "blocker:factory-767")
+        self.assertEqual(view[0]["issue_ref"], expected_ref)
+        self.assertEqual(view[0]["evidence_status"], "UNKNOWN")
+        self.assertIsNone(view[0]["mvp_impact"])
+        # The duplicate in Issues never consumes a second top-K slot or
+        # changes the total count of omitted *distinct* blockers.
+        self.assertEqual(duplicate["summary"], stopped["summary"])
+        self.assertEqual(
+            [row["id"] for row in rows],
+            [row["id"] for row in stopped["source"]],
+        )
+        self.assertEqual(
+            duplicate["summary"]["omitted"]["blockers"], 7 * 53 + 1 - 50
+        )
+        self.assertEqual(
+            duplicate["summary"]["omitted"]["work"],
+            stopped["summary"]["omitted"]["work"],
+        )
+
     def test_real_blockers_show_grounded_cause_owner_age_and_next_action(self):
         view = scenario("grounded")
         self.assertFalse(view["failed"])
@@ -58,7 +167,14 @@ class FactoryBlockersPanelTests(unittest.TestCase):
                 self.assertEqual(p.returncode, 0, p.stderr)
                 result = json.loads(p.stdout)
                 self.assertTrue(result["view"]["owner_decisions"])
-                self.assertEqual(result["view"]["blocker_explanations"], [])
+                # Legacy blockers lack new labels; only the fail-closed
+                # global-stop sentinel is projected, without inferred cause.
+                projected = result["view"]["blocker_explanations"]
+                self.assertEqual(len(projected), 1)
+                self.assertEqual(projected[0]["issue_ref"],
+                                 "github:pl0n3r/Factory#767")
+                self.assertEqual(projected[0]["evidence_status"], "UNKNOWN")
+                self.assertIsNone(projected[0]["mvp_impact"])
 
     def test_explicit_malformed_blocker_labels_still_fail_closed(self):
         sample = scenario("malformed-labels")

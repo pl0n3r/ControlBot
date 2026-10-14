@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -93,6 +94,36 @@ class HealthIdentityPayloadTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(set(payload), {"status", "version", "release_sha"})
 
+
+    def test_coverage_wrapper_records_identity_source(self):
+        """CI coverage mode must record executed lines for this new PHP DTO."""
+        fragments_raw = os.environ.get("CONTROLBOT_PHP_COVERAGE_DIR")
+        if not fragments_raw:
+            self.skipTest("Requires the CI coverage wrapper")
+        # Invoke the real DTO once more; the auto-prepend bootstrap writes a
+        # fragment at PHP shutdown when the coverage wrapper is active.
+        result = invoke_php("0.1.24", RELEASE_SHA)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        fragments_dir = Path(fragments_raw)
+        candidates = []
+        for fragment in fragments_dir.glob("*.json"):
+            try:
+                coverage = json.loads(fragment.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            for source_path, lines in coverage.items():
+                if source_path.replace("\\\\", "/").endswith("/src/HealthIdentityPayload.php"):
+                    if isinstance(lines, dict):
+                        candidates.append(lines)
+        self.assertTrue(candidates, "PHP coverage fragments omit HealthIdentityPayload.php")
+        self.assertTrue(
+            any(
+                isinstance(state, int) and state > 0
+                for lines in candidates
+                for state in lines.values()
+            ),
+            "No executed lines recorded for HealthIdentityPayload.php",
+        )
 
 if __name__ == "__main__":
     unittest.main()

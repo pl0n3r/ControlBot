@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,14 +29,17 @@ try {
 def invoke_php(version: str, release_sha: str) -> subprocess.CompletedProcess[str]:
     if shutil.which("php") is None:
         raise AssertionError("PHP CLI 8.5 debe estar disponible en CI")
-    return subprocess.run(
-        ["php", "-r", PHP_DRIVER, str(PHP_SOURCE), version, release_sha],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
+    with tempfile.TemporaryDirectory(prefix="controlbot-health-identity-") as temporary:
+        driver = Path(temporary) / "health_identity_driver.php"
+        driver.write_text(PHP_DRIVER, encoding="utf-8")
+        return subprocess.run(
+            ["php", str(driver), str(PHP_SOURCE), version, release_sha],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
 
 
 class HealthIdentityPayloadTests(unittest.TestCase):

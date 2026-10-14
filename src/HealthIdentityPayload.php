@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace ControlBot\\Health;
+namespace ControlBot\Health;
 
 use InvalidArgumentException;
 use JsonSerializable;
@@ -23,13 +23,13 @@ final readonly class HealthIdentityPayload implements JsonSerializable
     public static function build(string $version, string $releaseSha): self
     {
         if (preg_match(
-            '/\\A(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\z/',
+            '/\A(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\z/',
             $version
         ) !== 1) {
             throw new InvalidArgumentException('Invalid health identity.');
         }
 
-        if (preg_match('/\\A[0-9a-f]{40}\\z/', $releaseSha) !== 1) {
+        if (preg_match('/\A[0-9a-f]{40}\z/', $releaseSha) !== 1) {
             throw new InvalidArgumentException('Invalid health identity.');
         }
 

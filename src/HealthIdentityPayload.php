@@ -10,6 +10,7 @@ use JsonSerializable;
  * Pure structural identity for a supplied release artifact.
  *
  * A valid payload is not evidence that a server, deploy, or endpoint is healthy.
+ * The `ok` status means only that the supplied identity fields are structurally valid.
  */
 final readonly class HealthIdentityPayload implements JsonSerializable
 {

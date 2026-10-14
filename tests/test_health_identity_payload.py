@@ -32,7 +32,7 @@ def invoke_php(version: str, release_sha: str) -> subprocess.CompletedProcess[st
         raise AssertionError("PHP CLI 8.5 debe estar disponible en CI")
     with tempfile.TemporaryDirectory(prefix="controlbot-health-identity-") as temporary:
         driver = Path(temporary) / "health_identity_driver.php"
-        driver.write_text(PHP_DRIVER, encoding="utf-8")
+        driver.write_text("<?php\n" + PHP_DRIVER, encoding="utf-8")
         return subprocess.run(
             ["php", str(driver), str(PHP_SOURCE), version, release_sha],
             cwd=ROOT,

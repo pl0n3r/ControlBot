@@ -67,8 +67,10 @@ class HealthIdentityPayloadTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
                 self.assertEqual(result.stdout, "")
                 self.assertEqual(result.stderr, "Invalid health identity.")
-                self.assertNotIn(version, result.stderr)
-                self.assertNotIn(release_sha, result.stderr)
+                if version:
+                    self.assertNotIn(version, result.stderr)
+                if release_sha:
+                    self.assertNotIn(release_sha, result.stderr)
 
     def test_no_secrets_global_reads_or_untrusted_fields(self):
         source = PHP_SOURCE.read_text(encoding="utf-8")

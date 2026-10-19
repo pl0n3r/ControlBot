@@ -56,6 +56,20 @@ class RevisionJuridicaTests(unittest.TestCase):
             self.assertTrue(module.check_bundle(root))
             (root / "revision-juridica/paquete-completo.md").write_bytes(b"viejo")
             self.assertTrue(module.check_bundle(root))
+            # Rollback offline: restaurar las copias y el paquete de las fuentes.
+            (root / "revision-juridica/retencion.md").write_bytes(
+                (root / "docs/privacidad/retencion.md").read_bytes()
+            )
+            bundle = module.expected_files(root, stamp, sha)
+            (root / "revision-juridica/paquete-completo.md").write_bytes(
+                bundle["revision-juridica/paquete-completo.md"]
+            )
+            self.assertEqual([], module.check_bundle(root))
+            # Un cambio de versión también invalida el índice, sin escribir.
+            (root / "config/version.json").write_text(
+                '{"version":"99.0.0"}\n', encoding="utf-8"
+            )
+            self.assertTrue(module.check_bundle(root))
 
     def test_invalid_stamp_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:

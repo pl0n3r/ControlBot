@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import date, datetime, timezone
 import json
 from pathlib import Path
@@ -48,6 +49,12 @@ def stamp_from_existing(root: Path) -> tuple[str, str]:
     return match.group(1), match.group(2)
 
 
+def git_blob_fingerprint(content: bytes) -> str:
+    """SHA Git del contenido exacto, sin usar estado mutable del repositorio."""
+    prefix = b"blob " + str(len(content)).encode("ascii") + b"\\0"
+    return hashlib.sha1(prefix + content).hexdigest()
+
+
 def expected_files(root: Path, stamp: str, source_sha: str) -> dict[str, bytes]:
     date.fromisoformat(stamp)
     if re.fullmatch(r"[0-9a-f]{40}", source_sha) is None:
@@ -77,6 +84,9 @@ def expected_files(root: Path, stamp: str, source_sha: str) -> dict[str, bytes]:
         "Estado: documented_not_legally_approved",
         f"Versión del repositorio: {version}",
         f"SHA de origen de los documentos: {source_sha}",
+        "",
+        "Huellas Git blob SHA-1 de las fuentes incluidas:",
+        *(f"- {source}: {git_blob_fingerprint((root / source).read_bytes())}" for source in SOURCES),
         "",
         "Este directorio agrupa borradores técnicos para entregar al abogado. No supone aprobación jurídica, consentimiento, publicación ni entrada en producción.",
         "",
@@ -148,6 +158,13 @@ def check_bundle(root: Path) -> list[str]:
 
 
 def generate(root: Path) -> None:
+    # La identidad de HEAD sólo certifica fuentes confirmadas, nunca borradores.
+    clean = subprocess.run(
+        ["git", "diff", "--quiet", "HEAD", "--", *SOURCES],
+        cwd=root, capture_output=True, check=False,
+    )
+    if clean.returncode != 0:
+        raise ValueError("Fuentes modificadas sin confirmar: no generar procedencia falsa")
     sha = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=root, text=True
     ).strip().lower()

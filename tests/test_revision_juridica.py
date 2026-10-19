@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -70,6 +71,13 @@ class RevisionJuridicaTests(unittest.TestCase):
                 '{"version":"99.0.0"}\n', encoding="utf-8"
             )
             self.assertTrue(module.check_bundle(root))
+
+    def test_dirty_sources_are_denied_before_generation(self):
+        with mock.patch.object(module.subprocess, "run") as run:
+            run.return_value.returncode = 1
+            with self.assertRaisesRegex(ValueError, "sin confirmar"):
+                module.generate(ROOT)
+            self.assertEqual(run.call_count, 1)
 
     def test_invalid_stamp_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:

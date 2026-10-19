@@ -6,6 +6,14 @@ Estado: documented_not_legally_approved
 Versión del repositorio: 0.1.24
 SHA de origen de los documentos: f32a96e355c874f13ce557e8ac4167f32fce271b
 
+Huellas Git blob SHA-1 de las fuentes incluidas:
+- docs/privacidad/aviso-privacidad.md: 1b257e5380a489843a91ddcf9a7a59ef1d014b44
+- docs/privacidad/canal-derechos.md: a8bdab592f280af4695599814a2963fd61bdfc75
+- docs/privacidad/politica-tratamiento.md: 6972038968aac9124526280b837e247aadf14fcf
+- docs/privacidad/registro-tratamientos.md: 9d848ca2a9121c5c022b07456f6307f9e2b17bf4
+- docs/privacidad/retencion.md: 2459698593eced6f3bd81ee6e82519bd8b753460
+- docs/privacidad/terminos-condiciones.md: c86aefbf8efac3ee7c44ce1a540581a57d561326
+
 Este directorio agrupa borradores técnicos para entregar al abogado. No supone aprobación jurídica, consentimiento, publicación ni entrada en producción.
 
 ## Hechos del responsable pendientes de confirmar

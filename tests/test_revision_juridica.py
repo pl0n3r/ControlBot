@@ -32,6 +32,19 @@ class RevisionJuridicaTests(unittest.TestCase):
         self.assertIn("schedule:", workflow)
         self.assertIn("branches: [main]", workflow)
         self.assertIn("revision-juridica-desfase", workflow)
+        # Validar que los issues nuevos son aceptables por el coordinador.
+        issue_template = workflow.split("cat > \"$body\" <<'ISSUE'", 1)[1].split(
+            "\n          ISSUE", 1
+        )[0]
+        for heading in (
+            "### Contexto", "### Alcance", "### Fuera de alcance",
+            "### Criterios de aceptación", "### Contrato ejecutable",
+            "### Rutas reclamadas",
+        ):
+            with self.subTest(heading=heading):
+                self.assertIn(heading, issue_template)
+        self.assertEqual(issue_template.count("<!-- factory-acceptance "), 1)
+        self.assertEqual(issue_template.count("<!-- factory-plan-task "), 1)
         self.assertIn("generar_revision_juridica.py --check", workflow)
         self.assertNotIn("pull-requests: write", workflow)
         self.assertNotIn("gh pr merge", workflow)

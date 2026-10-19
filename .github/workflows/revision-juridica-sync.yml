@@ -46,9 +46,16 @@ jobs:
           ### Contexto
           La verificación de la carpeta revision-juridica/ en main falló. Regenerar con python3 scripts/generar_revision_juridica.py, comprobar --check y abrir PR para squash. No se autoriza aprobación legal ni edición de los documentos fuente.
           
+          ### Alcance
+          Regenerar exclusivamente copias desde docs/privacidad/ y demostrar --check en un PR sujeto a revisión y CI.
+          
+          ### Fuera de alcance
+          No modificar fuentes, publicar o aprobar documentos jurídicos, desplegar ni escribir directamente en main.
+          
           ### Criterios de aceptación
           - [ ] [AC-01] Copias y paquete coinciden exactamente con las seis fuentes; test ejecutable tests/test_revision_juridica.py::RevisionJuridicaTests::test_generated_bundle_matches_sources.
           
+          ### Contrato ejecutable
           <!-- factory-acceptance {"version":1,"criteria":[{"id":"AC-01","kind":"test","target":"tests/test_revision_juridica.py::RevisionJuridicaTests::test_generated_bundle_matches_sources"}]} -->
           
           ### Rutas reclamadas

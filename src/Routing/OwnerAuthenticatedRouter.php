@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace ControlBot\\Routing;
+namespace ControlBot\Routing;
 
-use ControlBot\\Security\\OwnerSessionService;
+use ControlBot\Security\OwnerSessionService;
 use Throwable;
 
 /**

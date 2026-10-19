@@ -12,10 +12,10 @@ PHP_SCENARIO = r"""
 require 'src/Approvals.php';
 require 'src/OwnerSession.php';
 require 'src/ControlBotWebEntrypoint.php';
-use ControlBot\\Security\\OwnerSessionService;
-use ControlBot\\Security\\TokenVault;
-use ControlBot\\Security\\Totp;
-use ControlBot\\Web\\ControlBotWebEntrypoint;
+use ControlBot\Security\OwnerSessionService;
+use ControlBot\Security\TokenVault;
+use ControlBot\Security\Totp;
+use ControlBot\Web\ControlBotWebEntrypoint;
 $now = 1800000000;
 $owner = 'pl0n3r';
 $key = base64_encode(str_repeat('K', SODIUM_CRYPTO_SECRETBOX_KEYBYTES));

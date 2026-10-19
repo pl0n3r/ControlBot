@@ -78,13 +78,13 @@ final class ControlBotWebEntrypoint
         array $environment,
         int $now,
         array $ownerSession,
-        \\ControlBot\\Security\\OwnerSessionService $ownerAuth,
+        \ControlBot\Security\OwnerSessionService $ownerAuth,
         ?string $githubProjectionPath = null,
         ?string $orchestratorSnapshotPath = null,
         ?string $orchestratorCachePath = null,
     ): array {
         require_once __DIR__ . '/Routing/OwnerAuthenticatedRouter.php';
-        $owner = \\ControlBot\\Routing\\OwnerAuthenticatedRouter::verifiedOwner(
+        $owner = \ControlBot\Routing\OwnerAuthenticatedRouter::verifiedOwner(
             $ownerAuth,
             $ownerSession,
             $now,
@@ -100,7 +100,7 @@ final class ControlBotWebEntrypoint
                     'X-Frame-Options' => 'DENY',
                     'Referrer-Policy' => 'no-referrer',
                 ],
-                'body' => "Forbidden.\\n",
+                'body' => "Forbidden.\n",
             ];
         }
         // Delegar solo DESPUES de verificar OAuth y TOTP; se descarta

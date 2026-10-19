@@ -33,7 +33,7 @@ final class PdoDecisionRepository implements DecisionRepository
             throw new InvalidArgumentException('Decision record invalid.');
         }
         try {
-            $json = json_encode($decision, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $json = json_encode($decision, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES, 32);
         } catch (JsonException) {
             throw new InvalidArgumentException('Decision record invalid.');
         }

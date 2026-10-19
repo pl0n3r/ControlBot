@@ -51,7 +51,7 @@ def stamp_from_existing(root: Path) -> tuple[str, str]:
 
 def git_blob_fingerprint(content: bytes) -> str:
     """SHA Git del contenido exacto, sin usar estado mutable del repositorio."""
-    prefix = b"blob " + str(len(content)).encode("ascii") + b"\\0"
+    prefix = b"blob " + str(len(content)).encode("ascii") + b"\0"
     return hashlib.sha1(prefix + content).hexdigest()
 
 

@@ -49,10 +49,9 @@ def stamp_from_existing(root: Path) -> tuple[str, str]:
     return match.group(1), match.group(2)
 
 
-def git_blob_fingerprint(content: bytes) -> str:
-    """SHA Git del contenido exacto, sin usar estado mutable del repositorio."""
-    prefix = b"blob " + str(len(content)).encode("ascii") + b"\0"
-    return hashlib.sha1(prefix + content).hexdigest()
+def source_sha256(content: bytes) -> str:
+    """Huella SHA-256 de contenido para comprobación de integridad."""
+    return hashlib.sha256(content).hexdigest()
 
 
 def expected_files(root: Path, stamp: str, source_sha: str) -> dict[str, bytes]:
@@ -85,8 +84,8 @@ def expected_files(root: Path, stamp: str, source_sha: str) -> dict[str, bytes]:
         f"Versión del repositorio: {version}",
         f"SHA de origen de los documentos: {source_sha}",
         "",
-        "Huellas Git blob SHA-1 de las fuentes incluidas:",
-        *(f"- {source}: {git_blob_fingerprint((root / source).read_bytes())}" for source in SOURCES),
+        "Huellas SHA-256 de las fuentes incluidas:",
+        *(f"- {source}: {source_sha256((root / source).read_bytes())}" for source in SOURCES),
         "",
         "Este directorio agrupa borradores técnicos para entregar al abogado. No supone aprobación jurídica, consentimiento, publicación ni entrada en producción.",
         "",

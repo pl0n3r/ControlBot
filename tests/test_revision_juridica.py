@@ -1,4 +1,5 @@
 """Regresiones del paquete jurídico offline y su sincronización."""
+import hashlib
 import importlib.util
 from pathlib import Path
 import shutil
@@ -48,6 +49,17 @@ class RevisionJuridicaTests(unittest.TestCase):
         self.assertIn("generar_revision_juridica.py --check", workflow)
         self.assertNotIn("pull-requests: write", workflow)
         self.assertNotIn("gh pr merge", workflow)
+
+    def test_sha256_fingerprints_match_sources(self):
+        self.assertEqual(
+            module.source_sha256(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        )
+        index = (ROOT / "revision-juridica/00-LEEME.md").read_text("utf-8")
+        self.assertIn("Huellas SHA-256 de las fuentes incluidas:", index)
+        for source in module.SOURCES:
+            expected = hashlib.sha256((ROOT / source).read_bytes()).hexdigest()
+            self.assertIn(f"- {source}: {expected}", index)
 
     def test_read_only_check_rejects_tampered_or_missing_copies(self):
         with tempfile.TemporaryDirectory() as tmp:

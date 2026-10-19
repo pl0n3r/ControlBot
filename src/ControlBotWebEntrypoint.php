@@ -66,6 +66,57 @@ final class ControlBotWebEntrypoint
         return self::withShell($response, $path === '/github' ? 'GitHub' : 'GitHub del proyecto');
     }
 
+    /**
+     * Canal autenticado para las vistas del dueño. La sesion procede del
+     * almacenamiento privado de PHP, no de cabeceras ni de REMOTE_USER.
+     *
+     * La integracion del bootstrap HTTP se hace por separado: nunca inferir
+     * autenticacion OAuth/TOTP de una cabecera introducida por el cliente.
+     */
+    public static function handleAuthenticated(
+        array $server,
+        array $environment,
+        int $now,
+        array $ownerSession,
+        \ControlBot\Security\OwnerSessionService $ownerAuth,
+        ?string $githubProjectionPath = null,
+        ?string $orchestratorSnapshotPath = null,
+        ?string $orchestratorCachePath = null,
+    ): array {
+        require_once __DIR__ . '/Routing/OwnerAuthenticatedRouter.php';
+        $owner = \ControlBot\Routing\OwnerAuthenticatedRouter::verifiedOwner(
+            $ownerAuth,
+            $ownerSession,
+            $now,
+        );
+        $expected = $environment['CONTROLBOT_OWNER_LOGIN'] ?? null;
+        if ($owner === null || !is_string($expected) || !hash_equals($expected, $owner)) {
+            return [
+                'status' => 403,
+                'headers' => [
+                    'Content-Type' => 'text/plain; charset=utf-8',
+                    'Cache-Control' => 'no-store',
+                    'X-Content-Type-Options' => 'nosniff',
+                    'X-Frame-Options' => 'DENY',
+                    'Referrer-Policy' => 'no-referrer',
+                ],
+                'body' => "Forbidden.\n",
+            ];
+        }
+        // Delegar solo DESPUES de verificar OAuth y TOTP; se descarta
+        // cualquier REMOTE_USER recibido en la peticion original.
+        $trustedServer = $server;
+        $trustedServer['REMOTE_USER'] = $owner;
+        return self::handle(
+            $trustedServer,
+            $environment,
+            $now,
+            $githubProjectionPath,
+            $orchestratorSnapshotPath,
+            $orchestratorCachePath,
+        );
+    }
+
     private static function withShell(array $response, string $title): array
     {
         if (($response['status'] ?? null) !== 200

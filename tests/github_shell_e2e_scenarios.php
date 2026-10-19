@@ -1,9 +1,14 @@
 <?php
 declare(strict_types=1);
 
+require_once dirname(__DIR__) . '/src/Approvals.php';
+require_once dirname(__DIR__) . '/src/OwnerSession.php';
 require_once dirname(__DIR__) . '/src/ControlBotWebEntrypoint.php';
 
 use ControlBot\Web\ControlBotWebEntrypoint;
+use ControlBot\Security\OwnerSessionService;
+use ControlBot\Security\TokenVault;
+use ControlBot\Security\Totp;
 
 function github_projection(): string
 {
@@ -35,10 +40,26 @@ function github_projection(): string
 
 function route(string $uri,string $projection,string $method='GET',string $user='owner'): array
 {
-    return ControlBotWebEntrypoint::handle(
-        ['REQUEST_METHOD'=>$method,'REQUEST_URI'=>$uri,'REMOTE_USER'=>$user],
+    $now=1000;
+    $service=new OwnerSessionService(
+        'owner',
+        new TokenVault(base64_encode(str_repeat('K',SODIUM_CRYPTO_SECRETBOX_KEYBYTES)))
+    );
+    $session=[];
+    $service->establishTrustedOAuthSession($session,'owner','gho_synthetic_fixture_not_live');
+    $secret='JBSWY3DPEHPK3PXP';
+    $service->reauthenticateTotp($session,Totp::code($secret,$now),$secret,$now);
+    if($user!=='owner'){
+        // Negative fixture: a falsified owner session cannot reach private views.
+        $session['_owner_login']=$user;
+    }
+
+    return ControlBotWebEntrypoint::handleAuthenticated(
+        ['REQUEST_METHOD'=>$method,'REQUEST_URI'=>$uri,'REMOTE_USER'=>'untrusted-client'],
         ['CONTROLBOT_OWNER_LOGIN'=>'owner'],
-        1000,
+        $now,
+        $session,
+        $service,
         $projection,
         sys_get_temp_dir().'/cb-shell-missing-orchestrator.json',
         sys_get_temp_dir().'/cb-shell-cache.json',

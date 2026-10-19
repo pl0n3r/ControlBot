@@ -4,6 +4,7 @@ import runpy
 import subprocess
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -34,8 +35,8 @@ def _diff_numstat_for_pr(pr: dict) -> list[tuple[str, int, int]]:
         )
         parents = [line.removeprefix("parent ") for line in raw.split("\n\n", 1)[0].splitlines()
                    if line.startswith("parent ")]
-        if head not in parents:
-            raise ValueError("Checkout no coincide con HEAD exacto del PR")
+        if len(parents) != 2 or set(parents) != {base, head}:
+            raise ValueError("Checkout no es el merge sintético exacto base+head del PR")
     if subprocess.run(
         ["git", "cat-file", "-e", f"{base}^{{commit}}"],
         cwd=ROOT, capture_output=True, check=False,
@@ -363,6 +364,37 @@ class InfrastructureIntentTests(unittest.TestCase):
             verified = generated.intersection(known)
         changed = _budget_without_verified_copies(diff, verified)
         self.assertLessEqual(changed, 400)
+
+    def test_budget_rejects_unrelated_synthetic_merge_parents(self):
+        base, head, checkout = "a" * 40, "b" * 40, "c" * 40
+        pr = {"base": {"sha": base}, "head": {"sha": head}}
+        payload = b"1\t0\ttests/demo.py\0"
+        for parents in ((base, head), (head, base)):
+            with self.subTest(parents=parents):
+                commit = "tree " + "d" * 40 + "\n" + "".join(
+                    f"parent {value}\n" for value in parents
+                ) + "\nSynthetic GitHub merge\n"
+                with patch.object(subprocess, "check_output",
+                                  side_effect=[checkout, commit, payload]):
+                    with patch.object(subprocess, "run") as run:
+                        run.return_value.returncode = 0
+                        self.assertEqual(_diff_numstat_for_pr(pr),
+                                         [("tests/demo.py", 1, 0)])
+        for parents in ((head, "d" * 40), (base, head, "d" * 40), (head,)):
+            with self.subTest(rejected_parents=parents):
+                commit = "tree " + "d" * 40 + "\n" + "".join(
+                    f"parent {value}\n" for value in parents
+                ) + "\nSynthetic commit\n"
+                with patch.object(subprocess, "check_output",
+                                  side_effect=[checkout, commit]):
+                    with self.assertRaisesRegex(ValueError, "merge sintético exacto"):
+                        _diff_numstat_for_pr(pr)
+        with patch.object(subprocess, "check_output",
+                          side_effect=[head, payload]):
+            with patch.object(subprocess, "run") as run:
+                run.return_value.returncode = 0
+                self.assertEqual(_diff_numstat_for_pr(pr),
+                                 [("tests/demo.py", 1, 0)])
 
     def test_budget_excludes_only_verified_generated_docs(self):
         changes = [

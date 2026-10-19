@@ -36,9 +36,52 @@ $untrustedHeader=ControlBotWebEntrypoint::handleAuthenticated($wrongServer,$env,
 $fake=$session;
 $fake['_github_token_sealed']='not-a-vault-token';
 $forged=ControlBotWebEntrypoint::handleAuthenticated($server,$env,$now,$fake,$service);
+$projection=tempnam(sys_get_temp_dir(),'cb-auth-project-');
+$projectSnapshot=[
+  'version'=>1,'project_id'=>'alpha-project','observed_at'=>$now-1,
+  'repositories'=>[[
+    'repository_id'=>'alpha-repo','repository'=>'pl0n3r/Alpha',
+    'source_ref'=>'https://github.com/pl0n3r/Alpha','observed_at'=>$now-1,
+    'main_sha'=>str_repeat('a',40),
+    'checks'=>['items'=>[],'truncated'=>false],
+    'pull_requests'=>['items'=>[],'truncated'=>false],
+    'issues'=>['items'=>[],'truncated'=>false],
+    'latest_release'=>null,'latest_workflow'=>null,
+  ]],
+];
+file_put_contents($projection,json_encode(
+    ['version'=>1,'projects'=>[$projectSnapshot]],JSON_THROW_ON_ERROR
+));
+$routes=[];
+foreach(['/','/api/orchestrator-live','/github','/projects/alpha-project/github'] as $path){
+  $request=['REQUEST_METHOD'=>'GET','REQUEST_URI'=>$path,'REMOTE_USER'=>'pl0n3r'];
+  $denied=ControlBotWebEntrypoint::handleAuthenticated(
+      $request,$env,$now,[],$service,$projection,
+      sys_get_temp_dir().'/cb-auth-missing-snapshot.json',
+      sys_get_temp_dir().'/cb-auth-snapshot-cache.json'
+  );
+  $allowed=ControlBotWebEntrypoint::handleAuthenticated(
+      $request,$env,$now,$session,$service,$projection,
+      sys_get_temp_dir().'/cb-auth-missing-snapshot.json',
+      sys_get_temp_dir().'/cb-auth-snapshot-cache.json'
+  );
+  $old=ControlBotWebEntrypoint::handleAuthenticated(
+      $request,$env,$now+301,$session,$service,$projection
+  );
+  $routes[$path]=[
+      'denied'=>$denied['status'],
+      'denied_body'=>$denied['body'],
+      'denied_cache'=>$denied['headers']['Cache-Control']??null,
+      'allowed'=>$allowed['status'],
+      'expired'=>$old['status'],
+  ];
+}
+@unlink($projection);
+@unlink(sys_get_temp_dir().'/cb-auth-snapshot-cache.json');
 echo json_encode([
   'missing'=>$missing,'not_otp'=>$notOtp,'valid'=>$valid,'expired'=>$expired,
   'untrusted_header'=>$untrustedHeader,'forged'=>$forged,
+  'routes'=>$routes,
 ],JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 """
 
@@ -61,6 +104,17 @@ class RouterAutenticadoTests(unittest.TestCase):
                 self.assertIn(response["status"], (401, 403))
                 self.assertEqual(response["headers"]["Cache-Control"], "no-store")
                 self.assertNotIn("gho_fixture_only", response["body"])
+        for path, response in payload["routes"].items():
+            with self.subTest(route=path):
+                self.assertIn(response["denied"], (401, 403))
+                self.assertEqual(response["denied_cache"], "no-store")
+                self.assertEqual(response["denied_body"], "Forbidden.\\n")
+                self.assertEqual(response["allowed"], 200)
+                self.assertIn(response["expired"], (401, 403))
+        index = (ROOT / "public" / "index.php").read_text(encoding="utf-8")
+        self.assertIn("handleAuthenticated(", index)
+        self.assertIn("session_start(", index)
+        self.assertNotIn("ControlBotWebEntrypoint::handle(", index)
         self.assertEqual(payload["valid"]["status"], 200)
         self.assertEqual(payload["untrusted_header"]["status"], 200)
         self.assertNotIn("gho_fixture_only", payload["valid"]["body"])

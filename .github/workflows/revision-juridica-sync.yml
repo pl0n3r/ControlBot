@@ -1,0 +1,67 @@
+name: Sincronizar revisión jurídica
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/privacidad/**
+      - datos.yml
+      - config/version.json
+      - revision-juridica/**
+      - scripts/generar_revision_juridica.py
+  schedule:
+    - cron: '17 6 * * *'
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: revision-juridica-sync-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Comprobar paquete sin escribir
+        id: verificacion
+        continue-on-error: true
+        run: python3 scripts/generar_revision_juridica.py --check
+      - name: Registrar un único issue de desfase
+        if: steps.verificacion.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/labels/revision-juridica-desfase" >/dev/null 2>&1; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/labels" \
+              -f name=revision-juridica-desfase -f color=FBCA04 \
+              -f description="Paquete jurídico distinto de sus fuentes" >/dev/null
+          fi
+          count="$(gh issue list --repo "${GITHUB_REPOSITORY}" --state open --label revision-juridica-desfase --json number --jq 'length')"
+          if [ "$count" -eq 0 ]; then
+            body="$(mktemp)"
+            cat > "$body" <<'ISSUE'
+### Contexto
+La verificación de la carpeta revision-juridica/ en main falló. Regenerar con python3 scripts/generar_revision_juridica.py, comprobar --check y abrir PR para squash. No se autoriza aprobación legal ni edición de los documentos fuente.
+
+### Criterios de aceptación
+- [ ] [AC-01] Copias y paquete coinciden exactamente con las seis fuentes; test ejecutable tests/test_revision_juridica.py::RevisionJuridicaTests::test_generated_bundle_matches_sources.
+
+<!-- factory-acceptance {"version":1,"criteria":[{"id":"AC-01","kind":"test","target":"tests/test_revision_juridica.py::RevisionJuridicaTests::test_generated_bundle_matches_sources"}]} -->
+
+### Rutas reclamadas
+- revision-juridica/
+
+<!-- factory-plan-task {"version":1,"epic":800,"task_key":"LEGAL_SYNC_CONTROLBOT","order":1,"owner":"pl0n3r","roles":["legal-privacidad","documentacion","ingenieria-software"],"depends_on":[],"paths":["revision-juridica/"]} -->
+ISSUE
+            gh issue create --repo "${GITHUB_REPOSITORY}" \
+              --title "docs(legal): regenerar revision-juridica/ desactualizada" \
+              --body-file "$body" --assignee pl0n3r \
+              --label revision-juridica-desfase \
+              --label "estado: disponible" --label "tipo: documentación" \
+              --label "prioridad: media"
+          fi
+          echo "::error::El paquete jurídico está desactualizado; existe un Issue único para corregirlo."
+          exit 1

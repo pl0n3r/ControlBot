@@ -53,10 +53,13 @@ try {
         $service,
     );
 } catch (Throwable) {
-    // Configuration and session errors cannot disclose the owner identity,
-    // credentials, environment values or snapshots in the HTTP response.
+    // Missing server-side configuration is an unavailable service (503);
+    // an invalid/absent owner session with valid configuration is forbidden (403).
+    // Neither path exposes identities, secrets or snapshots.
+    $configured = is_string($owner ?? null) && $owner !== ''
+        && is_string($vaultKey ?? null) && $vaultKey !== '';
     $response = [
-        'status' => 403,
+        'status' => $configured ? 403 : 503,
         'headers' => [
             'Content-Type' => 'text/plain; charset=utf-8',
             'Cache-Control' => 'no-store',
@@ -64,7 +67,7 @@ try {
             'X-Frame-Options' => 'DENY',
             'Referrer-Policy' => 'no-referrer',
         ],
-        'body' => "Forbidden.\n",
+        'body' => $configured ? "Forbidden.\n" : "Service unavailable.\n",
     ];
 }
 

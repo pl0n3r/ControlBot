@@ -29,9 +29,11 @@ def _diff_numstat_for_pr(pr: dict) -> list[tuple[str, int, int]]:
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
     if checkout != head:
-        parents = subprocess.check_output(
-            ["git", "show", "-s", "--format=%P", "HEAD"], cwd=ROOT, text=True
-        ).split()
+        raw = subprocess.check_output(
+            ["git", "cat-file", "-p", "HEAD"], cwd=ROOT, text=True
+        )
+        parents = [line.removeprefix("parent ") for line in raw.split("\n\n", 1)[0].splitlines()
+                   if line.startswith("parent ")]
         if head not in parents:
             raise ValueError("Checkout no coincide con HEAD exacto del PR")
     if subprocess.run(

@@ -119,5 +119,26 @@ class RouterAutenticadoTests(unittest.TestCase):
         self.assertEqual(payload["untrusted_header"]["status"], 200)
         self.assertNotIn("gho_fixture_only", payload["valid"]["body"])
 
+
+    def test_public_bootstrap_rejects_spoofed_remote_user(self):
+        """El front controller no acepta REMOTE_USER como sesión OAuth."""
+        php = r"""
+$_SERVER['REQUEST_METHOD'] = 'GET';
+$_SERVER['REQUEST_URI'] = '/github';
+$_SERVER['REMOTE_USER'] = 'pl0n3r';
+putenv('CONTROLBOT_OWNER_LOGIN=pl0n3r');
+putenv('CONTROLBOT_VAULT_KEY='.base64_encode(
+    str_repeat('K', SODIUM_CRYPTO_SECRETBOX_KEYBYTES)
+));
+require 'public/index.php';
+"""
+        result = subprocess.run(
+            ["php", "-r", php],
+            cwd=ROOT, text=True, capture_output=True, timeout=30
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout, "Forbidden.\n")
+        self.assertEqual(result.stderr, "")
+
 if __name__ == "__main__":
     unittest.main()

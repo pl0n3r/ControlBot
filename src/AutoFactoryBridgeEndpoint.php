@@ -85,6 +85,15 @@ final class AutoFactoryBridgeEndpoint
             }
         }
         if ($method === 'GET' && $path === '/v1/bridge/commands/next' && $body === []) {
+            // $_GET contains strings, not native integers or null. Normalize only
+            // recognized values; malformed and unknown parameters still fail closed.
+            if (!array_key_exists('cursor', $query) || $query['cursor'] === '') {
+                $query['cursor'] = null;
+            }
+            if (is_string($query['waitMs'] ?? null)
+                && preg_match('/^[0-9]{4,5}$/D', $query['waitMs']) === 1) {
+                $query['waitMs'] = (int) $query['waitMs'];
+            }
             if (!self::hasKeys($query, ['profileAlias', 'cursor', 'waitMs'])
                 || !self::alias($query['profileAlias'])
                 || !hash_equals($identity['profileAlias'], $query['profileAlias'])

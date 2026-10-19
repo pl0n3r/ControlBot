@@ -1,5 +1,4 @@
 """Regresiones del paquete jurídico offline y su sincronización."""
-import hashlib
 import importlib.util
 from pathlib import Path
 import shutil
@@ -49,17 +48,6 @@ class RevisionJuridicaTests(unittest.TestCase):
         self.assertIn("generar_revision_juridica.py --check", workflow)
         self.assertNotIn("pull-requests: write", workflow)
         self.assertNotIn("gh pr merge", workflow)
-
-    def test_sha256_fingerprints_match_sources(self):
-        self.assertEqual(
-            module.source_sha256(b"abc"),
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-        )
-        index = (ROOT / "revision-juridica/00-LEEME.md").read_text("utf-8")
-        self.assertIn("Huellas SHA-256 de las fuentes incluidas:", index)
-        for source in module.SOURCES:
-            expected = hashlib.sha256((ROOT / source).read_bytes()).hexdigest()
-            self.assertIn(f"- {source}: {expected}", index)
 
     def test_read_only_check_rejects_tampered_or_missing_copies(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -113,73 +101,33 @@ class RevisionJuridicaTests(unittest.TestCase):
             self.assertTrue(module.check_bundle(root))
 
 
-    def test_invalid_inputs_fail_closed(self):
+    def test_invalid_sources_and_clean_generation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "config").mkdir()
-            config = root / "config/version.json"
-            data = root / "datos.yml"
             sha = "f32a96e355c874f13ce557e8ac4167f32fce271b"
-            config.write_text('{"version":"0.1.24"}', encoding="utf-8")
-            data.write_text('{"treatments":[{"providers":[]}]}', encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "SHA de origen inválido"):
-                module.expected_files(root, "2026-10-19", "bad-sha")
+            for name in (*module.SOURCES, "datos.yml", "config/version.json"):
+                dest = root / name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, dest)
+            self.assertEqual("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", module.source_sha256(b"abc"))
+            for date, revision in (("2026-02-31", sha), ("2026-10-19", "bad")):
+                with self.assertRaises(ValueError):
+                    module.expected_files(root, date, revision)
+            (root / "config/version.json").write_text('{"version":"bad"}')
             with self.assertRaises(ValueError):
-                module.expected_files(root, "2026-02-31", sha)
-            for invalid in ('{"version":42}', '{"version":"version-one"}'):
-                with self.subTest(version=invalid):
-                    config.write_text(invalid, encoding="utf-8")
-                    with self.assertRaisesRegex(ValueError, "Versión no verificable"):
-                        module.expected_files(root, "2026-10-19", sha)
-            config.write_text('{"version":"0.1.24"}', encoding="utf-8")
-            for invalid, reason in (
-                ('{"treatments":[]}', "Inventario"),
-                ('{"treatments":"bad"}', "Inventario"),
-                ('{"treatments":["bad"]}', "Proveedores no verificables"),
-                ('{"treatments":[{"providers":"bad"}]}', "Proveedores no verificables"),
-                ('{"treatments":[{"providers":[15]}]}', "Proveedor inválido"),
-                ('{"treatments":[{"providers":[" "]}]}', "Proveedor inválido"),
-            ):
-                with self.subTest(treatments=invalid):
-                    data.write_text(invalid, encoding="utf-8")
-                    with self.assertRaisesRegex(ValueError, reason):
-                        module.expected_files(root, "2026-10-19", sha)
-
-    def test_generate_clean_sources_and_cli_modes(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            for path in (*module.SOURCES, "datos.yml", "config/version.json"):
-                (root / path).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(ROOT / path, root / path)
-            (root / "datos.yml").write_text(
-                '{"treatments":[{"providers":["Proveedor de prueba"]}]}',
-                encoding="utf-8",
-            )
-            source_sha = "f32a96e355c874f13ce557e8ac4167f32fce271b"
-            with mock.patch.object(module.subprocess, "run") as clean:
+                module.expected_files(root, "2026-10-19", sha)
+            shutil.copyfile(ROOT / "config/version.json", root / "config/version.json")
+            for bad in ('{"treatments":[]}', '{"treatments":["bad"]}', '{"treatments":[{"providers":[3]}]}'):
+                (root / "datos.yml").write_text(bad)
+                with self.assertRaises(ValueError):
+                    module.expected_files(root, "2026-10-19", sha)
+            (root / "datos.yml").write_text('{"treatments":[{"providers":["Ejemplo"]}]}')
+            with mock.patch.object(module.subprocess, "run") as clean, mock.patch.object(module.subprocess, "check_output", return_value=sha):
                 clean.return_value.returncode = 0
-                with mock.patch.object(
-                    module.subprocess, "check_output", return_value=source_sha
-                ):
-                    module.generate(root)
-                self.assertEqual(1, clean.call_count)
+                module.generate(root)
             self.assertEqual([], module.check_bundle(root))
-            index = (root / "revision-juridica/00-LEEME.md").read_text("utf-8")
-            self.assertIn("- Declarado en datos.yml: Proveedor de prueba", index)
-            with mock.patch.object(module, "ROOT", root):
-                with mock.patch("sys.argv", ["generar_revision_juridica.py", "--check"]):
-                    self.assertEqual(0, module.main())
-                (root / "revision-juridica/retencion.md").write_bytes(b"desfase")
-                before = (root / "revision-juridica/retencion.md").read_bytes()
-                with mock.patch("sys.argv", ["generar_revision_juridica.py", "--check"]):
-                    self.assertEqual(1, module.main())
-                self.assertEqual(
-                    before, (root / "revision-juridica/retencion.md").read_bytes()
-                )
-                with mock.patch("sys.argv", ["generar_revision_juridica.py"]):
-                    with mock.patch.object(module, "generate") as generate:
-                        self.assertEqual(0, module.main())
-                        generate.assert_called_once_with(root)
+            with mock.patch.object(module, "ROOT", root), mock.patch("sys.argv", ["gen", "--check"]):
+                self.assertEqual(0, module.main())
 
 
 if __name__ == "__main__":

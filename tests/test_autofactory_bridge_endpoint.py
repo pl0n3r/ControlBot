@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,10 +78,15 @@ class PuenteAutofactoryTests(unittest.TestCase):
             capture_output=True, timeout=10
         )
         self.assertEqual(syntax.returncode, 0, syntax.stdout + syntax.stderr)
-        result = subprocess.run(
-            ["php", "-r", SCENARIO], cwd=ROOT, text=True,
-            capture_output=True, timeout=30
-        )
+        # Use a real PHP entrypoint so the CI Xdebug auto_prepend_file
+        # instruments src/AutoFactoryBridgeEndpoint.php (php -r skips it).
+        with tempfile.TemporaryDirectory(prefix="cb-bridge-", dir=ROOT / "tests") as directory:
+            script = Path(directory) / "scenario.php"
+            script.write_text("<?php\n" + SCENARIO, encoding="utf-8")
+            result = subprocess.run(
+                ["php", str(script)], cwd=ROOT, text=True,
+                capture_output=True, timeout=30
+            )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         data = json.loads(result.stdout)
         expected = {

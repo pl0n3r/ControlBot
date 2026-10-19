@@ -61,3 +61,19 @@ class PolicyCallerIdentityTests(unittest.TestCase):
                 self.assertIn(before, source)
                 with self.assertRaises(AssertionError):
                     self._assert_canonical_caller(source.replace(before, after, 1))
+
+    def test_existing_contract_suite_supplies_independent_tests_gate(self):
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        jobs = workflow.split("\njobs:\n", 1)[1]
+        self.assertEqual(jobs.count("\n  contrato:\n"), 1)
+        self.assertIn("\n  validar:\n", jobs)
+        suite = jobs.split("\n  contrato:\n", 1)[1].split("\n  validar:\n", 1)[0]
+        self.assertIn("    name: Pruebas de contrato e integración\n", suite)
+        self.assertIn("python3 scripts/generate_coverage.py", suite)
+        self.assertIn("Instalar coverage.py", suite)
+        self.assertIn("Ejecutar regresiones ControlBot con cobertura", suite)
+        self.assertIn("uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", suite)
+        self.assertNotIn("continue-on-error: true", suite)
+        self.assertIn("    name: Validar\n", jobs)
+        self.assertIn("    needs: [factory, contrato]\n", jobs)
+        self.assertNotIn("name: Contrato ControlBot", suite)

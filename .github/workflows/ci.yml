@@ -31,7 +31,7 @@ jobs:
       kit_ref: v1
 
   contrato:
-    name: Contrato ControlBot
+    name: Pruebas de contrato e integración
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 8

@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import runpy
 import subprocess
@@ -343,13 +344,15 @@ class InfrastructureIntentTests(unittest.TestCase):
         self.assertNotIn("attempt_id", request)
 
     def test_slice_stays_under_size_budget(self):
-        event_path = Path(__import__("os").environ.get("GITHUB_EVENT_PATH", ""))
-        if not event_path.is_file():
-            self.skipTest("PR diff budget is enforced from GitHub pull_request metadata.")
-        event = json.loads(event_path.read_text(encoding="utf-8"))
+        if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
+            self.skipTest("PR diff budget only applies to pull_request events.")
+        raw_event_path = os.environ.get("GITHUB_EVENT_PATH")
+        if not raw_event_path or not Path(raw_event_path).is_file():
+            self.fail("Evidencia de evento PR ausente")
+        event = json.loads(Path(raw_event_path).read_text(encoding="utf-8"))
         pr = event.get("pull_request")
         if not isinstance(pr, dict):
-            self.skipTest("PR diff budget only applies to pull_request events.")
+            self.fail("Payload pull_request inválido")
         diff = _diff_numstat_for_pr(pr)
         if not diff:
             self.fail("Evidencia de diff de PR ausente")
@@ -364,6 +367,22 @@ class InfrastructureIntentTests(unittest.TestCase):
             verified = generated.intersection(known)
         changed = _budget_without_verified_copies(diff, verified)
         self.assertLessEqual(changed, 400)
+
+    def test_budget_fails_closed_without_pr_event_evidence(self):
+        with patch.dict(os.environ, {
+            "GITHUB_EVENT_NAME": "pull_request",
+            "GITHUB_EVENT_PATH": "/__controlbot_missing_event__.json",
+        }):
+            with patch.object(Path, "is_file", return_value=False):
+                with self.assertRaisesRegex(AssertionError, "Evidencia de evento PR ausente"):
+                    self.test_slice_stays_under_size_budget()
+            with patch.object(Path, "is_file", return_value=True):
+                with patch.object(Path, "read_text", return_value="{}"):
+                    with self.assertRaisesRegex(AssertionError, "Payload pull_request inválido"):
+                        self.test_slice_stays_under_size_budget()
+        with patch.dict(os.environ, {"GITHUB_EVENT_NAME": "push"}):
+            with self.assertRaises(unittest.SkipTest):
+                self.test_slice_stays_under_size_budget()
 
     def test_budget_rejects_unrelated_synthetic_merge_parents(self):
         base, head, checkout = "a" * 40, "b" * 40, "c" * 40

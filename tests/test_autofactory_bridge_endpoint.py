@@ -66,6 +66,13 @@ $results['wrongBudget']=$do('POST','/v1/bridge/heartbeat',[],$badBudget);
 $goodBudget=$badBudget;$goodBudget['messageBudget']['remaining']=0;
 $results['validBudget']=$do('POST','/v1/bridge/heartbeat',[],$goodBudget);
 $results['nextWithoutQueue']=$do('GET','/v1/bridge/commands/next',$next);
+$httpNext=['profileAlias'=>'test-profile','waitMs'=>'25000'];
+$results['httpOmittedCursor']=$do('GET','/v1/bridge/commands/next',$httpNext);
+$results['httpEmptyCursor']=$do('GET','/v1/bridge/commands/next',array_merge($httpNext,['cursor'=>'']));
+$results['httpValidCommand']=$do('GET','/v1/bridge/commands/next',array_merge($httpNext,['cursor'=>'prepared-pause']));
+$results['httpMalformedWait']=$do('GET','/v1/bridge/commands/next',array_merge($httpNext,['waitMs'=>'25000ms']));
+$results['httpOutOfRange']=$do('GET','/v1/bridge/commands/next',array_merge($httpNext,['waitMs'=>'35000']));
+$results['httpInjectedArray']=$do('GET','/v1/bridge/commands/next',array_merge($httpNext,['waitMs'=>['25000']]));
 foreach(['prepared-pause'=>'nextPause','prepared-mode'=>'nextMode','prepared-message'=>'nextMessage','invalid-command'=>'nextInvalid'] as $cursor=>$name){
     $results[$name]=$do('GET','/v1/bridge/commands/next',array_merge($next,['cursor'=>$cursor]));
 }
@@ -112,6 +119,9 @@ class PuenteAutofactoryTests(unittest.TestCase):
             "missingCredential": 401, "crossProfile": 400, "duplicateTab": 400,
             "wrongBudget": 400, "validBudget": 202, "nextWithoutQueue": 503,
             "nextPause": 200, "nextMode": 200, "nextMessage": 200,
+            "httpOmittedCursor": 503, "httpEmptyCursor": 503,
+            "httpValidCommand": 200, "httpMalformedWait": 400,
+            "httpOutOfRange": 400, "httpInjectedArray": 400,
             "nextInvalid": 503, "malformedCursor": 400,
             "ackFirst": 200, "ackRepeat": 200, "ackConflict": 409,
             "ackUnknown": 404, "ackInvalid": 400, "unknownRoute": 404,

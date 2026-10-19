@@ -113,5 +113,74 @@ class RevisionJuridicaTests(unittest.TestCase):
             self.assertTrue(module.check_bundle(root))
 
 
+    def test_invalid_inputs_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "config").mkdir()
+            config = root / "config/version.json"
+            data = root / "datos.yml"
+            sha = "f32a96e355c874f13ce557e8ac4167f32fce271b"
+            config.write_text('{"version":"0.1.24"}', encoding="utf-8")
+            data.write_text('{"treatments":[{"providers":[]}]}', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "SHA de origen inválido"):
+                module.expected_files(root, "2026-10-19", "bad-sha")
+            with self.assertRaises(ValueError):
+                module.expected_files(root, "2026-02-31", sha)
+            for invalid in ('{"version":42}', '{"version":"version-one"}'):
+                with self.subTest(version=invalid):
+                    config.write_text(invalid, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "Versión no verificable"):
+                        module.expected_files(root, "2026-10-19", sha)
+            config.write_text('{"version":"0.1.24"}', encoding="utf-8")
+            for invalid, reason in (
+                ('{"treatments":[]}', "Inventario"),
+                ('{"treatments":"bad"}', "Inventario"),
+                ('{"treatments":["bad"]}', "Proveedores no verificables"),
+                ('{"treatments":[{"providers":"bad"}]}', "Proveedores no verificables"),
+                ('{"treatments":[{"providers":[15]}]}', "Proveedor inválido"),
+                ('{"treatments":[{"providers":[" "]}]}', "Proveedor inválido"),
+            ):
+                with self.subTest(treatments=invalid):
+                    data.write_text(invalid, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, reason):
+                        module.expected_files(root, "2026-10-19", sha)
+
+    def test_generate_clean_sources_and_cli_modes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for path in (*module.SOURCES, "datos.yml", "config/version.json"):
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / path, root / path)
+            (root / "datos.yml").write_text(
+                '{"treatments":[{"providers":["Proveedor de prueba"]}]}',
+                encoding="utf-8",
+            )
+            source_sha = "f32a96e355c874f13ce557e8ac4167f32fce271b"
+            with mock.patch.object(module.subprocess, "run") as clean:
+                clean.return_value.returncode = 0
+                with mock.patch.object(
+                    module.subprocess, "check_output", return_value=source_sha
+                ):
+                    module.generate(root)
+                self.assertEqual(1, clean.call_count)
+            self.assertEqual([], module.check_bundle(root))
+            index = (root / "revision-juridica/00-LEEME.md").read_text("utf-8")
+            self.assertIn("- Declarado en datos.yml: Proveedor de prueba", index)
+            with mock.patch.object(module, "ROOT", root):
+                with mock.patch("sys.argv", ["generar_revision_juridica.py", "--check"]):
+                    self.assertEqual(0, module.main())
+                (root / "revision-juridica/retencion.md").write_bytes(b"desfase")
+                before = (root / "revision-juridica/retencion.md").read_bytes()
+                with mock.patch("sys.argv", ["generar_revision_juridica.py", "--check"]):
+                    self.assertEqual(1, module.main())
+                self.assertEqual(
+                    before, (root / "revision-juridica/retencion.md").read_bytes()
+                )
+                with mock.patch("sys.argv", ["generar_revision_juridica.py"]):
+                    with mock.patch.object(module, "generate") as generate:
+                        self.assertEqual(0, module.main())
+                        generate.assert_called_once_with(root)
+
+
 if __name__ == "__main__":
     unittest.main()

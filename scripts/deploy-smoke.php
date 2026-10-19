@@ -59,7 +59,9 @@ try {
     }
 
     $payload = $readJson($healthPath);
-    if (array_keys($payload) !== ['status', 'version', 'release_sha']
+    $keys = array_keys($payload);
+    sort($keys, SORT_STRING);
+    if ($keys !== ['release_sha', 'status', 'version']
         || $payload['status'] !== 'ok'
         || !is_string($payload['version'])
         || !is_string($payload['release_sha'])

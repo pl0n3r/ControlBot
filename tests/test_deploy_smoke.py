@@ -75,6 +75,14 @@ class DeployReproducibleTests(unittest.TestCase):
                 self.assertEqual(success.stderr, "")
                 self.assertIn("release identity verified", success.stdout)
 
+                # JSON object member order is not semantically significant.
+                response_file.write_text(json.dumps({
+                    "release_sha": GOOD_SHA, "status": "ok", "version": version,
+                }), encoding="utf-8")
+                with urlopen(url, timeout=5) as response:
+                    captured.write_bytes(response.read())
+                self.assertEqual(self.run_smoke(captured).returncode, 0)
+
                 for wrong in (
                     {"status": "ok", "version": version, "release_sha": "b" * 40},
                     {"status": "ok", "version": "0.0.0", "release_sha": GOOD_SHA},

@@ -46,3 +46,41 @@ jobs:
       DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+
+  smoke:
+    name: Verificar identidad exacta después del deploy
+    needs: [readiness, deploy]
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+      DOMAIN: ${{ vars.DOMAIN }}
+      HEALTH_PATH: ${{ vars.HEALTH_PATH || '/health.php' }}
+      EXPECTED_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
+      - name: Validar puerta HTTPS de smoke
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_ENABLED" == "true" ]] || { echo "::error::Deploy no autorizado"; exit 1; }
+          [[ "$DOMAIN" =~ ^https://[A-Za-z0-9][A-Za-z0-9.-]*(:443)?/?$ ]] || { echo "::error::Origen HTTPS no válido"; exit 1; }
+          [[ "$HEALTH_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]] || { echo "::error::Health path inválido"; exit 1; }
+          [[ "$HEALTH_PATH" != *..* ]] || { echo "::error::Health path inválido"; exit 1; }
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::SHA faltante"; exit 1; }
+      - name: Comprobar health post-deploy sin divulgar identidad ni secretos
+        run: |
+          set -euo pipefail
+          fixture="$(mktemp)"
+          trap 'rm -f "$fixture"' EXIT
+          response="$(curl --fail --silent --show-error --max-time 15 --max-redirs 0 --proto '=https' --output "$fixture" --write-out '%{http_code}' "${DOMAIN%/}${HEALTH_PATH}")"
+          [[ "$response" == "200" ]] || { echo "::error::Health no respondió 200"; exit 1; }
+          php scripts/deploy-smoke.php "$fixture" config/version.json "$EXPECTED_SHA"

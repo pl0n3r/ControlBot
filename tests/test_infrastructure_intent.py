@@ -1,7 +1,11 @@
 import json
+import os
+import re
+import runpy
 import subprocess
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,6 +19,58 @@ def scenario(name: str):
         capture_output=True,
     )
     return json.loads(run.stdout)
+
+
+def _diff_numstat_for_pr(pr: dict) -> list[tuple[str, int, int]]:
+    """GitHub PR checkout: comparar merge sintético con base exacta, fail closed."""
+    base = pr["base"]["sha"]
+    head = pr["head"]["sha"]
+    if any(re.fullmatch(r"[0-9a-f]{40}", value) is None for value in (base, head)):
+        raise ValueError("Identidad de PR inválida")
+    checkout = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    if checkout != head:
+        raw = subprocess.check_output(
+            ["git", "cat-file", "-p", "HEAD"], cwd=ROOT, text=True
+        )
+        parents = [line.removeprefix("parent ") for line in raw.split("\n\n", 1)[0].splitlines()
+                   if line.startswith("parent ")]
+        if len(parents) != 2 or set(parents) != {base, head}:
+            raise ValueError("Checkout no es el merge sintético exacto base+head del PR")
+    if subprocess.run(
+        ["git", "cat-file", "-e", f"{base}^{{commit}}"],
+        cwd=ROOT, capture_output=True, check=False,
+    ).returncode:
+        subprocess.run(
+            ["git", "fetch", "--no-tags", "--depth=1", "origin", base],
+            cwd=ROOT, capture_output=True, check=True,
+        )
+    payload = subprocess.check_output(
+        ["git", "diff", "--no-renames", "--numstat", "-z", base, checkout],
+        cwd=ROOT,
+    )
+    result = []
+    for record in payload.split(b"\0"):
+        if not record:
+            continue
+        fields = record.decode("utf-8").split("\t", 2)
+        if len(fields) != 3 or not fields[0].isdigit() or not fields[1].isdigit():
+            raise ValueError("Git diff incompleto, binario o no canónico")
+        path = fields[2]
+        if not path or path.startswith("/") or ".." in path.split("/"):
+            raise ValueError("Ruta de diff no canónica")
+        result.append((path, int(fields[0]), int(fields[1])))
+    return result
+
+
+def _budget_without_verified_copies(
+    diff: list[tuple[str, int, int]], verified_paths: set[str],
+) -> int:
+    return sum(
+        added + deleted for path, added, deleted in diff
+        if path not in verified_paths
+    )
 
 
 class InfrastructureIntentTests(unittest.TestCase):
@@ -288,15 +344,94 @@ class InfrastructureIntentTests(unittest.TestCase):
         self.assertNotIn("attempt_id", request)
 
     def test_slice_stays_under_size_budget(self):
-        event_path = Path(__import__("os").environ.get("GITHUB_EVENT_PATH", ""))
-        if not event_path.is_file():
-            self.skipTest("PR diff budget is enforced from GitHub pull_request metadata.")
-        event = json.loads(event_path.read_text(encoding="utf-8"))
-        pull_request = event.get("pull_request")
-        if not isinstance(pull_request, dict):
+        if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
             self.skipTest("PR diff budget only applies to pull_request events.")
-        changed = int(pull_request["additions"]) + int(pull_request["deletions"])
+        raw_event_path = os.environ.get("GITHUB_EVENT_PATH")
+        if not raw_event_path or not Path(raw_event_path).is_file():
+            self.fail("Evidencia de evento PR ausente")
+        event = json.loads(Path(raw_event_path).read_text(encoding="utf-8"))
+        pr = event.get("pull_request")
+        if not isinstance(pr, dict):
+            self.fail("Payload pull_request inválido")
+        diff = _diff_numstat_for_pr(pr)
+        if not diff:
+            self.fail("Evidencia de diff de PR ausente")
+        generated = {path for path, _, _ in diff if path.startswith("revision-juridica/")}
+        verified = set()
+        if generated:
+            script = runpy.run_path(str(ROOT / "scripts/generar_revision_juridica.py"))
+            if script["check_bundle"](ROOT):
+                self.fail("Paquete jurídico no verificable; no descontar líneas")
+            stamp, sha = script["stamp_from_existing"](ROOT)
+            known = set(script["expected_files"](ROOT, stamp, sha))
+            verified = generated.intersection(known)
+        changed = _budget_without_verified_copies(diff, verified)
         self.assertLessEqual(changed, 400)
+
+    def test_budget_fails_closed_without_pr_event_evidence(self):
+        with patch.dict(os.environ, {
+            "GITHUB_EVENT_NAME": "pull_request",
+            "GITHUB_EVENT_PATH": "/__controlbot_missing_event__.json",
+        }):
+            with patch.object(Path, "is_file", return_value=False):
+                with self.assertRaisesRegex(AssertionError, "Evidencia de evento PR ausente"):
+                    self.test_slice_stays_under_size_budget()
+            with patch.object(Path, "is_file", return_value=True):
+                with patch.object(Path, "read_text", return_value="{}"):
+                    with self.assertRaisesRegex(AssertionError, "Payload pull_request inválido"):
+                        self.test_slice_stays_under_size_budget()
+        with patch.dict(os.environ, {"GITHUB_EVENT_NAME": "push"}):
+            with self.assertRaises(unittest.SkipTest):
+                self.test_slice_stays_under_size_budget()
+
+    def test_budget_rejects_unrelated_synthetic_merge_parents(self):
+        base, head, checkout = "a" * 40, "b" * 40, "c" * 40
+        pr = {"base": {"sha": base}, "head": {"sha": head}}
+        payload = b"1\t0\ttests/demo.py\0"
+        for parents in ((base, head), (head, base)):
+            with self.subTest(parents=parents):
+                commit = "tree " + "d" * 40 + "\n" + "".join(
+                    f"parent {value}\n" for value in parents
+                ) + "\nSynthetic GitHub merge\n"
+                with patch.object(subprocess, "check_output",
+                                  side_effect=[checkout, commit, payload]):
+                    with patch.object(subprocess, "run") as run:
+                        run.return_value.returncode = 0
+                        self.assertEqual(_diff_numstat_for_pr(pr),
+                                         [("tests/demo.py", 1, 0)])
+        for parents in ((head, "d" * 40), (base, head, "d" * 40), (head,)):
+            with self.subTest(rejected_parents=parents):
+                commit = "tree " + "d" * 40 + "\n" + "".join(
+                    f"parent {value}\n" for value in parents
+                ) + "\nSynthetic commit\n"
+                with patch.object(subprocess, "check_output",
+                                  side_effect=[checkout, commit]):
+                    with self.assertRaisesRegex(ValueError, "merge sintético exacto"):
+                        _diff_numstat_for_pr(pr)
+        with patch.object(subprocess, "check_output",
+                          side_effect=[head, payload]):
+            with patch.object(subprocess, "run") as run:
+                run.return_value.returncode = 0
+                self.assertEqual(_diff_numstat_for_pr(pr),
+                                 [("tests/demo.py", 1, 0)])
+
+    def test_budget_excludes_only_verified_generated_docs(self):
+        changes = [
+            ("revision-juridica/aviso-privacidad.md", 600, 0),
+            ("revision-juridica/archivo-extra.md", 100, 0),
+            ("scripts/example.py", 390, 0),
+        ]
+        copies = {"revision-juridica/aviso-privacidad.md"}
+        self.assertEqual(_budget_without_verified_copies(changes, copies), 490)
+        self.assertGreater(_budget_without_verified_copies(changes, copies), 400)
+        self.assertEqual(_budget_without_verified_copies(changes, set()), 1090)
+        self.assertLessEqual(
+            _budget_without_verified_copies(
+                [("revision-juridica/aviso-privacidad.md", 600, 0),
+                 ("scripts/example.py", 390, 0)], copies
+            ),
+            400,
+        )
 
 
 if __name__ == "__main__":

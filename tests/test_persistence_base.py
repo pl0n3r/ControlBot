@@ -39,6 +39,11 @@ $empty = rejects(fn()=> $repo->save('repo:43', [], 3));
 $list = rejects(fn()=> $repo->save('repo:43', ['a', 'b'], 3));
 $invalidTime = rejects(fn()=> $repo->save('repo:43', ['choice'=>'A'], 0));
 $large = rejects(fn()=> $repo->save('repo:43', ['payload'=>str_repeat('x', 65536)], 3));
+// Regression: deep JSON must be rejected BEFORE deleting an existing record.
+$nested = ['choice'=>'deep'];
+for ($level = 0; $level < 34; $level++) { $nested = ['nested'=>$nested]; }
+$invalidDepth = rejects(fn()=> $repo->save('repo:42', $nested, 1700000002));
+$unchangedAfterDepth = ($repo->find('repo:42') === $after);
 $db->exec("INSERT INTO controlbot_decisions VALUES ('invalid', 'not-json', 2)");
 $invalidStored = rejects(fn()=> $repo->find('invalid'));
 $db->exec("UPDATE controlbot_decisions SET payload_json = '[]' WHERE decision_id='invalid'");
@@ -57,6 +62,7 @@ echo json_encode([
  'invalid_id'=>$invalidId, 'invalid_read_id'=>$invalidReadId,
  'invalid_json'=>$invalidJson, 'empty'=>$empty, 'list'=>$list,
  'invalid_time'=>$invalidTime, 'large'=>$large,
+ 'invalid_depth'=>$invalidDepth, 'unchanged_after_depth'=>$unchangedAfterDepth,
  'invalid_stored'=>$invalidStored, 'invalid_stored_list'=>$invalidStoredList,
  'rolled_back'=>$rolledBack, 'invalid_mode'=>$invalidMode,
  'invalid_migrator'=>$invalidMigrator
@@ -93,7 +99,8 @@ class PersistenciaBaseTests(unittest.TestCase):
             self.assertEqual(int(value["count"]), 1)
             for field in (
                 "invalid_id", "invalid_read_id", "invalid_json", "empty", "list",
-                "invalid_time", "large", "invalid_stored", "invalid_stored_list",
+                "invalid_time", "large", "invalid_depth", "unchanged_after_depth",
+                "invalid_stored", "invalid_stored_list",
                 "rolled_back", "invalid_mode", "invalid_migrator",
             ):
                 self.assertTrue(value[field], field)

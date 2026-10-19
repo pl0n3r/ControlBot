@@ -47,10 +47,10 @@ def _diff_numstat_for_pr(pr: dict) -> list[tuple[str, int, int]]:
         cwd=ROOT,
     )
     result = []
-    for record in payload.split(b"\\0"):
+    for record in payload.split(b"\0"):
         if not record:
             continue
-        fields = record.decode("utf-8").split("\\t", 2)
+        fields = record.decode("utf-8").split("\t", 2)
         if len(fields) != 3 or not fields[0].isdigit() or not fields[1].isdigit():
             raise ValueError("Git diff incompleto, binario o no canónico")
         path = fields[2]

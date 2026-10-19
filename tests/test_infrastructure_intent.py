@@ -1,4 +1,6 @@
 import json
+import re
+import runpy
 import subprocess
 import unittest
 from pathlib import Path
@@ -15,6 +17,56 @@ def scenario(name: str):
         capture_output=True,
     )
     return json.loads(run.stdout)
+
+
+def _diff_numstat_for_pr(pr: dict) -> list[tuple[str, int, int]]:
+    """GitHub PR checkout: comparar merge sintético con base exacta, fail closed."""
+    base = pr["base"]["sha"]
+    head = pr["head"]["sha"]
+    if any(re.fullmatch(r"[0-9a-f]{40}", value) is None for value in (base, head)):
+        raise ValueError("Identidad de PR inválida")
+    checkout = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    if checkout != head:
+        parents = subprocess.check_output(
+            ["git", "show", "-s", "--format=%P", "HEAD"], cwd=ROOT, text=True
+        ).split()
+        if head not in parents:
+            raise ValueError("Checkout no coincide con HEAD exacto del PR")
+    if subprocess.run(
+        ["git", "cat-file", "-e", f"{base}^{{commit}}"],
+        cwd=ROOT, capture_output=True, check=False,
+    ).returncode:
+        subprocess.run(
+            ["git", "fetch", "--no-tags", "--depth=1", "origin", base],
+            cwd=ROOT, capture_output=True, check=True,
+        )
+    payload = subprocess.check_output(
+        ["git", "diff", "--no-renames", "--numstat", "-z", base, checkout],
+        cwd=ROOT,
+    )
+    result = []
+    for record in payload.split(b"\\0"):
+        if not record:
+            continue
+        fields = record.decode("utf-8").split("\\t", 2)
+        if len(fields) != 3 or not fields[0].isdigit() or not fields[1].isdigit():
+            raise ValueError("Git diff incompleto, binario o no canónico")
+        path = fields[2]
+        if not path or path.startswith("/") or ".." in path.split("/"):
+            raise ValueError("Ruta de diff no canónica")
+        result.append((path, int(fields[0]), int(fields[1])))
+    return result
+
+
+def _budget_without_verified_copies(
+    diff: list[tuple[str, int, int]], verified_paths: set[str],
+) -> int:
+    return sum(
+        added + deleted for path, added, deleted in diff
+        if path not in verified_paths
+    )
 
 
 class InfrastructureIntentTests(unittest.TestCase):
@@ -292,11 +344,41 @@ class InfrastructureIntentTests(unittest.TestCase):
         if not event_path.is_file():
             self.skipTest("PR diff budget is enforced from GitHub pull_request metadata.")
         event = json.loads(event_path.read_text(encoding="utf-8"))
-        pull_request = event.get("pull_request")
-        if not isinstance(pull_request, dict):
+        pr = event.get("pull_request")
+        if not isinstance(pr, dict):
             self.skipTest("PR diff budget only applies to pull_request events.")
-        changed = int(pull_request["additions"]) + int(pull_request["deletions"])
+        diff = _diff_numstat_for_pr(pr)
+        if not diff:
+            self.fail("Evidencia de diff de PR ausente")
+        generated = {path for path, _, _ in diff if path.startswith("revision-juridica/")}
+        verified = set()
+        if generated:
+            script = runpy.run_path(str(ROOT / "scripts/generar_revision_juridica.py"))
+            if script["check_bundle"](ROOT):
+                self.fail("Paquete jurídico no verificable; no descontar líneas")
+            stamp, sha = script["stamp_from_existing"](ROOT)
+            known = set(script["expected_files"](ROOT, stamp, sha))
+            verified = generated.intersection(known)
+        changed = _budget_without_verified_copies(diff, verified)
         self.assertLessEqual(changed, 400)
+
+    def test_budget_excludes_only_verified_generated_docs(self):
+        changes = [
+            ("revision-juridica/aviso-privacidad.md", 600, 0),
+            ("revision-juridica/archivo-extra.md", 100, 0),
+            ("scripts/example.py", 390, 0),
+        ]
+        copies = {"revision-juridica/aviso-privacidad.md"}
+        self.assertEqual(_budget_without_verified_copies(changes, copies), 490)
+        self.assertGreater(_budget_without_verified_copies(changes, copies), 400)
+        self.assertEqual(_budget_without_verified_copies(changes, set()), 1090)
+        self.assertLessEqual(
+            _budget_without_verified_copies(
+                [("revision-juridica/aviso-privacidad.md", 600, 0),
+                 ("scripts/example.py", 390, 0)], copies
+            ),
+            400,
+        )
 
 
 if __name__ == "__main__":

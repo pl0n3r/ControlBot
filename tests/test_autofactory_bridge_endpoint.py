@@ -21,7 +21,20 @@ $verify=function($candidate)use($token,&$identity){return hash_equals($token,$ca
 $store=function($kind,$instanceId,$data)use(&$events,&$acks,$instance){
     if($instanceId!==$instance) throw new \RuntimeException('unexpected identity');
     if($kind==='heartbeat'){$events[]=['kind'=>$kind,'profileAlias'=>$data['profileAlias']];return true;}
-    if($kind==='next')return null; // no authorized queue, fail closed
+    if($kind==='next'){
+        $cursor=$data['cursor'];
+        if($cursor===null)return null; // no authorized queue, fail closed
+        if($cursor==='invalid-command')return ['cursor'=>'cursor-next','command'=>['version'=>1,'kind'=>'command','id'=>'order-1','action'=>'unexpected','target'=>'all','payload'=>null]];
+        $commands=[
+          'prepared-pause'=>['action'=>'pause','target'=>'all','payload'=>null],
+          'prepared-mode'=>['action'=>'set_mode','target'=>1,'payload'=>['mode'=>'work']],
+          'prepared-message'=>['action'=>'send_message','target'=>1,'payload'=>['text'=>'Synthetic command text']],
+        ];
+        if(!isset($commands[$cursor]))return null;
+        return ['cursor'=>'cursor-next','command'=>array_merge(
+          ['version'=>1,'kind'=>'command','id'=>'order-1'],$commands[$cursor]
+        )];
+    }
     if($kind==='ack'){
         if($data['id']!=='order-1')return 'missing';
         $key=$instanceId.':'.$data['id'];
@@ -50,7 +63,12 @@ $results['duplicateTab']=$do('POST','/v1/bridge/heartbeat',[],$badTabs);
 $badBudget=$hb;$badBudget['messageBudget']=['windowMs'=>60000,'budget'=>1,'sent'=>1,'remaining'=>5,
   'limitEvents'=>0,'highReasoningSends'=>0,'nextAllowedAt'=>null,'source'=>'default'];
 $results['wrongBudget']=$do('POST','/v1/bridge/heartbeat',[],$badBudget);
+$goodBudget=$badBudget;$goodBudget['messageBudget']['remaining']=0;
+$results['validBudget']=$do('POST','/v1/bridge/heartbeat',[],$goodBudget);
 $results['nextWithoutQueue']=$do('GET','/v1/bridge/commands/next',$next);
+foreach(['prepared-pause'=>'nextPause','prepared-mode'=>'nextMode','prepared-message'=>'nextMessage','invalid-command'=>'nextInvalid'] as $cursor=>$name){
+    $results[$name]=$do('GET','/v1/bridge/commands/next',array_merge($next,['cursor'=>$cursor]));
+}
 $results['malformedCursor']=$do('GET','/v1/bridge/commands/next',array_merge($next,['cursor'=>'../../secret']));
 $results['ackFirst']=$do('POST','/v1/bridge/commands/ack',[],$ack);
 $results['ackRepeat']=$do('POST','/v1/bridge/commands/ack',[],$ack);
@@ -92,7 +110,9 @@ class PuenteAutofactoryTests(unittest.TestCase):
         expected = {
             "gate": 503, "validHeartbeat": 202, "invalidCredential": 401,
             "missingCredential": 401, "crossProfile": 400, "duplicateTab": 400,
-            "wrongBudget": 400, "nextWithoutQueue": 503, "malformedCursor": 400,
+            "wrongBudget": 400, "validBudget": 202, "nextWithoutQueue": 503,
+            "nextPause": 200, "nextMode": 200, "nextMessage": 200,
+            "nextInvalid": 503, "malformedCursor": 400,
             "ackFirst": 200, "ackRepeat": 200, "ackConflict": 409,
             "ackUnknown": 404, "ackInvalid": 400, "unknownRoute": 404,
             "revoked": 401, "expired": 401,
@@ -105,7 +125,7 @@ class PuenteAutofactoryTests(unittest.TestCase):
                 self.assertNotIn("synthetic-token-opaque-do-not-log", json.dumps(response))
         self.assertEqual(data["ackFirst"]["body"], {"accepted": True, "duplicate": False})
         self.assertEqual(data["ackRepeat"]["body"], {"accepted": True, "duplicate": True})
-        self.assertEqual(data["counts"], {"heartbeats": 1, "acks": 1})
+        self.assertEqual(data["counts"], {"heartbeats": 2, "acks": 1})
         self.assertEqual(data["nextWithoutQueue"]["body"], {"error": "not_ready"})
         # No public wiring: this boundary is explicitly pre-live and gated.
         source = ENDPOINT.read_text(encoding="utf-8")

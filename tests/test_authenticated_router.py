@@ -89,7 +89,7 @@ class RouterAutenticadoTests(unittest.TestCase):
     def test_acceptance(self):
         self.assertTrue(ENTRY.is_file())
         self.assertTrue(GUARD.is_file())
-        for path in (ENTRY, GUARD):
+        for path in (ENTRY, GUARD, ROOT / "public" / "index.php", ROOT / "tests" / "github_shell_e2e_scenarios.php"):
             checked = subprocess.run(["php", "-l", str(path)], cwd=ROOT, text=True, capture_output=True)
             self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
         completed = subprocess.run(
@@ -108,7 +108,7 @@ class RouterAutenticadoTests(unittest.TestCase):
             with self.subTest(route=path):
                 self.assertIn(response["denied"], (401, 403))
                 self.assertEqual(response["denied_cache"], "no-store")
-                self.assertEqual(response["denied_body"], "Forbidden.\\n")
+                self.assertEqual(response["denied_body"], "Forbidden.\n")
                 self.assertEqual(response["allowed"], 200)
                 self.assertIn(response["expired"], (401, 403))
         index = (ROOT / "public" / "index.php").read_text(encoding="utf-8")

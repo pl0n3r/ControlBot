@@ -16,6 +16,28 @@ SECRET = re.compile(r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|BEGIN [A
 
 
 class OrquestadorLocalReferenceTests(unittest.TestCase):
+    def test_extension_cors_origin_cannot_inject_http_headers(self):
+        # Testar el validador puro, sin iniciar el scheduler de referencia.
+        import ast
+        tree = ast.parse((TOOL / "orq.py").read_text(encoding="utf-8"))
+        target = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "safe_extension_origin")
+        namespace = {"re": re}
+        exec(compile(ast.Module(body=[target], type_ignores=[]), "<origin-test>", "exec"), namespace)
+        check = namespace["safe_extension_origin"]
+        for good in ("chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+                     "moz-extension://12345678-abcd-1234-abcd-123456789abc",
+                     "safari-web-extension://12345678-abcd-1234-abcd-123456789abc"):
+            self.assertEqual(check(good), good)
+        for bad in ("https://example.com", "chrome-extension://",
+                    "chrome-extension://abc\\r\\nX-Evil: injected",
+                    "moz-extension://abc\\nSet-Cookie: hijacked",
+                    "safari-web-extension://abc/path",
+                    "chrome-extension://abc:8777",
+                    "chrome-extension://abc,https://evil.test",
+                    "chrome-extension://a" + "b" * 200):
+            with self.subTest(origin=bad):
+                self.assertIsNone(check(bad))
+
     def test_reference_tool_is_versioned_and_clean(self):
         for name in EXPECTED:
             with self.subTest(archivo=name):

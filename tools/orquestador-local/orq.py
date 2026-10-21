@@ -1379,6 +1379,16 @@ def ack_command(b):
     raise ValueError("orden desconocida")
 
 
+
+def safe_extension_origin(origin):
+    """Accept only one extension origin without a port, path or CR/LF."""
+    if not isinstance(origin, str) or len(origin) > 160:
+        return None
+    if re.fullmatch(r"(?:chrome-extension|safari-web-extension|moz-extension)://[A-Za-z0-9][A-Za-z0-9-]{0,127}", origin) is None:
+        return None
+    return origin
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *a):
         # Solo trazas del enlace con AutoFactory, como máximo una por minuto.
@@ -1400,8 +1410,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def do_OPTIONS(self):
-        origin = self.headers.get("Origin", "")
-        ok = origin.startswith(("chrome-extension://", "safari-web-extension://", "moz-extension://"))
+        origin = self._ext_origin()
+        ok = origin is not None
         self.send_response(204 if ok else 403)
         if ok:
             self.send_header("Access-Control-Allow-Origin", origin)
@@ -1426,8 +1436,7 @@ class Handler(BaseHTTPRequestHandler):
         return False
 
     def _ext_origin(self):
-        o = self.headers.get("Origin", "")
-        return o if o.startswith(("chrome-extension://", "safari-web-extension://", "moz-extension://")) else None
+        return safe_extension_origin(self.headers.get("Origin", ""))
 
     def _json_ext(self, code, obj, origin):
         raw = json.dumps(obj).encode("utf-8")

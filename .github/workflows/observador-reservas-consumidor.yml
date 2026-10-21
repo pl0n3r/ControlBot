@@ -1,0 +1,32 @@
+name: Observación local de reservas V3 (Fase A, solo lectura)
+
+# Instalar por PR/V3 en cada consumidor, tras publicar Factory@v1 con
+# el reusable. El schedule de Coordinación normal NO sustituye este caller.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  checks: read
+  actions: read
+
+concurrency:
+  group: lease-consumer-caller-${{ github.repository_id }}
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    name: Observar reservas locales, sin liberar
+    # El token del caller solo permite GET; cualquier fuente incompleta
+    # produce UNKNOWN y no acredita ningún ciclo de Fase A.
+    uses: pl0n3r/Factory/.github/workflows/observador-reservas-consumidor.yml@v1
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      checks: read
+      actions: read

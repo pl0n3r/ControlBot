@@ -1414,7 +1414,7 @@ class Handler(BaseHTTPRequestHandler):
         ok = origin is not None
         self.send_response(204 if ok else 403)
         if ok:
-            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Origin", origin.replace("\r", "").replace("\n", ""))
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Agent-Key")
         self.end_headers()
@@ -1440,11 +1440,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _json_ext(self, code, obj, origin):
         """Nunca reflejar cabeceras no validadas, incluso si cambia el caller."""
-        allowed = safe_extension_origin(origin)
+        allowed = "*" if origin == "*" else safe_extension_origin(origin)
         raw = json.dumps(obj).encode("utf-8")
         self.send_response(code)
         if allowed is not None:
-            self.send_header("Access-Control-Allow-Origin", allowed)
+            self.send_header("Access-Control-Allow-Origin", allowed.replace("\r", "").replace("\n", ""))
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(raw)))
         self.send_header("Cache-Control", "no-store")
@@ -1561,13 +1561,7 @@ class Handler(BaseHTTPRequestHandler):
                     log_action(f"DIAG LAN {self.client_address[0]} {_k}: claves={sorted(_raw.keys())} chats_open={_raw.get('chats_open')} chats={'ausente' if _c is None else (len(_c) if isinstance(_c, list) else type(_c).__name__)}")
             clean = af_clean(_raw)
             AF[clean["instance_id"]] = clean
-            raw = b'{"ok":true}'
-            self.send_response(200)
-            self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(raw)))
-            self.end_headers()
-            self.wfile.write(raw)
+            return self._json_ext(200, {"ok": True}, origin)
         except Exception as exc:
             log_action(f"AF rechazado: payload inválido ({str(exc)[:100]})")
             self._send(400, json.dumps({"error": str(exc)[:120]}), "application/json")

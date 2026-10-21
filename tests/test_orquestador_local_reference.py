@@ -72,17 +72,28 @@ class OrquestadorLocalReferenceTests(unittest.TestCase):
         bad = ("chrome-extension://abc\r\nX-Evil: injected", 
                "moz-extension://abc\nSet-Cookie: hijacked",
                "https://evil.example", "chrome-extension://abc/path")
-        for origin in (good, *bad):
+        # La ruta GET sin Origin ya autenticada conserva wildcard legítimo.
+        for origin in (good, "*", *bad):
             with self.subTest(origin=origin):
                 reply = FakeResponse()
                 namespace["_json_ext"](reply, 200, {"ok": True}, origin)
-                expected = [("Access-Control-Allow-Origin", good)] if origin == good else []
+                expected = [("Access-Control-Allow-Origin", origin)] if origin in (good, "*") else []
                 self.assertEqual(
                     [x for x in reply.headers if x[0] == "Access-Control-Allow-Origin"],
                     expected,
                 )
                 self.assertEqual(reply.status, 200)
                 self.assertEqual(reply.wfile.getvalue(), b'{"ok": true}')
+
+    def test_cors_headers_use_only_validated_emitters(self):
+        source = (TOOL / "orq.py").read_text(encoding="utf-8")
+        # Evita que un tercer sink directo restablezca una ruta de inyección.
+        self.assertEqual(
+            source.count('self.send_header("Access-Control-Allow-Origin",'), 2
+        )
+        self.assertIn('self.send_header("Access-Control-Allow-Origin", origin.replace(', source)
+        self.assertIn('self.send_header("Access-Control-Allow-Origin", allowed.replace(', source)
+        self.assertIn('return self._json_ext(200, {"ok": True}, origin)', source)
 
     def test_reference_tool_is_versioned_and_clean(self):
         for name in EXPECTED:

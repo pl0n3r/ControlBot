@@ -1439,9 +1439,12 @@ class Handler(BaseHTTPRequestHandler):
         return safe_extension_origin(self.headers.get("Origin", ""))
 
     def _json_ext(self, code, obj, origin):
+        """Nunca reflejar cabeceras no validadas, incluso si cambia el caller."""
+        allowed = safe_extension_origin(origin)
         raw = json.dumps(obj).encode("utf-8")
         self.send_response(code)
-        self.send_header("Access-Control-Allow-Origin", origin)
+        if allowed is not None:
+            self.send_header("Access-Control-Allow-Origin", allowed)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(raw)))
         self.send_header("Cache-Control", "no-store")

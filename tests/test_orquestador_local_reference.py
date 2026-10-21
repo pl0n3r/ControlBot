@@ -38,6 +38,52 @@ class OrquestadorLocalReferenceTests(unittest.TestCase):
             with self.subTest(origin=bad):
                 self.assertIsNone(check(bad))
 
+    def test_extension_json_response_rechecks_origin_at_sink(self):
+        # El parámetro de _json_ext no debe servir para inyectar headers.
+        import ast
+        import io
+        import json
+        tree = ast.parse((TOOL / "orq.py").read_text(encoding="utf-8"))
+        sanitizer = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                         and n.name == "safe_extension_origin")
+        handler = next(n for n in tree.body if isinstance(n, ast.ClassDef)
+                       and n.name == "Handler")
+        emitter = next(n for n in handler.body if isinstance(n, ast.FunctionDef)
+                       and n.name == "_json_ext")
+        namespace = {"re": re, "json": json}
+        exec(compile(ast.Module(body=[sanitizer, emitter], type_ignores=[]),
+                     "<headers-test>", "exec"), namespace)
+
+        class FakeResponse:
+            def __init__(self):
+                self.headers = []
+                self.wfile = io.BytesIO()
+
+            def send_response(self, status):
+                self.status = status
+
+            def send_header(self, name, value):
+                self.headers.append((name, value))
+
+            def end_headers(self):
+                pass
+
+        good = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
+        bad = ("chrome-extension://abc\\r\\nX-Evil: injected", 
+               "moz-extension://abc\\nSet-Cookie: hijacked",
+               "https://evil.example", "chrome-extension://abc/path")
+        for origin in (good, *bad):
+            with self.subTest(origin=origin):
+                reply = FakeResponse()
+                namespace["_json_ext"](reply, 200, {"ok": True}, origin)
+                expected = [("Access-Control-Allow-Origin", good)] if origin == good else []
+                self.assertEqual(
+                    [x for x in reply.headers if x[0] == "Access-Control-Allow-Origin"],
+                    expected,
+                )
+                self.assertEqual(reply.status, 200)
+                self.assertEqual(reply.wfile.getvalue(), b'{"ok": true}')
+
     def test_reference_tool_is_versioned_and_clean(self):
         for name in EXPECTED:
             with self.subTest(archivo=name):

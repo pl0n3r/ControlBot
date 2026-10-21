@@ -29,8 +29,8 @@ class OrquestadorLocalReferenceTests(unittest.TestCase):
                      "safari-web-extension://12345678-abcd-1234-abcd-123456789abc"):
             self.assertEqual(check(good), good)
         for bad in ("https://example.com", "chrome-extension://",
-                    "chrome-extension://abc\\r\\nX-Evil: injected",
-                    "moz-extension://abc\\nSet-Cookie: hijacked",
+                    "chrome-extension://abc\r\nX-Evil: injected",
+                    "moz-extension://abc\nSet-Cookie: hijacked",
                     "safari-web-extension://abc/path",
                     "chrome-extension://abc:8777",
                     "chrome-extension://abc,https://evil.test",

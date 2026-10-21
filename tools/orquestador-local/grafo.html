@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orquestador · Fábrica viva</title>
+<style>
+:root{--bg:#090d16;--panel:#0e1422;--fg:#c9d4e8;--dim:#5a6a86;--cy:#5fd3ff;--or:#f4a582;--gr:#6ee7a0;--rd:#ff6b6b;--yl:#f2d479;--bd:#26344e}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font-family:ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace}
+header{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--bd)}
+h1{font-size:14px;letter-spacing:.14em;margin:0;color:var(--cy)}h1 small{color:var(--dim);letter-spacing:0;font-weight:400;margin-left:10px}
+.pill{border:1px solid var(--bd);border-radius:999px;padding:3px 10px;font-size:11.5px;color:var(--dim)}
+.pill b{color:var(--fg);font-weight:600}.pill.ok b{color:var(--gr)}.pill.warn b{color:var(--yl)}.pill.bad{border-color:#5b2a2f}.pill.bad b{color:var(--rd)}
+main{padding:6px 12px 0}svg{width:100%;height:auto;display:block;max-height:62vh}
+.node rect{fill:var(--panel);stroke:var(--cy);stroke-width:1.2}.node.idle rect{stroke:var(--bd)}.node.done rect{stroke:var(--gr)}
+.node text{font-size:13px;fill:var(--fg)}.node .h{fill:var(--cy)}.node.idle .h{fill:var(--dim)}.node.done .h{fill:var(--gr)}.node .d{fill:var(--dim);font-size:11px}
+.node .pc{fill:var(--gr)}.node.idle .pc{fill:var(--dim)}.node .pc.run{fill:var(--or)}
+.center rect{fill:var(--panel);stroke:var(--cy);stroke-width:1.4}.center.paused rect{stroke:var(--rd)}.center text{font-size:13px;fill:var(--fg)}.center .h{fill:var(--cy);font-weight:600}.center .d{fill:var(--dim);font-size:11.5px}
+.edge{stroke:#2a3a58;stroke-width:1;stroke-dasharray:3 7;fill:none}.spoke{stroke:#1d2a44;stroke-width:1;stroke-dasharray:2 8;fill:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:2px 18px 8px}.chip{border:1px solid var(--bd);border-radius:6px;padding:4px 9px;font-size:11.5px;color:var(--dim)}.chip b{color:var(--fg)}
+.chip i{font-style:normal;margin-left:6px}.g{color:var(--gr)}.o{color:var(--or)}.r{color:var(--rd)}.y{color:var(--yl)}.c{color:var(--cy)}
+.bushead{padding:8px 18px 4px;color:var(--dim);font-size:12px;border-top:1px solid var(--bd)}.bushead b{color:var(--rd);font-weight:600}
+#bus{padding:0 18px 18px;font-size:12px;line-height:1.7;height:26vh;overflow-y:auto}
+.l{display:grid;grid-template-columns:78px 150px 92px 1fr;gap:10px;white-space:nowrap}.l span:last-child{white-space:normal;overflow:hidden;text-overflow:ellipsis}
+.l .t{color:var(--dim)}.l .w{color:var(--fg)}.tp-despacho{color:var(--cy)}.tp-merge{color:var(--gr)}.tp-humano{color:var(--rd)}.tp-decision{color:var(--yl)}.tp-state{color:var(--dim)}.tp-materializa{color:var(--or)}.tp-cmd{color:var(--yl)}
+.aviso{padding:0 18px 12px;color:#44526d;font-size:11px}
+@media(max-width:760px){.l{grid-template-columns:62px 1fr}.l span:nth-child(3){display:none}.l span:nth-child(2){display:none}}
+</style></head><body>
+<header><h1>ORQUESTADOR<small>fábrica viva · solo lectura · datos de GitHub</small></h1>
+<span class="pill" id="p-kill">kill switch <b>…</b></span><span class="pill" id="p-own">decisiones tuyas <b>…</b></span><span class="pill" id="p-condor">Condor <b>…</b></span><span class="pill" id="p-up">actualizado <b>…</b></span></header>
+<main><svg id="svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet"><g id="edges"></g><g id="dots"></g><g id="nodes"></g></svg></main>
+<div class="chips" id="chips"></div>
+<div class="bushead" id="bushead">bus de mensajes — comentarios y eventos reales de los repos</div>
+<div id="bus"></div>
+<div class="aviso">Cada nodo es un <b>frente de trabajo activo</b> (issue reservado o en revisión, o PR fusionado hace poco), no un chat individual. Los puntos se mueven más rápido cuanto más reciente es la actividad.</div>
+<script>
+const SLOTS=[[190,86],[810,86],[895,300],[810,514],[190,514],[105,300]],W=262,HGT=74,C=[500,300];
+const NS="http://www.w3.org/2000/svg";let D=null,dots=[];
+const $=id=>document.getElementById(id);
+const el=(n,a={},t)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(t!=null)e.textContent=t;return e};
+const tz=s=>new Date(s).toLocaleTimeString("es-CO",{hour12:false,timeZone:"America/Bogota"});
+const ago=s=>{const m=Math.max(0,Math.round((Date.now()-new Date(s))/60000));return m<60?m+" min":Math.floor(m/60)+" h "+(m%60)+" min"};
+function render(){
+ if(!D||!D.ok)return;
+ const nodes=$("nodes"),edges=$("edges");nodes.innerHTML="";edges.innerHTML="";dots=[];
+ const fr=D.fronts.slice(0,6),ext=Math.max(0,D.fronts.length-6),pos=fr.map((f,i)=>SLOTS[i]);
+ // aristas entre nodos consecutivos y radios al centro
+ pos.forEach((p,i)=>{const q=pos[(i+1)%pos.length];if(pos.length>1&&q!==p)edges.appendChild(el("line",{class:"edge",x1:p[0],y1:p[1],x2:q[0],y2:q[1]}));
+  edges.appendChild(el("line",{class:"spoke",x1:C[0],y1:C[1],x2:p[0],y2:p[1]}));});
+ fr.forEach((f,i)=>{
+  const [x,y]=pos[i],mins=(Date.now()-new Date(f.t))/60000,act=mins<15,done=f.estado==="fusionado";
+  const g=el("g",{class:"node "+(done?"done":(act?"":"idle")),transform:`translate(${x-W/2},${y-HGT/2})`});
+  g.appendChild(el("rect",{width:W,height:HGT,rx:5}));
+  g.appendChild(el("text",{class:"h",x:14,y:22},"✱ "+(f.agente?f.agente.slice(0,20):f.repo.toLowerCase()+"#"+f.n)));
+  g.appendChild(el("text",{class:"pc"+(done?"":" run"),x:W-12,y:22,"text-anchor":"end"},(done?"✓ ":"◔ ")+f.pct+"%"));
+  g.appendChild(el("text",{x:14,y:46},f.titulo.length>31?f.titulo.slice(0,30)+"…":f.titulo));
+  g.appendChild(el("text",{class:"d",x:14,y:64},f.repo+" #"+f.n+" · "+f.estado+" · hace "+ago(f.t)));
+  nodes.appendChild(g);
+  const sp=act?0.0035:0.0009,n=act?3:1;
+  for(let k=0;k<n;k++){dots.push({a:C,b:[x,y],t:Math.random(),v:sp,act});}
+  const q=pos[(i+1)%pos.length];if(pos.length>1&&act)dots.push({a:[x,y],b:q,t:Math.random(),v:sp*0.8,act});
+ });
+ if(ext>0){const t=el("text",{x:500,y:588,fill:"#5a6a86","text-anchor":"middle","font-size":12},"+"+ext+" frentes más");nodes.appendChild(t);}
+ // centro
+ const lastDesp=[...D.bus].reverse().find(b=>b.tipo==="despacho"),rec=lastDesp?(Date.now()-new Date(lastDesp.t))/60000:999;
+ const paused=D.kill!=="RUNNING",tot=Object.values(D.repos),disp=tot.reduce((a,c)=>a+c.disponible,0),blq=tot.reduce((a,c)=>a+c.bloqueado,0),act=D.fronts.filter(f=>f.estado!=="fusionado").length;
+ const cg=el("g",{class:"center"+(paused?" paused":""),transform:`translate(${C[0]-150},${C[1]-48})`});
+ cg.appendChild(el("rect",{width:300,height:96,rx:6}));
+ cg.appendChild(el("text",{class:"h",x:16,y:24},"◆ orquestador"));
+ cg.appendChild(el("text",{class:"d",x:16,y:46},"kill switch · "+D.kill));
+ cg.appendChild(el("text",{class:"d",x:16,y:64},"frentes "+act+" · listos "+disp+" · bloqueados "+blq));
+ cg.appendChild(el("text",{class:"d",x:16,y:84},paused?"● pausado":(rec<12?"● despachando · hace "+Math.round(rec)+" min":"○ en espera · último despacho hace "+(rec>900?"?":Math.round(rec)+" min"))));
+ nodes.appendChild(cg);
+ // pills
+ const pk=$("p-kill");pk.className="pill "+(paused?"bad":"ok");pk.innerHTML="kill switch <b>"+D.kill+"</b>";
+ const po=$("p-own");po.className="pill "+(D.owner.length?"bad":"ok");po.innerHTML="decisiones tuyas <b>"+D.owner.length+"</b>";
+ const pc=$("p-condor");pc.className="pill "+(D.condor&&D.condor.status==="ok"?"ok":"warn");pc.innerHTML="Condor <b>"+(D.condor?("v"+D.condor.version+(D.condor.schema_up_to_date?" ✓":" esquema?")):"sin lectura")+"</b>";
+ const pu=$("p-up");pu.className="pill "+(D.errores?"warn":"ok");pu.innerHTML="actualizado <b>"+tz(D.generado)+"</b>"+(D.errores?" · "+D.errores+" errores API":"");
+ // chips por repo
+ $("chips").innerHTML=Object.keys(D.repos).map(r=>{const c=D.repos[r];return `<span class="chip"><b>${r}</b><i class="g">${c.disponible} listos</i><i class="o">${c.reservado} reserv.</i><i class="c">${c["en revisión"]} rev.</i><i class="y">${c.bloqueado} bloq.</i></span>`}).join("");
+ // bus
+ const b=$("bus"),nearBottom=b.scrollHeight-b.scrollTop-b.clientHeight<60;
+ b.innerHTML=D.bus.map(m=>`<div class="l"><span class="t">${tz(m.t)}</span><span class="w">${m.repo.toLowerCase()}#${m.n}</span><span class="tp-${m.tipo}">${m.tipo}</span><span>${m.txt.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span></div>`).join("");
+ if(nearBottom)b.scrollTop=b.scrollHeight;
+ $("bushead").innerHTML="bus de mensajes — comentarios y eventos reales · "+(D.owner.length?"<b>esperando decisión humana ("+D.owner.length+")</b>":"sin decisiones pendientes tuyas");
+}
+function frame(){const g=$("dots");g.innerHTML="";
+ for(const d of dots){d.t+=d.v*16;if(d.t>1)d.t-=1;const x=d.a[0]+(d.b[0]-d.a[0])*d.t,y=d.a[1]+(d.b[1]-d.a[1])*d.t;
+  g.appendChild(el("circle",{cx:x,cy:y,r:d.act?4.2:2.4,fill:d.act?"#f4a582":"#3b4a66",opacity:d.act?0.95:0.7}));}
+ requestAnimationFrame(frame)}
+async function load(){try{const r=await fetch("/data.json",{cache:"no-store"});D=await r.json();render()}catch(e){}}
+load();setInterval(load,15000);requestAnimationFrame(frame);
+</script></body></html>
+

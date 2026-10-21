@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orquestador local</title>
+<style>
+:root{--bg:#0a0e14;--card:#10161f;--line:#1d2836;--tx:#dbe5ef;--mut:#7d8a9a;--ok:#3fb950;--warn:#e3a008;--bad:#f85149;--acc:#58a6ff;--or:#ff9f43;--cy:#4cc9f0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.45 ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace}
+header{padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;border-bottom:1px solid var(--line)}
+h1{font-size:14px;letter-spacing:.14em;margin:0;color:var(--cy)}h1 small{color:var(--mut);letter-spacing:0;font-weight:400;margin-left:8px}
+h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:0 0 8px}
+.pill{border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:11.5px;color:var(--mut)}.pill b{color:var(--tx)}
+.pill.ok b{color:var(--ok)}.pill.warn b{color:var(--warn)}.pill.bad b{color:var(--bad)}
+.sp{flex:1}
+main{padding:12px 16px 40px;display:grid;gap:12px;max-width:1500px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.kpi{padding:8px 12px}.kpi b{display:block;font-size:24px}.kpi span{color:var(--mut);font-size:11px}
+.grid2{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(280px,1fr);gap:12px}.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+@media (max-width:1000px){.grid2{grid-template-columns:1fr}}
+svg text{font-family:inherit}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:6px;font-size:11px;color:var(--mut)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+table{border-collapse:collapse;width:100%;min-width:520px}th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:11px}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--mut)}.or{color:var(--or)}
+.alert{border-left:3px solid var(--bad);padding:5px 9px;margin:4px 0;background:rgba(248,81,73,.08);border-radius:4px}
+.alert.w{border-color:var(--warn);background:rgba(227,160,8,.08)}.alert.i{border-color:var(--acc);background:rgba(88,166,255,.08)}
+button{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:5px 11px;cursor:pointer;font:inherit}button.ghost{background:transparent;color:var(--acc);border:1px solid var(--line)}
+pre{margin:6px 0 0;white-space:pre-wrap;word-break:break-all;background:rgba(127,127,127,.12);padding:8px;border-radius:6px}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+.bus{max-height:300px;overflow-y:auto;font-size:12px;line-height:1.7}.bus div{border-bottom:1px solid rgba(127,127,127,.1)}
+.tag{display:inline-block;min-width:62px;color:var(--mut)}
+#detail{min-height:92px}
+.bars{display:flex;align-items:flex-end;gap:3px;height:48px}.bars i{flex:1;background:var(--acc);border-radius:2px 2px 0 0;min-height:2px;opacity:.85}
+.card2{position:absolute;border:1.5px solid #4cc9f0;border-radius:8px;background:#0f1722;padding:6px 9px;font-size:11.5px;line-height:1.3;cursor:grab;user-select:none;touch-action:none;overflow:hidden}.card2:hover{background:#142033}.card2 .ttl{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:2px 0 3px;color:#c7d3e0}.bar{height:3px;background:#1d2836;border-radius:2px;margin:2px 0 3px}.bar i{display:block;height:3px;border-radius:2px}
+@media (prefers-reduced-motion:reduce){animateMotion{display:none}}
+.card button:not(.ghost){padding:3px 9px}
+.banner{position:sticky;top:0;z-index:40;background:#3b1215;border-bottom:2px solid #f85149;color:#ffd7d4;padding:8px 16px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}.banner b{color:#fff}.banner button{background:#f85149}
+
+/* ===== diseño pro ===== */
+:root{--g1:#1f6feb;--g2:#8957e5;--glass:rgba(16,22,31,.72)}
+body{font:13.5px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(1200px 500px at 15% -10%,rgba(31,111,235,.18),transparent 60%),radial-gradient(900px 420px at 95% 0%,rgba(137,87,229,.16),transparent 60%),var(--bg);background-attachment:fixed}
+h1{font-size:15px;letter-spacing:.18em;background:linear-gradient(90deg,#4cc9f0,#8957e5);-webkit-background-clip:text;background-clip:text;color:transparent}
+header{background:var(--glass);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20;border-bottom:1px solid rgba(88,166,255,.18)}
+.card{background:linear-gradient(180deg,rgba(20,28,40,.92),rgba(14,20,29,.92));border:1px solid rgba(88,166,255,.12);box-shadow:0 8px 30px rgba(0,0,0,.28);border-radius:14px}
+h2{font-size:11.5px;color:#9db1c9}
+.sec{display:flex;align-items:center;gap:10px;margin:14px 2px 2px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#cfe3ff;font-weight:700}
+.sec:before{content:"";width:4px;height:16px;border-radius:2px;background:linear-gradient(180deg,#4cc9f0,#8957e5)}
+.sec small{letter-spacing:0;text-transform:none;color:var(--mut);font-weight:400}
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.tile{position:relative;overflow:hidden;border-radius:14px;padding:12px 14px;border:1px solid rgba(255,255,255,.07);background:linear-gradient(145deg,rgba(24,34,48,.95),rgba(13,19,28,.95))}
+.tile:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--c,#4cc9f0)}
+.tile b{display:block;font-size:30px;line-height:1.05;font-weight:800;color:var(--c,#dbe5ef);text-shadow:0 0 22px var(--c,transparent)}
+.tile span{display:block;margin-top:3px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em}
+.tile i{position:absolute;right:10px;top:8px;font-style:normal;font-size:20px;opacity:.55}
+.chats{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.chat{position:relative;border-radius:12px;padding:11px 13px;background:rgba(10,16,24,.85);border:1px solid var(--c,#1d2836)}
+.chat .top{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mut)}
+.chat .led{width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+.chat.work .led{animation:pulse 1.3s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35;transform:scale(.8)}}
+.chat .iss{margin:7px 0 3px;font-size:15px;font-weight:700}
+.chat .st{font-size:11.5px;color:var(--c)}
+.chat .ft{margin-top:6px;font-size:11px;color:var(--mut);display:flex;justify-content:space-between}
+.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:10.5px;border:1px solid var(--c,#1d2836);color:var(--c,#9db1c9)}
+details.fold{border:1px solid rgba(88,166,255,.12);border-radius:14px;background:rgba(14,20,29,.6)}
+details.fold>summary{cursor:pointer;list-style:none;padding:11px 14px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#9db1c9;display:flex;gap:8px;align-items:center}
+details.fold>summary:before{content:"▸";color:var(--cy);transition:transform .15s}details.fold[open]>summary:before{transform:rotate(90deg)}
+details.fold>summary small{letter-spacing:0;text-transform:none;color:var(--mut)}
+details.fold>.in{padding:0 12px 12px;display:grid;gap:12px}
+button{background:linear-gradient(135deg,var(--g1),var(--g2));box-shadow:0 4px 14px rgba(31,111,235,.28)}
+
+.banner{position:static!important;margin:10px auto 0;max-width:1468px;width:calc(100% - 32px);background:linear-gradient(90deg,rgba(255,159,67,.10),rgba(255,159,67,.03));border:1px solid rgba(255,159,67,.28)!important;border-radius:12px;color:#e8c9a6;padding:7px 12px;font-size:12.5px;gap:6px 12px}
+.banner b{color:#ffd9b0;font-weight:600}.banner .dot{width:7px;height:7px;border-radius:50%;background:#ff9f43;box-shadow:0 0 10px #ff9f43;flex:none}
+.banner .chip{border-color:rgba(255,159,67,.35);color:#e8c9a6;--c:rgba(255,159,67,.35)}.banner .why{color:#9a8a76;font-size:11.5px;flex:1;min-width:220px}
+.banner button{background:transparent;color:#ffd9b0;border:1px solid rgba(255,159,67,.4);box-shadow:none;padding:3px 10px;font-size:12px}.banner button:hover{background:rgba(255,159,67,.14)}
+</style>
+</head>
+<body>
+<header>
+  <h1>ORQUESTADOR<small>fábrica viva · solo lectura · datos reales de GitHub</small></h1>
+  <span class="sp"></span>
+  <span class="pill" id="p-kill"></span><span class="pill" id="p-owner"></span><span class="pill" id="p-condor"></span><span class="pill" id="p-rate"></span>
+  <span class="mut" id="age"></span><button class="ghost" id="reload">Actualizar</button>
+</header>
+<div id="tip" style="display:none;position:fixed;z-index:50;max-width:340px;background:#0f1722;border:1px solid #2b3b52;border-radius:8px;padding:9px 11px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none"></div>
+<div id="toast" style="display:none;position:fixed;right:16px;bottom:16px;z-index:60;max-width:420px;background:#0f1722;border:1px solid #3fb950;border-radius:8px;padding:10px 12px;font-size:12.5px"></div>
+<div id="banner" style="display:none"></div>
+<main id="app"><div class="card mut">Cargando datos de GitHub…</div></main>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const coT=iso=>{try{return new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date(iso))}catch(e){return (iso||'').slice(11,16)}};
+const coD=iso=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(iso))}catch(e){return (iso||'').slice(0,10)}};
+const COL={Factory:"#4cc9f0",Condor:"#f72585",GrindFlow:"#7bd88f",brvtal:"#ff9f43",ControlBot:"#b794f6",AutoFactory:"#ffd166",FactoryRunner:"#9aa5b1"};
+const OWNER="pl0n3r";
+let last=null,sel=null;
+async function load(force){
+  $('#reload').disabled=true;
+  try{const r=await fetch('/api/data'+(force?'?refresh=1':''));const j=await r.json();
+    if(j.data){last=j;if(!dragging)render()}else{$('#app').innerHTML='<div class="card bad">'+esc(j.error||'Sin datos')+'</div>'}
+  }catch(e){$('#app').innerHTML='<div class="card bad">No se pudo leer el servidor local: '+esc(e)+'</div>'}
+  $('#reload').disabled=false;
+}
+function hrs(h){return h==null?'—':h<1?(Math.max(1,Math.round(h*60))+' min'):h<48?Math.round(h)+' h':Math.round(h/24)+' d'}
+function ageText(){if(!last)return;const s=Math.round(Date.now()/1000-last.cached_at);$('#age').textContent='leído hace '+(s<90?s+' s':Math.round(s/60)+' min')+(last.error?' · '+last.error:'')}
+
+function roadTo0(d){
+  const rows=d.repos.filter(r=>r.total>0).sort((a,b)=>b.total-a.total);
+  const max=Math.max(1,...rows.map(r=>r.total));
+  const COLS2={disponible:'#3fb950',reservado:'#4cc9f0','en revisión':'#8957e5','requiere recuperación':'#ff9f43',bloqueado:'#f85149','del dueño (live/decisión)':'#d29922',planificado:'#7d8a9a'};
+  const bars=rows.map(r=>{
+    const segs=Object.entries(r.counts).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<i title="${esc(k)}: ${v}" style="width:${v/max*100}%;background:${COLS2[k]||'#58a6ff'}"></i>`).join('');
+    return `<div style="display:grid;grid-template-columns:110px 1fr 34px;gap:10px;align-items:center;margin:5px 0"><b style="color:${COL[r.repo]||'inherit'}">${esc(r.repo)}</b><div style="display:flex;height:10px;border-radius:6px;overflow:hidden;background:#0c121a">${segs}</div><span class="n" style="text-align:right">${r.total}</span></div>`;
+  }).join('');
+  const legend=Object.entries(COLS2).map(([k,c])=>`<span><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${c};margin-right:5px"></i>${esc(k)}</span>`).join('');
+  return `<div class="card"><h2>Camino a 0 issues · por repo y estado</h2>${bars}<div class="legend" style="margin-top:8px">${legend}</div></div>`;
+}
+function ownerCard(ex,d){
+  const it=ex.owner_tasks||[];
+  if(!it.length)return '';
+  const pend=it.filter(x=>!x.hecho),done=it.filter(x=>x.hecho);
+  const row=x=>`<details style="margin:7px 0;border:1px solid rgba(255,159,67,.25);border-radius:10px;padding:8px 11px;background:rgba(255,159,67,.05)"><summary style="cursor:pointer"><b style="color:#ffd9b0">${esc(x.titulo)}</b> <span class="mut">· destraba ~${x.destraba} · ${esc(x.estado)}</span></summary><div style="margin-top:6px"><div>${esc(x.como)}</div>${(()=>{const g=x.decision&&d?gateOf(d,x.decision.repo,x.decision.n):null;return g?decisionBlock(x.decision.repo,g):''})()}<div class="mut" style="margin-top:4px">Issues: ${x.issues.map(esc).join(', ')}</div></div></details>`;
+  const ok=d=>`<div class="mut" style="margin:3px 0">✓ ${esc(d.titulo)} · ${esc(d.estado)}</div>`;
+  return `<div class="sec">Decisiones y acciones tuyas <small>${pend.length} pendientes · se comprueban solas</small></div><div class="card">${pend.length?pend.map(row).join(''):'<div class="alert i" style="border-color:var(--ok);background:rgba(63,185,80,.08)"><b>Nada pendiente tuyo</b></div>'}${done.length?`<details class="fold" style="margin-top:8px"><summary>Ya resueltas (${done.length})</summary><div class="in">${done.map(ok).join('')}</div></details>`:''}</div>`;
+}
+function heroKpis(d,ex){
+  const t=d.totals,ag=(ex.agents||[]).filter(a=>a.age_s<300);
+  let w=0,f=0,e=0,n=0;ag.forEach(a=>(a.chats||[]).forEach(c=>{if(!c.directed)return;n++;if(c.state==='generando')w++;else if(c.state==='esperando_envio')f++;else if(c.state==='error'||c.state==='desconocido')e++}));
+  const own=(d.alerts||[]).filter(a=>a.startsWith('Decisión tuya')).length+(ex.owner_tasks||[]).filter(x=>!x.hecho).length;
+  const T=(v,l,c,i)=>`<div class="tile" style="--c:${c}"><i>${i}</i><b>${v}</b><span>${l}</span></div>`;
+  const open=d.repos.reduce((a,r)=>a+r.total,0);
+  return '<div class="hero">'+T(open,'issues abiertos · meta 0',open?'#e3a008':'#3fb950','🎯')+T(w,'chats trabajando','#4cc9f0','⚙')+T(f,'chats libres',f?'#3fb950':'#7d8a9a','✓')+T(e,'chats a reemplazar',e?'#f85149':'#7d8a9a','⚠')
+    +T((d.ready||[]).length,'PRs listos para fusionar',(d.ready||[]).length?'#3fb950':'#7d8a9a','⇄')+T(t.recover,'frentes sin recuperar (límite '+RECOVER_LIMIT+')',t.recover>RECOVER_LIMIT?'#ff9f43':'#7d8a9a','↺')
+    +T(t.merged24,'fusionados en 24 h','#8957e5','★')+T(own,'decisiones tuyas',own?'#f85149':'#3fb950','☝')+'</div>';
+}
+function chatCards(ex){
+  const ag=(ex.agents||[]).filter(a=>a.age_s<300);
+  if(!ag.length)return '<div class="card"><div class="mut">Ningún navegador conectado. Abre chatgpt.com con la extensión AutoFactory (1.7.27+) y pulsa PLAY: cada pestaña nueva se convierte en un agente.</div></div>';
+  const asg={};(ex.assigned||[]).forEach(a=>asg[a.iid+'|'+a.chat]=a);
+  const COLS={generando:'#4cc9f0',esperando_envio:'#3fb950',error:'#f85149',desconocido:'#e3a008',detenido:'#7d8a9a',limite:'#e3a008',sesion_cerrada:'#f85149'};
+  const TXT={generando:'Trabajando',detenido:'Detenido · pulsa PLAY en esa ventana',esperando_envio:'Libre · esperando orden',error:'En error · ciérrala y abre una nueva',desconocido:'Sin script nuevo · ciérrala y abre una nueva',detenido:'Detenido',limite:'Límite de uso',sesion_cerrada:'Sesión cerrada'};
+  let html='';
+  ag.forEach((a,gi)=>(a.chats||[]).forEach(c=>{
+    const st=c.state,col=COLS[st]||'#7d8a9a',as=asg[a.instance_id+'|'+c.chat_id];
+    const ref=as?as.issue:null,repo=ref?ref.split('#')[0]:null;
+    const iss=ref?`<a target="_blank" href="https://github.com/${OWNER}/${repo}/issues/${ref.split('#')[1]}" style="color:${COL[repo]||'#dbe5ef'}">${esc(ref)} ↗</a>`:'<span class="mut">sin issue</span>';
+    html+=`<div class="chat ${st==='generando'?'work':''}" style="--c:${col}"><div class="top"><span class="led"></span>Navegador ${gi+1} · …${esc(c.chat_id.slice(-4))}${c.directed?'':' <span class="chip">sin dirigir</span>'}</div><div class="iss">${iss}</div><div class="st">${esc(TXT[st]||st)}</div><div class="ft"><span>${as?as.n+' envío'+(as.n>1?'s':''):'sin envíos'}</span><span>${as?'hace '+hrs(as.age_s/3600):''}</span></div></div>`;
+  }));
+  return `<div class="chats">${html}</div><div class="mut" style="margin:8px 2px 0">Sumar un agente: abre una pestaña en chatgpt.com. Quitarlo: cierra su pestaña. No recargues las que trabajan.</div>`;
+}
+async function setPlanner(on){
+  if(!TOKEN){toast('Sin token: recarga la página',true);return}
+  if(!on&&!confirm('¿Detener el reparto? Los chats terminan lo que están haciendo y no reciben órdenes nuevas hasta que lo inicies.'))return;
+  try{const r=await fetch('/api/planner',{method:'POST',headers:{'Content-Type':'application/json','X-Orq-Token':TOKEN},body:JSON.stringify({on})});const j=await r.json();if(!j.ok)alert(j.error||'No se pudo cambiar');else load(true)}catch(e){alert('No se pudo cambiar el reparto')}
+}
+function chatsCard(ex){
+  const ag=(ex.agents||[]).filter(a=>a.age_s<300);
+  if(!ag.length)return '<div class="card"><h2>Chats reales</h2><div class="mut">Ningún navegador está conectado. Abre chatgpt.com con la extensión AutoFactory (1.7.27+) y pulsa PLAY.</div></div>';
+  const asg={};(ex.assigned||[]).forEach(a=>asg[a.iid+'|'+a.chat]=a);
+  const col={generando:'#4cc9f0',esperando_envio:'#3fb950',error:'#f85149',desconocido:'#8b949e',detenido:'#8b949e',limite:'#e3a008',sesion_cerrada:'#f85149'};
+  const txt={generando:'trabajando',esperando_envio:'libre · esperando orden',error:'en error · ciérralo y abre uno nuevo',desconocido:'sin script nuevo · cierra y abre uno nuevo',detenido:'detenido',limite:'límite de uso',sesion_cerrada:'sesión cerrada'};
+  let rows='',n=0;
+  ag.forEach((a,gi)=>(a.chats||[]).forEach(c=>{
+    n++;const as=asg[a.instance_id+'|'+c.chat_id];
+    const st=c.directed?c.state:(c.state==='desconocido'?'desconocido':c.state);
+    const ref=as?as.issue:null;
+    const link=ref?`<a target="_blank" href="https://github.com/${OWNER}/${ref.split('#')[0]}/issues/${ref.split('#')[1]}">${esc(ref)} ↗</a>`:'<span class="mut">—</span>';
+    rows+=`<tr><td>perfil ${gi+1}</td><td>…${esc(c.chat_id.slice(-4))}</td><td style="color:${col[st]||'#8b949e'}">● ${esc(txt[st]||st)}</td><td>${link}</td><td class="n">${as?as.n:0}</td><td class="n">${as?hrs(as.age_s/3600):'—'}</td></tr>`;
+  }));
+  const free=ag.reduce((t,a)=>t+(a.chats||[]).filter(c=>c.directed&&c.state==='esperando_envio').length,0);
+  const pon=ex.planner_on!==false;
+  const pbtn=`<span style="float:right"><span class="${pon?'ok':'bad'}" style="margin-right:8px">● reparto ${pon?'activo':'detenido'}</span><button onclick="setPlanner(${pon?'false':'true'})" style="cursor:pointer;padding:4px 12px;border-radius:6px;border:1px solid ${pon?'#f85149':'#3fb950'};background:transparent;color:${pon?'#f85149':'#3fb950'};font-weight:600">${pon?'■ Detener reparto':'▶ Iniciar reparto'}</button></span>`;
+  return `<div class="card"><h2>Chats reales (${n}) · ${free} libres${pbtn}</h2><table><tr><th>Navegador</th><th>Chat</th><th>Estado</th><th>Issue asignado</th><th class="n">Envíos</th><th class="n">Último envío</th></tr>${rows}</table><div class="mut" style="margin-top:6px">Para sumar un agente: abre una pestaña nueva en chatgpt.com. Para quitarlo: cierra la pestaña. No recargues las que trabajan.</div></div>`;
+}
+function chatsSummary(ex){
+  const ag=(ex.agents||[]).filter(a=>a.age_s<300);
+  if(!ag.length)return 'los chats reales de AutoFactory aún no llegan';
+  let n=0,w=0,e=0;ag.forEach(a=>(a.chats||[]).forEach(c=>{if(c.directed){n++;if(c.state==='generando')w++;if(c.state==='error')e++}}));
+  return 'chats reales dirigidos: '+n+' · trabajando '+w+(e?' · en error '+e:'');
+}
+function chatFor(ex,f){
+  const key=f.repo+'#'+f.n;
+  const a=(ex.assigned||[]).find(x=>x.issue===key);if(!a)return '';
+  let st='';(ex.agents||[]).forEach(g=>{if(g.instance_id===a.iid)(g.chats||[]).forEach(c=>{if(c.chat_id===a.chat)st=c.state})});
+  const col=st==='generando'?'#4cc9f0':st==='error'?'#f85149':'#8b949e';
+  return `<div class="mut" style="font-size:10.5px;color:${col}">💬 chat …${esc(a.chat.slice(-4))} · ${esc(st||'?')} · envío ${a.n}</div>`;
+}
+function fronts(d){
+  const out=[];
+  d.repos.forEach(r=>r.work.forEach(w=>out.push({...w,repo:r.repo})));
+  return out.sort((a,b)=>(a.repo===b.repo?a.n-b.n:a.repo.localeCompare(b.repo)));
+}
+function frontStatus(f){
+  if(f.state==='requiere recuperación')return{c:'#ff9f43',k:'recuperación',dash:'4 3'};
+  if(f.pr&&f.pr.fails>0)return{c:'#f85149',k:'PR con fallos'};
+  if(f.h!=null&&f.h>0.5)return{c:'#e3a008',k:'sin actividad >30 min'};
+  if(f.pr&&!f.pr.draft&&f.pr.merge==='CLEAN')return{c:'#3fb950',k:'PR listo'};
+  return{c:'#4cc9f0',k:f.state};
+}
+const POSKEY='orq-pos-v1';
+function loadPos(){try{return JSON.parse(localStorage.getItem(POSKEY)||'{}')}catch(e){return {}}}
+function savePos(p){try{localStorage.setItem(POSKEY,JSON.stringify(p))}catch(e){}}
+let TOKEN=null,dragging=false,pinned=null,causeFilter='todas';
+fetch('/api/token').then(r=>r.json()).then(j=>TOKEN=j.token).catch(()=>{});
+// Si el orquestador se reinició, el token de esta página quedó viejo (403): se renueva solo y se reintenta una vez.
+(function(){const _f=window.fetch.bind(window);window.fetch=async(u,o={})=>{let r=await _f(u,o);
+  if(r.status===403&&o.headers&&o.headers['X-Orq-Token']){const t=await _f('/api/token').then(x=>x.json()).then(j=>j.token).catch(()=>null);
+    if(t){TOKEN=t;r=await _f(u,{...o,headers:{...o.headers,'X-Orq-Token':t}})}}
+  return r}})();
+function toast(m,bad){const t=$('#toast');t.textContent=m;t.style.borderColor=bad?'#f85149':'#3fb950';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',6000)}
+function cmdTag(ex,iid,chat){const c=(ex.commands||[]).find(x=>x.instance_id===iid&&x.chat_id===chat);return c?`<span class="mut"> · ${c.acked?'✓ ':'⏳ '}${c.want==='stop'?'parar':'arrancar'}${c.acked?' (recibida)':' (esperando al agente)'}</span>`:''}
+function unlockCard(d){
+  const rows=[];for(const r of d.repos)for(const u of (r.unlockers||[]))rows.push(Object.assign({repo:r.repo},u));
+  rows.sort((a,b)=>b.k-a.k);
+  if(!rows.length)return '';
+  return '<div class="card"><h2>Desbloquean más trabajo · sacarlos primero</h2><table><tr><th>Repo</th><th>Issue</th><th class="n">Desbloquea</th><th>Estado</th><th>Prioridad</th><th>Título</th></tr>'+rows.slice(0,12).map(u=>`<tr><td style="color:${COL[u.repo]||'inherit'}">${esc(u.repo)}</td><td><a target="_blank" href="https://github.com/${OWNER}/${u.repo}/issues/${u.n}">#${u.n}</a></td><td class="n"><b>${u.k}</b></td><td>${esc(u.state)}</td><td class="${u.crit?'ok':'bad'}">${u.crit?'crítica':'subir a crítica'}</td><td>${esc(u.title)}</td></tr>`).join('')+'</table><div class="mut">Cuenta issues que dependen de este, directa o indirectamente (depends_on y condiciones de desbloqueo).</div></div>';
+}
+async function agentCmd(iid,chat,want){
+  try{const r=await fetch('/api/agent-cmd',{method:'POST',headers:{'Content-Type':'application/json','X-Orq-Token':TOKEN},body:JSON.stringify({instance_id:iid,chat_id:chat||null,want})});const j=await r.json();if(!j.ok)alert(j.error||'No se pudo enviar');else load(true)}catch(e){alert('No se pudo enviar la orden')}
+}
+async function act(action,repo,number,ask){
+  if(!TOKEN){toast('Sin token: recarga la página',true);return}
+  if(!confirm(ask))return;
+  try{const r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json','X-Orq-Token':TOKEN},body:JSON.stringify({action,repo,number})});
+    const j=await r.json();toast(j.ok?('✓ '+repo+'#'+number+': '+j.msg):('✕ '+(j.error||'falló')),!j.ok);if(j.ok){pinned=null;$('#tip').style.display='none';load(true)}
+  }catch(e){toast('✕ '+e,true)}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){pinned=null;$('#tip').style.display='none';$('#tip').style.pointerEvents='none'}});document.addEventListener('pointerdown',e=>{if(pinned&&!e.target.closest('.card2')){pinned=null;$('#tip').style.display='none';$('#tip').style.pointerEvents='none'}});
+function suggest(f){
+  if(f.state==='requiere recuperación')return 'El agente dueño debe retomar la reserva (sesión inactiva o sin cupo).';
+  if(f.pr&&f.pr.fails>0)return 'Revisar checks en rojo del PR; el agente debe corregirlos.';
+  if(f.pr&&!f.pr.draft&&f.pr.merge==='CLEAN')return 'PR listo: se puede fusionar ya.';
+  if(f.pr&&f.pr.pend>0)return 'Esperando que terminen '+f.pr.pend+' check(s).';
+  if(f.pr&&f.pr.draft)return 'PR en borrador: el agente aún está trabajando.';
+  if(f.h!=null&&f.h>0.5)return 'Sin actividad hace '+hrs(f.h)+': supera los 30 min; la reserva debe liberarse (Factory #1175).';
+  return 'En curso.';
+}
+function actionsHtml(f){
+  let b='';
+  if(f.pr&&!f.pr.draft&&f.pr.merge==='CLEAN')b+=`<button onclick="act('merge','${f.repo}',${f.pr.n},'¿Fusionar ${f.repo} PR #${f.pr.n} (squash)?')">Fusionar PR #${f.pr.n}</button> `;
+  if(f.pr&&f.pr.merge==='BEHIND')b+=`<button onclick="act('update','${f.repo}',${f.pr.n},'¿Actualizar la rama de ${f.repo} PR #${f.pr.n} con la base?')">Actualizar rama PR #${f.pr.n}</button> `;
+  b+=`<a target="_blank" href="https://github.com/${OWNER}/${f.repo}/issues/${f.n}">Abrir issue ↗</a>${f.pr?` · <a target="_blank" href="https://github.com/${OWNER}/${f.repo}/pull/${f.pr.n}">Abrir PR ↗</a>`:''}`;
+  return `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">${b}</div>`;
+}
+function tipHtml(f){
+  const st=f._st||frontStatus(f);
+  return `<div style="font-weight:700;color:${COL[f.repo]||'#fff'}">${esc(f.repo)} #${f.n}</div>
+  <div style="margin:3px 0">${esc(f.title)}</div>
+  <div class="mut">Estado: <b style="color:${st.c}">${esc(st.k)}</b> · ${esc(f.state)}</div>
+  <div class="mut">Última actividad: ${hrs(f.h)}</div>${typeof LASTEX!=='undefined'?chatFor(LASTEX,f):''}
+  ${f.pr?`<div class="mut">PR #${f.pr.n}: ${f.pr.draft?'borrador':esc(f.pr.merge)} · fallos <b class="${f.pr.fails?'bad':'ok'}">${f.pr.fails}</b> · pendientes ${f.pr.pend}</div>`:'<div class="mut">Sin PR abierto</div>'}
+  <div style="margin-top:4px;color:#ff9f43">→ ${esc(suggest(f))}</div>
+  <div class="mut" style="margin-top:3px;font-size:10.5px">clic: fijar y ver acciones · arrastra para mover</div>${pinned===f.repo+'#'+f.n?actionsHtml(f):''}`;
+}
+function pct(f){if(f.pr&&!f.pr.draft&&f.pr.merge==='CLEAN')return 100;if(f.state==='en revisión')return 76;if(f.state==='requiere recuperación')return 20;return 32}
+function graph(d,ex){
+  const F=fronts(d),saved=loadPos(),CW=176,CH=112,GAP=12,COLW=CW+14,TOP=150,PADX=10;
+  const repos=d.repos.map(r=>r.repo).filter(r=>F.some(f=>f.repo===r));
+  const by={};F.forEach(f=>(by[f.repo]=by[f.repo]||[]).push(f));
+  const Wd=Math.max(repos.length*COLW+PADX*2,900);
+  let maxY=TOP+60;const cards=[];
+  repos.forEach((r,ci)=>{const x=PADX+ci*COLW;by[r].sort((a,b)=>(b.h||0)-(a.h||0));
+    by[r].forEach((f,k)=>{const key=f.repo+'#'+f.n;let cx=x,cy=TOP+54+k*(CH+GAP);if(saved[key]){cx=saved[key][0];cy=saved[key][1]}
+      const st=frontStatus(f);f._st=st;cards.push({f,key,x:cx,y:cy,col:x,st});maxY=Math.max(maxY,cy+CH+20)})});
+  const cx0=Wd/2;let edges='';
+  repos.forEach((r,ci)=>{const x=PADX+ci*COLW+CW/2;const n=by[r].length;const rec=Math.min(...by[r].map(f=>f.h==null?9:f.h));const sp=rec<1?2.2:rec<4?3.6:rec<12?5.5:8;
+    edges+=`<path id="h${ci}" d="M${cx0},62 C${cx0},100 ${x},90 ${x},${TOP-6}" stroke="${COL[r]||'#335'}" stroke-opacity=".55" stroke-width="1.4" stroke-dasharray="3 6" fill="none"/>
+    <circle r="3" fill="#ff9f43"><animateMotion dur="${sp}s" repeatCount="indefinite"><mpath href="#h${ci}"/></animateMotion></circle>`});
+  cards.forEach(c=>{const x=c.col+CW/2;edges+=`<line class="cl" data-key="${esc(c.key)}" x1="${x}" y1="${TOP+30}" x2="${c.x+CW/2}" y2="${c.y}" stroke="#22314a" stroke-width="1" stroke-dasharray="2 5"/>`});
+  const t=d.totals,act=F.length;
+  const head=`<div style="position:absolute;left:${cx0-130}px;top:6px;width:260px;height:56px;border:1px solid #4cc9f0;border-radius:10px;background:#0f1a2b;text-align:center;padding:6px 8px;line-height:1.35">
+    <div style="color:#4cc9f0">● orquestador · ${esc(ex.kill||'?')}</div><div style="font-size:11.5px">${act} frentes · ${t.available} disponibles · <span style="color:${t.recover?'#ff9f43':'inherit'}">${t.recover} sin recuperar</span></div></div>`;
+  const heads=repos.map((r,ci)=>`<div style="position:absolute;left:${PADX+ci*COLW}px;top:${TOP-6}px;width:${CW}px;height:36px;border:1px solid ${COL[r]||'#456'};border-radius:8px;background:#0f1722;padding:7px 10px;font-weight:700;color:${COL[r]||'#fff'}">${esc(r)} <span class="mut" style="font-weight:400">${by[r].length} frente${by[r].length>1?'s':''}</span></div>`).join('');
+  const cardsHtml=cards.map(c=>{const f=c.f,p=pct(f);return `<div class="card2" data-key="${esc(c.key)}" data-r="${esc(f.repo)}" data-n="${f.n}" data-x="${c.x}" data-y="${c.y}" style="left:${c.x}px;top:${c.y}px;width:${CW}px;height:${CH}px;border-color:${c.st.c}${c.st.dash?';border-style:dashed':''}">
+    <div style="display:flex;justify-content:space-between"><b style="color:${COL[f.repo]||'#fff'}">#${f.n}</b><span style="color:${c.st.c}">${esc(c.st.k)}${f.pr&&f.pr.fails?' ✕'+f.pr.fails:f.pr&&!f.pr.draft&&f.pr.merge==='CLEAN'?' ✓':''}</span></div>
+    <div class="ttl">${esc(f.title)}</div>
+    <div class="bar"><i style="width:${p}%;background:${c.st.c}"></i></div><div class="mut" style="font-size:10.5px">${hrs(f.h)} sin actividad${f.pr?' · PR #'+f.pr.n:''}</div>${chatFor(ex,f)}</div>`}).join('');
+  const tools=`<div style="display:flex;gap:8px;margin:0 0 8px;align-items:center"><button class="ghost" id="zreset">Reordenar</button><span class="mut" style="font-size:11px">arrastra una tarjeta para moverla · pasa el cursor para ver el detalle · clic = fijar detalle</span></div>`;
+  return tools+`<div id="board" style="position:relative;width:${Wd}px;min-height:${maxY+10}px;margin:0 auto"><svg width="${Wd}" height="${maxY+10}" style="position:absolute;left:0;top:0;pointer-events:none">${edges}</svg>${head}${heads}${cardsHtml}</div>`;
+}
+function wire(d){
+  const board=$('#board');if(!board)return;const tip=$('#tip');
+  const byKey={};fronts(d).forEach(f=>byKey[f.repo+'#'+f.n]=f);
+  board.querySelectorAll('.card2').forEach(g=>{
+    const f=byKey[g.dataset.key];
+    g.addEventListener('mouseenter',()=>{if(f&&!dragging&&!pinned){tip.innerHTML=tipHtml(f);tip.style.display='block'}});
+    g.addEventListener('mousemove',e=>{if(pinned)return;const w=tip.offsetWidth,h=tip.offsetHeight;let x=e.clientX+16,y=e.clientY+16;if(x+w>innerWidth-8)x=e.clientX-w-16;if(y+h>innerHeight-8)y=e.clientY-h-16;tip.style.left=Math.max(8,x)+'px';tip.style.top=Math.max(8,y)+'px'});
+    g.addEventListener('mouseleave',()=>{if(!pinned)tip.style.display='none'});
+    g.addEventListener('pointerdown',e=>{
+      g.setPointerCapture(e.pointerId);dragging=true;let moved=false;const sx=e.clientX,sy=e.clientY,ox=+g.dataset.x,oy=+g.dataset.y;
+      const line=board.querySelector(`.cl[data-key="${CSS.escape(g.dataset.key)}"]`);g.style.zIndex=20;
+      const mv=ev=>{const dx=ev.clientX-sx,dy=ev.clientY-sy;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;if(!moved)return;const nx=Math.max(0,ox+dx),ny=Math.max(60,oy+dy);
+        g.style.left=nx+'px';g.style.top=ny+'px';g.dataset.x=nx;g.dataset.y=ny;if(line){line.setAttribute('x2',nx+98);line.setAttribute('y2',ny)};tip.style.display='none'};
+      const up=ev=>{g.releasePointerCapture(ev.pointerId);g.removeEventListener('pointermove',mv);g.removeEventListener('pointerup',up);dragging=false;g.style.zIndex='';
+        if(moved){const sp=loadPos();sp[g.dataset.key]=[+g.dataset.x,+g.dataset.y];savePos(sp)}else{sel={repo:g.dataset.r,n:+g.dataset.n};$('#detail').innerHTML=detail();pinned=g.dataset.key;tip.innerHTML=tipHtml(byKey[pinned]);tip.style.display='block';tip.style.pointerEvents='auto';const r=g.getBoundingClientRect();tip.style.left=Math.min(innerWidth-360,r.right+8)+'px';tip.style.top=Math.max(8,Math.min(innerHeight-260,r.top))+'px'}};
+      g.addEventListener('pointermove',mv);g.addEventListener('pointerup',up);
+    });
+  });
+  $('#zreset').onclick=()=>{savePos({});render()};
+}
+function legend(){return `<div class="legend"><span><i style="border:2px solid #4cc9f0;background:none"></i>en curso</span><span><i style="border:2px solid #3fb950;background:none"></i>PR listo ✓</span><span><i style="border:2px solid #f85149;background:none"></i>PR con fallos ✕</span><span><i style="border:2px solid #e3a008;background:none"></i>más de 30 min sin actividad</span><span><i style="border:2px dashed #ff9f43;background:none"></i>requiere recuperación</span><span>naranja discontinuo = reserva caducada, probablemente sin chat activo;</span><span>la barra indica el avance estimado; los puntos naranjas viajan más rápido cuando hay actividad reciente</span></div>`}
+function detail(){
+  if(!sel||!last)return '<div class="mut">Haz clic en un nodo para ver su detalle.</div>';
+  const d=last.data,f=fronts(d).find(x=>x.repo===sel.repo&&x.n===sel.n);if(!f)return '<div class="mut">Ese frente ya no está activo.</div>';
+  const st=f._st||frontStatus(f);
+  return `<div><b>${esc(f.repo)} #${f.n}</b> <span class="pill" style="border-color:${st.c}">${esc(st.k)}</span></div>
+  <div style="margin:4px 0">${esc(f.title)}</div>
+  <div class="mut">Estado: ${esc(f.state)} · sin actividad ${hrs(f.h)}</div>
+  ${f.pr?`<div>PR #${f.pr.n}: ${f.pr.draft?'borrador':esc(f.pr.merge)} · fallos ${f.pr.fails} · pendientes ${f.pr.pend}</div>`:'<div class="mut">Sin PR abierto</div>'}
+  <div style="margin-top:4px"><a target="_blank" href="https://github.com/${OWNER}/${f.repo}/issues/${f.n}">Abrir issue ↗</a>${f.pr?` · <a target="_blank" href="https://github.com/${OWNER}/${f.repo}/pull/${f.pr.n}">Abrir PR ↗</a>`:''}</div>`;
+}
+function blockedBoard(d){
+  const all=d.repos.flatMap(r=>(r.blocked||[]).map(b=>({...b,repo:r.repo})));
+  const causes=['todas',...new Set(all.map(b=>b.cause))];
+  const rows=all.filter(b=>causeFilter==='todas'||b.cause===causeFilter).sort((a,b)=>(a.repo===b.repo?a.n-b.n:a.repo.localeCompare(b.repo)));
+  const chips=causes.map(c=>`<button class="${c===causeFilter?'':'ghost'}" onclick="causeFilter='${c}';render()">${esc(c)}${c==='todas'?' ('+all.length+')':' ('+all.filter(b=>b.cause===c).length+')'}</button>`).join(' ');
+  return `<div class="card"><h2>Bloqueados · liberar a «disponible» (${rows.length})</h2><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${chips}</div>
+  <table><tr><th>Proyecto</th><th>Issue</th><th>Causa</th><th class="n">Edad</th><th>Título</th><th></th></tr>`+rows.map(b=>{const live=false;return `<tr><td style="color:${COL[b.repo]||'inherit'}">${esc(b.repo)}</td><td><a target="_blank" href="https://github.com/${OWNER}/${b.repo}/issues/${b.n}">#${b.n}</a></td><td><span class="pill">${esc(b.cause)}</span></td><td class="n">${hrs(b.h)}</td><td>${esc(b.title)}</td><td>${live?'<span class="mut">requiere tu orden de live</span>':`<button onclick="act('unblock','${b.repo}',${b.n},'¿Liberar ${b.repo}#${b.n} a «disponible»?\n\n${esc(b.title).replace(/'/g,'’')}\n\nSi la causa del bloqueo persiste, Coordinación lo volverá a bloquear con su motivo.')">Liberar</button>`}</td></tr>`}).join('')+`</table><div class="mut" style="margin-top:6px">Cada acción queda en <code>acciones.log</code>. Liberar un issue de readiness solo prepara el trabajo (pruebas, evidencia, documentos); activar el live sigue siendo una decisión aparte y no se hace desde aquí.</div></div>`;
+}
+function bottlenecks(d){
+  const out=[],t=d.totals,F=fronts(d);
+  if(t.available===0)out.push(['bad','COLA VACÍA: ningún issue disponible. Hay agentes sin trabajo.']);
+  const ready=d.ready.length;if(ready)out.push(['w',`${ready} PR(s) listos para fusionar esperando: ${d.ready.slice(0,5).map(p=>p.repo+'#'+p.n).join(', ')}`]);
+  const rec=F.filter(f=>f.state==='requiere recuperación');
+  if(rec.length)out.push(['w',`${rec.length} frentes con reserva caducada: ${rec.slice(0,6).map(f=>f.repo+'#'+f.n).join(', ')}${rec.length>6?'…':''} deben retomarlos los agentes (sesión inactiva o sin cupo).`]);
+  const red=F.filter(f=>f.pr&&f.pr.fails>0&&f.state!=='requiere recuperación');
+  if(red.length)out.push(['w',`${red.length} PR(s) con checks en rojo: ${red.slice(0,6).map(f=>f.repo+' PR#'+f.pr.n).join(', ')}`]);
+  const stale=F.filter(f=>f.h!=null&&f.h>0.5&&f.state!=='requiere recuperación');
+  if(stale.length)out.push(['w',`${stale.length} frentes sin actividad hace más de 30 min (deberían liberarse): ${stale.slice(0,6).map(f=>f.repo+'#'+f.n).join(', ')}`]);
+  d.repos.forEach(r=>{if(r.last_merge_h!=null&&r.last_merge_h>24)out.push(['i',`${r.repo}: ${hrs(r.last_merge_h)} sin fusiones.`]);
+    const idle=!r.counts.disponible&&!(r.counts.reservado||r.counts['en revisión']);if(idle&&r.total>0)out.push(['i',`${r.repo}: sin trabajo activo ni disponible (${r.total} issues, casi todos bloqueados/planificados).`])});
+  if(d.rate.remaining<800)out.push(['w',`Cupo de la API de GitHub bajo: ${d.rate.remaining}/${d.rate.limit}.`]);
+  (d.alerts||[]).filter(a=>a.startsWith('Decisión tuya')).forEach(a=>out.push(['bad',a]));
+  if(!out.length)out.push(['i','Sin cuellos de botella detectados.']);
+  return out.map(([c,m])=>`<div class="alert ${c==='bad'?'':c}">${esc(m)}</div>`).join('');
+}
+function daysChart(d){
+  const days=[];for(let i=6;i>=0;i--){days.push(coD(new Date(Date.now()-i*864e5)))}
+  const tot=days.map(x=>d.repos.reduce((a,r)=>a+((r.days||{})[x]||0),0)),max=Math.max(1,...tot);
+  return `<div class="bars">${tot.map((v,i)=>`<i title="${days[i]}: ${v}" style="height:${Math.max(4,v/max*100)}%"></i>`).join('')}</div>
+  <div class="mut" style="display:flex;justify-content:space-between;font-size:10.5px"><span>${days[0].slice(5)}</span><span>por día (7 d): ${tot.join(' · ')}</span><span>${days[6].slice(5)}</span></div>`;
+}
+
+let hitoFilter='todo';
+function hitosCard(d){
+  const items=[];
+  d.repos.forEach(r=>{const rd={};(r.releases||[]).forEach(x=>{const k=x.at.slice(0,10);(rd[k]=rd[k]||[]).push(x)});Object.values(rd).forEach(a=>{a.sort((p,q)=>q.at.localeCompare(p.at));const x=a[0];items.push({repo:r.repo,at:x.at,kind:'publicación',title:'Release '+x.tag+(a.length>1?` (última de ${a.length} publicadas ese día)`:''),url:`https://github.com/${OWNER}/${r.repo}/releases/tag/${x.tag}`})});
+    (r.merged_list||[]).forEach(m=>items.push({repo:r.repo,at:m.at,kind:m.kind,title:m.title,n:m.n,url:`https://github.com/${OWNER}/${r.repo}/pull/${m.n}`}))});
+  const KINDS={'todo':null,'publicación':['publicación'],'funcionalidades':['funcionalidad'],'correcciones críticas':['corrección crítica'],'correcciones':['corrección','corrección crítica']};
+  const sel=KINDS[hitoFilter];
+  const rows=items.filter(i=>i.kind!=='mantenimiento'&&i.kind!=='otros').filter(i=>!sel||sel.includes(i.kind)).sort((a,b)=>b.at.localeCompare(a.at));
+  const day=x=>coD(x);const byDay={};rows.forEach(i=>(byDay[day(i.at)]=byDay[day(i.at)]||[]).push(i));
+  const n=k=>items.filter(i=>i.kind===k).length;
+  const chips=Object.keys(KINDS).map(k=>`<button class="${k===hitoFilter?'':'ghost'}" onclick="hitoFilter='${k}';render()">${k}</button>`).join(' ');
+  const icon={'publicación':'🚀','funcionalidad':'✦','corrección crítica':'🛡','corrección':'🔧'};
+  const body=Object.keys(byDay).slice(0,7).map(dy=>`<div style="margin:8px 0 2px;color:var(--mut);font-size:11px">${dy} · ${byDay[dy].length} hito${byDay[dy].length>1?'s':''}</div>`+byDay[dy].slice(0,18).map(i=>`<div style="padding:2px 0"><span style="color:var(--mut)">${coT(i.at)}</span> ${icon[i.kind]||'•'} <b style="color:${COL[i.repo]||'inherit'}">${esc(i.repo)}</b> <a target="_blank" href="${i.url}">${esc(i.title)}</a></div>`).join('')+(byDay[dy].length>18?`<div class="mut">… y ${byDay[dy].length-18} más</div>`:'')).join('');
+  return `<div class="card"><h2>Hitos logrados · últimos 7 días (hora Colombia)</h2><div class="mut" style="margin-bottom:6px">🚀 ${n('publicación')} publicaciones · ✦ ${n('funcionalidad')} funcionalidades · 🛡 ${n('corrección crítica')} correcciones críticas · 🔧 ${n('corrección')} correcciones <span style="margin-left:8px">(el mantenimiento, docs y tests no se listan)</span></div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${chips}</div><div style="max-height:420px;overflow-y:auto">${body||'<div class="mut">Sin hitos con este filtro.</div>'}</div></div>`;
+}
+
+const RECOVER_LIMIT=8;let lastRecover=null;
+function recoverAlert(d){
+  const F=fronts(d).filter(f=>f.state==='requiere recuperación');const n=F.length,b=$('#banner');
+  document.title=(n>RECOVER_LIMIT?'⚠ '+n+' sin recuperar · ':'')+'Orquestador local';
+  if(n>RECOVER_LIMIT){
+    const by={};F.forEach(f=>by[f.repo]=(by[f.repo]||0)+1);
+    const oldest=F.slice().sort((a,c)=>(c.h||0)-(a.h||0))[0];
+    b.className='banner';b.style.display='flex';
+    b.innerHTML=`<span class="dot"></span><span><b>${n} frentes sin recuperar</b> <span class="mut">· límite ${RECOVER_LIMIT}</span></span><span>${Object.entries(by).map(([k,v])=>`<span class="chip">${esc(k)} ${v}</span>`).join(' ')}</span><span class="why" title="La liberación automática (Factory #1175) está fusionada pero sigue en modo de prueba: no libera nada hasta que se active.">Más viejo: ${esc(oldest.repo)}#${oldest.n} (${hrs(oldest.h)}) · el orquestador los reparte a los chats libres</span><button onclick="releaseAllDialog()">Liberar…</button><button onclick="notifyOn()">Avisarme</button>`;
+    if(lastRecover!==null&&lastRecover<=RECOVER_LIMIT&&'Notification' in window&&Notification.permission==='granted'){new Notification('Orquestador: '+n+' frentes sin recuperar',{body:'Superó el límite de '+RECOVER_LIMIT+'. Revisa los agentes.'})}
+  }else{b.style.display='none';b.innerHTML=''}
+  lastRecover=n;
+}
+function notifyOn(){if(!('Notification' in window)){toast('Este navegador no soporta avisos',true);return}Notification.requestPermission().then(p=>toast(p==='granted'?'Avisos de escritorio activados':'Avisos no permitidos',p!=='granted'))}
+
+async function mergeAll(){
+  const d=last.data;if(!d.ready.length)return;
+  if(!confirm('¿Fusionar ahora '+d.ready.length+' PR(s) listos?\n\n'+d.ready.map(p=>p.repo+' #'+p.n+' '+p.title).join('\n')))return;
+  let ok=0,bad=[];
+  for(const p of d.ready){try{const r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json','X-Orq-Token':TOKEN},body:JSON.stringify({action:'merge',repo:p.repo,number:p.n})});const j=await r.json();if(j.ok)ok++;else bad.push(p.repo+'#'+p.n)}catch(e){bad.push(p.repo+'#'+p.n)}}
+  toast('Fusionados '+ok+(bad.length?' · fallaron '+bad.join(', '):''),bad.length>0);load(true);
+}
+function gateOf(d,repo,n){const r=(d.repos||[]).find(x=>x.repo===repo);const g=r&&(r.gates||[]).find(x=>x.n===n);return g&&g.gate?g:null}
+function decisionBlock(repo,g){
+  const gt=g.gate,rec=gt.recommendation,safe=gt.safe_default;
+  const opts=gt.options.map(o=>{
+    const tag=(o.id===rec?'<span class="ok"> ★ recomendada</span>':'')+(o.id===safe?' <span class="mut">· opción segura por defecto</span>':'');
+    return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:8px 10px;margin:6px 0;display:flex;gap:10px;align-items:flex-start;justify-content:space-between"><div style="min-width:0"><b>Opción ${esc(o.id)} · ${esc(o.label)}</b>${tag}<div class="mut" style="margin-top:3px">${esc(o.effect)}</div></div><button onclick="decide('${esc(repo)}',${g.n},'${esc(o.id)}')" style="cursor:pointer;flex:none;padding:6px 12px;border-radius:6px;border:1px solid ${o.id===rec?'#3fb950':'#58a6ff'};background:transparent;color:${o.id===rec?'#3fb950':'#58a6ff'};font-weight:600">Elegir ${esc(o.id)}</button></div>`}).join('');
+  return `<div style="margin:8px 0"><b>${esc(repo)} #${g.n}</b> · <a target="_blank" href="https://github.com/${OWNER}/${esc(repo)}/issues/${g.n}">abrir ↗</a><div style="margin:4px 0"><b>${esc(gt.title||g.title)}</b></div><div>${esc(gt.summary)}</div>${gt.explain?`<div class="mut" style="margin-top:4px">${esc(gt.explain)}</div>`:''}${gt.why?`<div class="mut" style="margin-top:4px">Por qué se recomienda: ${esc(gt.why)}</div>`:''}${gt.blocks?`<div class="mut" style="margin-top:4px">Qué destraba: ${esc(gt.blocks)}</div>`:''}${opts}</div>`;
+}
+async function decide(repo,n,opt){
+  if(!TOKEN){toast('Sin token: recarga la página',true);return}
+  const g=gateOf(last.data,repo,n);const o=g&&g.gate.options.find(x=>x.id===opt);
+  if(!confirm('Vas a registrar tu decisión en '+repo+' #'+n+':\n\nOpción '+opt+' · '+(o?o.label:'')+'\n\n'+(o?o.effect:'')+'\n\nSe publicará /decidir '+opt+' en el issue. ¿Confirmas?'))return;
+  try{const r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json','X-Orq-Token':TOKEN},body:JSON.stringify({action:'decide',repo,number:n,option:opt})});const j=await r.json();toast(j.ok?(j.msg||'Decisión registrada'):(j.error||'No se pudo registrar'),!j.ok);if(j.ok)load(true)}catch(e){toast('No se pudo registrar la decisión',true)}
+}
+function attentionCard(d,ex){
+  const items=[];const rel=d.release||{},t=d.totals;
+  (d.repos||[]).forEach(r=>(r.gates||[]).forEach(g=>{if(g.gate)items.push(['bad','Decisión tuya pendiente',decisionBlock(r.repo,g)]);else items.push(['bad','Decisión tuya pendiente',r.repo+' #'+g.n+': '+g.title])}));
+  if(rel.main_version&&rel.last_release&&('v'+rel.main_version)!==rel.last_release)items.push(['bad','Release preparada sin publicar',`main tiene la versión ${rel.main_version} y la última release es ${rel.last_release}: abre la puerta de release (release-window).`]);
+  else if(rel.ahead>=15)items.push(['w','Muchos cambios sin publicar en v1',`main lleva ${rel.ahead} commits por delante de v1; conviene preparar la siguiente release.`]);
+  (ex.owner_blockers||[]).slice(-6).forEach(b=>items.push(['w','Bloqueado, ningún chat puede avanzarlo: '+b.issue,'frenado por '+((b.blockers||[]).join(', ')||'causa no identificada')+' · '+b.why]));
+  if(ex.kill&&ex.kill!=='RUNNING')items.push(['bad','Kill switch en '+ex.kill,'Los agentes no avanzan hasta que vuelva a RUNNING (Factory #767).']);
+  (d.health||[]).filter(x=>!x.ok).forEach(x=>items.push(['bad','Sitio caído: '+x.nombre,(x.code?('HTTP '+x.code):x.error||'sin respuesta')]));
+  if(d.rate.remaining<800)items.push(['w','Cupo de la API de GitHub bajo',d.rate.remaining+'/'+d.rate.limit+': evita consultas amplias.']);
+  const body=items.length?items.map(([c,t,m])=>`<div class="alert ${c==='bad'?'':'w'}"><b>${esc(t)}</b> · ${m.includes('<button')?m:esc(m)}</div>`).join(''):'<div class="alert i" style="border-color:var(--ok);background:rgba(63,185,80,.08)"><b>Nada requiere tu atención ahora.</b> Los agentes avanzan solos.</div>';
+  return `<div class="card"><h2>Necesita tu atención (${items.length})</h2>${body}</div>`;
+}
+function goalsRows(g){
+  return g.map(x=>{const p=x.total?Math.round(x.done/x.total*100):0;const c=p>=100?'#3fb950':p>=40?'#4cc9f0':'#e3a008';
+    return `<details style="margin:6px 0"><summary style="cursor:pointer"><b style="color:${COL[x.repo]||'inherit'}">${esc(x.repo)}</b> ${esc(x.nombre)} <span class="mut">· ${x.done}/${x.total} · ${p}%</span><div class="bar" style="height:6px;margin-top:4px"><i style="width:${p}%;background:${c};height:6px"></i></div></summary>${x.pend.length?'<ul style="margin:6px 0 0 18px;padding:0">'+x.pend.map(i=>`<li><a target="_blank" href="https://github.com/${OWNER}/${x.repo}/issues/${i.n}">#${i.n}</a> ${esc(i.title)}</li>`).join('')+'</ul>':'<div class="ok">Meta completa</div>'}${x.unknown?`<div class="mut">${x.unknown} issue(s) de la meta no se encontraron (revisa config.json)</div>`:''}</details>`}).join('');
+}
+function goalsCard(d){
+  const all=(d.goals||[]).slice().sort((x,y)=>(y.total-y.done)-(x.total-x.done));
+  const top=all.slice(0,6),rest=all.slice(6);
+  return `<div class="card"><h2>Metas · lo que más falta (${all.length} en total)</h2>`+goalsRows(top)+(rest.length?`<details class="fold" style="margin-top:8px"><summary>Ver las otras ${rest.length} metas</summary><div class="in">${goalsRows(rest)}</div></details>`:'')+`<div class="mut" style="margin-top:6px">Calculadas con las épicas de cada repo; sin listas fijas.</div></div>`;
+}
+function prodCard(d){
+  const rel=d.release||{};
+  return `<div class="card"><h2>Producción y release</h2><div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">`+(d.health||[]).map(h=>`<div style="border:1px solid ${h.ok?'#2f6f3d':'#f85149'};border-radius:8px;padding:6px 10px"><b>${esc(h.nombre)}</b> <span class="${h.ok?'ok':'bad'}">● ${h.ok?'arriba':'caído'}</span><div class="mut">HTTP ${h.code??'—'} · ${h.ms} ms</div></div>`).join('')+`</div>`+
+  (rel.error?`<div class="mut">Release: ${esc(rel.error)}</div>`:`<div>Factory: main v${esc(rel.main_version)} · última release <b>${esc(rel.last_release)}</b> · v1 va ${rel.ahead} commit${rel.ahead===1?'':'s'} por detrás de main</div>`)+`</div>`;
+}
+
+async function releaseAllDialog(){
+  if(!TOKEN){toast('Sin token: recarga la página',true);return}
+  toast('Calculando qué se perdería…');
+  let items;try{const r=await fetch('/api/release-preview');const j=await r.json();if(!j.items)throw new Error(j.error||'sin datos');items=j.items}catch(e){toast('✕ '+e,true);return}
+  const safe=items.filter(i=>!i.at_risk),risk=items.filter(i=>i.at_risk);
+  const row=i=>`<li>${esc(i.repo)}#${i.n} <span class="mut">${esc(i.title)}${i.pr?' · PR #'+i.pr:''}${i.ahead?' · '+i.ahead+' commit(s) en '+esc(i.branch):''}</span></li>`;
+  const m=document.createElement('div');m.id='relmodal';m.style.cssText='position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML=`<div class="card" style="max-width:760px;max-height:88vh;overflow:auto;background:#10161f"><h2>Liberar frentes sin recuperar (${items.length})</h2>
+   <div class="alert w"><b>Cómo funciona:</b> solo libera los frentes que no tienen PR abierto ni commits propios, con el comando oficial <code>/liberar-forzado</code>. Esos no tienen nada que perder.</div>
+   <h2 style="margin-top:10px">Seguros (${safe.length}): sin PR abierto ni commits propios</h2><ul style="margin:0 0 8px 18px;padding:0">${safe.map(row).join('')||'<li class="mut">ninguno</li>'}</ul>
+   <h2>Con trabajo (${risk.length}): NO se liberan desde aquí</h2><ul style="margin:0 0 8px 18px;padding:0;color:#ffb4ae">${risk.map(row).join('')||'<li class="mut">ninguno</li>'}</ul>
+   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button id="rel-safe" ${safe.length?'':'disabled'}>Liberar solo los seguros (${safe.length})</button>
+<button class="ghost" id="rel-cancel">Cancelar</button></div>
+   <div class="mut" style="margin-top:8px">Los frentes con PR abierto o commits propios se liberarán automáticamente, conservando su rama y su PR, cuando entre Factory #1175 (con #1190 y #1191). Mientras tanto no se liberan a la fuerza para no perder trabajo.</div></div>`;
+  document.body.appendChild(m);
+  const run=async list=>{let ok=0,bad=[];for(const i of list){try{const r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json','X-Orq-Token':TOKEN},body:JSON.stringify({action:'release_forced',repo:i.repo,number:i.n})});const j=await r.json();if(j.ok)ok++;else bad.push(i.repo+'#'+i.n)}catch(e){bad.push(i.repo+'#'+i.n)}}
+    m.remove();toast('Liberación solicitada para '+ok+(bad.length?' · fallaron '+bad.join(', '):'')+'. Coordinación la procesa en unos minutos.',bad.length>0);load(true)};
+  $('#rel-cancel').onclick=()=>m.remove();
+  $('#rel-safe').onclick=()=>run(safe);
+}
+
+function render(){
+  const j=last,d=j.data,ex=j.extra||{},t=d.totals;window.LASTEX=ex;
+  const kp=(v,l,c)=>`<div class="card kpi"><b class="${c||''}">${v}</b><span>${l}</span></div>`;
+  $('#p-kill').className='pill '+(ex.kill==='RUNNING'?'ok':'bad');$('#p-kill').innerHTML='kill switch <b>'+esc(ex.kill||'?')+'</b>';
+  const own=(d.alerts||[]).filter(a=>a.startsWith('Decisión tuya')).length;$('#p-owner').className='pill '+(own?'bad':'ok');$('#p-owner').innerHTML='decisiones tuyas <b>'+own+'</b>';
+  const c=ex.condor;$('#p-condor').innerHTML='Condor <b>'+(c&&c.version?('v'+esc(c.version)):'?')+'</b>';
+  $('#p-rate').className='pill '+(d.rate.remaining<800?'warn':'');$('#p-rate').innerHTML='API <b>'+d.rate.remaining+'/'+d.rate.limit+'</b>';
+  let h='';
+  h+=heroKpis(d,ex);
+  h+=ownerCard(ex,d);
+  h+=roadTo0(d);
+  h+=attentionCard(d,ex);
+  h+='<div class="sec">Mapa de frentes <small>'+fronts(d).length+' frentes · cada uno con su chat</small></div>';
+  h+='<div class="card">'+graph(d,ex)+legend()+'</div>';
+  h+='<div class="card"><h2>Detalle del frente</h2><div id="detail">'+detail()+'</div></div>';
+  h+='<div class="sec">Agentes en vivo <small>'+chatsSummary(ex)+'</small></div>';
+  h+=chatCards(ex);
+  if(d.ready.length){const cmd=d.ready.map(p=>`gh pr merge ${p.n} -R ${OWNER}/${p.repo} --squash`).join('\n');
+    h+='<div class="sec">Listo para fusionar</div><div class="card"><h2>Un clic en el panel, o copia los comandos</h2><table><tr><th>Repo</th><th>PR</th><th>Título</th></tr>'+d.ready.map(p=>`<tr><td>${esc(p.repo)}</td><td><a target="_blank" href="https://github.com/${OWNER}/${p.repo}/pull/${p.n}">#${p.n}</a></td><td>${esc(p.title)}</td></tr>`).join('')+'</table><button id="copy" style="margin-top:8px">Copiar comandos</button><pre id="cmds">'+esc(cmd)+'</pre></div>'}
+  h+='<div class="sec">Avance <small>metas calculadas con el trabajo pendiente real</small></div>';
+  h+='<div class="grid2">'+goalsCard(d)+prodCard(d)+'</div>';
+  h+=unlockCard(d);
+  h+='<div class="sec">Detalle <small>despliega lo que necesites</small></div>';
+  h+='<details class="fold"><summary>Bloqueados y cuellos de botella</summary><div class="in">'+blockedBoard(d)+'<div class="card" style="box-shadow:none"><h2>Cuellos de botella</h2>'+bottlenecks(d)+'</div></div></details>';
+  h+='<details class="fold"><summary>Hitos y ritmo de fusión</summary><div class="in">'+hitosCard(d)+'<div class="card" style="box-shadow:none"><h2>PRs fusionados por día (hora Colombia)</h2>'+daysChart(d)+'</div></div></details>';
+  h+='<details class="fold"><summary>Por proyecto</summary><div class="in">'+('<div class="card"><h2>Por proyecto</h2><table><tr><th>Proyecto</th><th class="n">Disp.</th><th class="n">Reserv.</th><th class="n">Revisión</th><th class="n">Recup.</th><th class="n">Bloq.</th><th class="n">Dueño</th><th class="n">Plan.</th><th class="n">24 h</th><th class="n">4 d</th><th class="n">7 d</th><th class="n">Último merge</th><th class="n">PRs</th></tr>'+
+   d.repos.map(r=>{const c=r.counts;return `<tr><td><b style="color:${COL[r.repo]||'inherit'}">${esc(r.repo)}</b></td><td class="n ${c.disponible?'ok':''}">${c.disponible||0}</td><td class="n">${c.reservado||0}</td><td class="n">${c['en revisión']||0}</td><td class="n ${c['requiere recuperación']?'warn':''}">${c['requiere recuperación']||0}</td><td class="n">${c.bloqueado||0}</td><td class="n">${c['del dueño (live/decisión)']||0}</td><td class="n">${c.planificado||0}</td><td class="n">${r.merged24}</td><td class="n">${r.merged96}</td><td class="n">${r.merged168}</td><td class="n ${r.last_merge_h>12?'bad':''}">${hrs(r.last_merge_h)}</td><td class="n">${r.prs.length}</td></tr>`}).join('')+'</table></div>')+'</div></details>';
+  h+='<details class="fold"><summary>Bus de mensajes</summary><div class="in">'+('<div class="card"><h2>Bus de mensajes (comentarios y eventos reales)</h2><div class="bus">'+((ex.bus||[]).slice().reverse().map(b=>`<div><span class="tag">${esc(coT(b.t))}</span> <span class="tag">${esc(b.repo)}#${esc(b.n)}</span> <span class="tag or">${esc(b.tipo)}</span> ${esc(b.txt)}</div>`).join('')||'<div class="mut">Sin mensajes recientes</div>')+'</div></div>')+'</div></details>';
+  if(Object.keys(d.errors).length)h+='<div class="card bad">Repos con error de lectura: '+esc(JSON.stringify(d.errors))+'</div>';
+  h+='<div class="mut" style="text-align:center">Lectura y control de agentes · '+esc(d.generated_at)+' · se refresca cada 60 s (caché de 3 min para cuidar el cupo de GitHub)</div>';
+  $('#app').innerHTML=h;
+  document.querySelectorAll('.node').forEach(n=>n.onclick=()=>{sel={repo:n.dataset.r,n:+n.dataset.n};$('#detail').innerHTML=detail()});
+  wire(d);
+  recoverAlert(d);
+  document.querySelectorAll('[data-ac]').forEach(b=>b.onclick=()=>agentCmd(b.dataset.ac,b.dataset.ch||null,b.dataset.w));
+  const b=$('#copy');if(b)b.onclick=()=>{navigator.clipboard.writeText($('#cmds').textContent);b.textContent='Copiado'};
+  ageText();
+}
+$('#reload').onclick=()=>load(true);
+load(false);setInterval(()=>load(false),60000);setInterval(ageText,5000);
+</script>
+</body>
+</html>

@@ -26,6 +26,16 @@ final class GitHubIntentTrustedEvidence
                 return self::unknown();
             }
 
+            // A dot or dot-dot path segment has no stable GitHub repository
+            // identity: URL normalization could change the claimed scope.
+            [$owner, $repository] = explode('/', $repositoryRef, 2);
+            if (
+                in_array($owner, ['.', '..'], true) ||
+                in_array($repository, ['.', '..'], true)
+            ) {
+                return self::unknown();
+            }
+
             // A fixed policy TTL, never caller supplied. GitHubProjectView
             // checks every field, timestamp, source URL and ambiguity.
             $project = GitHubProjectView::project(

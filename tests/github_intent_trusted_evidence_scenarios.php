@@ -52,7 +52,21 @@ if ($scenario === 'canonical') {
     $mismatchedSource['repositories'][0]['source_ref'] = 'https://github.com/other/repo';
     $extraField = canonicalSnapshot();
     $extraField['repositories'][0]['caller_attested'] = true;
-    echo json_encode([
+    // Both owner and repository URL components must be literal names,
+    // never dot-segments that browsers or proxies can normalize.
+    $invalidPathScopes = [];
+    foreach ([
+        'owner_dot' => './ControlBot',
+        'owner_dotdot' => '../ControlBot',
+        'repository_dot' => 'pl0n3r/.',
+        'repository_dotdot' => 'pl0n3r/..',
+    ] as $name => $reference) {
+        $snapshot = canonicalSnapshot();
+        $snapshot['repositories'][0]['repository'] = $reference;
+        $snapshot['repositories'][0]['source_ref'] = 'https://github.com/' . $reference;
+        $invalidPathScopes[$name] = projection($snapshot, $reference);
+    }
+    echo json_encode(array_merge([
         'caller_timestamp' => projection($callerTimestamp),
         'caller_ttl' => projection($callerTtl),
         'scope_mismatch' => projection(canonicalSnapshot(), 'other/repo'),
@@ -68,7 +82,7 @@ if ($scenario === 'canonical') {
             'version' => 1, 'project_id' => 'controlbot',
             'observed_at' => NOW - 120, 'repositories' => [],
         ]),
-    ], JSON_THROW_ON_ERROR);
+    ], $invalidPathScopes), JSON_THROW_ON_ERROR);
 } else {
     fwrite(STDERR, "Unknown scenario\n");
     exit(2);

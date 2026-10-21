@@ -38,7 +38,9 @@ class GitHubIntentTrustedEvidenceTests(unittest.TestCase):
 
     def test_caller_timestamp_scope_mismatch_stale_or_ambiguous_source_fails_closed(self):
         cases = scenario("closed")
-        self.assertEqual(len(cases), 12)
+        self.assertEqual(len(cases), 16)
+        for name in ("owner_dot", "owner_dotdot", "repository_dot", "repository_dotdot"):
+            self.assertIn(name, cases)
         for name, data in cases.items():
             with self.subTest(name=name):
                 self.assertEqual(data["state"], "unknown")

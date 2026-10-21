@@ -69,8 +69,8 @@ class OrquestadorLocalReferenceTests(unittest.TestCase):
                 pass
 
         good = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
-        bad = ("chrome-extension://abc\\r\\nX-Evil: injected", 
-               "moz-extension://abc\\nSet-Cookie: hijacked",
+        bad = ("chrome-extension://abc\r\nX-Evil: injected", 
+               "moz-extension://abc\nSet-Cookie: hijacked",
                "https://evil.example", "chrome-extension://abc/path")
         for origin in (good, *bad):
             with self.subTest(origin=origin):

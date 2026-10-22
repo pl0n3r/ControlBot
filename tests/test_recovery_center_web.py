@@ -52,6 +52,22 @@ class RecoveryCenterWebTests(unittest.TestCase):
             self.assertNotIn("<script>", v["body"])
 
     def test_recovery_docs_match_integrated_owner_only_route(self):
+        owner = scenario("owner")
+        self.assertEqual(owner["status"], 200)
+        self.assertEqual(owner["headers"]["Cache-Control"], "no-store")
+        self.assertIn("default-src 'none'", owner["headers"]["Content-Security-Policy"])
+        self.assertIn("UNKNOWN", owner["body"])
+
+        guards = scenario("guards")
+        self.assertEqual(guards["anonymous"]["status"], 403)
+        self.assertEqual(guards["post"]["status"], 405)
+        self.assertNotEqual(guards["forged_user"]["status"], 200)
+
+        invalid = scenario("invalid-profile")
+        for response in invalid.values():
+            self.assertEqual(response["status"], 503)
+            self.assertEqual(response["body"], "Service unavailable.\n")
+
         docs = (ROOT / "docs" / "disaster-recovery-ui.md").read_text(encoding="utf-8")
         for term in (
             "GET /security/resilience",

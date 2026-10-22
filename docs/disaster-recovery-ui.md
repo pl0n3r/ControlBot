@@ -10,7 +10,7 @@ La vista combina `RecoveryProfile`, `RecoveryEvidence` y `RecoveryDrillProjectio
 
 Desde #846 / PR #847, ControlBot ya dispone de `GET /security/resilience`. El router `ControlBotWebEntrypoint::handleAuthenticated` comprueba al owner por sesión OAuth + TOTP sellada mediante `OwnerAuthenticatedRouter::verifiedOwner` antes de delegar en `RecoveryCenterWebEntrypoint::handle`. La cabecera `REMOTE_USER` suministrada por cliente no concede acceso a esta ruta. Sin sesión válida se responde 403 y una petición POST se rechaza con 405. Si el perfil local es inválido, se responde 503 de forma genérica.
 
-La vista lee un perfil local fijo y pasa evidencias nulas a `RecoveryCenterUi::project`: presenta `UNKNOWN` sin `BackupReceipt`, restore drill ni Factory Recovery Health. Los valores RPO 15 min y RTO 60 min son **objetivos**, no mediciones. La respuesta es HTML escapado con `Cache-Control: no-store`, CSP restrictiva y sin formularios, scripts o acciones mutantes. Las pruebas de aceptación son `tests/test_recovery_center_web.py`.
+La vista lee un perfil local fijo y pasa evidencias nulas a `RecoveryCenterUi::project`: presenta `UNKNOWN` sin `BackupReceipt`, restore drill ni Factory Recovery Health. Los valores RPO 15 min y RTO 60 min son **objetivos**, no mediciones. La respuesta HTML delegada por `RecoveryCenterWebEntrypoint` contiene HTML escapado, `Cache-Control: no-store` y una CSP restrictiva; la vista no incluye formularios, scripts ni acciones mutantes. Las pruebas de aceptación son `tests/test_recovery_center_web.py`.
 
 ## Puerta operativa independiente
 

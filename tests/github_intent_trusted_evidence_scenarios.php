@@ -37,6 +37,11 @@ function projection(array $snapshot, string $repository = REPOSITORY, int $now =
 $scenario = $argv[1] ?? '';
 if ($scenario === 'canonical') {
     echo json_encode(projection(canonicalSnapshot()), JSON_THROW_ON_ERROR);
+} elseif ($scenario === 'ttl_boundary') {
+    echo json_encode([
+        'last_accepted_second' => projection(canonicalSnapshot(NOW - 300)),
+        'first_rejected_second' => projection(canonicalSnapshot(NOW - 301)),
+    ], JSON_THROW_ON_ERROR);
 } elseif ($scenario === 'closed') {
     $callerTimestamp = canonicalSnapshot();
     $callerTimestamp['evidence_observed_at'] = NOW;

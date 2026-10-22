@@ -95,6 +95,43 @@ class OrquestadorLocalReferenceTests(unittest.TestCase):
         self.assertIn('self.send_header("Access-Control-Allow-Origin", allowed.replace(', source)
         self.assertIn('return self._json_ext(200, {"ok": True}, origin)', source)
 
+    def test_lan_routes_require_session_without_starting_server(self):
+        import ast
+        source = (TOOL / 'orq.py').read_text(encoding='utf-8')
+        module = ast.parse(source)
+        handler = next(n for n in module.body if isinstance(n, ast.ClassDef) and n.name == 'Handler')
+        method = next(n for n in handler.body if isinstance(n, ast.FunctionDef) and n.name == 'do_GET')
+        isolated = ast.Module(body=[ast.ClassDef(name='Isolated', bases=[], keywords=[], body=[method], decorator_list=[])], type_ignores=[])
+        namespace = {}
+        exec(compile(ast.fix_missing_locations(isolated), '<lan-test>', 'exec'), namespace)
+        for path in ('/', '/index.html', '/grafo', '/grafo.html', '/data.json', '/api/data'):
+            with self.subTest(path=path):
+                class Client(namespace['Isolated']):
+                    def _is_local(self): return False
+                    def _lan_viewer(self): return False
+                    def _send(self, status, body, kind):
+                        self.result = (status, body, kind)
+                client = Client()
+                client.path = path
+                client.do_GET()
+                self.assertEqual(client.result[0], 401)
+                self.assertNotIn('"data"', client.result[1])
+
+    def test_dashboard_escapes_server_text_and_avoids_inline_actions(self):
+        page = (TOOL / 'index.html').read_text(encoding='utf-8')
+        graph = (TOOL / 'grafo.html').read_text(encoding='utf-8')
+        self.assertIn('trustedHtml?m:esc(m)', page)
+        self.assertNotIn("m.includes('<button')", page)
+        self.assertIn('data-unblock=', page)
+        self.assertNotIn('onclick="act(\'unblock\'', page)
+        self.assertIn("g.addEventListener('keydown'", page)
+        self.assertIn('pc.textContent="Condor "', graph)
+
+    def test_contract_declares_remote_log_and_assign(self):
+        contract = (TOOL / 'CONTRATO-EXTENSION.md').read_text(encoding='utf-8')
+        self.assertIn('POST /api/af/log', contract)
+        self.assertIn('"assign"', contract)
+
     def test_reference_tool_is_versioned_and_clean(self):
         for name in EXPECTED:
             with self.subTest(archivo=name):
@@ -111,8 +148,13 @@ class OrquestadorLocalReferenceTests(unittest.TestCase):
         for state in STATE_FILES:
             with self.subTest(ignorado=state):
                 self.assertIn(state, ignore)
+        import subprocess
         for state in ("agent_key.txt", "acciones.log", "assigned.json", "config.json"):
-            self.assertFalse((TOOL / state).exists(), state + " no debe versionarse")
+            tracked = subprocess.run(
+                ["git", "ls-files", "--error-unmatch", str(TOOL / state)],
+                cwd=ROOT, capture_output=True,
+            ).returncode == 0
+            self.assertFalse(tracked, state + " no debe versionarse")
         readme = (TOOL / "README.md").read_text(encoding="utf-8")
         self.assertIn("referencia", readme)
         self.assertIn("no se despliega", readme)

@@ -1592,6 +1592,10 @@ class Handler(BaseHTTPRequestHandler):
             lan_ok = self.path in ("/", "/index.html", "/data.json", "/grafo", "/grafo.html") or self.path.startswith("/api/data")
             if not lan_ok:
                 return self._send(403, '{"error":"solo el Mac del dueño"}', "application/json")
+            if not self._lan_viewer():
+                if self.path in ("/", "/index.html", "/grafo", "/grafo.html"):
+                    return self._send(401, LOGIN_HTML, "text/html; charset=utf-8")
+                return self._send(401, '{"error":"sesión requerida"}', "application/json")
         if self.path == "/api/release-preview":
             if not self._same_origin():
                 return self._send(403, '{"error":"no autorizado"}', "application/json")

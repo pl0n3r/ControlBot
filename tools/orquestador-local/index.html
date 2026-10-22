@@ -142,7 +142,7 @@ function chatCards(ex){
   if(!ag.length)return '<div class="card"><div class="mut">Ningún navegador conectado. Abre chatgpt.com con la extensión AutoFactory (1.7.27+) y pulsa PLAY: cada pestaña nueva se convierte en un agente.</div></div>';
   const asg={};(ex.assigned||[]).forEach(a=>asg[a.iid+'|'+a.chat]=a);
   const COLS={generando:'#4cc9f0',esperando_envio:'#3fb950',error:'#f85149',desconocido:'#e3a008',detenido:'#7d8a9a',limite:'#e3a008',sesion_cerrada:'#f85149'};
-  const TXT={generando:'Trabajando',detenido:'Detenido · pulsa PLAY en esa ventana',esperando_envio:'Libre · esperando orden',error:'En error · ciérrala y abre una nueva',desconocido:'Sin script nuevo · ciérrala y abre una nueva',detenido:'Detenido',limite:'Límite de uso',sesion_cerrada:'Sesión cerrada'};
+  const TXT={generando:'Trabajando',esperando_envio:'Libre · esperando orden',error:'En error · ciérrala y abre una nueva',desconocido:'Sin script nuevo · ciérrala y abre una nueva',detenido:'Detenido · pulsa PLAY en esa ventana',limite:'Límite de uso',sesion_cerrada:'Sesión cerrada'};
   let html='';
   ag.forEach((a,gi)=>(a.chats||[]).forEach(c=>{
     const st=c.state,col=COLS[st]||'#7d8a9a',as=asg[a.instance_id+'|'+c.chat_id];
@@ -275,7 +275,7 @@ function graph(d,ex){
   const head=`<div style="position:absolute;left:${cx0-130}px;top:6px;width:260px;height:56px;border:1px solid #4cc9f0;border-radius:10px;background:#0f1a2b;text-align:center;padding:6px 8px;line-height:1.35">
     <div style="color:#4cc9f0">● orquestador · ${esc(ex.kill||'?')}</div><div style="font-size:11.5px">${act} frentes · ${t.available} disponibles · <span style="color:${t.recover?'#ff9f43':'inherit'}">${t.recover} sin recuperar</span></div></div>`;
   const heads=repos.map((r,ci)=>`<div style="position:absolute;left:${PADX+ci*COLW}px;top:${TOP-6}px;width:${CW}px;height:36px;border:1px solid ${COL[r]||'#456'};border-radius:8px;background:#0f1722;padding:7px 10px;font-weight:700;color:${COL[r]||'#fff'}">${esc(r)} <span class="mut" style="font-weight:400">${by[r].length} frente${by[r].length>1?'s':''}</span></div>`).join('');
-  const cardsHtml=cards.map(c=>{const f=c.f,p=pct(f);return `<div class="card2" data-key="${esc(c.key)}" data-r="${esc(f.repo)}" data-n="${f.n}" data-x="${c.x}" data-y="${c.y}" style="left:${c.x}px;top:${c.y}px;width:${CW}px;height:${CH}px;border-color:${c.st.c}${c.st.dash?';border-style:dashed':''}">
+  const cardsHtml=cards.map(c=>{const f=c.f,p=pct(f);return `<div class="card2" role="button" tabindex="0" aria-label="${esc(f.repo+' #'+f.n+' · '+c.st.k)}" data-key="${esc(c.key)}" data-r="${esc(f.repo)}" data-n="${f.n}" data-x="${c.x}" data-y="${c.y}" style="left:${c.x}px;top:${c.y}px;width:${CW}px;height:${CH}px;border-color:${c.st.c}${c.st.dash?';border-style:dashed':''}">
     <div style="display:flex;justify-content:space-between"><b style="color:${COL[f.repo]||'#fff'}">#${f.n}</b><span style="color:${c.st.c}">${esc(c.st.k)}${f.pr&&f.pr.fails?' ✕'+f.pr.fails:f.pr&&!f.pr.draft&&f.pr.merge==='CLEAN'?' ✓':''}</span></div>
     <div class="ttl">${esc(f.title)}</div>
     <div class="bar"><i style="width:${p}%;background:${c.st.c}"></i></div><div class="mut" style="font-size:10.5px">${hrs(f.h)} sin actividad${f.pr?' · PR #'+f.pr.n:''}</div>${chatFor(ex,f)}</div>`}).join('');
@@ -285,8 +285,16 @@ function graph(d,ex){
 function wire(d){
   const board=$('#board');if(!board)return;const tip=$('#tip');
   const byKey={};fronts(d).forEach(f=>byKey[f.repo+'#'+f.n]=f);
+  tip.setAttribute('role','region');tip.setAttribute('aria-live','polite');
   board.querySelectorAll('.card2').forEach(g=>{
     const f=byKey[g.dataset.key];
+    const pinCard=()=>{
+      sel={repo:g.dataset.r,n:+g.dataset.n};$('#detail').innerHTML=detail();pinned=g.dataset.key;
+      tip.innerHTML=tipHtml(byKey[pinned]);tip.style.display='block';tip.style.pointerEvents='auto';
+      const r=g.getBoundingClientRect();tip.style.left=Math.min(innerWidth-360,r.right+8)+'px';tip.style.top=Math.max(8,Math.min(innerHeight-260,r.top))+'px';
+      tip.setAttribute('tabindex','-1');tip.focus();
+    };
+    g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pinCard()}});
     g.addEventListener('mouseenter',()=>{if(f&&!dragging&&!pinned){tip.innerHTML=tipHtml(f);tip.style.display='block'}});
     g.addEventListener('mousemove',e=>{if(pinned)return;const w=tip.offsetWidth,h=tip.offsetHeight;let x=e.clientX+16,y=e.clientY+16;if(x+w>innerWidth-8)x=e.clientX-w-16;if(y+h>innerHeight-8)y=e.clientY-h-16;tip.style.left=Math.max(8,x)+'px';tip.style.top=Math.max(8,y)+'px'});
     g.addEventListener('mouseleave',()=>{if(!pinned)tip.style.display='none'});
@@ -294,9 +302,9 @@ function wire(d){
       g.setPointerCapture(e.pointerId);dragging=true;let moved=false;const sx=e.clientX,sy=e.clientY,ox=+g.dataset.x,oy=+g.dataset.y;
       const line=board.querySelector(`.cl[data-key="${CSS.escape(g.dataset.key)}"]`);g.style.zIndex=20;
       const mv=ev=>{const dx=ev.clientX-sx,dy=ev.clientY-sy;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;if(!moved)return;const nx=Math.max(0,ox+dx),ny=Math.max(60,oy+dy);
-        g.style.left=nx+'px';g.style.top=ny+'px';g.dataset.x=nx;g.dataset.y=ny;if(line){line.setAttribute('x2',nx+98);line.setAttribute('y2',ny)};tip.style.display='none'};
+        g.style.left=nx+'px';g.style.top=ny+'px';g.dataset.x=nx;g.dataset.y=ny;if(line){line.setAttribute('x2',nx+88);line.setAttribute('y2',ny)};tip.style.display='none'};
       const up=ev=>{g.releasePointerCapture(ev.pointerId);g.removeEventListener('pointermove',mv);g.removeEventListener('pointerup',up);dragging=false;g.style.zIndex='';
-        if(moved){const sp=loadPos();sp[g.dataset.key]=[+g.dataset.x,+g.dataset.y];savePos(sp)}else{sel={repo:g.dataset.r,n:+g.dataset.n};$('#detail').innerHTML=detail();pinned=g.dataset.key;tip.innerHTML=tipHtml(byKey[pinned]);tip.style.display='block';tip.style.pointerEvents='auto';const r=g.getBoundingClientRect();tip.style.left=Math.min(innerWidth-360,r.right+8)+'px';tip.style.top=Math.max(8,Math.min(innerHeight-260,r.top))+'px'}};
+        if(moved){const sp=loadPos();sp[g.dataset.key]=[+g.dataset.x,+g.dataset.y];savePos(sp)}else{pinCard()}};
       g.addEventListener('pointermove',mv);g.addEventListener('pointerup',up);
     });
   });
@@ -319,8 +327,13 @@ function blockedBoard(d){
   const rows=all.filter(b=>causeFilter==='todas'||b.cause===causeFilter).sort((a,b)=>(a.repo===b.repo?a.n-b.n:a.repo.localeCompare(b.repo)));
   const chips=causes.map(c=>`<button class="${c===causeFilter?'':'ghost'}" onclick="causeFilter='${c}';render()">${esc(c)}${c==='todas'?' ('+all.length+')':' ('+all.filter(b=>b.cause===c).length+')'}</button>`).join(' ');
   return `<div class="card"><h2>Bloqueados · liberar a «disponible» (${rows.length})</h2><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${chips}</div>
-  <table><tr><th>Proyecto</th><th>Issue</th><th>Causa</th><th class="n">Edad</th><th>Título</th><th></th></tr>`+rows.map(b=>{const live=false;return `<tr><td style="color:${COL[b.repo]||'inherit'}">${esc(b.repo)}</td><td><a target="_blank" href="https://github.com/${OWNER}/${b.repo}/issues/${b.n}">#${b.n}</a></td><td><span class="pill">${esc(b.cause)}</span></td><td class="n">${hrs(b.h)}</td><td>${esc(b.title)}</td><td>${live?'<span class="mut">requiere tu orden de live</span>':`<button onclick="act('unblock','${b.repo}',${b.n},'¿Liberar ${b.repo}#${b.n} a «disponible»?\n\n${esc(b.title).replace(/'/g,'’')}\n\nSi la causa del bloqueo persiste, Coordinación lo volverá a bloquear con su motivo.')">Liberar</button>`}</td></tr>`}).join('')+`</table><div class="mut" style="margin-top:6px">Cada acción queda en <code>acciones.log</code>. Liberar un issue de readiness solo prepara el trabajo (pruebas, evidencia, documentos); activar el live sigue siendo una decisión aparte y no se hace desde aquí.</div></div>`;
+  <table><tr><th>Proyecto</th><th>Issue</th><th>Causa</th><th class="n">Edad</th><th>Título</th><th></th></tr>`+rows.map(b=>{const live=false;return `<tr><td style="color:${COL[b.repo]||'inherit'}">${esc(b.repo)}</td><td><a target="_blank" href="https://github.com/${OWNER}/${b.repo}/issues/${b.n}">#${b.n}</a></td><td><span class="pill">${esc(b.cause)}</span></td><td class="n">${hrs(b.h)}</td><td>${esc(b.title)}</td><td>${live?'<span class="mut">requiere tu orden de live</span>':`<button data-unblock="${esc(b.repo)}|${b.n}" data-title="${esc(b.title)}">Liberar</button>`}</td></tr>`}).join('')+`</table><div class="mut" style="margin-top:6px">Cada acción queda en <code>acciones.log</code>. Liberar un issue de readiness solo prepara el trabajo (pruebas, evidencia, documentos); activar el live sigue siendo una decisión aparte y no se hace desde aquí.</div></div>`;
 }
+document.addEventListener('click',e=>{
+  const button=e.target.closest('[data-unblock]');if(!button)return;
+  const [repo,n]=button.dataset.unblock.split('|');
+  act('unblock',repo,Number(n),'¿Liberar '+repo+'#'+n+' a «disponible»?\n\n'+button.dataset.title+'\n\nSi la causa del bloqueo persiste, Coordinación lo volverá a bloquear con su motivo.');
+});
 function bottlenecks(d){
   const out=[],t=d.totals,F=fronts(d);
   if(t.available===0)out.push(['bad','COLA VACÍA: ningún issue disponible. Hay agentes sin trabajo.']);
@@ -399,14 +412,14 @@ async function decide(repo,n,opt){
 }
 function attentionCard(d,ex){
   const items=[];const rel=d.release||{},t=d.totals;
-  (d.repos||[]).forEach(r=>(r.gates||[]).forEach(g=>{if(g.gate)items.push(['bad','Decisión tuya pendiente',decisionBlock(r.repo,g)]);else items.push(['bad','Decisión tuya pendiente',r.repo+' #'+g.n+': '+g.title])}));
+  (d.repos||[]).forEach(r=>(r.gates||[]).forEach(g=>{if(g.gate)items.push(['bad','Decisión tuya pendiente',decisionBlock(r.repo,g),true]);else items.push(['bad','Decisión tuya pendiente',r.repo+' #'+g.n+': '+g.title])}));
   if(rel.main_version&&rel.last_release&&('v'+rel.main_version)!==rel.last_release)items.push(['bad','Release preparada sin publicar',`main tiene la versión ${rel.main_version} y la última release es ${rel.last_release}: abre la puerta de release (release-window).`]);
   else if(rel.ahead>=15)items.push(['w','Muchos cambios sin publicar en v1',`main lleva ${rel.ahead} commits por delante de v1; conviene preparar la siguiente release.`]);
   (ex.owner_blockers||[]).slice(-6).forEach(b=>items.push(['w','Bloqueado, ningún chat puede avanzarlo: '+b.issue,'frenado por '+((b.blockers||[]).join(', ')||'causa no identificada')+' · '+b.why]));
   if(ex.kill&&ex.kill!=='RUNNING')items.push(['bad','Kill switch en '+ex.kill,'Los agentes no avanzan hasta que vuelva a RUNNING (Factory #767).']);
   (d.health||[]).filter(x=>!x.ok).forEach(x=>items.push(['bad','Sitio caído: '+x.nombre,(x.code?('HTTP '+x.code):x.error||'sin respuesta')]));
   if(d.rate.remaining<800)items.push(['w','Cupo de la API de GitHub bajo',d.rate.remaining+'/'+d.rate.limit+': evita consultas amplias.']);
-  const body=items.length?items.map(([c,t,m])=>`<div class="alert ${c==='bad'?'':'w'}"><b>${esc(t)}</b> · ${m.includes('<button')?m:esc(m)}</div>`).join(''):'<div class="alert i" style="border-color:var(--ok);background:rgba(63,185,80,.08)"><b>Nada requiere tu atención ahora.</b> Los agentes avanzan solos.</div>';
+  const body=items.length?items.map(([c,t,m,trustedHtml])=>`<div class="alert ${c==='bad'?'':'w'}"><b>${esc(t)}</b> · ${trustedHtml?m:esc(m)}</div>`).join(''):'<div class="alert i" style="border-color:var(--ok);background:rgba(63,185,80,.08)"><b>Nada requiere tu atención ahora.</b> Los agentes avanzan solos.</div>';
   return `<div class="card"><h2>Necesita tu atención (${items.length})</h2>${body}</div>`;
 }
 function goalsRows(g){

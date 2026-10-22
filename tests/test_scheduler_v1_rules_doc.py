@@ -57,7 +57,7 @@ class SchedulerV1RulesDocTests(unittest.TestCase):
             validate_document(changed)
 
     def test_missing_reason_fails_closed(self):
-        changed = self.text.replace("**Por qué:** Reducir mensajes", "**Por qué:** ", 1)
+        changed = re.sub(r"(?m)^(\*\*Por qué:\*\*).+$", r"\1", self.text, count=1)
         with self.assertRaisesRegex(ValueError, "falta .*Por qué"):
             validate_document(changed)
 

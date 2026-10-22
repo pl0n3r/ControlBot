@@ -36,6 +36,18 @@ class GitHubIntentTrustedEvidenceTests(unittest.TestCase):
         self.assertIs(data["execution"], False)
         self.assertNotIn("allow", json.dumps(data).lower())
 
+    def test_fixed_ttl_accepts_300_seconds_and_rejects_301(self):
+        cases = scenario("ttl_boundary")
+        current = cases["last_accepted_second"]
+        self.assertEqual(current["state"], "current")
+        self.assertEqual(current["age_seconds"], 300)
+        self.assertIs(current["execution"], False)
+        expired = cases["first_rejected_second"]
+        self.assertEqual(expired["state"], "unknown")
+        self.assertEqual(expired["reason"], "untrusted_or_stale_snapshot")
+        self.assertIs(expired["execution"], False)
+        self.assertNotIn("evidence_ref", expired)
+
     def test_caller_timestamp_scope_mismatch_stale_or_ambiguous_source_fails_closed(self):
         cases = scenario("closed")
         self.assertEqual(len(cases), 16)

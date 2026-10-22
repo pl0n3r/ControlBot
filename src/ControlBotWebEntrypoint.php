@@ -105,6 +105,14 @@ final class ControlBotWebEntrypoint
         }
         // Delegar solo DESPUES de verificar OAuth y TOTP; se descarta
         // cualquier REMOTE_USER recibido en la peticion original.
+        // Recovery is reached only after server-backed owner OAuth/TOTP verification.
+        // Never route this view through the REMOTE_USER-based public handle().
+        $uri = $server['REQUEST_URI'] ?? null;
+        if (is_string($uri) && strlen($uri) <= 2048 && !str_contains($uri, "\0")
+            && parse_url($uri, PHP_URL_PATH) === '/security/resilience') {
+            require_once __DIR__ . '/RecoveryCenterWebEntrypoint.php';
+            return RecoveryCenterWebEntrypoint::handle($server);
+        }
         $trustedServer = $server;
         $trustedServer['REMOTE_USER'] = $owner;
         return self::handle(

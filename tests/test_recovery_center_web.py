@@ -55,10 +55,12 @@ class RecoveryCenterWebTests(unittest.TestCase):
         owner = scenario("owner")
         self.assertEqual(owner["status"], 200)
         self.assertEqual(owner["headers"]["Cache-Control"], "no-store")
+        self.assertIn("text/html", owner["headers"]["Content-Type"])
         self.assertIn("default-src 'none'", owner["headers"]["Content-Security-Policy"])
         self.assertIn("UNKNOWN", owner["body"])
         self.assertNotIn("HEALTHY", owner["body"])
         self.assertNotIn("<form", owner["body"].lower())
+        self.assertNotIn("<script", owner["body"].lower())
 
         guards = scenario("guards")
         self.assertEqual(guards["anonymous"]["status"], 403)

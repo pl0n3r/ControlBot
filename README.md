@@ -8,85 +8,55 @@ ControlBot mantiene el modelo operativo de proyectos, agentes, trabajo, decision
 
 ## Operational Cockpit
 
-<!-- factory:status:start -->
-| Señal | Estado |
-| --- | --- |
-| main SHA | UNKNOWN |
-| versión | UNKNOWN |
-| CI | UNKNOWN |
-| release | UNKNOWN |
-| health | UNKNOWN |
-| smoke/observer | UNKNOWN |
-| quality/security | UNKNOWN |
-| Issue activo | UNKNOWN |
-| PR activo | UNKNOWN |
-| último release | UNKNOWN |
-<!-- factory:status:end -->
+[![CI en main](https://github.com/pl0n3r/ControlBot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pl0n3r/ControlBot/actions/workflows/ci.yml)
+[![Última release](https://img.shields.io/github/v/release/pl0n3r/ControlBot?label=release)](https://github.com/pl0n3r/ControlBot/releases)
 
-### Progress + Readiness
+[GitHub Actions](https://github.com/pl0n3r/ControlBot/actions) · [GitHub Releases](https://github.com/pl0n3r/ControlBot/releases) · [Orquestador de ControlBot](https://control.condorapp.com.co/) (panel privado, no acredita sitio operativo).
 
-<!-- factory:progress-readiness:start -->
-| Señal | Estado |
-| --- | --- |
-| Target | UNKNOWN |
-| Progress | UNKNOWN |
-| Readiness | UNKNOWN |
-| Evidence freshness | UNKNOWN |
-| Critical blockers | UNKNOWN |
-| Trend | UNKNOWN |
-
-| Dimensión | Progress | Readiness |
-| --- | --- | --- |
-| UNKNOWN | UNKNOWN | UNKNOWN |
-<!-- factory:progress-readiness:end -->
-
-> Estos bloques son derivados. `UNKNOWN`/`PENDING` significa que falta evidencia canónica; nunca se promueve a `GREEN` o `DEGRADED` sin evidencia.
+El [health owner-gated de #817](https://github.com/pl0n3r/ControlBot/issues/817) está preparado como contrato offline, pero **no hay un `/health` público productivo acreditado**. Los badges se actualizan al visualizar GitHub, sin commits de refresco ni porcentajes de progreso.
 
 ## Work Queue
 
-- **NOW:** [trabajo reservado/en curso](https://github.com/pl0n3r/ControlBot/issues?q=is%3Aissue+is%3Aopen+label%3A%22estado%3A+reservado%22).
-- **NEXT:** [Issues críticos disponibles](https://github.com/pl0n3r/ControlBot/issues?q=is%3Aissue+is%3Aopen+label%3A%22prioridad%3A+cr%C3%ADtica%22+label%3A%22estado%3A+disponible%22).
+- **NOW:** [Issues abiertos con reservas y revisiones](https://github.com/pl0n3r/ControlBot/issues) — comprobar claims y checks en GitHub antes de actuar.
+- **NEXT:** [Issues críticos disponibles](https://github.com/pl0n3r/ControlBot/issues?q=is%3Aissue+is%3Aopen+label%3A%22prioridad%3A+cr%C3%ADtica%22+label%3A%22estado%3A+disponible%22), según Coordinación y dependencias.
 - **LATER:** [épico y planificación canónica #1](https://github.com/pl0n3r/ControlBot/issues/1).
-- **BLOCKED:** [bloqueos vigentes](https://github.com/pl0n3r/ControlBot/issues?q=is%3Aissue+is%3Aopen+label%3A%22estado%3A+bloqueado%22).
+- **BLOCKED:** [sitio/go-live #625](https://github.com/pl0n3r/ControlBot/issues/625) requiere backup real conforme a [D-059](docs/hostinger-d059-backup.md) y puertas del dueño.
 
-Esta vista resume la cola; no reemplaza el épico, los Issues, las decisiones ni el historial de releases.
+Esta vista resume la cola y enlaza sus fuentes; el README no concede reservas ni sustituye Issues, CI o decisiones.
 
 ## Qué hace el producto
 
-ControlBot es el sistema operativo privado de la fábrica. Centraliza:
+ControlBot es el **control plane** de la fábrica, con componentes versionados para:
 
-- dashboard de producción, trabajo, seguridad y costos;
-- proyectos, agentes, sesiones y capacidad;
-- despacho y seguimiento de trabajo;
-- decisiones del dueño e inbox de puertas humanas;
-- observabilidad, incidentes y bitácora;
-- integraciones gobernadas con GitHub, FactoryRunner y el puente de navegador.
+- [decisiones y puertas del dueño](src/DecisionRuntime.php), [inbox](src/OwnerInbox.php) y registro de acciones;
+- [proyección GitHub read-only](docs/github-control-plane-readonly-v1.md) y contratos de [evidencia de intenciones](docs/github-intent-policy-v1.md), que no conceden ejecución por inferencia;
+- [modelos de proyectos](src/ProjectModel.php), [agentes](src/AgentRuntime.php), [scheduler](src/SchedulerSelection.php) y [estado de trabajos](src/WorkInventorySnapshot.php);
+- [observación de reservas V3](docs/observador-reservas-consumidor.md) GET-only (sin liberar leases automáticamente) y [observabilidad pública de solo lectura](docs/factory-public-health-observability.md), sin productor live conectado.
 
-El acceso es solo del dueño. Las capacidades sensibles permanecen detrás de autenticación fuerte, policy y trazabilidad.
+La presencia de contratos y tests en `main` **no acredita despliegue**: el sitio está sujeto a [#625](https://github.com/pl0n3r/ControlBot/issues/625) y la puerta D-059.
 
 ## Arquitectura en 60 segundos
 
 ```mermaid
 flowchart LR
-    O["Dueño"] --> C["ControlBot · control plane"]
-    C --> F["Factory · governance/kit"]
-    C --> R["FactoryRunner · execution plane"]
-    C --> G["GitHub · source of truth"]
-    C --> A["AutoFactory · herramienta local/manual"]
-    C --> P["Productos: Condor / GrindFlow / BRVTAL"]
+    O["Dueño / decisiones"] --> C["ControlBot · control plane"]
+    F["Factory · governance/kit"] --> C
+    G["GitHub · fuente de verdad"] -.->|"snapshots / checks"| C
+    C -.->|"órdenes aprobadas"| R["FactoryRunner · execution plane"]
+    C --> M["Modelos, scheduler y observabilidad"]
 ```
 
-ControlBot decide y coordina dentro de su autoridad; no reemplaza los contratos de Factory, no ejecuta trabajo arbitrario por shell y no fusiona datos ni código con los productos.
+Las conexiones punteadas representan [contratos y proyecciones](docs/github-control-plane-readonly-v1.md), **no acciones remotas habilitadas**. [FactoryRunner](https://github.com/pl0n3r/FactoryRunner) ejecuta trabajo gobernado; [AutoFactory](https://github.com/pl0n3r/AutoFactory) sigue local/manual e independiente.
 
 ## Stack e infraestructura
 
-**Stack declarado:** PHP 8.5 + MariaDB + GitHub Actions + Hostinger shared hosting.
+- **Stack declarado:** [PHP 8.5 + MariaDB](AGENTES.md), [GitHub Actions](.github/workflows/ci.yml) y Hostinger shared hosting como destino; app, DB y deploy independientes.
+- **Coordinación y policy:** [Factory@v1](.github/workflows/coordinacion.yml), con reservas V3, roles, aceptación y checks reproducibles.
+- **Control plane GitHub:** [snapshots solo lectura](src/GitHubProjectSnapshot.php), [políticas de intención](src/GitHubIntentPolicy.php) y adapters sujetos a permisos explícitos.
+- **Operación/health:** [identidad owner-gated #817](https://github.com/pl0n3r/ControlBot/issues/817) y [observador V3](docs/observador-reservas-consumidor.md) en fase de construcción; ninguno prueba salud pública live.
+- **Despliegue:** [backup/restauración D-059](docs/hostinger-d059-backup.md) antes de tocar Hostinger; sin asumir cron, DB, credenciales o servicio habilitados.
 
-- app, base de datos y deploy propios;
-- sin procesos Node permanentes ni WebSockets en hosting compartido;
-- tareas periódicas por cron cuando correspondan;
-- tokens y secretos solo server-side;
-- deploy y observación permanecen fail-closed hasta contar con configuración explícita.
+El panel requiere acceso restringido; el repositorio de código es público según [D-062](decisiones.yml).
 
 ## Ciclo de entrega
 
@@ -106,16 +76,13 @@ Un merge no equivale a go-live ni a producción validada. Las acciones de infrae
 
 ## Roadmap y fuentes de verdad
 
-- **Visión y roadmap:** [Issue #1](https://github.com/pl0n3r/ControlBot/issues/1)
-- **Contrato local:** [`AGENTES.md`](AGENTES.md)
-- **Decisiones del dueño:** [`decisiones.yml`](decisiones.yml)
-- **Tratamientos y fase:** [`datos.yml`](datos.yml)
-- **Trabajo ejecutable:** [GitHub Issues](https://github.com/pl0n3r/ControlBot/issues)
-- **Cambios revisados:** [Pull Requests](https://github.com/pl0n3r/ControlBot/pulls)
-- **Contratos profundos:** [`docs/`](docs/)
-- **Gobernanza común:** [`pl0n3r/factory@v1`](https://github.com/pl0n3r/factory/tree/v1)
+- [Roadmap/épico ControlBot #1](https://github.com/pl0n3r/ControlBot/issues/1) y [GitHub Issues](https://github.com/pl0n3r/ControlBot/issues): planificación y claims.
+- [PRs](https://github.com/pl0n3r/ControlBot/pulls), [CI](https://github.com/pl0n3r/ControlBot/actions) y [Releases](https://github.com/pl0n3r/ControlBot/releases): evidencia verificable exact-HEAD.
+- [PLAN-AGENTES.md](https://github.com/pl0n3r/factory/blob/main/PLAN-AGENTES.md) y [AGENTES.md](AGENTES.md): gobernanza y contrato técnico.
+- [decisiones.yml](decisiones.yml) y [datos.yml](datos.yml): autoridades y tratamiento.
+- [docs/](docs/): contratos, runbooks y límites; [#817](https://github.com/pl0n3r/ControlBot/issues/817) identifica la preparación de health, [#625](https://github.com/pl0n3r/ControlBot/issues/625) el despliegue pendiente.
 
-El README enlaza estas fuentes; no las sustituye ni crea un roadmap paralelo.
+La evidencia operativa se consulta en sus fuentes, no se recrea como tabla estática de progreso en el README.
 
 ## Desarrollo local
 

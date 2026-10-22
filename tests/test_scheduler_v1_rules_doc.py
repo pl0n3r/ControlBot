@@ -30,9 +30,9 @@ def validate_document(source):
     blocks = re.findall(r"(?ms)^## R\d\d — .*?(?=^## |\Z)", source)
     for i, block in enumerate(blocks, 1):
         for marker in ("**Regla:**", "**Por qué:**", "**Fuente:**"):
-            if not re.search(re.escape(marker) + r"\s*\S", block):
+            if not re.search(re.escape(marker) + r"[ \t]*[^\s\n][^\n]*", block):
                 raise ValueError(f"R{i:02d}: falta {marker}")
-        if "orq.py#L" not in block:
+        if "[orq.py#L" not in block:
             raise ValueError(f"R{i:02d}: fuente no trazable")
     for heading in ("## Qué NO portar", "## Preguntas abiertas"):
         if heading not in source:
@@ -71,7 +71,7 @@ class SchedulerV1RulesDocTests(unittest.TestCase):
 
     def test_missing_source_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "fuente no trazable"):
-            validate_document(self.text.replace("orq.py#L875-L916", "orq.py sin línea", 1))
+            validate_document(self.text.replace("[orq.py#L875-L916]", "[orq.py sin línea]", 1))
 
     def test_reference_source_signatures(self):
         source = ORQ.read_text(encoding="utf-8")

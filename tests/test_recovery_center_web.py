@@ -51,6 +51,27 @@ class RecoveryCenterWebTests(unittest.TestCase):
             self.assertEqual(v["body"], "Service unavailable.\n")
             self.assertNotIn("<script>", v["body"])
 
+    def test_recovery_docs_match_integrated_owner_only_route(self):
+        docs = (ROOT / "docs" / "disaster-recovery-ui.md").read_text(encoding="utf-8")
+        for term in (
+            "GET /security/resilience",
+            "ControlBotWebEntrypoint::handleAuthenticated",
+            "OwnerAuthenticatedRouter::verifiedOwner",
+            "RecoveryCenterWebEntrypoint::handle",
+            "UNKNOWN",
+            "Cache-Control: no-store",
+            "#577",
+            "B en #577",
+            "RPO 15 min",
+            "RTO 60 min",
+        ):
+            self.assertIn(term, docs)
+        self.assertNotIn("HTML/routing final queda fuera de este slice", docs)
+        entry = (ROOT / "src" / "ControlBotWebEntrypoint.php").read_text(encoding="utf-8")
+        self.assertIn("parse_url($uri, PHP_URL_PATH) === '/security/resilience'", entry)
+        self.assertIn("RecoveryCenterWebEntrypoint::handle($server)", entry)
+        self.assertIn("OwnerAuthenticatedRouter::verifiedOwner", entry)
+
     def test_existing_routes_and_no_live_capabilities_are_preserved(self):
         response = scenario("delegated")
         self.assertIn(response["status"], (200, 503))

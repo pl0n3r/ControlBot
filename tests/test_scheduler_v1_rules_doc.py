@@ -37,6 +37,12 @@ def validate_document(source):
     for heading in ("## Qué NO portar", "## Preguntas abiertas"):
         if heading not in source:
             raise ValueError("Falta " + heading)
+    not_port = source.split("## Qué NO portar", 1)[1].split("## Preguntas abiertas", 1)[0]
+    questions = source.split("## Preguntas abiertas", 1)[1].split("## Criterio de aceptación", 1)[0]
+    if not re.search(r"(?m)^- \S", not_port):
+        raise ValueError("Qué NO portar está vacío")
+    if not re.search(r"(?m)^[1-9][0-9]*\. \S", questions):
+        raise ValueError("Preguntas abiertas está vacío")
     for token in REQUIRED:
         if token not in source:
             raise ValueError("No se documentó " + token)
@@ -72,6 +78,16 @@ class SchedulerV1RulesDocTests(unittest.TestCase):
     def test_missing_source_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "fuente no trazable"):
             validate_document(self.text.replace("[orq.py#L875-L916]", "[orq.py sin línea]", 1))
+
+    def test_empty_nonportable_section_fails_closed(self):
+        content = self.text.split("## Qué NO portar", 1)[1].split("## Preguntas abiertas", 1)[0]
+        with self.assertRaisesRegex(ValueError, "Qué NO portar está vacío"):
+            validate_document(self.text.replace(content, "\n\n", 1))
+
+    def test_empty_questions_fails_closed(self):
+        content = self.text.split("## Preguntas abiertas", 1)[1].split("## Criterio de aceptación", 1)[0]
+        with self.assertRaisesRegex(ValueError, "Preguntas abiertas está vacío"):
+            validate_document(self.text.replace(content, "\n\n", 1))
 
     def test_reference_source_signatures(self):
         source = ORQ.read_text(encoding="utf-8")

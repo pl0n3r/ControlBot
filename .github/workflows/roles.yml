@@ -23,6 +23,7 @@ jobs:
       contents: read
       issues: write
       pull-requests: read
+      checks: read
     uses: pl0n3r/factory/.github/workflows/roles.yml@v1
     with:
       mode: sync
@@ -34,6 +35,7 @@ jobs:
       contents: read
       issues: write
       pull-requests: read
+      checks: read
     uses: pl0n3r/factory/.github/workflows/roles.yml@v1
     with:
       mode: suggest
@@ -50,6 +52,7 @@ jobs:
       contents: read
       issues: write
       pull-requests: read
+      checks: read
     uses: pl0n3r/factory/.github/workflows/roles.yml@v1
     with:
       mode: validate

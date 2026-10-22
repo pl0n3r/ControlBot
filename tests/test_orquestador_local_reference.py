@@ -102,7 +102,7 @@ class OrquestadorLocalReferenceTests(unittest.TestCase):
         handler = next(n for n in module.body if isinstance(n, ast.ClassDef) and n.name == 'Handler')
         method = next(n for n in handler.body if isinstance(n, ast.FunctionDef) and n.name == 'do_GET')
         isolated = ast.Module(body=[ast.ClassDef(name='Isolated', bases=[], keywords=[], body=[method], decorator_list=[])], type_ignores=[])
-        namespace = {}
+        namespace = {'LOGIN_HTML': '<form>Acceso LAN</form>'}
         exec(compile(ast.fix_missing_locations(isolated), '<lan-test>', 'exec'), namespace)
         for path in ('/', '/index.html', '/grafo', '/grafo.html', '/data.json', '/api/data'):
             with self.subTest(path=path):

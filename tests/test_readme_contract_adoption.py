@@ -44,12 +44,15 @@ class ReadmeContractAdoptionTests(unittest.TestCase):
         readme = self.read("README.md")
         self.assertTrue(readme.startswith("# ControlBot\n"))
 
-        # Hero + diez headings: once superficies canónicas en orden.
-        headings = [f"## {section}" for section in REQUIRED_SECTIONS]
-        offsets = [readme.index(heading) for heading in headings]
-        self.assertEqual(sorted(offsets), offsets)
-        for heading in headings:
-            self.assertEqual(1, readme.count(heading), heading)
+        # Hero + diez headings exactos: rechazar sufijos y falsos prefijos.
+        headings = [
+            line[3:] for line in readme.splitlines() if line.startswith("## ")
+        ]
+        self.assertEqual(
+            list(REQUIRED_SECTIONS), headings[:len(REQUIRED_SECTIONS)]
+        )
+        for section in REQUIRED_SECTIONS:
+            self.assertEqual(1, headings.count(section), section)
 
         for forbidden in (
             "UNKNOWN", "<!-- factory:status", "<!-- factory:progress-readiness",

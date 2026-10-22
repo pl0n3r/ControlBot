@@ -1,15 +1,15 @@
-Última actualización automática (UTC): 2026-10-19 | SHA de origen: f32a96e355c874f13ce557e8ac4167f32fce271b
+Última actualización automática (UTC): 2026-10-19 | SHA de origen: cc747f4fa603390a3accc624c58308fa6c9757a4
 
 # Paquete para revisión jurídica — ControlBot
 
 Estado: documented_not_legally_approved
 Versión del repositorio: 0.1.24
-SHA de origen de los documentos: f32a96e355c874f13ce557e8ac4167f32fce271b
+SHA de origen de los documentos: cc747f4fa603390a3accc624c58308fa6c9757a4
 
 Huellas SHA-256 de las fuentes incluidas:
 - docs/privacidad/aviso-privacidad.md: 0e53bdf2c362dac7fd3f7e01e3e0ab86698c0cbba8a9635995d7a1b65d0b03be
-- docs/privacidad/canal-derechos.md: 6b7f5b94688dfb11f1370b54d8fa72b47f43283bb24ee1dc3d4304d4238f6edc
-- docs/privacidad/politica-tratamiento.md: f3fefe7ec729909abf7704108493685350176394a41fa42b891d1aad0560bb04
+- docs/privacidad/canal-derechos.md: 899df409e5429937152159344dc4a46bb05a2d128f36701553e341544208fb25
+- docs/privacidad/politica-tratamiento.md: 13fbd1207cf33afc841b9fd1c662383ee9c5edfe886d26af3d3d6e908a702a63
 - docs/privacidad/registro-tratamientos.md: 032881141522c59d43bfecae96b62e1e1c024bbd69e4bdc56a7600a8578f9cdb
 - docs/privacidad/retencion.md: eff42375857094aaf43105ff796a0e68616f2a125451eee9e69461d5baff7b73
 - docs/privacidad/terminos-condiciones.md: ccfe36fe739719f5b527c6ef06e0f71077920ce422dd10e4c2d9e885da1d6a78

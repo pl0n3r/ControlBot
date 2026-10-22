@@ -17,16 +17,6 @@ REQUIRED_SECTIONS = (
     "Mapa de la fábrica",
 )
 
-STATUS_MARKERS = (
-    "<!-- factory:status:start -->",
-    "<!-- factory:status:end -->",
-)
-PROGRESS_MARKERS = (
-    "<!-- factory:progress-readiness:start -->",
-    "<!-- factory:progress-readiness:end -->",
-)
-
-
 class ReadmeContractAdoptionTests(unittest.TestCase):
     def read(self, path: str) -> str:
         return (ROOT / path).read_text(encoding="utf-8")
@@ -50,36 +40,48 @@ class ReadmeContractAdoptionTests(unittest.TestCase):
             all(isinstance(value, str) and value.strip() for value in metadata.values())
         )
 
-    def test_readme_has_contract_v1_anatomy(self) -> None:
+    def test_readme_is_contract_v2_without_unknown_blocks(self) -> None:
         readme = self.read("README.md")
-        positions = []
-        for section in REQUIRED_SECTIONS:
-            heading = f"## {section}"
-            self.assertEqual(1, readme.count(heading), heading)
-            positions.append(readme.index(heading))
-        self.assertEqual(sorted(positions), positions)
-        self.assertIn("# ControlBot", readme)
-        self.assertIn("Centro de control web **privado**", readme)
+        self.assertTrue(readme.startswith("# ControlBot\n"))
 
-    def test_derived_blocks_fail_closed_without_evidence(self) -> None:
-        readme = self.read("README.md")
-        for marker in (*STATUS_MARKERS, *PROGRESS_MARKERS):
-            self.assertEqual(1, readme.count(marker), marker)
-
-        status = readme.split(STATUS_MARKERS[0], 1)[1].split(STATUS_MARKERS[1], 1)[0]
-        progress = (
-            readme.split(PROGRESS_MARKERS[0], 1)[1]
-            .split(PROGRESS_MARKERS[1], 1)[0]
+        # Hero + diez headings exactos: rechazar sufijos y falsos prefijos.
+        headings = [
+            line[3:] for line in readme.splitlines() if line.startswith("## ")
+        ]
+        self.assertEqual(
+            list(REQUIRED_SECTIONS), headings[:len(REQUIRED_SECTIONS)]
         )
-        for row in (
-            "main SHA", "versión", "CI", "release", "health",
-            "smoke/observer", "quality/security", "Issue activo",
-            "PR activo", "último release",
+        for section in REQUIRED_SECTIONS:
+            self.assertEqual(1, headings.count(section), section)
+
+        for forbidden in (
+            "UNKNOWN", "<!-- factory:status", "<!-- factory:progress-readiness",
+            "Progress + Readiness", "| Señal | Estado |",
+            "| Readiness |", "| main SHA |", "| Target |",
         ):
-            self.assertIn(f"| {row} | UNKNOWN |", status)
-        self.assertIn("| Readiness | UNKNOWN |", progress)
-        self.assertNotIn("GREEN", status)
-        self.assertNotIn("DEGRADED", status)
+            self.assertNotIn(forbidden, readme, forbidden)
+
+        cockpit = readme.split("## Operational Cockpit", 1)[1].split(
+            "## Work Queue", 1
+        )[0]
+        for signal in (
+            "https://github.com/pl0n3r/ControlBot/actions/workflows/ci.yml/badge.svg?branch=main",
+            "https://github.com/pl0n3r/ControlBot/actions",
+            "https://github.com/pl0n3r/ControlBot/releases",
+            "https://img.shields.io/github/v/release/pl0n3r/ControlBot",
+            "https://control.condorapp.com.co/",
+        ):
+            self.assertIn(signal, cockpit, signal)
+        self.assertIn("sin commits de refresco", cockpit)
+        self.assertIn("no hay un `/health` público productivo acreditado", cockpit)
+        self.assertNotIn("| Señal |", cockpit)
+        self.assertNotIn("https://example.com", cockpit)
+
+        # Fuentes fiables y límites de autoridad; el health privado no da live.
+        self.assertIn("https://github.com/pl0n3r/ControlBot/issues/817", readme)
+        self.assertIn("https://github.com/pl0n3r/ControlBot/issues/625", readme)
+        self.assertIn("docs/hostinger-d059-backup.md", readme)
+        self.assertIn("docs/observador-reservas-consumidor.md", readme)
 
     def test_readme_caller_only_on_document_changes(self) -> None:
         """F2B: solo cambios documentales disparan el validador Factory v1."""

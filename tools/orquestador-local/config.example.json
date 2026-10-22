@@ -1,0 +1,18 @@
+{
+  "_comentario": "Edita este archivo para cambiar tus metas y los sitios que se vigilan. Las metas listan issues por repo; el avance sale de cuántos están cerrados.",
+  "metas": [
+    {"nombre": "Home de BRVTAL igual a la referencia", "repo": "brvtal", "issues": [968, 969, 970, 971, 972, 973, 974, 975, 976, 983]},
+    {"nombre": "Orquestador de ControlBot con datos reales", "repo": "ControlBot", "issues": [760, 753, 754, 755]},
+    {"nombre": "GrindFlow: Library (MVP)", "repo": "GrindFlow", "issues": [407, 414, 415, 416, 417, 418]},
+    {"nombre": "GrindFlow: Scheduling (MVP)", "repo": "GrindFlow", "issues": [423, 424, 425, 426, 427, 428, 429]},
+    {"nombre": "GrindFlow: preparación comercial", "repo": "GrindFlow", "issues": [437, 438, 439, 440]},
+    {"nombre": "Condor: preparación de live readiness", "repo": "Condor", "issues": [613, 616, 617, 638, 639]},
+    {"nombre": "Factory: los agentes fusionan solos", "repo": "Factory", "issues": [1139, 1189, 1175, 1190, 1191]},
+    {"nombre": "AutoFactory ↔ orquestador (estado de agentes)", "repo": "AutoFactory", "issues": [156, 157, 158]}
+  ],
+  "salud": [
+    {"nombre": "Condor", "url": "https://condorapp.com.co/health"},
+    {"nombre": "BRVTAL", "url": "https://www.brvtal.com.co/"},
+    {"nombre": "ControlBot (acepta 401 = arriba)", "url": "https://control.condorapp.com.co/", "ok": [200, 401]}
+  ]
+}

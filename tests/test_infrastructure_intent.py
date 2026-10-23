@@ -64,12 +64,17 @@ def _diff_numstat_for_pr(pr: dict) -> list[tuple[str, int, int]]:
     return result
 
 
+# Código de referencia que no forma parte del runtime de ControlBot (decisión del dueño, 2026-10-21):
+# no cuenta para el tope de líneas por PR.
+BUDGET_EXEMPT_PREFIXES = ("tools/orquestador-local/",)
+
+
 def _budget_without_verified_copies(
     diff: list[tuple[str, int, int]], verified_paths: set[str],
 ) -> int:
     return sum(
         added + deleted for path, added, deleted in diff
-        if path not in verified_paths
+        if path not in verified_paths and not path.startswith(BUDGET_EXEMPT_PREFIXES)
     )
 
 
@@ -431,6 +436,18 @@ class InfrastructureIntentTests(unittest.TestCase):
                  ("scripts/example.py", 390, 0)], copies
             ),
             400,
+        )
+
+    def test_reference_tool_is_exempt_from_size_budget(self):
+        changes = [
+            ("tools/orquestador-local/orq.py", 1700, 0),
+            ("tools/orquestador-local/index.html", 490, 0),
+            ("src/Runtime.php", 120, 30),
+        ]
+        self.assertEqual(_budget_without_verified_copies(changes, set()), 150)
+        # La exención es solo de esa carpeta: otro directorio sigue contando.
+        self.assertEqual(
+            _budget_without_verified_copies([("tools/otra/script.py", 500, 0)], set()), 500,
         )
 
 

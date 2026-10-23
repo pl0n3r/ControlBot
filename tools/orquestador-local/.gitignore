@@ -1,0 +1,8 @@
+acciones.log
+af_logs.jsonl
+agent_key.txt
+assigned.json
+agent_blocked.json
+planner_state.json
+config.json
+__pycache__/

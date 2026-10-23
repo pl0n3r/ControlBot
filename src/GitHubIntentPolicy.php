@@ -48,6 +48,90 @@ final class GitHubIntentPolicy
         return self::result('deny','untrusted_evidence_freshness');
     }
 
+
+    /**
+     * Offline V2. The snapshot, serverContext and clock MUST be supplied by
+     * trusted application code, not by a request or intention payload.
+     * Freshness describes an observation; it does not confer permission.
+     */
+    public static function evaluateTrusted(
+        array $envelope,
+        ?CapabilityGrant $grant,
+        array $serverContext,
+        array $canonicalSnapshot,
+        int $trustedNow
+    ): array {
+        try { $intent = self::intent($envelope); }
+        catch (\Throwable) { return self::result('unknown', 'invalid_intent'); }
+
+        try {
+            self::fields($serverContext, ['project_ref', 'repository_ref']);
+            if (
+                $trustedNow < 1
+                || !is_string($serverContext['project_ref'])
+                || !is_string($serverContext['repository_ref'])
+            ) throw new InvalidArgumentException('server context invalid.');
+
+            // describe() consumes a raw eight-field Envelope, not the
+            // normalized Envelope containing its derived execution flag.
+            $raw = $intent;
+            unset($raw['execution']);
+            $req = GitHubIntentAuthorityRequirements::describe(
+                $raw, $serverContext['project_ref'], $serverContext['repository_ref']
+            );
+            $expectedScope = in_array($intent['type'], ['project.freeze', 'project.unfreeze'], true)
+                ? 'project' : 'repository';
+            $expectedRef = $expectedScope === 'project'
+                ? $serverContext['project_ref'] : $serverContext['repository_ref'];
+            if (
+                ($req['state'] ?? null) !== 'requirements'
+                || ($req['type'] ?? null) !== $intent['type']
+                || ($req['capability'] ?? null) !== (self::CAPABILITIES[$intent['type']] ?? null)
+                || ($req['scope'] ?? null) !== $expectedScope
+                || ($req['scope_ref'] ?? null) !== $expectedRef
+                || ($req['scope_parameters'] ?? null) !== [$expectedScope . '_ref' => $expectedRef]
+                || ($req['approval_class'] ?? null) !== 'owner_required'
+            ) return self::result('deny', 'requirements_invalid');
+
+            foreach (['authorized', 'grant_issued', 'approval_issued', 'approval_verified', 'execution'] as $flag) {
+                if (!array_key_exists($flag, $req) || $req[$flag] !== false)
+                    return self::result('deny', 'requirements_invalid');
+            }
+            // No caller-controlled evidence_ref, timestamp or TTL is used.
+            // Envelope refs use github:/controlbot:, whereas the trusted
+            // observation has an HTTPS commit URL. They are NOT interchangeable.
+            $trusted = GitHubIntentTrustedEvidence::derive(
+                $canonicalSnapshot, $serverContext['repository_ref'], $trustedNow
+            );
+            $expectedSource = 'https://github.com/' . $serverContext['repository_ref'];
+            if (
+                ($trusted['state'] ?? null) !== 'current'
+                || ($trusted['freshness'] ?? null) !== 'current'
+                || ($trusted['repository_ref'] ?? null) !== $serverContext['repository_ref']
+                || ($trusted['source_ref'] ?? null) !== $expectedSource
+                || !is_string($trusted['evidence_ref'] ?? null)
+                || !preg_match(
+                    '#^' . preg_quote($expectedSource, '#') . '/commit/[a-f0-9]{40}$#D',
+                    $trusted['evidence_ref']
+                )
+                || ($trusted['execution'] ?? null) !== false
+            ) return self::result('deny', 'untrusted_or_stale_snapshot');
+
+            // All GitHub capabilities remain forbidden in the current catalog.
+            // A CapabilityGrant from another domain or an approval_ref string
+            // must not become authority. No grant inspection, issue or adapter.
+            $classification = \ControlBot\Production\CapabilityPolicy::classify($req['capability']);
+            if (
+                ($classification['known'] ?? null) !== false
+                || ($classification['decision'] ?? null) !== 'forbidden'
+                || ($classification['auto_grant_allowed'] ?? null) !== false
+            ) return self::result('deny', 'authority_catalog_changed');
+            return self::result('deny', 'grant_required');
+        } catch (\Throwable) {
+            return self::result('deny', 'requirements_invalid');
+        }
+    }
+
     private static function intent(array $envelope): array
     {
         if(!array_key_exists('execution',$envelope)||$envelope['execution']!==false)

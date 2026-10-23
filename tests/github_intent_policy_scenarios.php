@@ -4,6 +4,8 @@ require __DIR__.'/../src/GitHubIntentEnvelope.php';
 require __DIR__.'/../src/CapabilityPolicy.php';
 require __DIR__.'/../src/CapabilityGrant.php';
 require __DIR__.'/../src/GitHubIntentPolicy.php';
+require __DIR__.'/../src/GitHubIntentAuthorityRequirements.php';
+require __DIR__.'/../src/GitHubIntentTrustedEvidence.php';
 
 use ControlBot\GitHub\GitHubIntentEnvelope;
 use ControlBot\GitHub\GitHubIntentPolicy;
@@ -47,6 +49,30 @@ function foreignGrant(string $capability='hostinger.read',?string $approval=null
         'backup_receipt_id'=>null,'owner_approval_id'=>$approval,
         'idempotency_key'=>'grant:intent:679:1','revoked_at'=>null,
     ]);
+}
+
+
+function server(): array
+{
+    return ['project_ref'=>'controlbot:project/controlbot', 'repository_ref'=>'pl0n3r/ControlBot'];
+}
+
+function trustedSnapshot(int $observed=NOW-120): array
+{
+    return [
+        'version'=>1, 'project_id'=>'controlbot', 'observed_at'=>$observed,
+        'repositories'=>[[
+            'repository_id'=>'controlbot-repo',
+            'repository'=>'pl0n3r/ControlBot',
+            'source_ref'=>'https://github.com/pl0n3r/ControlBot',
+            'observed_at'=>$observed,
+            'main_sha'=>str_repeat('a', 40),
+            'checks'=>['items'=>[], 'truncated'=>false],
+            'pull_requests'=>['items'=>[], 'truncated'=>false],
+            'issues'=>['items'=>[], 'truncated'=>false],
+            'latest_release'=>null, 'latest_workflow'=>null,
+        ]],
+    ];
 }
 
 $case=$argv[1]??'';
@@ -103,6 +129,33 @@ if($case==='reuse'){
         'future_observed'=>GitHubIntentPolicy::evaluate(env(),null,$future,NOW),
         'bad_ttl'=>GitHubIntentPolicy::evaluate(env(),null,$badTtl,NOW),
         'bad_authority'=>GitHubIntentPolicy::evaluate(env(),null,$badAuthority,NOW),
+    ];
+}elseif($case==='trusted_valid'){
+    $injected=server();$injected['evidence_max_age_seconds']=900;
+    $spoofed=env();$spoofed['evidence_observed_at']=NOW;
+    $out=[
+        'current'=>GitHubIntentPolicy::evaluateTrusted(env(),null,server(),trustedSnapshot(),NOW),
+        'no_caller_ttl'=>GitHubIntentPolicy::evaluateTrusted(env(),null,$injected,trustedSnapshot(),NOW),
+        'no_caller_timestamp'=>GitHubIntentPolicy::evaluateTrusted($spoofed,null,server(),trustedSnapshot(),NOW),
+        'last_valid_second'=>GitHubIntentPolicy::evaluateTrusted(env(),null,server(),trustedSnapshot(NOW-300),NOW),
+    ];
+}elseif($case==='trusted_closed'){
+    $other=server();$other['repository_ref']='other/Repo';
+    $extra=server();$extra['evidence_ref']=EVIDENCE;
+    $mismatch=env();$mismatch['repository_ref']='other/Repo';
+    $duplicated=trustedSnapshot();$duplicated['repositories'][]=$duplicated['repositories'][0];
+    $strange=env();$strange['type']='repo.shell';
+    $out=[
+        'missing_grant'=>GitHubIntentPolicy::evaluateTrusted(env(),null,server(),trustedSnapshot(),NOW),
+        'foreign_grant'=>GitHubIntentPolicy::evaluateTrusted(env(),foreignGrant(),server(),trustedSnapshot(),NOW),
+        'foreign_owner_approval'=>GitHubIntentPolicy::evaluateTrusted(env(),foreignGrant('database.restore','33333333-3333-4333-8333-333333333333'),server(),trustedSnapshot(),NOW),
+        'stale'=>GitHubIntentPolicy::evaluateTrusted(env(),null,server(),trustedSnapshot(NOW-301),NOW),
+        'mismatched_scope'=>GitHubIntentPolicy::evaluateTrusted(env(),null,$other,trustedSnapshot(),NOW),
+        'mismatched_intent'=>GitHubIntentPolicy::evaluateTrusted($mismatch,null,server(),trustedSnapshot(),NOW),
+        'extra_context'=>GitHubIntentPolicy::evaluateTrusted(env(),null,$extra,trustedSnapshot(),NOW),
+        'duplicate_source'=>GitHubIntentPolicy::evaluateTrusted(env(),null,server(),$duplicated,NOW),
+        'unknown_type'=>GitHubIntentPolicy::evaluateTrusted($strange,null,server(),trustedSnapshot(),NOW),
+        'invalid_clock'=>GitHubIntentPolicy::evaluateTrusted(env(),null,server(),trustedSnapshot(),0),
     ];
 }else{
     fwrite(STDERR,"Unknown github intent policy scenario\n");exit(2);

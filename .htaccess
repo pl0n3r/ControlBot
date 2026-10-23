@@ -31,7 +31,7 @@ RewriteRule ^(?:AGENTES|AGENTS|README|CHANGELOG|LICENSE)(?:\.[^/]+)?$ - [F,L,NC]
 RewriteRule \.(?:md|ya?ml|json|lock|sql|log|ini|dist|xml|toml)$ - [F,L,NC]
 # Reject direct client access to the internal health entrypoint. Internal rewrites keep the original THE_REQUEST.
 RewriteCond %{THE_REQUEST} \s/+public/health\.php(?:\s|\?|$) [NC]
-RewriteRule ^public/health\.php$ - [F,L,NC]
+RewriteRule ^public/health\.php$ - [R=404,L,NC]
 RewriteRule ^(?!(?:index\.php|public/index\.php|health\.php|public/health\.php)$).+\.php$ - [F,L,NC]
 
 # Owner-gated health route stays closed without real server auth and private artifact.

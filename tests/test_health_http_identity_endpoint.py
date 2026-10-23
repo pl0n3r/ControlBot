@@ -19,7 +19,7 @@ ENTRY = ROOT / "public" / "health.php"
 RULES = ROOT / ".htaccess"
 GOOD_SHA = "a" * 40
 DEPLOYED_VERSION = json.loads((ROOT / "config" / "version.json").read_text(encoding="utf-8"))["version"]
-MISMATCH_VERSION = "99.99.99" if DEPLOYED_VERSION != "99.99.99" else "99.99.98
+MISMATCH_VERSION = "99.99.99" if DEPLOYED_VERSION != "99.99.99" else "99.99.98"
 ATTESTATION_KEY = b"k" * 32
 PHP_DRIVER = r"""
 require $argv[1];
@@ -139,7 +139,7 @@ class HealthHttpIdentityEndpointTests(unittest.TestCase):
         self.assertIn("RewriteRule ^(?:src|config|docs|scripts|tests|vendor", rules)
         self.assertIn("RewriteRule ^health\\.php$ public/health.php [L,NC]", rules)
         self.assertIn(r"RewriteCond %{THE_REQUEST} \\s/+public/health\\.php", rules)
-        self.assertIn(r"RewriteRule ^public/health\\.php$ - [F,L,NC]", rules)
+        self.assertIn(r"RewriteRule ^public/health\\.php$ - [R=404,L,NC]", rules)
         self.assertLess(rules.index("RewriteRule ^public/health\\.php$"), rules.index("RewriteRule ^(?!(?:index"))
         php_deny = next(line for line in rules.splitlines() if line.startswith("RewriteRule ^(?!"))
         self.assertIn("public/health\\.php", php_deny)

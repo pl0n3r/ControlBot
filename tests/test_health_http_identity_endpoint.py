@@ -18,6 +18,8 @@ ENDPOINT = ROOT / "src" / "HealthIdentityHttpEndpoint.php"
 ENTRY = ROOT / "public" / "health.php"
 RULES = ROOT / ".htaccess"
 GOOD_SHA = "a" * 40
+DEPLOYED_VERSION = json.loads((ROOT / "config" / "version.json").read_text(encoding="utf-8"))["version"]
+MISMATCH_VERSION = "99.99.99" if DEPLOYED_VERSION != "99.99.99" else "99.99.98
 ATTESTATION_KEY = b"k" * 32
 PHP_DRIVER = r"""
 require $argv[1];
@@ -57,7 +59,7 @@ class HealthHttpIdentityEndpointTests(unittest.TestCase):
         public.mkdir()
         private.mkdir()
         artifact = private / "release.json"
-        HealthHttpIdentityEndpointTests.write_receipt(artifact, "0.1.24", GOOD_SHA)
+        HealthHttpIdentityEndpointTests.write_receipt(artifact, DEPLOYED_VERSION, GOOD_SHA)
         server = {"REQUEST_METHOD": "GET", "HTTPS": "on", "AUTH_TYPE": "Basic", "REMOTE_USER": "owner", "DOCUMENT_ROOT": str(public)}
         configuration = {"owner_login": "owner", "release_manifest_path": str(artifact), "attestation_key": base64.b64encode(ATTESTATION_KEY).decode("ascii")}
         return server, configuration, artifact
@@ -67,14 +69,14 @@ class HealthHttpIdentityEndpointTests(unittest.TestCase):
             server, config, artifact = self.fixture(Path(tmp))
             response = self.invoke(server, config)
             self.assertEqual(response["status"], 200)
-            self.assertEqual(json.loads(response["body"]), {"status": "ok", "version": "0.1.24", "release_sha": GOOD_SHA})
+            self.assertEqual(json.loads(response["body"]), {"status": "ok", "version": DEPLOYED_VERSION, "release_sha": GOOD_SHA})
             self.assertEqual(set(json.loads(response["body"])), {"status", "version", "release_sha"})
             self.assertIn("no-store", response["headers"]["Cache-Control"])
             self.assertEqual(response["headers"]["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response["headers"]["Content-Type"], "application/json; charset=utf-8")
             self.assertNotIn("token", response["body"].lower())
             # Re-read the private artifact for each call, never a caller-provided SHA.
-            self.write_receipt(artifact, "0.1.24", "b" * 40)
+            self.write_receipt(artifact, DEPLOYED_VERSION, "b" * 40)
             second = self.invoke(server, config)
             self.assertEqual(json.loads(second["body"])["release_sha"], "b" * 40)
 
@@ -103,16 +105,16 @@ class HealthHttpIdentityEndpointTests(unittest.TestCase):
                     self.assertEqual(result["status"], status)
                     self.assertNotIn(GOOD_SHA, result["body"])
                     self.assertIn("no-store", result["headers"]["Cache-Control"])
-            for bad in ({"version": "0.1.24", "release_sha": "wrong"},
-                        {"version": "0.1.24", "release_sha": GOOD_SHA, "secret": "token-secret"},
-                        ["0.1.24", GOOD_SHA]):
+            for bad in ({"version": DEPLOYED_VERSION, "release_sha": "wrong"},
+                        {"version": DEPLOYED_VERSION, "release_sha": GOOD_SHA, "secret": "token-secret"},
+                        [DEPLOYED_VERSION, GOOD_SHA]):
                 artifact.write_text(json.dumps(bad))
                 result = self.invoke(server, config)
                 self.assertEqual(result["status"], 503)
                 self.assertNotIn("token-secret", result["body"])
             artifact.write_text("X" * 513)
             self.assertEqual(self.invoke(server, config)["status"], 503)
-            self.write_receipt(artifact, "0.1.24", GOOD_SHA)
+            self.write_receipt(artifact, DEPLOYED_VERSION, GOOD_SHA)
             link = Path(tmp) / "private" / "link.json"
             link.symlink_to(artifact)
             self.assertEqual(self.invoke(server, {**config, "release_manifest_path": str(link)})["status"], 503)
@@ -120,13 +122,13 @@ class HealthHttpIdentityEndpointTests(unittest.TestCase):
             forged = {**server, "QUERY_STRING": "release_sha=" + GOOD_SHA, "HTTP_X_RELEASE_SHA": GOOD_SHA}
             self.assertEqual(self.invoke(forged, {**config, "release_manifest_path": None})["status"], 503)
             # Repeated object members are ambiguous to PHP json_decode; canonical bytes reject them.
-            self.write_receipt(artifact, "0.1.24", GOOD_SHA)
+            self.write_receipt(artifact, DEPLOYED_VERSION, GOOD_SHA)
             raw = artifact.read_text(encoding="utf-8")
-            artifact.write_text(raw[:-1] + ',"version":"0.1.24"}', encoding="utf-8")
+            artifact.write_text(raw[:-1] + ',"version":DEPLOYED_VERSION}', encoding="utf-8")
             self.assertEqual(self.invoke(server, config)["status"], 503)
-            self.write_receipt(artifact, "0.1.25", GOOD_SHA)
+            self.write_receipt(artifact, MISMATCH_VERSION, GOOD_SHA)
             self.assertEqual(self.invoke(server, config)["status"], 503)
-            self.write_receipt(artifact, "0.1.24", GOOD_SHA)
+            self.write_receipt(artifact, DEPLOYED_VERSION, GOOD_SHA)
             artifact.write_text(artifact.read_text().replace('"signature":"', '"signature":"f'))
             self.assertEqual(self.invoke(server, config)["status"], 503)
 
@@ -136,6 +138,9 @@ class HealthHttpIdentityEndpointTests(unittest.TestCase):
         self.assertIn("Require valid-user", rules)
         self.assertIn("RewriteRule ^(?:src|config|docs|scripts|tests|vendor", rules)
         self.assertIn("RewriteRule ^health\\.php$ public/health.php [L,NC]", rules)
+        self.assertIn(r"RewriteCond %{THE_REQUEST} \\s/+public/health\\.php", rules)
+        self.assertIn(r"RewriteRule ^public/health\\.php$ - [F,L,NC]", rules)
+        self.assertLess(rules.index("RewriteRule ^public/health\\.php$"), rules.index("RewriteRule ^(?!(?:index"))
         php_deny = next(line for line in rules.splitlines() if line.startswith("RewriteRule ^(?!"))
         self.assertIn("public/health\\.php", php_deny)
         self.assertIn("[F,L,NC]", php_deny)

@@ -14,4 +14,8 @@ La vista lee un perfil local fijo y pasa evidencias nulas a `RecoveryCenterUi::p
 
 ## Puerta operativa independiente
 
-La decisión del propietario **B en #577** sigue vigente: no provisionar Backblaze B2, buckets ni credenciales, y no activar Recovery live. La existencia de esta ruta no acredita copia offsite, versioning/Object Lock, checksums, restore ejecutado ni RPO/RTO observados; la ausencia de esa evidencia debe seguir siendo `UNKNOWN`, nunca `HEALTHY`.
+La **B previa en #577** es antecedente, sustituido para preparación acotada por la [opción A del OWNER en #858](https://github.com/pl0n3r/ControlBot/issues/858#issuecomment-6387350597) y el [journal auténtico `factory-human-decision` v2, opción A](https://github.com/pl0n3r/ControlBot/issues/858#issuecomment-6387355246). A permite preparar Backblaze B2, preflight read-only de versioning/Object Lock y diseño de credenciales least-privilege por canal privado, únicamente con acceso y permisos adecuados.
+
+A **no autoriza** alta de cuenta, aceptar términos, pagos o gasto, almacenar credenciales en chat/GitHub, acceso a datos reales, escritura de backups, restore, operaciones destructivas o go-live. Cada permiso posterior debe verificarse por separado. ControlBot solo lee; Factory y FactoryRunner producen evidencia real.
+
+Sin recibos verificables de cifrado, offsite, Object Lock, checksum, freshness y restore descartable, el estado sigue `UNKNOWN`, no HEALTHY. Los targets de RPO 15 y RTO 60 minutos no son RPO/RTO observados.

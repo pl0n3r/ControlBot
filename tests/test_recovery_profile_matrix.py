@@ -122,7 +122,7 @@ class RecoveryProfileMatrixTests(unittest.TestCase):
     def test_documented_scope_does_not_promise_live_backups(self):
         doc = DOC.read_text(encoding="utf-8")
         for name in GROUP:
-            self.assertIn(f"\`{name}\`", doc)
+            self.assertIn(f"`{name}`", doc)
         for expected in (
             "Condor y FactoryRunner", "UNKNOWN", "Backblaze B2",
             "#577", "#858", "No confirma backups", "no autoriza provisión",

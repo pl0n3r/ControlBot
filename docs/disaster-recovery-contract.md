@@ -67,10 +67,23 @@ cifrado, offsite e inmutabilidad. `configured` solo acredita configuración:
 **No confirma backups**, Object Lock, checksums de una copia real, restore
 drill, RPO observado ni RTO demostrado.
 
-La decisión B del propietario en [#577](https://github.com/pl0n3r/ControlBot/issues/577)
-permanece vigente. La puerta sucesora [#858](https://github.com/pl0n3r/ControlBot/issues/858)
-todavía exige A auténtica y **no autoriza provisión** por el mero hecho de
-ejecutar esta prueba. No hay acceso a Backblaze B2 ni a secretos, usuarios,
-datos productivos, proveedor, red, API de backups o rollback. Un futuro
-perfil requiere criterios aprobados y evidencias propias; no debe confundirse
-con recuperación operacional verificada.
+## Autoridad sucesora vigente: opción A, preparación sin live
+
+La [decisión B histórica de #577](https://github.com/pl0n3r/ControlBot/issues/577)
+es un antecedente: quedó sustituida **solo** para preparación acotada por la
+[opción A del OWNER en #858](https://github.com/pl0n3r/ControlBot/issues/858#issuecomment-6387350597)
+y el [journal `factory-human-decision` v2 autenticado, opción A](https://github.com/pl0n3r/ControlBot/issues/858#issuecomment-6387355246).
+Preparar Backblaze B2 permite preflight read-only de versioning/Object Lock y
+credenciales mínimas por canal privado con autorización real del proveedor.
+Una prueba declarativa **no autoriza provisión** ni certifica bucket alguno.
+
+La A no autoriza alta de cuenta, aceptar términos, pagos o gasto, credenciales
+en GitHub/chat, uso de datos reales, escritura de backup, restore, destrucción
+o go-live. Las decisiones de compra, privacidad y operación requieren
+autoridad independiente.
+
+ControlBot consume en lectura; Factory y FactoryRunner son productores de
+evidencia genuina de checksum, cifrado, offsite, Object Lock, freshness y
+restore descartable. Hasta tener receipts reales, se conserva `UNKNOWN`,
+no HEALTHY. RPO/RTO observados siguen sin demostrarse. Condor y FactoryRunner
+siguen sin perfiles locales y sus estados continúan UNKNOWN.

@@ -54,16 +54,20 @@ backup receipts. Los siete repositorios del grupo se representan así:
 | --- | --- | --- | --- |
 | AutoFactory | `autofactory` | `autofactory.json` | Configurado, no HEALTHY |
 | BRVTAL | `brvtal` | `brvtal.json` | Configurado, no HEALTHY |
-| Condor | `condor` | Ninguno | UNKNOWN |
+| Condor | `condor` | `condor.json` (Factory #305) | Configurado, no HEALTHY |
 | ControlBot | `controlbot` | `controlbot.json` | Configurado, no HEALTHY |
 | Factory | `factory` | `factory.json` | Configurado, no HEALTHY |
 | FactoryRunner | `factoryrunner` | Ninguno | UNKNOWN |
 | GrindFlow | `grindflow` | `grindflow.json` | Configurado, no HEALTHY |
 
-**Condor y FactoryRunner** carecen de perfil en este repositorio: se consideran
-`UNKNOWN` y no se les inventan objetivos RPO/RTO ni retenciones. Los cinco
-perfiles existentes declaran RPO/RTO, retención, fuentes y requisitos de
-cifrado, offsite e inmutabilidad. `configured` solo acredita configuración:
+**FactoryRunner** carece de perfil en este repositorio: permanece `UNKNOWN`
+y no se le inventan objetivos RPO/RTO ni retenciones. **Condor** proyecta
+únicamente los targets/retención declarados por Factory #305 (manifest
+`condor.yml` blob `75f5640081b003758a15fbb60db2c10365dcb3f9`), sin
+recibos operativos. Factory declara fuentes DB/media/repository, **no**
+`configuration`; el perfil la deja `not_applicable` (sin obligación adicional
+en esta proyección), no afirma un inventario ni una copia de configuración. Los seis perfiles existentes declaran RPO/RTO, retención,
+fuentes y requisitos de cifrado, offsite e inmutabilidad. `configured` solo acredita configuración:
 **No confirma backups**, Object Lock, checksums de una copia real, restore
 drill, RPO observado ni RTO demostrado.
 
@@ -85,5 +89,5 @@ autoridad independiente.
 ControlBot consume en lectura; Factory y FactoryRunner son productores de
 evidencia genuina de checksum, cifrado, offsite, Object Lock, freshness y
 restore descartable. Hasta tener receipts reales, se conserva `UNKNOWN`,
-no HEALTHY. RPO/RTO observados siguen sin demostrarse. Condor y FactoryRunner
-siguen sin perfiles locales y sus estados continúan UNKNOWN.
+no HEALTHY. RPO/RTO observados siguen sin demostrarse. FactoryRunner sigue sin perfil local y permanece UNKNOWN; Condor tiene
+objetivos declarativos, pero su estado **operativo** permanece UNKNOWN.

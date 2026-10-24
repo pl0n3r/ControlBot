@@ -17,7 +17,7 @@ GROUP = frozenset({
     "autofactory", "brvtal", "condor", "controlbot",
     "factory", "factoryrunner", "grindflow",
 })
-DECLARED = frozenset({"autofactory", "brvtal", "controlbot", "factory", "grindflow"})
+DECLARED = frozenset({"autofactory", "brvtal", "condor", "controlbot", "factory", "grindflow"})
 
 PHP_VALIDATE = r"""
 require 'src/InfrastructureProvider.php';
@@ -84,7 +84,7 @@ class RecoveryProfileMatrixTests(unittest.TestCase):
     def test_missing_projects_remain_unknown_not_healthy(self):
         declared = profiles()
         absent = GROUP - set(declared)
-        self.assertEqual(absent, {"condor", "factoryrunner"})
+        self.assertEqual(absent, {"factoryrunner"})
         stale = copy.deepcopy(declared["controlbot"])
         stale["freshness"] = "stale"
         checked = validate({**{k: None for k in sorted(absent)}, "stale": stale})
@@ -95,6 +95,33 @@ class RecoveryProfileMatrixTests(unittest.TestCase):
         self.assertEqual(checked["stale"]["status"], "unknown")
         # Even a configured policy is never a usable backup or HEALTHY evidence.
         self.assertNotIn("HEALTHY", [v["status"] for v in checked.values()])
+
+    def test_condor_manifest_policy_is_configured_not_healthy(self):
+        # Factory #305: DECLARED_NOT_MEASURED, not a backup/restore receipt.
+        condor = profiles()["condor"]
+        result = validate({"condor": condor})["condor"]
+        self.assertTrue(result["accepted"])
+        self.assertEqual(result["status"], "configured")
+        profile = result["profile"]
+        self.assertEqual(profile["targets"], {"rpo_minutes": 15, "rto_minutes": 60})
+        self.assertEqual(profile["retention"], {
+            "hourly": 24, "daily": 7, "weekly": 8, "monthly": 12,
+        })
+        self.assertEqual(profile["sources"], {
+            "database": "required", "media": "required",
+            "repository": "required", "configuration": "not_applicable",
+        })
+        self.assertEqual(profile["restore_drill_cadence_hours"], 168)
+        self.assertEqual(profile["source_ref"], "https://github.com/pl0n3r/Factory/issues/305")
+        self.assertTrue(profile["strategy"]["offsite_required"])
+        self.assertTrue(profile["strategy"]["immutable_required"])
+        self.assertTrue(profile["encryption_required"])
+        for forbidden in ("HEALTHY", "backup_receipt", "observed_rpo", "observed_rto",
+                          "credential", "api_key", "object_lock_verified"):
+            self.assertNotIn(forbidden, condor)
+        self.assertEqual(
+            validate({"factoryrunner": None})["factoryrunner"]["status"], "unknown",
+        )
 
     def test_invalid_or_sensitive_profile_fails_closed(self):
         base = profiles()["controlbot"]
@@ -124,7 +151,7 @@ class RecoveryProfileMatrixTests(unittest.TestCase):
         for name in GROUP:
             self.assertIn(f"`{name}`", doc)
         for expected in (
-            "Condor y FactoryRunner", "UNKNOWN", "Backblaze B2",
+            "FactoryRunner", "UNKNOWN", "Backblaze B2",
             "#577", "#858", "No confirma backups", "no autoriza provisión",
         ):
             self.assertIn(expected, doc)

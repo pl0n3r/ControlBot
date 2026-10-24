@@ -53,7 +53,7 @@ class ReconciliacionIssuesTests(unittest.TestCase):
         for issue, decision, evidence, unblock in rows:
             with self.subTest(issue=issue):
                 self.assertIn("https://github.com/pl0n3r/ControlBot/", evidence)
-                self.assertIn("/", unblock if "/" in unblock else "/")  # no PII needed
+                self.assertGreaterEqual(len(unblock), 25)
                 self.assertIn(decision, {"MANTENER", "ACTUALIZAR"})
 
     def test_reject_missing_or_duplicated_issue(self):
@@ -73,7 +73,8 @@ class ReconciliacionIssuesTests(unittest.TestCase):
         source = REPORT.read_text(encoding="utf-8")
         first = next(line for line in source.splitlines() if line.startswith("| [#"))
         broken = first.replace(
-            "https://github.com/pl0n3r/ControlBot/issues/1", "sin-fuente", 1
+            "[Épica raíz](https://github.com/pl0n3r/ControlBot/issues/1)",
+            "sin-fuente", 1
         )
         # Si falla identidad o fuente, no puede pasar por una fila aceptable.
         with self.assertRaises(ValueError):

@@ -109,7 +109,7 @@ class RecoveryProfileMatrixTests(unittest.TestCase):
         })
         self.assertEqual(profile["sources"], {
             "database": "required", "media": "required",
-            "repository": "required", "configuration": "required",
+            "repository": "required", "configuration": "not_applicable",
         })
         self.assertEqual(profile["restore_drill_cadence_hours"], 168)
         self.assertEqual(profile["source_ref"], "https://github.com/pl0n3r/Factory/issues/305")

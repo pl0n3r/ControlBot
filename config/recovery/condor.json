@@ -16,7 +16,7 @@
     "database": "required",
     "media": "required",
     "repository": "required",
-    "configuration": "required"
+    "configuration": "not_applicable"
   },
   "strategy": {
     "copies_required": 3,

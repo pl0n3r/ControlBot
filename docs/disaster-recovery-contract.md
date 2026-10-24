@@ -64,7 +64,9 @@ backup receipts. Los siete repositorios del grupo se representan así:
 y no se le inventan objetivos RPO/RTO ni retenciones. **Condor** proyecta
 únicamente los targets/retención declarados por Factory #305 (manifest
 `condor.yml` blob `75f5640081b003758a15fbb60db2c10365dcb3f9`), sin
-recibos operativos. Los seis perfiles existentes declaran RPO/RTO, retención,
+recibos operativos. Factory declara fuentes DB/media/repository, **no**
+`configuration`; el perfil la deja `not_applicable` (sin obligación adicional
+en esta proyección), no afirma un inventario ni una copia de configuración. Los seis perfiles existentes declaran RPO/RTO, retención,
 fuentes y requisitos de cifrado, offsite e inmutabilidad. `configured` solo acredita configuración:
 **No confirma backups**, Object Lock, checksums de una copia real, restore
 drill, RPO observado ni RTO demostrado.

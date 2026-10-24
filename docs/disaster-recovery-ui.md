@@ -14,7 +14,7 @@ La vista lee un perfil local fijo y pasa evidencias nulas a `RecoveryCenterUi::p
 
 ## Puerta operativa independiente
 
-La **B previa en #577** es antecedente, sustituido para preparación acotada por la [opción A del OWNER en #858](https://github.com/pl0n3r/ControlBot/issues/858#issuecomment-6387350597) y el [journal auténtico `factory-human-decision` v2, opción A](https://github.com/pl0n3r/ControlBot/issues/858#issuecomment-6387355246). A permite preparar Backblaze B2, preflight read-only de versioning/Object Lock y diseño de credenciales least-privilege por canal privado, únicamente con acceso y permisos adecuados.
+La decisión B en #577 es un antecedente histórico, sustituido para preparación acotada por la [opción A del OWNER en #858](https://github.com/pl0n3r/ControlBot/issues/858#issuecomment-6387350597) y el [journal auténtico `factory-human-decision` v2, opción A](https://github.com/pl0n3r/ControlBot/issues/858#issuecomment-6387355246). A permite preparar Backblaze B2, preflight read-only de versioning/Object Lock y diseño de credenciales least-privilege por canal privado, únicamente con acceso y permisos adecuados.
 
 A **no autoriza** alta de cuenta, aceptar términos, pagos o gasto, almacenar credenciales en chat/GitHub, acceso a datos reales, escritura de backups, restore, operaciones destructivas o go-live. Cada permiso posterior debe verificarse por separado. ControlBot solo lee; Factory y FactoryRunner producen evidencia real.
 

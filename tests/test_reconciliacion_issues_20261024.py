@@ -72,10 +72,9 @@ class ReconciliacionIssuesTests(unittest.TestCase):
     def test_reject_rows_without_auditable_evidence(self):
         source = REPORT.read_text(encoding="utf-8")
         first = next(line for line in source.splitlines() if line.startswith("| [#"))
-        broken = first.replace(
-            "[Épica raíz](https://github.com/pl0n3r/ControlBot/issues/1)",
-            "sin-fuente", 1
-        )
+        columns = [part.strip() for part in first.strip().strip("|").split("|")]
+        columns[2] = "sin-fuente"
+        broken = "| " + " | ".join(columns) + " |"
         # Si falla identidad o fuente, no puede pasar por una fila aceptable.
         with self.assertRaises(ValueError):
             parse_report(source.replace(first, broken, 1))

@@ -1,4 +1,5 @@
 """Pruebas offline de contrato de grants GitHub (#856, decisión #855=A)."""
+import base64
 import copy
 import hashlib
 import hmac
@@ -13,7 +14,7 @@ SIGNED = ("capability", "scope", "scope_ref", "owner", "issued_at",
           "expires_at", "nonce", "issuer")
 PHP = r"""
 require 'src/GitHubIntentGrantVerification.php';
-$input = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+$input = json_decode(base64_decode($argv[1], true), true, 512, JSON_THROW_ON_ERROR);
 $key = hex2bin($input['key']);
 echo json_encode(
     \ControlBot\GitHub\GitHubIntentGrantVerification::inspect(
@@ -64,8 +65,9 @@ def sign(case):
 
 def evaluate(case):
     run = subprocess.run(
-        ["php", "-r", PHP], cwd=ROOT,
-        input=json.dumps(case), capture_output=True, text=True, check=False,
+        ["php", "--", base64.b64encode(json.dumps(case).encode("utf-8")).decode("ascii")],
+        cwd=ROOT,
+        input="<?php\n" + PHP, capture_output=True, text=True, check=False,
     )
     if run.returncode:
         raise AssertionError(run.stderr.strip() or run.stdout.strip())

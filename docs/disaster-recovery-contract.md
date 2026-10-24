@@ -43,3 +43,34 @@ El perfil contiene metadata operativa de proyecto y refs técnicas, no payloads 
 ## Reversión
 
 El slice es puro y sin estado externo. Revertir `RecoveryProfile.php`, sus tests y esta documentación elimina la proyección sin modificar backups, bases de datos, storage, manifests ni secretos existentes.
+
+
+## Inventario de perfiles: cobertura declarativa (Factory / ControlBot #182)
+
+La matriz `tests/test_recovery_profile_matrix.py` valida **políticas offline**, nunca
+backup receipts. Los siete repositorios del grupo se representan así:
+
+| Repositorio | Clave canónica | Perfil `config/recovery` | Estado |
+| --- | --- | --- | --- |
+| AutoFactory | `autofactory` | `autofactory.json` | Configurado, no HEALTHY |
+| BRVTAL | `brvtal` | `brvtal.json` | Configurado, no HEALTHY |
+| Condor | `condor` | Ninguno | UNKNOWN |
+| ControlBot | `controlbot` | `controlbot.json` | Configurado, no HEALTHY |
+| Factory | `factory` | `factory.json` | Configurado, no HEALTHY |
+| FactoryRunner | `factoryrunner` | Ninguno | UNKNOWN |
+| GrindFlow | `grindflow` | `grindflow.json` | Configurado, no HEALTHY |
+
+**Condor y FactoryRunner** carecen de perfil en este repositorio: se consideran
+`UNKNOWN` y no se les inventan objetivos RPO/RTO ni retenciones. Los cinco
+perfiles existentes declaran RPO/RTO, retención, fuentes y requisitos de
+cifrado, offsite e inmutabilidad. `configured` solo acredita configuración:
+**No confirma backups**, Object Lock, checksums de una copia real, restore
+drill, RPO observado ni RTO demostrado.
+
+La decisión B del propietario en [#577](https://github.com/pl0n3r/ControlBot/issues/577)
+permanece vigente. La puerta sucesora [#858](https://github.com/pl0n3r/ControlBot/issues/858)
+todavía exige A auténtica y **no autoriza provisión** por el mero hecho de
+ejecutar esta prueba. No hay acceso a Backblaze B2 ni a secretos, usuarios,
+datos productivos, proveedor, red, API de backups o rollback. Un futuro
+perfil requiere criterios aprobados y evidencias propias; no debe confundirse
+con recuperación operacional verificada.

@@ -213,7 +213,7 @@ final class GitHubPullRequestIntentExecutor
             'decision' => 'deny', 'execution' => false, 'runtime_authorized' => false,
             'fake_effect' => ['status' => $status, 'reason' => $reason],
             'fake_state' => $snapshot['fake_state'], 'audit' => $snapshot['audit'],
-            'ledger' => $snapshot['ledger'], 'replayed' => false,
+            'ledger' => (object) $snapshot['ledger'], 'replayed' => false,
         ];
     }
 }

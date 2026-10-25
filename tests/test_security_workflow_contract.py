@@ -63,14 +63,22 @@ class SecurityWorkflowContractTests(unittest.TestCase):
         )
         placeholder = "${{ github.event.issue.number || github.run_id }}"
         self.assertEqual(1, template.count(placeholder))
-        self.assertNotEqual(
-            template.replace(placeholder, "878"),
-            template.replace(placeholder, "880"),
+        # Different OWNER gates cannot collide; events on the same gate share a key.
+        events = (
+            ("issue_comment", 878, 1001),
+            ("issue_comment", 880, 1002),
+            ("issues", 880, 1003),
+            ("issue_comment", None, 1004),
+            ("issues", None, 1005),
         )
-        self.assertEqual(
-            template.replace(placeholder, "880"),
-            template.replace(placeholder, "880"),
-        )
+        groups = [
+            template.replace(placeholder, str(issue_number or run_id))
+            for _event_type, issue_number, run_id in events
+        ]
+        self.assertNotEqual(groups[0], groups[1])
+        self.assertEqual(groups[1], groups[2])
+        self.assertNotEqual(groups[3], groups[4])
+        self.assertNotEqual(groups[2], groups[3])
         self.assertIn("github.event.comment.author_association == 'OWNER'", source)
         self.assertIn("github.event.comment.user.type != 'Bot'", source)
 

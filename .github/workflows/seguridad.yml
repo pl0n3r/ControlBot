@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: seguridad-${{ github.repository }}-human-gates
+  group: seguridad-${{ github.repository }}-human-gate-${{ github.event.issue.number || github.run_id }}
   cancel-in-progress: false
 
 jobs:

@@ -26,6 +26,9 @@ final class RecoveryPortfolio
         $projects = [];
         foreach (self::PROJECTS as $key) {
             $raw = $profiles[$key] ?? null;
+            if ($key === 'factoryrunner' && $raw !== null) {
+                throw new InvalidArgumentException('FactoryRunner has no approved recovery profile.');
+            }
             if ($raw !== null && (!is_array($raw) || array_is_list($raw))) {
                 throw new InvalidArgumentException('Recovery portfolio profile invalid.');
             }

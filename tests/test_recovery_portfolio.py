@@ -38,7 +38,7 @@ class RecoveryPortfolioTests(unittest.TestCase):
         self.assertEqual(sum(p["profile_status"] == "configured" for p in view["projects"]), 6)
 
     def test_invalid_cross_project_and_sensitive_fail_closed(self):
-        for label in ("cross-project", "sensitive", "extra-project", "bad-shape"):
+        for label in ("cross-project", "sensitive", "extra-project", "bad-shape", "unexpected-runner"):
             with self.subTest(case=label):
                 self.assertTrue(scenario("recovery_portfolio_scenarios.php", label)["rejected"])
         stale = scenario("recovery_portfolio_scenarios.php", "stale")
@@ -65,6 +65,10 @@ class RecoveryPortfolioTests(unittest.TestCase):
         self.assertEqual(guards["post"]["status"], 405)
         bad = scenario("recovery_center_web_scenarios.php", "invalid-profile")
         self.assertEqual({x["status"] for x in bad.values()}, {503})
+
+    def test_broken_symlink_guard_precedes_missing_profile_fallback(self):
+        source = (ROOT / "src/RecoveryCenterWebEntrypoint.php").read_text(encoding="utf-8")
+        self.assertLess(source.index("if (is_link($path))"), source.index("if (!file_exists($path))"))
 
     def test_offline_provider_free_code_and_documented_limits(self):
         source = (ROOT / "src" / "RecoveryPortfolio.php").read_text(encoding="utf-8")

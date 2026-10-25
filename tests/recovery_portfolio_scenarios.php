@@ -18,11 +18,15 @@ if ($scenario === 'baseline') {
 } elseif ($scenario === 'stale') {
     $profiles['controlbot']['freshness'] = 'stale';
     $out = RecoveryPortfolio::project($profiles);
-} elseif (in_array($scenario, ['cross-project', 'sensitive', 'extra-project', 'bad-shape'], true)) {
+} elseif (in_array($scenario, ['cross-project', 'sensitive', 'extra-project', 'bad-shape', 'unexpected-runner'], true)) {
     if ($scenario === 'cross-project') $profiles['controlbot']['project_ref'] = 'controlbot:project/project-brvtal';
     if ($scenario === 'sensitive') $profiles['controlbot']['api_key'] = 'do-not-echo';
     if ($scenario === 'extra-project') $profiles['unknown-project'] = null;
     if ($scenario === 'bad-shape') $profiles['controlbot'] = 'unexpected';
+    if ($scenario === 'unexpected-runner') {
+        $profiles['factoryrunner'] = $profiles['factory'];
+        $profiles['factoryrunner']['project_ref'] = 'controlbot:project/project-factoryrunner';
+    }
     try {
         RecoveryPortfolio::project($profiles);
         $out = ['rejected' => false];

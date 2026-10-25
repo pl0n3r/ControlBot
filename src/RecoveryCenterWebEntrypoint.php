@@ -61,11 +61,14 @@ final class RecoveryCenterWebEntrypoint
         $profiles = [];
         foreach (['autofactory', 'brvtal', 'condor', 'controlbot', 'factory', 'factoryrunner', 'grindflow'] as $name) {
             $path = $directory . '/' . $name . '.json';
+            if (is_link($path)) {
+                throw new \RuntimeException('Recovery profile symlink not allowed');
+            }
             if (!file_exists($path)) {
                 $profiles[$name] = null;
                 continue;
             }
-            if (is_link($path) || !is_file($path)) {
+            if (!is_file($path)) {
                 throw new \RuntimeException('Recovery profile invalid');
             }
             $size = filesize($path);

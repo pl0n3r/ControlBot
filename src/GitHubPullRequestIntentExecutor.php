@@ -1,7 +1,6 @@
 <?php
 declare(strict_types=1);
 namespace ControlBot\GitHub;
-
 require_once __DIR__ . '/GitHubIntentEnvelope.php';
 require_once __DIR__ . '/GitHubIntentAuthorityRequirements.php';
 require_once __DIR__ . '/GitHubIntentTestGrantAuthority.php';
@@ -12,7 +11,6 @@ final class GitHubPullRequestIntentExecutor
     private const TYPES = ['pr.review', 'pr.merge', 'release.approve'];
     private const SHA = '/^[a-f0-9]{40}$/D';
     private const REQUIRED = ['Validar', 'SonarCloud Code Analysis', 'CodeQL', 'Factory policy'];
-
     public static function simulate(
         array $rawEnvelope, array $fixture, array $fakeState,
         array $audit = [], array $ledger = []
@@ -157,7 +155,6 @@ final class GitHubPullRequestIntentExecutor
             return self::result('denied', 'invalid_fixture', $original);
         }
     }
-
     private static function fields(array $value, array $expected): bool
     {
         if (array_is_list($value)) return false;
@@ -165,17 +162,14 @@ final class GitHubPullRequestIntentExecutor
         sort($keys); sort($expected);
         return $keys === $expected;
     }
-
     private static function fieldsOrFalse(mixed $value, array $expected): bool
     {
         return is_array($value) && self::fields($value, $expected);
     }
-
     private static function rows(mixed $value, int $limit): bool
     {
         return is_array($value) && array_is_list($value) && count($value) <= $limit;
     }
-
     private static function checks(mixed $checks): bool
     {
         if (!self::rows($checks, 30)) return false;
@@ -193,7 +187,6 @@ final class GitHubPullRequestIntentExecutor
         }
         return true;
     }
-
     private static function green(array $checks): bool
     {
         $successful = [];
@@ -206,7 +199,6 @@ final class GitHubPullRequestIntentExecutor
         }
         return true;
     }
-
     private static function result(string $status, string $reason, array $snapshot): array
     {
         return [

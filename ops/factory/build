@@ -13,7 +13,6 @@ import json
 import os
 from pathlib import Path
 import re
-import stat
 import subprocess
 import sys
 import tarfile
@@ -35,20 +34,45 @@ class BuildError(Exception):
     pass
 
 
-def tracked_paths() -> list[str]:
+def git_output(*arguments: str) -> bytes:
+    """Git provenance is always resolved in this checkout, never via caller Git env."""
+    clean_env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     result = subprocess.run(
-        ["git", "ls-files", "--cached", "-z"],
-        cwd=ROOT, check=False, capture_output=True, timeout=15,
+        ["git", *arguments], cwd=ROOT, env=clean_env,
+        check=False, capture_output=True, timeout=15,
     )
     if result.returncode != 0:
-        raise BuildError("Git index is unavailable.")
-    try:
-        paths = [p.decode("utf-8", "strict") for p in result.stdout.split(b"\0") if p]
-    except UnicodeDecodeError as exc:
-        raise BuildError("Non-UTF8 repository path.") from exc
-    if len(paths) != len(set(paths)):
-        raise BuildError("Duplicate tracked path.")
-    return sorted(paths)
+        raise BuildError("Authenticated Git source cannot be verified.")
+    return result.stdout
+
+
+def tracked_paths() -> list[str]:
+    """Enumerate committed HEAD tree entries, not a mutable Git index."""
+    raw = git_output("ls-tree", "-r", "-z", "--full-tree", "HEAD")
+    selected: list[str] = []
+    for record in raw.split(b"\\0"):
+        if not record:
+            continue
+        header, separator, encoded_path = record.partition(b"\\t")
+        if not separator:
+            raise BuildError("Invalid committed tree entry.")
+        try:
+            mode, kind, object_id = header.decode("ascii").split(" ")
+            name = encoded_path.decode("utf-8", "strict")
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise BuildError("Invalid committed tree entry.") from exc
+        if not allowed(name):
+            continue
+        relative = Path(name)
+        if (relative.is_absolute() or ".." in relative.parts or "." in relative.parts
+                or "\\\\" in name or "\\n" in name or "\\r" in name):
+            raise BuildError("Invalid committed runtime path.")
+        if mode not in {"100644", "100755"} or kind != "blob" or not SHA_PATTERN.fullmatch(object_id):
+            raise BuildError("Symlink or irregular object in committed runtime.")
+        selected.append(name)
+    if len(selected) != len(set(selected)):
+        raise BuildError("Duplicate committed runtime path.")
+    return sorted(selected)
 
 
 def allowed(path: str) -> bool:
@@ -62,23 +86,21 @@ def allowed(path: str) -> bool:
 
 
 def source_data(name: str) -> bytes:
+    """Read the commit blob, never bytes from an index-hidden/CRLF worktree."""
     relative = Path(name)
     if (relative.is_absolute() or ".." in relative.parts or "." in relative.parts
-            or "\\" in name or "\n" in name or "\r" in name or "\0" in name):
+            or "\\\\" in name or "\\n" in name or "\\r" in name or "\\0" in name):
         raise BuildError("Invalid source path.")
-    candidate = ROOT / relative
-    current = candidate
-    while current != ROOT:
-        if current.is_symlink():
-            raise BuildError("Symlink in packaged source.")
-        current = current.parent
-    if not candidate.is_file() or not stat.S_ISREG(candidate.stat().st_mode):
-        raise BuildError("Missing or irregular tracked source.")
-    if candidate.stat().st_size > MAX_FILE_BYTES:
+    object_name = f"HEAD:{name}"
+    try:
+        size = int(git_output("cat-file", "-s", object_name).strip())
+    except ValueError as exc:
+        raise BuildError("Invalid committed object size.") from exc
+    if size > MAX_FILE_BYTES:
         raise BuildError("Runtime source exceeds size limit.")
-    data = candidate.read_bytes()
-    if len(data) > MAX_FILE_BYTES:
-        raise BuildError("Runtime source exceeds size limit.")
+    data = git_output("cat-file", "blob", object_name)
+    if len(data) != size or len(data) > MAX_FILE_BYTES:
+        raise BuildError("Runtime source size differs from Git HEAD.")
     return data
 
 
@@ -100,17 +122,10 @@ def build() -> None:
     expected_sha = os.getenv("GITHUB_SHA", "")
     if not SHA_PATTERN.fullmatch(expected_sha):
         raise BuildError("Missing or invalid exact commit SHA.")
-    head = subprocess.run(
-        ["git", "rev-parse", "--verify", "HEAD"], cwd=ROOT,
-        check=False, capture_output=True, text=True, timeout=15,
-    )
-    if head.returncode != 0 or head.stdout.strip() != expected_sha:
+    head = git_output("rev-parse", "--verify", "HEAD").decode("ascii", "strict").strip()
+    if head != expected_sha:
         raise BuildError("Checkout does not match the exact expected SHA.")
-    tracked_state = subprocess.run(
-        ["git", "status", "--porcelain=v1", "--untracked-files=no"], cwd=ROOT,
-        check=False, capture_output=True, timeout=15,
-    )
-    if tracked_state.returncode != 0 or tracked_state.stdout:
+    if git_output("status", "--porcelain=v1", "--untracked-files=no"):
         raise BuildError("Tracked sources differ from the authenticated HEAD.")
     selected = [name for name in tracked_paths() if allowed(name)]
     if not ESSENTIAL.issubset(selected):
@@ -149,7 +164,13 @@ def build() -> None:
         header, stream = canonical_tar_file("factory-build-manifest.json", manifest_bytes)
         archive.addfile(header, stream)
 
-    ARTIFACT.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Never follow an output-parent symlink into a location outside the checkout.
+    for directory in (ROOT / "var", ARTIFACT.parent):
+        if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+            raise BuildError("Symlink or irregular artifact parent.")
+        directory.mkdir(exist_ok=True, mode=0o700)
+        if directory.is_symlink() or not directory.is_dir():
+            raise BuildError("Symlink or irregular artifact parent.")
     tmp = None
     try:
         with tempfile.NamedTemporaryFile(prefix=".candidate-", suffix=".gz", dir=ARTIFACT.parent, delete=False) as fp:

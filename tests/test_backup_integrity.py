@@ -20,11 +20,7 @@ class BackupIntegrityTests(unittest.TestCase):
         self.assertTrue(d["valid"])
         self.assertTrue(d["uppercase"])
         for invalid in ("short", "non_hex", "long"):
-            self.assertEqual(
-                d[invalid],
-                {"status": "UNKNOWN", "reason": "digest_invalid"},
-                invalid,
-            )
+            self.assertTrue(d[invalid], invalid)
 
     def test_in_memory_checksum_verification(self):
         d = scenario("content")

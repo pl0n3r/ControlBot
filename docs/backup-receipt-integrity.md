@@ -1,6 +1,6 @@
 # BackupReceipt: SHA-256 y freshness offline (#898 / #182)
 
-En esta hoja, el constructor mantiene compatibilidad con recibos históricos sintéticos de formato flexible. La **verificación de integridad** exige `algorithm=sha256` y exactamente 64 caracteres hexadecimales; los legacy digests jamás producen MATCH y retornan UNKNOWN/digest_invalid. `safeEvidence()` sigue omitiendo el digest y el contenido. Un endurecimiento del constructor y migración de fixtures requieren una hoja distinta con claims de tests históricos.
+El constructor `BackupReceipt::fromRecord` exige `algorithm=sha256` y un digest de **exactamente 64 caracteres hexadecimales** (sin límite de formato heredado). Los digests cortos, largos y no hexadecimales se rechazan con `InvalidArgumentException` antes de admitir el recibo. El fixture sintético histórico de `tests/recovery_evidence_scenarios.php` también utiliza SHA-256 canónico. `safeEvidence()` sigue omitiendo el digest y el contenido.
 
 El método puro `verifyPayloadChecksumBefore(payload, scope, checkedAt)` verifica identidad exacta de proyecto/entorno/recurso/run/issue, causalidad, expiración y una antigüedad máxima de 24 horas desde la verificación nominal. Tras rechazar estructuralmente cualquier digest no canónico, calcula SHA-256 de los bytes recibidos **en memoria** y usa `hash_equals`. Solo retorna `MATCH|MISMATCH|UNKNOWN` y motivo enumerado; no emite digest, payload ni trazas sensibles.
 

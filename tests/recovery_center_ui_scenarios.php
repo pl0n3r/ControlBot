@@ -15,7 +15,7 @@ function receipt():BackupReceipt{return BackupReceipt::fromRecord([
 'version'=>1,'receipt_id'=>'11111111-1111-4111-8111-111111111111','project'=>'controlbot','environment'=>'production','resource'=>'database-main',
 'backup_type'=>'database_dump','run_id'=>'22222222-2222-4222-8222-222222222222','issue'=>'pl0n3r/ControlBot#282',
 'created_at'=>'2026-09-29T15:00:00Z','verified_at'=>'2026-09-29T15:01:00Z','status'=>'ready','artifact_ref'=>'artifact:recovery-ui-282',
-'integrity'=>['algorithm'=>'sha256','digest'=>'abcdef0123456789'],'restore_capability'=>'validated','expires_at'=>'2026-09-30T15:01:00Z']);}
+'integrity'=>['algorithm'=>'sha256','digest'=>hash('sha256', 'synthetic-recovery-ui')],'restore_capability'=>'validated','expires_at'=>'2026-09-30T15:01:00Z']);}
 function st(string $s='verified',?string $r='controlbot:evidence/recovery',?int $at=2100,string $f='fresh'):array{return['state'=>$s,'evidence_ref'=>$r,'observed_at'=>$at,'freshness'=>$f];}
 function evidence():array{return[
 'version'=>1,'project_ref'=>'controlbot:project/project-controlbot','profile_ref'=>'controlbot:recovery-profile/project-controlbot-v1',

@@ -50,6 +50,30 @@ class SecurityWorkflowContractTests(unittest.TestCase):
         self.assertIn("steps.gate_sync.outputs.canonical == 'true'", source)
         self.assertIn("status == 'invalid-gate'", source)
 
+    def test_independent_human_gates_use_per_issue_concurrency(self) -> None:
+        source = self.source()
+        header = source.split("\njobs:\n", 1)[0]
+        template = (
+            "seguridad-${{ github.repository }}-human-gate-"
+            "${{ github.event.issue.number || github.run_id }}"
+        )
+        self.assertIn(
+            f"concurrency:\n  group: {template}\n  cancel-in-progress: false\n",
+            header,
+        )
+        placeholder = "${{ github.event.issue.number || github.run_id }}"
+        self.assertEqual(1, template.count(placeholder))
+        self.assertNotEqual(
+            template.replace(placeholder, "878"),
+            template.replace(placeholder, "880"),
+        )
+        self.assertEqual(
+            template.replace(placeholder, "880"),
+            template.replace(placeholder, "880"),
+        )
+        self.assertIn("github.event.comment.author_association == 'OWNER'", source)
+        self.assertIn("github.event.comment.user.type != 'Bot'", source)
+
     def test_historical_or_untrusted_comments_are_not_replayed(self) -> None:
         source = self.source()
         for forbidden in (

@@ -14,8 +14,55 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate_identity:
+    name: Identificar destino sin mutación
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      target_key: ${{ steps.identity.outputs.target_key }}
+    steps:
+      - name: Descargar política Factory versionada
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: pl0n3r/factory
+          ref: v1
+          path: .factory
+          persist-credentials: false
+
+      - name: Derivar identidad validada y fallback aislado
+        id: identity
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          import sys
+
+          sys.path.insert(0, ".factory/seguridad")
+          from puertas_humanas import GateValidationError, gate_target_identity_from_body
+
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as event_file:
+              issue = json.load(event_file).get("issue") or {}
+          body = issue.get("body")
+          fallback = "issue-" + (os.environ.get("ISSUE_NUMBER") or os.environ["RUN_ID"])
+          try:
+              target = gate_target_identity_from_body(body) if isinstance(body, str) else fallback
+          except (GateValidationError, ValueError):
+              target = fallback
+          print("target_key=" + target)
+          PY
+
   materializar-respuesta:
     name: Materializar decisión explícita
+    needs: gate_identity
+    concurrency:
+      group: seguridad-${{ github.repository }}-human-gate-target-${{ needs.gate_identity.outputs.target_key }}
+      cancel-in-progress: false
     if: >-
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request == null &&
@@ -65,6 +112,10 @@ jobs:
 
   sincronizar-decision:
     name: Validar y enrutar decisión
+    needs: gate_identity
+    concurrency:
+      group: seguridad-${{ github.repository }}-human-gate-target-${{ needs.gate_identity.outputs.target_key }}
+      cancel-in-progress: false
     if: github.event_name == 'issues' && github.event.issue.state == 'open'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -137,9 +188,16 @@ jobs:
           if ! grep -Fxq 'decisión: dueño' <<<"$current"; then
             if ! gh api --paginate "repos/$REPOSITORIO/labels?per_page=100" --jq '.[].name' \
               | grep -Fxq 'decisión: dueño'; then
-              gh api --method POST "repos/$REPOSITORIO/labels" \
+              if ! gh api --method POST "repos/$REPOSITORIO/labels" \
                 -f name='decisión: dueño' -f color='B60205' \
-                -f description='Decisión reservada explícitamente al dueño.'
+                -f description='Decisión reservada explícitamente al dueño.'; then
+                # Otra puerta pudo crear esta etiqueta; confirmar existencia real.
+                gh api --paginate "repos/$REPOSITORIO/labels?per_page=100" --jq '.[].name' \
+                  | grep -Fxq 'decisión: dueño' || {
+                    echo "::error::No se pudo crear ni verificar la etiqueta de decisión" >&2
+                    exit 1
+                  }
+              fi
             fi
             jq -n '{labels:["decisión: dueño"]}' \
               | gh api --method POST "repos/$REPOSITORIO/issues/$ISSUE/labels" --input -

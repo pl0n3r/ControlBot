@@ -42,10 +42,16 @@ jobs:
       phase: ${{ vars.PRODUCTION_STAGE || 'construccion' }}
       migration_mode: ${{ vars.MIGRATION_MODE || 'none' }}
       live_migration_approved: ${{ vars.LIVE_MIGRATION_APPROVED == 'true' }}
+      transport: ${{ vars.DEPLOY_TRANSPORT || 'none' }}
+      hostinger_ssh_host: ${{ vars.HOSTINGER_SSH_HOST || '' }}
+      hostinger_ssh_user: ${{ vars.HOSTINGER_SSH_USER || '' }}
+      hostinger_ssh_port: ${{ vars.HOSTINGER_SSH_PORT || '' }}
+      hostinger_release_root: ${{ vars.HOSTINGER_RELEASE_ROOT || '' }}
     secrets:
       DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      HOSTINGER_KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
 
   smoke:
     name: Verificar identidad exacta después del deploy

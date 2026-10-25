@@ -107,6 +107,13 @@ class FactoryDeployBuildAdapterTests(unittest.TestCase):
                 result = self.run_build(phase=phase, sha=commit)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(self.archive().exists())
+        # Exact HEAD alone is insufficient if a tracked file is modified or staged.
+        source = self.checkout / "src/Example.php"
+        source.write_text("<?php // forged runtime\n", encoding="utf-8")
+        self.assertNotEqual(self.run_build().returncode, 0)
+        self.git("add", "src/Example.php")
+        self.assertNotEqual(self.run_build().returncode, 0)
+        self.assertFalse(self.archive().exists())
 
     def test_refuses_symlink_or_missing_runtime_entrypoint(self):
         sensitive = self.checkout / "secret-private.txt"

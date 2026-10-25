@@ -106,6 +106,12 @@ def build() -> None:
     )
     if head.returncode != 0 or head.stdout.strip() != expected_sha:
         raise BuildError("Checkout does not match the exact expected SHA.")
+    tracked_state = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=no"], cwd=ROOT,
+        check=False, capture_output=True, timeout=15,
+    )
+    if tracked_state.returncode != 0 or tracked_state.stdout:
+        raise BuildError("Tracked sources differ from the authenticated HEAD.")
     selected = [name for name in tracked_paths() if allowed(name)]
     if not ESSENTIAL.issubset(selected):
         raise BuildError("The authenticated runtime entrypoints are missing.")

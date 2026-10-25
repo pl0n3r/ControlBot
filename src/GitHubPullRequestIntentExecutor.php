@@ -12,14 +12,17 @@ final class GitHubPullRequestIntentExecutor
     private const SHA = '/^[a-f0-9]{40}$/D';
     private const REQUIRED = ['Validar', 'SonarCloud Code Analysis', 'CodeQL', 'Factory policy'];
     public static function simulate(
-        array $rawEnvelope, array $fixture, array $fakeState,
-        array $audit = [], array $ledger = []
+        array $rawEnvelope,
+        array $fixture,
+        array $fakeState,
+        array $audit = [],
+        array $ledger = []
     ): array {
         $original = ['fake_state' => $fakeState, 'audit' => $audit, 'ledger' => $ledger];
         try {
             if (!self::fields($fixture, [
-                'requirements', 'approval', 'trusted', 'seen', 'revoked',
-                'now', 'key', 'pr', 'release', 'outcome'
+                'pr', 'release', 'outcome', 'now', 'key',
+                'requirements', 'approval', 'trusted', 'seen', 'revoked'
             ]) || !self::fields($fakeState, ['reviews', 'merges', 'approvals'])
                 || !self::rows($fakeState['reviews'], 100)
                 || !self::rows($fakeState['merges'], 100)
@@ -113,14 +116,12 @@ final class GitHubPullRequestIntentExecutor
                     return self::result('denied', 'idempotency_conflict', $original);
                 }
                 $replay = self::result('simulated', 'idempotent_replay', $original);
-                $replay['replayed'] = true;
-                return $replay;
+                return array_replace($replay, ['replayed' => true]);
             }
-            if ($fixture['outcome'] !== 'success') {
-                return self::result(
-                    $fixture['outcome'] === 'ambiguous' ? 'ambiguous' : 'failed',
-                    'fake_transport_' . $fixture['outcome'], $original
-                );
+            $outcome = $fixture['outcome'];
+            if ($outcome !== 'success') {
+                $status = $outcome === 'failure' ? 'failed' : 'ambiguous';
+                return self::result($status, 'fake_transport_' . $outcome, $original);
             }
             $next = $fakeState;
             if ($type === 'pr.review') {
@@ -148,9 +149,8 @@ final class GitHubPullRequestIntentExecutor
                 'scope' => $expected['scope'], 'runtime_authorized' => false
             ];
             $ledger[$key] = ['fingerprint' => $fingerprint, 'status' => 'simulated'];
-            return self::result('simulated', 'offline_fake_only', [
-                'fake_state' => $next, 'audit' => $audit, 'ledger' => $ledger
-            ]);
+            $snapshot = ['fake_state' => $next, 'audit' => $audit, 'ledger' => $ledger];
+            return self::result('simulated', 'offline_fake_only', $snapshot);
         } catch (\Throwable) {
             return self::result('denied', 'invalid_fixture', $original);
         }

@@ -131,6 +131,32 @@ final class BackupReceipt
         return $this->record['receipt_id'];
     }
 
+    /**
+     * Comparación pura en memoria, sin leer backups o divulgar payload/digest.
+     * MATCH no acredita autenticidad externa del recibo ni restaurabilidad.
+     *
+     * @return array{status:string,reason:string}
+     */
+    public function verifyPayloadChecksumBefore(string $payload, array $scope, int $checkedAt): array
+    {
+        if (!$this->matches($scope)) {
+            return ['status' => 'UNKNOWN', 'reason' => 'scope_mismatch'];
+        }
+        if (!$this->isUsableBefore($checkedAt)) {
+            return ['status' => 'UNKNOWN', 'reason' => 'receipt_unusable'];
+        }
+        if ($checkedAt - self::timestamp($this->record['verified_at']) > 86400) {
+            return ['status' => 'UNKNOWN', 'reason' => 'receipt_stale'];
+        }
+        if (preg_match('/^[a-f0-9]{64}$/iD', $this->record['integrity']['digest']) !== 1) {
+            return ['status' => 'UNKNOWN', 'reason' => 'digest_invalid'];
+        }
+        if (!hash_equals(strtolower($this->record['integrity']['digest']), hash('sha256', $payload))) {
+            return ['status' => 'MISMATCH', 'reason' => 'checksum_mismatch'];
+        }
+        return ['status' => 'MATCH', 'reason' => 'checksum_match'];
+    }
+
     public function safeEvidence(): array
     {
         return [
@@ -175,9 +201,7 @@ final class BackupReceipt
             || array_keys($value) !== ['algorithm', 'digest']
             || ($value['algorithm'] ?? null) !== 'sha256'
             || !is_string($value['digest'] ?? null)
-            || strlen($value['digest']) < 16
-            || strlen($value['digest']) > 160
-            || preg_match('/^[A-Za-z0-9._:-]+$/D', $value['digest']) !== 1
+            || preg_match('/^[a-f0-9]{64}$/iD', $value['digest']) !== 1
             || self::containsSensitive($value['digest'])) {
             throw new InvalidArgumentException('integrity inválida.');
         }

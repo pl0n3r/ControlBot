@@ -30,7 +30,7 @@ function receipt(string $project='controlbot'): BackupReceipt {
         'issue'=>'pl0n3r/ControlBot#271','created_at'=>'2026-09-29T13:00:00Z',
         'verified_at'=>'2026-09-29T13:01:00Z','status'=>'ready',
         'artifact_ref'=>'artifact:restore-drill-271',
-        'integrity'=>['algorithm'=>'sha256','digest'=>'abcdef0123456789'],
+        'integrity'=>['algorithm'=>'sha256','digest'=>hash('sha256', 'synthetic-recovery-drill')],
         'restore_capability'=>'validated','expires_at'=>'2026-09-30T13:01:00Z',
     ]);
 }

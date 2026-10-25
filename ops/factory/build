@@ -50,10 +50,10 @@ def tracked_paths() -> list[str]:
     """Enumerate committed HEAD tree entries, not a mutable Git index."""
     raw = git_output("ls-tree", "-r", "-z", "--full-tree", "HEAD")
     selected: list[str] = []
-    for record in raw.split(b"\\0"):
+    for record in raw.split(b"\0"):
         if not record:
             continue
-        header, separator, encoded_path = record.partition(b"\\t")
+        header, separator, encoded_path = record.partition(b"\t")
         if not separator:
             raise BuildError("Invalid committed tree entry.")
         try:
@@ -65,7 +65,7 @@ def tracked_paths() -> list[str]:
             continue
         relative = Path(name)
         if (relative.is_absolute() or ".." in relative.parts or "." in relative.parts
-                or "\\\\" in name or "\\n" in name or "\\r" in name):
+                or "\\" in name or "\n" in name or "\r" in name):
             raise BuildError("Invalid committed runtime path.")
         if mode not in {"100644", "100755"} or kind != "blob" or not SHA_PATTERN.fullmatch(object_id):
             raise BuildError("Symlink or irregular object in committed runtime.")
@@ -89,7 +89,7 @@ def source_data(name: str) -> bytes:
     """Read the commit blob, never bytes from an index-hidden/CRLF worktree."""
     relative = Path(name)
     if (relative.is_absolute() or ".." in relative.parts or "." in relative.parts
-            or "\\\\" in name or "\\n" in name or "\\r" in name or "\\0" in name):
+            or "\\" in name or "\n" in name or "\r" in name or "\0" in name):
         raise BuildError("Invalid source path.")
     object_name = f"HEAD:{name}"
     try:

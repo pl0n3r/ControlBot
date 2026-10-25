@@ -70,15 +70,15 @@ class HostingerSshDeployBindingTests(unittest.TestCase):
         restored = self.source
         for line in added:
             with self.subTest(line=line):
-                self.assertEqual(restored.count(line + "\\n"), 1)
-                restored = restored.replace(line + "\\n", "", 1)
+                self.assertEqual(restored.count(line + "\n"), 1)
+                restored = restored.replace(line + "\n", "", 1)
         self.assertNotIn("vars.DEPLOY_TRANSPORT", restored)
         self.assertNotIn("HOSTINGER_KNOWN_HOSTS:", restored)
         self.assertIn("needs: [readiness, deploy]", restored)
         self.assertIn("if: vars.DEPLOY_ENABLED == 'true'", restored)
         self.assertIn("php scripts/deploy-smoke.php", restored)
         # This cannot prove Hostinger backup, remote artifact rollback, or HEALTHY.
-        self.assertTrue(restored.startswith("name: Deploy\\n"))
+        self.assertTrue(restored.startswith("name: Deploy\n"))
 
     def test_preflight_preserves_missing_adapter_and_live_authority_gates(self):
         docs = RUNBOOK.read_text(encoding="utf-8")

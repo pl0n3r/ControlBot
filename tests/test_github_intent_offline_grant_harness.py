@@ -87,7 +87,7 @@ def execute(case):
     # temporary PHP script lets CI's coverage bootstrap instrument src/*.php.
     with tempfile.TemporaryDirectory(prefix="cb-hmac-fixture-") as scratch:
         script = Path(scratch) / "fixture.php"
-        script.write_text("<?php\\n" + PHP, encoding="utf-8")
+        script.write_text("<?php\n" + PHP, encoding="utf-8")
         result = subprocess.run(
             ["php", str(script), payload], cwd=ROOT, text=True,
             capture_output=True, timeout=30, check=False,

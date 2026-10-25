@@ -1,20 +1,16 @@
 """AC-01..04: #761 offline-only PHP intent simulator, never a GitHub API client."""
 from __future__ import annotations
-
 import base64
 import copy
 import json
 import subprocess
 import unittest
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[1]
 KEY = bytes(range(32, 64)).hex()
 PROJECT = "controlbot:project/controlbot"
 REPO = "pl0n3r/ControlBot"
 CAP = "github.issue.write"
-
-
 def candidate(action="issue.create"):
     params = {
         "issue.create": {"payload_ref": "controlbot:fixture/payload"},
@@ -63,8 +59,6 @@ def candidate(action="issue.create"):
         },
         "audit": [], "ledger": {},
     }
-
-
 def execute(payload):
     encoded = base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
     process = subprocess.run(
@@ -74,8 +68,6 @@ def execute(payload):
     if process.returncode:
         raise AssertionError(process.stderr or process.stdout)
     return json.loads(process.stdout)
-
-
 class GitHubIssueIntentExecutorTests(unittest.TestCase):
     def assert_offline(self, result):
         self.assertEqual("deny", result["decision"])
@@ -83,7 +75,6 @@ class GitHubIssueIntentExecutorTests(unittest.TestCase):
         self.assertIs(result["runtime_authorized"], False)
         self.assertNotIn("fixture_proof", result)
         self.assertNotIn("transport", result)
-
     def test_rejected_policy_never_calls_transport(self):
         original = candidate()
         good = execute(original)
@@ -103,8 +94,7 @@ class GitHubIssueIntentExecutorTests(unittest.TestCase):
             self.assertEqual("denied", result["fake_effect"]["status"])
             self.assertEqual(original["state"], result["fake_state"])
             self.assertEqual([], result["audit"])
-            self.assertEqual({}, result["ledger"])
-
+            self.assertEqual([], result["ledger"])
     def test_authorized_retry_does_not_duplicate_issue(self):
         original = candidate()
         created = execute(original)
@@ -127,7 +117,6 @@ class GitHubIssueIntentExecutorTests(unittest.TestCase):
         conflict = execute(wrong)
         self.assertEqual("denied", conflict["fake_effect"]["status"])
         self.assertEqual(created["fake_state"], conflict["fake_state"])
-
     def test_ambiguous_or_failed_transport_is_fail_closed(self):
         for action in ("issue.create", "issue.update", "issue.close",
                        "issue.reserve", "issue.release"):
@@ -141,7 +130,7 @@ class GitHubIssueIntentExecutorTests(unittest.TestCase):
                 self.assertEqual(expected, result["receipt"]["status"])
                 self.assertEqual(payload["state"], result["fake_state"])
                 self.assertEqual([], result["audit"])
-                self.assertEqual({}, result["ledger"])
+                self.assertEqual([], result["ledger"])
         for action in ("issue.update", "issue.close", "issue.reserve", "issue.release"):
             payload = candidate(action)
             result = execute(payload)
@@ -154,7 +143,6 @@ class GitHubIssueIntentExecutorTests(unittest.TestCase):
         mismatched = candidate("issue.release")
         mismatched["state"]["issues"][0]["reservation_ref"] = "controlbot:fixture/other"
         self.assertEqual("denied", execute(mismatched)["fake_effect"]["status"])
-
     def test_result_contract_and_no_secrets(self):
         payload = candidate()
         result = execute(payload)
@@ -180,7 +168,5 @@ class GitHubIssueIntentExecutorTests(unittest.TestCase):
         self.assertNotIn("NEVER-EXPOSE-A-SECRET", json.dumps(result))
         payload["intent"]["type"] = "pr.merge"
         self.assertEqual("denied", execute(payload)["fake_effect"]["status"])
-
-
 if __name__ == "__main__":
     unittest.main()

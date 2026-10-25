@@ -1,11 +1,9 @@
 <?php
 declare(strict_types=1);
 namespace ControlBot\GitHub;
-
 require_once __DIR__ . '/GitHubIntentEnvelope.php';
 require_once __DIR__ . '/GitHubIntentAuthorityRequirements.php';
 require_once __DIR__ . '/GitHubIntentTestGrantAuthority.php';
-
 /**
  * In-memory ISSUE simulator. A valid offline HMAC test grant is always DENY in
  * real runtime. There is NO GitHub transport or production capability here.
@@ -13,7 +11,6 @@ require_once __DIR__ . '/GitHubIntentTestGrantAuthority.php';
 final class GitHubIssueIntentExecutor
 {
     private const TYPES = ['issue.create', 'issue.update', 'issue.close', 'issue.reserve', 'issue.release'];
-
     public static function simulate(
         array $rawEnvelope, array $fixture, array $fakeState,
         array $audit = [], array $ledger = []
@@ -23,18 +20,7 @@ final class GitHubIssueIntentExecutor
             if (!self::fields($fixture, [
                 'requirements', 'approval', 'trusted', 'seen', 'revoked',
                 'now', 'key', 'issue_number', 'outcome'
-            ]) || !self::fields($fakeState, ['issues', 'events'])
-                || !self::rows($fakeState['issues'], 100)
-                || !self::rows($fakeState['events'], 100)
-                || !self::rows($audit, 100)
-                || !is_array($ledger) || count($ledger) > 100
-                || !is_int($fixture['now']) || $fixture['now'] < 1
-                || !is_string($fixture['key']) || strlen($fixture['key']) !== 32
-                || !is_int($fixture['issue_number']) || $fixture['issue_number'] < 1
-                || !is_array($fixture['requirements']) || !is_array($fixture['approval'])
-                || !is_array($fixture['trusted']) || !is_array($fixture['seen'])
-                || !is_array($fixture['revoked'])
-                || !self::issues($fakeState['issues'])) {
+            ]) || !self::fields($fakeState, ['issues', 'events']) || !self::rows($fakeState['issues'], 100) || !self::rows($fakeState['events'], 100) || !self::rows($audit, 100) || !is_array($ledger) || count($ledger) > 100 || !is_int($fixture['now']) || $fixture['now'] < 1 || !is_string($fixture['key']) || strlen($fixture['key']) !== 32 || !is_int($fixture['issue_number']) || $fixture['issue_number'] < 1 || !is_array($fixture['requirements']) || !is_array($fixture['approval']) || !is_array($fixture['trusted']) || !is_array($fixture['seen']) || !is_array($fixture['revoked']) || !self::issues($fakeState['issues'])) {
                 return self::out('denied', 'invalid_fixture', $before);
             }
             $intent = GitHubIntentEnvelope::envelope($rawEnvelope);
@@ -45,27 +31,18 @@ final class GitHubIssueIntentExecutor
             $requirements = GitHubIntentAuthorityRequirements::describe(
                 $rawEnvelope, $intent['project_ref'], $intent['repository_ref']
             );
-            if (($requirements['state'] ?? null) !== 'requirements'
-                || $requirements !== $fixture['requirements']) {
+            if (($requirements['state'] ?? null) !== 'requirements' || $requirements !== $fixture['requirements']) {
                 return self::out('denied', 'requirements_mismatch', $before, $intent);
             }
             $trusted = $fixture['trusted'];
-            if (($trusted['mode'] ?? null) !== 'offline_test_only'
-                || ($trusted['origin'] ?? null) !== 'server'
-                || ($trusted['project_ref'] ?? null) !== $intent['project_ref']
-                || ($trusted['repository_ref'] ?? null) !== $intent['repository_ref']) {
+            if (($trusted['mode'] ?? null) !== 'offline_test_only' || ($trusted['origin'] ?? null) !== 'server' || ($trusted['project_ref'] ?? null) !== $intent['project_ref'] || ($trusted['repository_ref'] ?? null) !== $intent['repository_ref']) {
                 return self::out('denied', 'untrusted_context', $before, $intent);
             }
             $gate = GitHubIntentTestGrantAuthority::evaluate(
                 $requirements, $fixture['approval'], $trusted, $fixture['seen'],
                 $fixture['revoked'], $fixture['now'], $fixture['key']
             );
-            if (($gate['test_grant_valid'] ?? null) !== true
-                || ($gate['reason'] ?? null) !== 'verified_test_only'
-                || ($gate['decision'] ?? null) !== 'deny'
-                || ($gate['execution'] ?? null) !== false
-                || ($gate['runtime_authorized'] ?? null) !== false
-                || ($gate['authorized'] ?? null) !== false) {
+            if (($gate['test_grant_valid'] ?? null) !== true || ($gate['reason'] ?? null) !== 'verified_test_only' || ($gate['decision'] ?? null) !== 'deny' || ($gate['execution'] ?? null) !== false || ($gate['runtime_authorized'] ?? null) !== false || ($gate['authorized'] ?? null) !== false) {
                 return self::out('denied', 'test_grant_invalid', $before, $intent);
             }
             if (!in_array($fixture['outcome'], ['success', 'failure', 'ambiguous'], true)) {
@@ -82,10 +59,7 @@ final class GitHubIssueIntentExecutor
             ], JSON_THROW_ON_ERROR));
             if (array_key_exists($key, $ledger)) {
                 $record = $ledger[$key];
-                if (!self::fieldsOrFalse($record, ['digest', 'receipt'])
-                    || $record['digest'] !== $digest
-                    || !is_array($record['receipt'])
-                    || ($record['receipt']['status'] ?? null) !== 'executed') {
+                if (!self::fieldsOrFalse($record, ['digest', 'receipt']) || $record['digest'] !== $digest || !is_array($record['receipt']) || ($record['receipt']['status'] ?? null) !== 'executed') {
                     return self::out('denied', 'idempotency_conflict', $before, $intent);
                 }
                 $response = self::out('simulated', 'idempotent_replay', $before, $intent);
@@ -146,7 +120,6 @@ final class GitHubIssueIntentExecutor
             return self::out('denied', 'invalid_fixture', $before);
         }
     }
-
     private static function fields(array $value, array $names): bool
     {
         if (array_is_list($value)) return false;
@@ -155,36 +128,25 @@ final class GitHubIssueIntentExecutor
         sort($names);
         return $keys === $names;
     }
-
     private static function fieldsOrFalse(mixed $value, array $names): bool
     {
         return is_array($value) && self::fields($value, $names);
     }
-
     private static function rows(mixed $rows, int $limit): bool
     {
         return is_array($rows) && array_is_list($rows) && count($rows) <= $limit;
     }
-
     private static function issues(array $issues): bool
     {
         $numbers = [];
         foreach ($issues as $issue) {
-            if (!self::fieldsOrFalse($issue, ['number', 'state', 'reservation_ref'])
-                || !is_int($issue['number']) || $issue['number'] < 1
-                || isset($numbers[$issue['number']])
-                || !in_array($issue['state'], ['open', 'closed'], true)
-                || ($issue['reservation_ref'] !== null
-                    && (!is_string($issue['reservation_ref'])
-                        || preg_match('#^controlbot:fixture/[a-z0-9._/-]{1,100}$#D', $issue['reservation_ref']) !== 1))
-                || ($issue['state'] === 'closed' && $issue['reservation_ref'] !== null)) {
+            if (!self::fieldsOrFalse($issue, ['number', 'state', 'reservation_ref']) || !is_int($issue['number']) || $issue['number'] < 1 || isset($numbers[$issue['number']]) || !in_array($issue['state'], ['open', 'closed'], true) || ($issue['reservation_ref'] !== null && (!is_string($issue['reservation_ref']) || preg_match('#^controlbot:fixture/[a-z0-9._/-]{1,100}$#D', $issue['reservation_ref']) !== 1)) || ($issue['state'] === 'closed' && $issue['reservation_ref'] !== null)) {
                 return false;
             }
             $numbers[$issue['number']] = true;
         }
         return true;
     }
-
     private static function receipt(array $intent, string $status, int $now, string $digest): array
     {
         return [
@@ -200,7 +162,6 @@ final class GitHubIssueIntentExecutor
             'finished_at' => $now
         ];
     }
-
     private static function out(
         string $status, string $reason, array $snapshot, ?array $intent = null,
         ?int $now = null, ?string $digest = null

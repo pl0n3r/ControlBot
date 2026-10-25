@@ -67,7 +67,7 @@ final class BackupGate
             return self::deny('backup_type_mismatch', true);
         }
 
-        if (!$backup->isUsableBefore($writeAt)) {
+        if (!$backup->isUsableForProtectedWrite($writeAt)) {
             return self::deny('backup_not_usable_for_write', true);
         }
 

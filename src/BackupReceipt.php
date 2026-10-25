@@ -23,6 +23,7 @@ final class BackupReceipt
     ];
 
     private const RESTORE = ['manual', 'validated', 'unknown'];
+    private const MAX_PROTECTED_WRITE_RECEIPT_AGE_SECONDS = 86400;
 
     private function __construct(private readonly array $record)
     {
@@ -119,6 +120,20 @@ final class BackupReceipt
             return false;
         }
         return true;
+    }
+
+    /**
+     * Rechaza recibos sin expiración o demasiado antiguos para una escritura
+     * protegida. La validez estructural NO acredita un backup real ni el proveedor.
+     */
+    public function isUsableForProtectedWrite(int $writeAt): bool
+    {
+        if (!$this->isUsableBefore($writeAt) || $this->record['expires_at'] === null) {
+            return false;
+        }
+
+        return $writeAt - self::timestamp($this->record['verified_at'])
+            <= self::MAX_PROTECTED_WRITE_RECEIPT_AGE_SECONDS;
     }
 
     public function type(): string

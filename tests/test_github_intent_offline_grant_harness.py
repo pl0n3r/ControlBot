@@ -5,6 +5,7 @@ import base64
 import copy
 import json
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -82,10 +83,15 @@ def candidate(action="workflow.dispatch"):
 
 def execute(case):
     payload = base64.b64encode(json.dumps(case).encode()).decode("ascii")
-    result = subprocess.run(
-        ["php", "-r", PHP, payload], cwd=ROOT, text=True,
-        capture_output=True, timeout=30, check=False,
-    )
+    # PHP CLI -r bypasses auto_prepend_file and therefore Xdebug. A real
+    # temporary PHP script lets CI's coverage bootstrap instrument src/*.php.
+    with tempfile.TemporaryDirectory(prefix="cb-hmac-fixture-") as scratch:
+        script = Path(scratch) / "fixture.php"
+        script.write_text("<?php\\n" + PHP, encoding="utf-8")
+        result = subprocess.run(
+            ["php", str(script), payload], cwd=ROOT, text=True,
+            capture_output=True, timeout=30, check=False,
+        )
     if result.returncode:
         raise AssertionError(result.stderr or result.stdout)
     return json.loads(result.stdout)

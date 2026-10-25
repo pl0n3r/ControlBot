@@ -103,7 +103,7 @@ class FactoryDeployBuildAdapterTests(unittest.TestCase):
     def test_archive_uses_authenticated_commit_blobs_even_if_index_hides_change(self):
         source = self.checkout / "src/Example.php"
         committed_bytes = source.read_bytes()
-        source.write_bytes(b"<?php // altered but hidden by index\\n")
+        source.write_bytes(b"<?php // altered but hidden by index\n")
         self.git("update-index", "--assume-unchanged", "src/Example.php")
         try:
             # Malicious caller Git environment must not change repository identity.

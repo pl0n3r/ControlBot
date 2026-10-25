@@ -11,7 +11,7 @@ function recoveryProfile(array $o=[]):array{return array_replace_recursive([
 function producerReceipt(string $p='controlbot'):BackupReceipt{return BackupReceipt::fromRecord([
 'version'=>1,'receipt_id'=>'11111111-1111-4111-8111-111111111111','project'=>$p,'environment'=>'production','resource'=>'database-main','backup_type'=>'database_dump',
 'run_id'=>'22222222-2222-4222-8222-222222222222','issue'=>'pl0n3r/ControlBot#257','created_at'=>'2026-09-29T13:00:00Z','verified_at'=>'2026-09-29T13:01:00Z',
-'status'=>'ready','artifact_ref'=>'artifact:recovery-evidence-257','integrity'=>['algorithm'=>'sha256','digest'=>'abcdef0123456789'],'restore_capability'=>'validated','expires_at'=>'2026-09-30T13:01:00Z']);}
+'status'=>'ready','artifact_ref'=>'artifact:recovery-evidence-257','integrity'=>['algorithm'=>'sha256','digest'=>hash('sha256', 'synthetic-recovery-evidence')],'restore_capability'=>'validated','expires_at'=>'2026-09-30T13:01:00Z']);}
 function st(string $s='verified',?string $r='controlbot:evidence/recovery-check',?int $at=2100,string $f='fresh'):array{return ['state'=>$s,'evidence_ref'=>$r,'observed_at'=>$at,'freshness'=>$f];}
 function ev():array{return ['version'=>1,'project_ref'=>'controlbot:project/project-controlbot','profile_ref'=>'controlbot:recovery-profile/project-controlbot-v1',
 'controls'=>['checksum'=>st(r:'controlbot:evidence/checksum'),'encryption'=>st(r:'controlbot:evidence/encryption'),'offsite'=>st(r:'controlbot:evidence/offsite'),'immutability'=>st(r:'controlbot:evidence/immutability')],

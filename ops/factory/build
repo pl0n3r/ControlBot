@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Create a deterministic, local-only PHP runtime candidate from tracked files.
+
+This is the *build* stage, not a deploy, restore point or proof of runtime health.
+Only a narrowly allowlisted subset of tracked source files is packaged.
+"""
+from __future__ import annotations
+
+import gzip
+from hashlib import sha256
+import io
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+import tarfile
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[2]
+ARTIFACT = ROOT / "var" / "factory" / "build.tar.gz"
+ESSENTIAL = {
+    ".htaccess", "index.php", "config/version.json",
+    "public/index.php", "public/health.php",
+    "src/HealthIdentityHttpEndpoint.php",
+}
+SHA_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
+VERSION_PATTERN = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
+MAX_FILE_BYTES = 4 * 1024 * 1024
+
+
+class BuildError(Exception):
+    pass
+
+
+def tracked_paths() -> list[str]:
+    result = subprocess.run(
+        ["git", "ls-files", "--cached", "-z"],
+        cwd=ROOT, check=False, capture_output=True, timeout=15,
+    )
+    if result.returncode != 0:
+        raise BuildError("Git index is unavailable.")
+    try:
+        paths = [p.decode("utf-8", "strict") for p in result.stdout.split(b"\0") if p]
+    except UnicodeDecodeError as exc:
+        raise BuildError("Non-UTF8 repository path.") from exc
+    if len(paths) != len(set(paths)):
+        raise BuildError("Duplicate tracked path.")
+    return sorted(paths)
+
+
+def allowed(path: str) -> bool:
+    return (
+        path in {".htaccess", "index.php", "config/version.json"}
+        or (path.startswith("src/") and path.endswith(".php"))
+        or (path.startswith("public/") and Path(path).suffix in {
+            ".php", ".css", ".js", ".svg", ".png", ".webp", ".ico",
+        })
+    )
+
+
+def source_data(name: str) -> bytes:
+    relative = Path(name)
+    if (relative.is_absolute() or ".." in relative.parts or "." in relative.parts
+            or "\\" in name or "\n" in name or "\r" in name or "\0" in name):
+        raise BuildError("Invalid source path.")
+    candidate = ROOT / relative
+    current = candidate
+    while current != ROOT:
+        if current.is_symlink():
+            raise BuildError("Symlink in packaged source.")
+        current = current.parent
+    if not candidate.is_file() or not stat.S_ISREG(candidate.stat().st_mode):
+        raise BuildError("Missing or irregular tracked source.")
+    if candidate.stat().st_size > MAX_FILE_BYTES:
+        raise BuildError("Runtime source exceeds size limit.")
+    data = candidate.read_bytes()
+    if len(data) > MAX_FILE_BYTES:
+        raise BuildError("Runtime source exceeds size limit.")
+    return data
+
+
+def canonical_tar_file(name: str, data: bytes) -> tuple[tarfile.TarInfo, io.BytesIO]:
+    info = tarfile.TarInfo(name)
+    info.size = len(data)
+    info.mode = 0o644
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    return info, io.BytesIO(data)
+
+
+def build() -> None:
+    if os.getenv("PHASE") != "construccion":
+        raise BuildError("Only non-live construction artifacts are permitted.")
+    expected_sha = os.getenv("GITHUB_SHA", "")
+    if not SHA_PATTERN.fullmatch(expected_sha):
+        raise BuildError("Missing or invalid exact commit SHA.")
+    head = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD"], cwd=ROOT,
+        check=False, capture_output=True, text=True, timeout=15,
+    )
+    if head.returncode != 0 or head.stdout.strip() != expected_sha:
+        raise BuildError("Checkout does not match the exact expected SHA.")
+    tracked_state = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=no"], cwd=ROOT,
+        check=False, capture_output=True, timeout=15,
+    )
+    if tracked_state.returncode != 0 or tracked_state.stdout:
+        raise BuildError("Tracked sources differ from the authenticated HEAD.")
+    selected = [name for name in tracked_paths() if allowed(name)]
+    if not ESSENTIAL.issubset(selected):
+        raise BuildError("The authenticated runtime entrypoints are missing.")
+    sources = [(name, source_data(name)) for name in selected]
+    version_bytes = dict(sources)["config/version.json"]
+    try:
+        version_document = json.loads(version_bytes)
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise BuildError("Invalid version document.") from exc
+    if (not isinstance(version_document, dict)
+            or set(version_document) != {"version"}
+            or not isinstance(version_document["version"], str)
+            or not VERSION_PATTERN.fullmatch(version_document["version"])):
+        raise BuildError("Invalid version identity.")
+
+    manifest = {
+        "version": 1,
+        "phase": "construccion",
+        "source_sha": expected_sha,
+        "release_version": version_document["version"],
+        "files": [
+            {"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data)}
+            for name, data in sources
+        ],
+    }
+    manifest_bytes = (
+        json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        + "\n"
+    ).encode("utf-8")
+    tar_buffer = io.BytesIO()
+    with tarfile.open(fileobj=tar_buffer, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+        for name, data in sources:
+            header, stream = canonical_tar_file(name, data)
+            archive.addfile(header, stream)
+        header, stream = canonical_tar_file("factory-build-manifest.json", manifest_bytes)
+        archive.addfile(header, stream)
+
+    ARTIFACT.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix=".candidate-", suffix=".gz", dir=ARTIFACT.parent, delete=False) as fp:
+            tmp = Path(fp.name)
+            os.chmod(tmp, 0o600)
+            with gzip.GzipFile(fileobj=fp, mode="wb", filename="", mtime=0, compresslevel=9) as gz:
+                gz.write(tar_buffer.getvalue())
+        os.replace(tmp, ARTIFACT)
+    finally:
+        if tmp is not None and tmp.exists():
+            tmp.unlink()
+    print("Local construction build artifact created from committed runtime sources.")
+
+
+if __name__ == "__main__":
+    try:
+        build()
+    except (BuildError, OSError, subprocess.SubprocessError, tarfile.TarError) as exc:
+        print(f"::error::Offline build rejected: {exc}", file=sys.stderr)
+        raise SystemExit(1)

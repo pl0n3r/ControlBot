@@ -148,6 +148,9 @@ final class BackupReceipt
         if ($checkedAt - self::timestamp($this->record['verified_at']) > 86400) {
             return ['status' => 'UNKNOWN', 'reason' => 'receipt_stale'];
         }
+        if (preg_match('/^[a-f0-9]{64}$/iD', $this->record['integrity']['digest']) !== 1) {
+            return ['status' => 'UNKNOWN', 'reason' => 'digest_invalid'];
+        }
         if (!hash_equals(strtolower($this->record['integrity']['digest']), hash('sha256', $payload))) {
             return ['status' => 'MISMATCH', 'reason' => 'checksum_mismatch'];
         }
@@ -198,7 +201,9 @@ final class BackupReceipt
             || array_keys($value) !== ['algorithm', 'digest']
             || ($value['algorithm'] ?? null) !== 'sha256'
             || !is_string($value['digest'] ?? null)
-            || preg_match('/^[a-f0-9]{64}$/iD', $value['digest']) !== 1
+            || strlen($value['digest']) < 16
+            || strlen($value['digest']) > 160
+            || preg_match('/^[A-Za-z0-9._:-]+$/D', $value['digest']) !== 1
             || self::containsSensitive($value['digest'])) {
             throw new InvalidArgumentException('integrity inválida.');
         }

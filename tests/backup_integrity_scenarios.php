@@ -39,9 +39,9 @@ $out=match($mode) {
     'shape'=>[
         'valid'=>!rejected(fn()=>BackupReceipt::fromRecord(fixture())),
         'uppercase'=>!rejected(fn()=>BackupReceipt::fromRecord(fixture(['integrity'=>['digest'=>strtoupper(hash('sha256',PAYLOAD))]]))),
-        'short'=>rejected(fn()=>BackupReceipt::fromRecord(fixture(['integrity'=>['digest'=>str_repeat('a',16)]]))),
-        'non_hex'=>rejected(fn()=>BackupReceipt::fromRecord(fixture(['integrity'=>['digest'=>str_repeat('g',64)]]))),
-        'long'=>rejected(fn()=>BackupReceipt::fromRecord(fixture(['integrity'=>['digest'=>str_repeat('b',65)]]))),
+        'short'=>verify(['integrity'=>['digest'=>str_repeat('a',16)]]),
+        'non_hex'=>verify(['integrity'=>['digest'=>str_repeat('g',64)]]),
+        'long'=>verify(['integrity'=>['digest'=>str_repeat('b',65)]]),
     ],
     'content'=>[
         'match'=>verify(),'mismatch'=>verify([],PAYLOAD.'-changed'),

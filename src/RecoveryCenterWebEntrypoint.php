@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace ControlBot\Web;
 
 use ControlBot\Security\RecoveryCenterUi;
+use ControlBot\Security\RecoveryPortfolio;
 use ControlBot\Ui\ControlCenterShell;
 use Throwable;
 
@@ -13,6 +14,7 @@ require_once __DIR__ . '/BackupReceipt.php';
 require_once __DIR__ . '/RecoveryEvidence.php';
 require_once __DIR__ . '/RecoveryDrillProjection.php';
 require_once __DIR__ . '/RecoveryCenterUi.php';
+require_once __DIR__ . '/RecoveryPortfolio.php';
 require_once __DIR__ . '/ControlCenterShell.php';
 
 /** Called only after ControlBotWebEntrypoint::handleAuthenticated verified owner + TOTP. */
@@ -44,14 +46,49 @@ final class RecoveryCenterWebEntrypoint
             }
             // No evidence, receipt or Factory Recovery Health may be inferred.
             $projection = RecoveryCenterUi::project($profile, null, null, null, null);
-            $html = self::render($projection);
+            $portfolio = RecoveryPortfolio::project(self::localProfiles());
+            $html = self::render($projection, $portfolio);
             return self::response(200, $html, [], 'text/html; charset=utf-8');
         } catch (Throwable) {
             return self::response(503, "Service unavailable.\n");
         }
     }
 
-    private static function render(array $projection): string
+    /** Read only versioned local policies. Never fetch live health, receipts or provider metadata. */
+    private static function localProfiles(): array
+    {
+        $directory = dirname(__DIR__) . '/config/recovery';
+        $profiles = [];
+        foreach (['autofactory', 'brvtal', 'condor', 'controlbot', 'factory', 'factoryrunner', 'grindflow'] as $name) {
+            $path = $directory . '/' . $name . '.json';
+            if (is_link($path)) {
+                throw new \RuntimeException('Recovery profile symlink not allowed');
+            }
+            if (!file_exists($path)) {
+                $profiles[$name] = null;
+                continue;
+            }
+            if (!is_file($path)) {
+                throw new \RuntimeException('Recovery profile invalid');
+            }
+            $size = filesize($path);
+            if (!is_int($size) || $size < 2 || $size > 32768) {
+                throw new \RuntimeException('Recovery profile size invalid');
+            }
+            $raw = file_get_contents($path);
+            if (!is_string($raw) || strlen($raw) !== $size) {
+                throw new \RuntimeException('Recovery profile read failed');
+            }
+            $profile = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
+            if (!is_array($profile) || array_is_list($profile)) {
+                throw new \RuntimeException('Recovery profile shape invalid');
+            }
+            $profiles[$name] = $profile;
+        }
+        return $profiles;
+    }
+
+    private static function render(array $projection, array $portfolio): string
     {
         if (($projection['execution'] ?? null) !== false
             || ($projection['actions'] ?? null) !== []
@@ -75,7 +112,27 @@ final class RecoveryCenterWebEntrypoint
             $content .= '<p>' . self::e($label) . ': ' . self::e((string) $state) . '</p>';
         }
         $content .= '<p>Fuente de salud: ' . self::e((string) $projection['health']['source'])
-            . '. Los valores anteriores son objetivos o desconocidos; nunca mediciones reales.</p></main>';
+            . '. Los valores anteriores son objetivos o desconocidos; nunca mediciones reales.</p>';
+        if (($portfolio['execution'] ?? null) !== false || ($portfolio['actions'] ?? null) !== []) {
+            throw new \RuntimeException('Recovery portfolio must be read-only');
+        }
+        $content .= '<section aria-labelledby="recovery-portfolio-title">'
+            . '<h2 id="recovery-portfolio-title">Estado por proyecto</h2>'
+            . '<p>Políticas declarativas locales. Sin Factory Health ni backup receipts, cada estado DR es UNKNOWN.</p>'
+            . '<table><thead><tr><th scope="col">Proyecto</th><th scope="col">Perfil</th>'
+            . '<th scope="col">Estado DR</th><th scope="col">Motivo</th>'
+            . '<th scope="col">RPO objetivo</th><th scope="col">RTO objetivo</th></tr></thead><tbody>';
+        foreach ($portfolio['projects'] as $item) {
+            $rpo = $item['rpo_target_minutes'] === null ? 'No declarado' : $item['rpo_target_minutes'] . ' min';
+            $rto = $item['rto_target_minutes'] === null ? 'No declarado' : $item['rto_target_minutes'] . ' min';
+            $content .= '<tr><td>' . self::e($item['project']) . '</td>'
+                . '<td>' . self::e($item['profile_status']) . '</td>'
+                . '<td>' . self::e($item['dr_status']) . '</td>'
+                . '<td>' . self::e($item['reason']) . '</td>'
+                . '<td>' . self::e((string) $rpo) . '</td>'
+                . '<td>' . self::e((string) $rto) . '</td></tr>';
+        }
+        $content .= '</tbody></table></section></main>';
         return ControlCenterShell::render('Resilience', 'overview',
             ['overview' => '/overview', 'github' => '/github'], $content);
     }

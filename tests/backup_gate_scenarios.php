@@ -102,6 +102,45 @@ if ($name === 'missing') {
             strtotime('2027-01-15T07:02:00Z'),
         ),
     ];
+} elseif ($name === 'freshness') {
+    $earlyWrite = strtotime('2027-01-15T07:02:00Z');
+    $futureExpiry = receipt(['expires_at' => '2027-01-17T08:00:00Z']);
+    $out = [
+        'no_expiration' => BackupGate::evaluate(
+            'migration.registry.reconcile', scope(),
+            receipt(['expires_at' => null]), $earlyWrite,
+        ),
+        'stale_unexpired' => BackupGate::evaluate(
+            'migration.registry.reconcile', scope(),
+            $futureExpiry, strtotime('2027-01-16T07:01:01Z'),
+        ),
+        'at_24h' => BackupGate::evaluate(
+            'migration.registry.reconcile', scope(),
+            $futureExpiry, strtotime('2027-01-16T07:01:00Z'),
+        ),
+        'fresh' => BackupGate::evaluate(
+            'migration.registry.reconcile', scope(), receipt(), $earlyWrite,
+        ),
+        'read_unbounded' => BackupGate::evaluate(
+            'hostinger.read', scope(), receipt(['expires_at' => null]), $earlyWrite,
+        ),
+        'expired' => BackupGate::evaluate(
+            'migration.registry.reconcile', scope(),
+            receipt(['expires_at' => '2027-01-15T07:02:00Z']),
+            strtotime('2027-01-15T07:03:00Z'),
+        ),
+        'wrong_scope' => BackupGate::evaluate(
+            'migration.registry.reconcile', scope(),
+            receipt(['project' => 'condor']), $earlyWrite,
+        ),
+        'future_verification' => BackupGate::evaluate(
+            'migration.registry.reconcile', scope(),
+            receipt([
+                'created_at' => '2027-01-15T07:04:00Z',
+                'verified_at' => '2027-01-15T07:05:00Z',
+            ]), strtotime('2027-01-15T07:03:00Z'),
+        ),
+    ];
 } elseif ($name === 'readonly') {
     $out = [
         'read' => BackupGate::evaluate('hostinger.read', scope(), null, WRITE_AT),

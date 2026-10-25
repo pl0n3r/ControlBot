@@ -47,6 +47,34 @@ class BackupGateTests(unittest.TestCase):
         self.assertFalse(data["owner"]["allowed"])
         self.assertEqual(data["owner"]["reason"], "owner_approval_required")
 
+    def test_missing_expiration_is_denied_for_protected_write(self):
+        data = scenario("freshness")
+        self.assertFalse(data["no_expiration"]["allowed"])
+        self.assertTrue(data["no_expiration"]["backup_required"])
+        self.assertEqual(data["no_expiration"]["reason"], "backup_not_usable_for_write")
+        # Las operaciones de solo lectura no reciben autoridad nueva.
+        self.assertTrue(data["read_unbounded"]["allowed"])
+        self.assertFalse(data["read_unbounded"]["backup_required"])
+
+    def test_stale_receipt_is_denied_even_if_expiry_is_in_the_future(self):
+        data = scenario("freshness")
+        self.assertFalse(data["stale_unexpired"]["allowed"])
+        self.assertTrue(data["stale_unexpired"]["backup_required"])
+        self.assertEqual(data["stale_unexpired"]["reason"], "backup_not_usable_for_write")
+
+    def test_fresh_explicitly_expiring_receipt_preserves_safe_behavior(self):
+        data = scenario("freshness")
+        for key in ("fresh", "at_24h"):
+            self.assertTrue(data[key]["allowed"])
+            self.assertEqual(data[key]["reason"], "backup_verified")
+        for key, reason in (
+            ("expired", "backup_not_usable_for_write"),
+            ("wrong_scope", "backup_scope_mismatch"),
+            ("future_verification", "backup_not_usable_for_write"),
+        ):
+            self.assertFalse(data[key]["allowed"])
+            self.assertEqual(data[key]["reason"], reason)
+
     def test_evidence_never_contains_backup_payload(self):
         data = scenario("evidence")
         self.assertTrue(data["allowed"])

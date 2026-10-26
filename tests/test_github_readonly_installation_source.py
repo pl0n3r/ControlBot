@@ -1,9 +1,7 @@
 """PHP-backed regressions for the TEST-ONLY GitHub installation source (#924).
-
 All network requests are simulated by an injected PHP Closure, never an HTTP client.
 """
 from __future__ import annotations
-
 import base64
 import copy
 import hashlib
@@ -12,12 +10,10 @@ import json
 import subprocess
 import unittest
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "pl0n3r/ControlBot"
 SHA = "a" * 40
 SECRET = "controlbot-offline-only-fixture-key-12345678901234567890"
-
 PHP = r"""
 use ControlBot\GitHub\GitHubReadOnlyInstallationSource;
 require_once 'src/GitHubReadOnlyInstallationSource.php';
@@ -43,8 +39,6 @@ try {
     echo json_encode(['error' => 'fixture_invalid'], JSON_THROW_ON_ERROR);
 }
 """
-
-
 def fixture():
     data = {
         "origin": "server_fixture",
@@ -59,20 +53,14 @@ def fixture():
         "expires_at": 1150,
     }
     return seal(data)
-
-
 def seal(data):
     data = copy.deepcopy(data)
     data.pop("proof", None)
     encoded = json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode()
     data["proof"] = hmac.new(SECRET.encode(), encoded, hashlib.sha256).hexdigest()
     return data
-
-
 def request():
     return {"repository": REPOSITORY, "sha": SHA, "resource": "issues", "page_size": 2}
-
-
 def page(number=1, *, next_page=None, items=None):
     if items is None:
         items = [{"id": 1, "state": "open"}]
@@ -86,8 +74,6 @@ def page(number=1, *, next_page=None, items=None):
         "truncated": False,
         "next_page": next_page,
     }
-
-
 def execute(*, f=None, r=None, now=1050, responses=None, fake_mode="ok", key=SECRET):
     payload = {
         "fixture": fixture() if f is None else f,
@@ -105,15 +91,12 @@ def execute(*, f=None, r=None, now=1050, responses=None, fake_mode="ok", key=SEC
     if proc.returncode:
         raise AssertionError(proc.stderr.strip() or proc.stdout.strip())
     return json.loads(proc.stdout)
-
-
 class GitHubReadOnlyInstallationSourceTests(unittest.TestCase):
     def assert_offline(self, result):
         self.assertFalse(result["runtime_authorized"])
         self.assertFalse(result["production_verified"])
         self.assertFalse(result["execute_actions"])
         self.assertEqual(result["authority"], "unchanged")
-
     def test_exact_repository_and_sha_read_only_projection(self):
         responses = [
             page(1, next_page=2, items=[{"id": 2, "state": "open"}]),
@@ -134,7 +117,6 @@ class GitHubReadOnlyInstallationSourceTests(unittest.TestCase):
         self.assertEqual(out["audit"], [
             {"status": "CURRENT", "reason": "fixture_only", "pages": 2}
         ])
-
     def test_missing_owner_installation_or_scope_denies_network(self):
         variants = []
         for field, value in (
@@ -157,7 +139,6 @@ class GitHubReadOnlyInstallationSourceTests(unittest.TestCase):
                 self.assertEqual(out["result"]["status"], "UNKNOWN")
                 self.assertIsNone(out["result"]["fixture_projection"])
                 self.assertEqual(out["calls"], [])
-
         for invalid in (
             {**request(), "sha": "b" * 40},
             {**request(), "repository": "other/project"},
@@ -169,7 +150,6 @@ class GitHubReadOnlyInstallationSourceTests(unittest.TestCase):
                 out = execute(r=invalid)
                 self.assertEqual(out["result"]["status"], "UNKNOWN")
                 self.assertEqual(out["calls"], [])
-
     def test_403_429_timeout_partial_and_stale_fail_closed(self):
         for code in (403, 429):
             with self.subTest(status=code):
@@ -178,7 +158,6 @@ class GitHubReadOnlyInstallationSourceTests(unittest.TestCase):
                 self.assertEqual(result["result"]["status"], "UNKNOWN")
                 self.assertIsNone(result["result"]["fixture_projection"])
                 self.assertEqual(len(result["calls"]), 1)
-
         for modified in (
             {**page(), "truncated": True},
             {**page(), "complete": False, "next_page": None},
@@ -205,7 +184,6 @@ class GitHubReadOnlyInstallationSourceTests(unittest.TestCase):
         self.assertEqual(out["result"]["status"], "UNKNOWN")
         self.assertEqual(out["result"]["reason"], "page_limit")
         self.assertEqual(len(out["calls"]), 3)
-
     def test_no_writes_secrets_or_pii_in_audit(self):
         result = execute(responses=[{**page(), "items": [
             {"id": 1, "state": "open", "token": "private-sensitive"}
@@ -228,7 +206,5 @@ class GitHubReadOnlyInstallationSourceTests(unittest.TestCase):
         doc = (ROOT / "docs/github-readonly-installation-source.md").read_text()
         self.assertIn("runtime_authorized=false", doc)
         self.assertIn("production_verified=false", doc)
-
-
 if __name__ == "__main__":
     unittest.main()

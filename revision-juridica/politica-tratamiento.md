@@ -22,6 +22,7 @@
 | audit_log | usage | actor, action, repository, issue, category, option, sha, result, evidence, at, snoozed_until | security_audit | review_required | review_required | ninguno_declarado | review_required |
 | chat_response_opt_in | usage | agent_id, tab_id, repository, issue_number, question_text, response_text, status, received_at, opt_in | agent_response_relay | review_required | review_required | ninguno_declarado | review_required |
 | dashboard_health_status | usage | health | dashboard_operational_status | review_required | review_required | ninguno_declarado | review_required |
+| owner_login_credentials | authentication | password_hash | owner_login_security | review_required | review_required | ninguno_declarado | review_required |
 | staff_directory_contact | contact | email, masked_email | staff_administration | review_required | review_required | ninguno_declarado | request_lifetime_only |
 | staff_directory_identity | identification | staff_id, display_name, role, status, last_access_at, mfa_state | staff_administration | review_required | review_required | ninguno_declarado | request_lifetime_only |
 

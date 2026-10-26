@@ -54,6 +54,16 @@ Producto: `pl0n3r/ControlBot`
 - Proveedores: ninguno_declarado
 - Retención: `review_required`
 
+## owner_login_credentials
+
+- Categoría: `authentication`
+- Campos de software: `password_hash`
+- Finalidad: `owner_login_security`
+- Base documentada: `review_required` (revisión jurídica requerida)
+- Consentimiento: `review_required`
+- Proveedores: ninguno_declarado
+- Retención: `review_required`
+
 ## staff_directory_contact
 
 - Categoría: `contact`

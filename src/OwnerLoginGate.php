@@ -1,29 +1,12 @@
 <?php
 declare(strict_types=1);
-
 namespace ControlBot\Security;
-
 use Throwable;
-
-/**
- * Puerta de login local y offline del propietario. No sustituye el bootstrap
- * OAuth/TOTP de public/index.php ni activa rutas en producción.
- */
-final class OwnerLoginGate
-{
+final class OwnerLoginGate {
     private const IDLE_SECONDS = 900;
     private const WINDOW_SECONDS = 900;
     private const MAX_FAILURES = 5;
-
-    /**
-     * @param array<string, mixed> $server
-     * @param array<string, mixed> $post
-     * @param array<string, mixed> $session Sesión PHP provista por el servidor.
-     * @param array<string, mixed> $config Configuración privada del host.
-     * @param ?callable $regenerate Callback a session_regenerate_id(true) en HTTP.
-     * @return array{status:int,headers:array<string,string>,body:string}
-     */
-    public static function handle(
+        public static function handle(
         array $server,
         array $post,
         array &$session,
@@ -31,43 +14,26 @@ final class OwnerLoginGate
         int $now,
         ?callable $regenerate = null,
     ): array {
-        if (!self::configured($config) || $now <= 0) {
-            return self::response(503, 'Service unavailable.');
-        }
-
+        if (!self::configured($config) || $now <= 0) return self::response(503, 'Service unavailable.');
         $method = $server['REQUEST_METHOD'] ?? null;
-        if ($method !== 'GET' && $method !== 'POST') {
-            return self::response(405, 'Method not allowed.', ['Allow' => 'GET, POST']);
-        }
-        if (!self::validRequestPath($server, ['/login', '/login.php'])) {
-            return self::response(404, 'Not found.');
-        }
+        if ($method !== 'GET' && $method !== 'POST') return self::response(405, 'Method not allowed.', ['Allow' => 'GET, POST']);
+        if (!self::validRequestPath($server, ['/login', '/login.php'])) return self::response(404, 'Not found.');
         self::expire($session, $now);
         if (!self::validToken($session['_cb_login_csrf'] ?? null)) {
             $session['_cb_login_csrf'] = self::randomToken();
         }
-        if ($method === 'GET') {
-            return self::loginPage($session, self::isAuthenticated($session, $now));
-        }
-
+        if ($method === 'GET') return self::loginPage($session, self::isAuthenticated($session, $now));
         $action = $post['action'] ?? 'login';
         $token = $post['csrf'] ?? null;
-        if (!is_string($token) || !hash_equals($session['_cb_login_csrf'], $token)) {
-            return self::response(403, 'Solicitud inválida.');
-        }
+        if (!is_string($token) || !hash_equals($session['_cb_login_csrf'], $token)) return self::response(403, 'Solicitud inválida.');
         if ($action === 'logout') {
             // Invalidar el contexto local sin alterar sesiones OAuth ajenas.
             unset($session['_cb_owner_web'], $session['_cb_owner_last_seen']);
             $session['_cb_login_csrf'] = self::randomToken();
-            if ($regenerate !== null && $regenerate() !== true) {
-                return self::response(503, 'Service unavailable.');
-            }
+            if ($regenerate !== null && $regenerate() !== true) return self::response(503, 'Service unavailable.');
             return self::redirect('/login');
         }
-        if ($action !== 'login') {
-            return self::response(400, 'Solicitud inválida.');
-        }
-
+        if ($action !== 'login') return self::response(400, 'Solicitud inválida.');
         $login = $post['username'] ?? null;
         $password = $post['password'] ?? null;
         if (!is_string($login) || !is_string($password)
@@ -75,46 +41,28 @@ final class OwnerLoginGate
             return self::failurePage($session);
         }
         $ip = $server['REMOTE_ADDR'] ?? null;
-        if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP) === false) {
-            return self::response(503, 'Service unavailable.');
-        }
-
+        if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP) === false) return self::response(503, 'Service unavailable.');
         try {
             $result = self::checkAndRecord($config, $ip, $login, $password, $now);
         } catch (Throwable) {
             return self::response(503, 'Service unavailable.');
         }
-        if ($result === 'limited') {
-            return self::response(429, 'Demasiados intentos. Inténtalo más tarde.', ['Retry-After' => '30']);
-        }
-        if ($result !== 'authenticated') {
-            return self::failurePage($session);
-        }
-
-        if ($regenerate !== null && $regenerate() !== true) {
-            return self::response(503, 'Service unavailable.');
-        }
+        if ($result === 'limited') return self::response(429, 'Demasiados intentos. Inténtalo más tarde.', ['Retry-After' => '30']);
+        if ($result !== 'authenticated') return self::failurePage($session);
+        if ($regenerate !== null && $regenerate() !== true) return self::response(503, 'Service unavailable.');
         $session['_cb_owner_web'] = true;
         $session['_cb_owner_last_seen'] = $now;
         $session['_cb_login_csrf'] = self::randomToken();
         return self::redirect('/overview');
     }
-
     /** Comprueba la sesión *local*, sin conceder por ello tokens OAuth/TOTP. */
-    public static function isAuthenticated(array $session, int $now): bool
-    {
+    public static function isAuthenticated(array $session, int $now): bool {
         $last = $session['_cb_owner_last_seen'] ?? null;
         return ($session['_cb_owner_web'] ?? null) === true
             && is_int($last) && $last > 0 && $now >= $last
             && $now - $last < self::IDLE_SECONDS;
     }
-
-    /**
-     * Preflight de una futura integración HTTP. La activación y cableado real
-     * están sujetos a D-059; ningún código en public/index.php cambia aquí.
-     * Null equivale a ruta permitida, nunca a una elevación de credenciales.
-     */
-    public static function requireOwner(
+        public static function requireOwner(
         array $server,
         array &$session,
         array $config,
@@ -134,22 +82,14 @@ final class OwnerLoginGate
         )) {
             return null;
         }
-        if (!self::configured($config) || $now <= 0) {
-            return self::response(503, 'Service unavailable.');
-        }
-        if ($path === '/login' || $path === '/login.php') {
-            return null;
-        }
+        if (!self::configured($config) || $now <= 0) return self::response(503, 'Service unavailable.');
+        if ($path === '/login' || $path === '/login.php') return null;
         self::expire($session, $now);
-        if (!self::isAuthenticated($session, $now)) {
-            return self::redirect('/login', 302);
-        }
+        if (!self::isAuthenticated($session, $now)) return self::redirect('/login', 302);
         $session['_cb_owner_last_seen'] = $now;
         return null;
     }
-
-    private static function configured(array $config): bool
-    {
+    private static function configured(array $config): bool {
         $owner = $config['owner_login'] ?? null;
         $hash = $config['password_hash'] ?? null;
         $directory = $config['rate_limit_dir'] ?? null;
@@ -159,23 +99,16 @@ final class OwnerLoginGate
             && is_string($directory) && str_starts_with($directory, '/')
             && is_dir($directory) && !is_link($directory) && is_writable($directory);
     }
-
-    private static function validRequestPath(array $server, array $allowed): bool
-    {
+    private static function validRequestPath(array $server, array $allowed): bool {
         $uri = $server['REQUEST_URI'] ?? null;
-        if (!is_string($uri) || strlen($uri) > 2048 || str_contains($uri, "\0")) {
-            return false;
-        }
+        if (!is_string($uri) || strlen($uri) > 2048 || str_contains($uri, "\0")) return false;
         return in_array(parse_url($uri, PHP_URL_PATH), $allowed, true);
     }
-
-    private static function expire(array &$session, int $now): void
-    {
+    private static function expire(array &$session, int $now): void {
         if (!self::isAuthenticated($session, $now)) {
             unset($session['_cb_owner_web'], $session['_cb_owner_last_seen']);
         }
     }
-
     private static function checkAndRecord(
         array $config,
         string $ip,
@@ -189,10 +122,8 @@ final class OwnerLoginGate
             throw new \RuntimeException('Private throttle directory unavailable.');
         }
         // Identidades no se guardan ni siquiera en nombres de archivo.
-        $keys = [
-            'ip:' . hash_hmac('sha256', $ip, $hash),
-            'user:' . hash_hmac('sha256', strtolower($login), $hash),
-        ];
+        $keys = ['ip:' . hash_hmac('sha256', $ip, $hash),
+                 'user:' . hash_hmac('sha256', strtolower($login), $hash)];
         sort($keys, SORT_STRING);
         $resources = [];
         try {
@@ -229,16 +160,12 @@ final class OwnerLoginGate
                     $blocked = true;
                 }
             }
-            if ($blocked) {
-                return 'limited';
-            }
+            if ($blocked) return 'limited';
             // Ambos checks ocurren siempre, con independencia del usuario.
             $passwordOk = password_verify($password, $hash);
             $ownerOk = hash_equals($config['owner_login'], $login);
             if ($passwordOk && $ownerOk) {
-                foreach ($resources as $handle) {
-                    self::saveThrottle($handle, ['start' => $now, 'count' => 0, 'blocked_until' => 0]);
-                }
+                foreach ($resources as $handle) { self::saveThrottle($handle, ['start' => $now, 'count' => 0, 'blocked_until' => 0]); }
                 return 'authenticated';
             }
             foreach ($resources as $i => $handle) {
@@ -252,24 +179,17 @@ final class OwnerLoginGate
             return 'invalid';
         } finally {
             foreach (array_reverse($resources) as $handle) {
-                flock($handle, LOCK_UN);
-                fclose($handle);
+                flock($handle, LOCK_UN); fclose($handle);
             }
         }
     }
-
-    private static function saveThrottle($handle, array $state): void
-    {
+    private static function saveThrottle($handle, array $state): void {
         rewind($handle);
-        if (!ftruncate($handle, 0)
-            || fwrite($handle, json_encode($state, JSON_THROW_ON_ERROR)) === false
-            || !fflush($handle)) {
-            throw new \RuntimeException('Throttle write failed.');
-        }
+        if (!ftruncate($handle, 0) ||
+            fwrite($handle, json_encode($state, JSON_THROW_ON_ERROR)) === false ||
+            !fflush($handle)) throw new \RuntimeException('Throttle write failed.');
     }
-
-    private static function loginPage(array $session, bool $authenticated, string $notice = '', int $status = 200): array
-    {
+    private static function loginPage(array $session, bool $authenticated, string $notice = '', int $status = 200): array {
         $csrf = htmlspecialchars($session['_cb_login_csrf'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $noticeHtml = $notice !== '' ? '<p role="alert" class="error">' . htmlspecialchars($notice, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '';
         $content = $authenticated
@@ -290,36 +210,16 @@ final class OwnerLoginGate
             . '<body><main><h1>ControlBot</h1><p>Acceso del propietario</p>' . $noticeHtml . $content . '</main></body></html>';
         return self::response($status, $html, ['Content-Type' => 'text/html; charset=utf-8']);
     }
-
-    private static function failurePage(array $session): array
-    {
-        return self::loginPage($session, false, 'Usuario o contraseña incorrectos.', 401);
-    }
-
-    private static function redirect(string $to, int $status = 303): array
-    {
-        return self::response($status, '', ['Location' => $to]);
-    }
-
-    private static function response(int $status, string $body, array $extras = []): array
-    {
+    private static function failurePage(array $session): array { return self::loginPage($session, false, 'Usuario o contraseña incorrectos.', 401); }
+    private static function redirect(string $to, int $status = 303): array { return self::response($status, '', ['Location' => $to]); }
+    private static function response(int $status, string $body, array $extras = []): array {
         return ['status' => $status, 'headers' => array_merge([
-            'Content-Type' => 'text/plain; charset=utf-8',
-            'Cache-Control' => 'no-store',
-            'X-Content-Type-Options' => 'nosniff',
-            'X-Frame-Options' => 'DENY',
+            'Content-Type' => 'text/plain; charset=utf-8', 'Cache-Control' => 'no-store',
+            'X-Content-Type-Options' => 'nosniff', 'X-Frame-Options' => 'DENY',
             'Referrer-Policy' => 'no-referrer',
             'Content-Security-Policy' => "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; style-src 'unsafe-inline'",
         ], $extras), 'body' => $body];
     }
-
-    private static function validToken(mixed $token): bool
-    {
-        return is_string($token) && preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) === 1;
-    }
-
-    private static function randomToken(): string
-    {
-        return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
-    }
+    private static function validToken(mixed $token): bool { return is_string($token) && preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) === 1; }
+    private static function randomToken(): string { return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '='); }
 }

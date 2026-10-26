@@ -1,11 +1,8 @@
 <?php
 declare(strict_types=1);
-
 namespace ControlBot\GitHub;
-
 use Closure;
 use Throwable;
-
 /**
  * Offline-only source for GET-shaped GitHub installation fixtures.
  *
@@ -17,12 +14,7 @@ final class GitHubReadOnlyInstallationSource
     private const MAX_PAGES = 3;
     private const MAX_ITEMS_PER_PAGE = 25;
     private array $events = [];
-
-    public function __construct(
-        private readonly Closure $fakeGet,
-        private readonly string $testFixtureKey,
-    ) {}
-
+    public function __construct(private readonly Closure $fakeGet, private readonly string $testFixtureKey) {}
     /**
      * The fixture must originate from the test harness, never a browser payload.
      * Its synthetic HMAC only binds fixture fields; it is NOT a GitHub credential.
@@ -36,23 +28,16 @@ final class GitHubReadOnlyInstallationSource
             if (!$this->validRequest($request, $serverFixture)) {
                 return $this->result('UNKNOWN', 'identity_or_scope_mismatch', null, 0);
             }
-
             $count = 0;
             $pages = 0;
             $resource = $request['resource'];
             $repo = $serverFixture['repository'];
             $sha = $serverFixture['sha'];
             $size = $request['page_size'];
-
             for ($page = 1; $page <= self::MAX_PAGES; $page++) {
                 // Fixed relative route, never a user-controlled URL.
-                $query = [
-                    'method' => 'GET',
-                    'route' => '/repos/' . $repo . '/' . $resource,
-                    'page' => $page,
-                    'per_page' => $size,
-                    'mode' => 'offline_test_only',
-                ];
+                $query = ['method' => 'GET', 'route' => '/repos/' . $repo . '/' . $resource,
+                    'page' => $page, 'per_page' => $size, 'mode' => 'offline_test_only'];
                 $response = ($this->fakeGet)($query);
                 if (!$this->validPage($response, $repo, $sha, $page, $size)) {
                     return $this->result('UNKNOWN', 'incomplete_or_untrusted_page', null, $pages);
@@ -61,11 +46,8 @@ final class GitHubReadOnlyInstallationSource
                 $count += count($response['items']);
                 if ($response['next_page'] === null) {
                     return $this->result('CURRENT', 'fixture_only', [
-                        'repository' => $repo,
-                        'sha' => $sha,
-                        'resource' => $resource,
-                        'items_count' => $count,
-                        'pages' => $pages,
+                        'repository' => $repo, 'sha' => $sha, 'resource' => $resource,
+                        'items_count' => $count, 'pages' => $pages,
                         'kind' => 'fixture_projection',
                     ], $pages);
                 }
@@ -76,20 +58,15 @@ final class GitHubReadOnlyInstallationSource
             return $this->result('UNKNOWN', 'fixture_transport_error', null, 0);
         }
     }
-
     /** Sanitized and bounded in-memory audit; no fixture payload or owner fields. */
     public function audit(): array
     {
         return $this->events;
     }
-
     private function validFixture(array $f, int $now): bool
     {
-        $fields = [
-            'origin', 'test_only', 'owner_verified', 'installation_id',
-            'owner', 'repository', 'sha', 'scopes', 'observed_at',
-            'expires_at', 'proof',
-        ];
+        $fields = ['origin', 'test_only', 'owner_verified', 'installation_id',
+            'owner', 'repository', 'sha', 'scopes', 'observed_at', 'expires_at', 'proof'];
         if (count($f) !== count($fields)
             || count(array_intersect($fields, array_keys($f))) !== count($fields)
             || ($f['origin'] ?? null) !== 'server_fixture'
@@ -115,7 +92,6 @@ final class GitHubReadOnlyInstallationSource
             || preg_match('/^[a-f0-9]{64}$/D', $f['proof']) !== 1) {
             return false;
         }
-
         $attested = [];
         foreach ($fields as $name) {
             if ($name !== 'proof') {
@@ -125,7 +101,6 @@ final class GitHubReadOnlyInstallationSource
         $encoded = json_encode($attested, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         return hash_equals(hash_hmac('sha256', $encoded, $this->testFixtureKey), $f['proof']);
     }
-
     private function validRequest(array $r, array $f): bool
     {
         return count($r) === 4
@@ -137,7 +112,6 @@ final class GitHubReadOnlyInstallationSource
             && $r['page_size'] >= 1
             && $r['page_size'] <= self::MAX_ITEMS_PER_PAGE;
     }
-
     private function validPage(mixed $r, string $repo, string $sha, int $page, int $size): bool
     {
         if (!is_array($r)
@@ -167,7 +141,6 @@ final class GitHubReadOnlyInstallationSource
         }
         return true;
     }
-
     private function result(string $status, string $reason, ?array $projection, int $pages): array
     {
         $event = ['status' => $status, 'reason' => $reason, 'pages' => $pages];

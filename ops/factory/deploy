@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Synthetic-only deployment preflight. This program never deploys or writes files."""
+from __future__ import annotations
+
+import json
+import re
+import sys
+
+MAX_INPUT_BYTES = 8192
+SHA40 = re.compile(r"[0-9a-f]{40}\Z")
+SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+FIELDS = frozenset({
+    "kind", "phase", "transport", "candidate_sha", "expected_candidate_sha",
+    "artifact_sha256", "baseline_sha", "expected_baseline_sha",
+    "baseline_verified", "artifact_verified", "backup_verified", "rollback_verified",
+})
+
+
+def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate field")
+        result[key] = value
+    return result
+
+
+def _invalid_constant(value: str) -> object:
+    raise ValueError("invalid numeric constant")
+
+
+def _reason(document: object) -> str:
+    if not isinstance(document, dict) or set(document) != FIELDS:
+        return "invalid_synthetic_fixture"
+    if (document["kind"] != "synthetic" or document["phase"] != "construccion"
+            or document["transport"] != "none"):
+        return "invalid_synthetic_fixture"
+    for field in ("candidate_sha", "expected_candidate_sha", "baseline_sha", "expected_baseline_sha"):
+        if not isinstance(document[field], str) or not SHA40.fullmatch(document[field]):
+            return "invalid_synthetic_fixture"
+    if not isinstance(document["artifact_sha256"], str) or not SHA256.fullmatch(document["artifact_sha256"]):
+        return "invalid_synthetic_fixture"
+    for field in ("baseline_verified", "artifact_verified", "backup_verified", "rollback_verified"):
+        if type(document[field]) is not bool:
+            return "invalid_synthetic_fixture"
+    if not document["baseline_verified"]:
+        return "baseline_unverified"
+    if not document["artifact_verified"]:
+        return "artifact_unverified"
+    if not document["backup_verified"]:
+        return "backup_unverified"
+    if not document["rollback_verified"]:
+        return "rollback_unverified"
+    if document["candidate_sha"] != document["expected_candidate_sha"]:
+        return "candidate_sha_mismatch"
+    if document["baseline_sha"] != document["expected_baseline_sha"]:
+        return "baseline_sha_mismatch"
+    if document["candidate_sha"] == document["baseline_sha"]:
+        return "no_release_transition"
+    return "synthetic_checks_passed"
+
+
+def _emit(reason: str) -> None:
+    print(json.dumps({
+        "mode": "offline_preflight",
+        "status": "SYNTHETIC_ONLY" if reason == "synthetic_checks_passed" else "REJECTED",
+        "reason": reason,
+        "deploy_executed": False,
+        "production_ready": False,
+        "readiness": "UNKNOWN",
+    }, sort_keys=True, separators=(",", ":")))
+
+
+def main(argv: list[str]) -> int:
+    # Every production or transport invocation is denied, regardless of environment.
+    if argv != ["--offline-dry-run"]:
+        _emit("mode_not_authorized")
+        return 2
+    try:
+        raw = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
+        if not raw or len(raw) > MAX_INPUT_BYTES:
+            _emit("invalid_synthetic_fixture")
+            return 2
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs,
+                             parse_constant=_invalid_constant)
+        reason = _reason(payload)
+    except (ValueError, UnicodeError, TypeError, RecursionError):
+        reason = "invalid_synthetic_fixture"
+    _emit(reason)
+    return 0 if reason == "synthetic_checks_passed" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

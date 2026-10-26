@@ -25,7 +25,7 @@ def run(command: list[str], *, env: dict[str, str] | None = None) -> None:
 
 
 def coverage_environment() -> dict[str, str]:
-    real_php = shutil.which("php")
+    real_php = shutil.which(os.environ.get("CONTROLBOT_REAL_PHP") or "php")
     if real_php is None:
         raise RuntimeError("php no está disponible en PATH")
 

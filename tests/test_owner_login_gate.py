@@ -23,7 +23,9 @@ $regenerate = static function () use (&$regen): bool { $regen++; return true; };
 def php_run(script):
     with tempfile.TemporaryDirectory(prefix="controlbot-916-") as private_dir:
         env = {**os.environ, "CONTROLBOT_TEST_LIMIT_DIR": private_dir}
-        p = subprocess.run(["php", "-r", BASE + script], cwd=ROOT, env=env,
+        case = Path(private_dir) / "coverage-case.php"
+        case.write_text("<?php\n" + BASE + script, encoding="utf-8")
+        p = subprocess.run(["php", str(case)], cwd=ROOT, env=env,
                            text=True, capture_output=True, timeout=25)
         if p.returncode:
             raise AssertionError(p.stdout + p.stderr)

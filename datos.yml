@@ -60,6 +60,16 @@
       "providers": []
     },
     {
+      "id": "owner_login_credentials",
+      "category": "authentication",
+      "fields": ["password_hash"],
+      "purpose": "owner_login_security",
+      "basis": "review_required",
+      "retention": "review_required",
+      "consent": "review_required",
+      "providers": []
+    },
+    {
       "id": "staff_directory_contact",
       "category": "contact",
       "fields": ["email", "masked_email"],

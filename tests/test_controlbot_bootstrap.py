@@ -35,7 +35,7 @@ class ControlBotBootstrapTests(unittest.TestCase):
         self.assertEqual("pl0n3r/ControlBot", data["project"])
         self.assertEqual("construccion", data["phase"])
         self.assertEqual(
-            {"account_profiles", "agent_status", "audit_log", "chat_response_opt_in", "dashboard_health_status", "staff_directory_contact", "staff_directory_identity"},
+            {"account_profiles", "agent_status", "audit_log", "chat_response_opt_in", "dashboard_health_status", "owner_login_credentials", "staff_directory_contact", "staff_directory_identity"},
             {row["id"] for row in data["treatments"]},
         )
 

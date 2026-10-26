@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Offline-only synthetic backup preflight; never performs a backup or issues a receipt.
+
+This executable accepts a deliberately narrow JSON fixture on stdin. Caller-supplied
+booleans are test assertions, NOT independently authenticated production evidence.
+"""
+from __future__ import annotations
+
+import json
+import re
+import sys
+
+MAX_INPUT_BYTES = 8192
+SOURCE_SHA = re.compile(r"[0-9a-f]{40}\Z")
+ARTIFACT_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+FIELDS = frozenset({
+    "kind", "source_sha", "artifact_sha256", "baseline_verified",
+    "artifact_verified", "rollback_verified",
+})
+
+
+def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate field")
+        result[key] = value
+    return result
+
+
+def _reason(document: object) -> str:
+    if not isinstance(document, dict) or set(document) != FIELDS:
+        return "invalid_synthetic_fixture"
+    if document["kind"] != "synthetic":
+        return "invalid_synthetic_fixture"
+    if not all(type(document[key]) is bool for key in (
+        "baseline_verified", "artifact_verified", "rollback_verified",
+    )):
+        return "invalid_synthetic_fixture"
+    if not isinstance(document["source_sha"], str) or not SOURCE_SHA.fullmatch(document["source_sha"]):
+        return "invalid_synthetic_fixture"
+    if not isinstance(document["artifact_sha256"], str) or not ARTIFACT_SHA256.fullmatch(document["artifact_sha256"]):
+        return "invalid_synthetic_fixture"
+    if not document["baseline_verified"]:
+        return "baseline_unverified"
+    if not document["artifact_verified"]:
+        return "artifact_unverified"
+    if not document["rollback_verified"]:
+        return "rollback_unverified"
+    return "synthetic_checks_passed"
+
+
+def _emit(reason: str) -> None:
+    print(json.dumps({
+        "mode": "offline_preflight",
+        "status": "SYNTHETIC_ONLY" if reason == "synthetic_checks_passed" else "REJECTED",
+        "reason": reason,
+        "backup_verified": False,
+        "live_authorized": False,
+        "readiness": "UNKNOWN",
+    }, sort_keys=True, separators=(",", ":")))
+
+
+def main(argv: list[str]) -> int:
+    # No --live/--real/--host/--ssh mode exists, even with caller-supplied flags.
+    if argv != ["--offline-dry-run"]:
+        _emit("mode_not_authorized")
+        return 2
+    try:
+        raw = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
+        if not raw or len(raw) > MAX_INPUT_BYTES:
+            _emit("invalid_synthetic_fixture")
+            return 2
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs)
+        reason = _reason(payload)
+    except (ValueError, UnicodeError, TypeError, RecursionError):
+        reason = "invalid_synthetic_fixture"
+    _emit(reason)
+    return 0 if reason == "synthetic_checks_passed" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

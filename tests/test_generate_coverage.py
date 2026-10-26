@@ -1,4 +1,5 @@
 import importlib.util
+import subprocess
 import tempfile
 from pathlib import Path
 import unittest
@@ -131,6 +132,69 @@ class GenerateCoverageTests(unittest.TestCase):
                 "Faltan reportes de cobertura esperados",
             ):
                 GENERATE_COVERAGE.main()
+
+
+    def _php_wrapper_fixture(self):
+        directory = Path(self.tempdir.name)
+        prepend = directory / "prepend.php"
+        prepend.write_text(
+            '<?php file_put_contents(getenv("CB_TEST_PREPEND_MARKER"), "hit", FILE_APPEND);',
+            encoding="utf-8",
+        )
+        with (
+            patch.object(GENERATE_COVERAGE, "BUILD", directory / "build"),
+            patch.object(GENERATE_COVERAGE, "PHP_FRAGMENTS", directory / "php-fragments"),
+            patch.object(GENERATE_COVERAGE, "WRAPPER_DIR", directory / "bin"),
+            patch.object(GENERATE_COVERAGE, "PHP_BOOTSTRAP", prepend),
+        ):
+            env = GENERATE_COVERAGE.coverage_environment()
+        marker = directory / "seen.txt"
+        env["CB_TEST_PREPEND_MARKER"] = str(marker)
+        return env, marker, directory
+
+    def test_inline_php_coverage_prepend_is_executed(self):
+        env, marker, _ = self._php_wrapper_fixture()
+        proc = subprocess.run(
+            ["php", "-r", 'echo "INLINE";'],
+            cwd=ROOT, env=env, capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout, "INLINE")
+        self.assertEqual(marker.read_text(encoding="utf-8"), "hit")
+
+    def test_non_inline_php_execution_keeps_prepend(self):
+        env, marker, directory = self._php_wrapper_fixture()
+        script = directory / "script.php"
+        script.write_text('<?php echo "FILE";', encoding="utf-8")
+        proc = subprocess.run(
+            ["php", str(script)],
+            cwd=ROOT, env=env, capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout, "FILE")
+        self.assertEqual(marker.read_text(encoding="utf-8"), "hit")
+
+    def test_inline_php_failure_preserves_status_and_cleans_up(self):
+        env, marker, directory = self._php_wrapper_fixture()
+        proc = subprocess.run(
+            ["php", "-r", 'fwrite(STDERR, "EXPECTED_FAIL"); exit(17);'],
+            cwd=ROOT, env=env, capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(proc.returncode, 17)
+        self.assertIn("EXPECTED_FAIL", proc.stderr)
+        self.assertEqual(marker.read_text(encoding="utf-8"), "hit")
+        self.assertEqual(list((directory / "php-fragments").glob("inline-*.php")), [])
+
+    def test_inline_php_arguments_preserved(self):
+        env, marker, directory = self._php_wrapper_fixture()
+        proc = subprocess.run(
+            ["php", "-r", "echo implode('|', array_slice($argv, 1));", "uno", "dos"],
+            cwd=ROOT, env=env, capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout, "uno|dos")
+        self.assertEqual(marker.read_text(encoding="utf-8"), "hit")
+        self.assertEqual(list((directory / "php-fragments").glob("inline-*.php")), [])
 
 
 if __name__ == "__main__":

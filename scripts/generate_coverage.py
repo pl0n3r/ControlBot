@@ -25,7 +25,7 @@ def run(command: list[str], *, env: dict[str, str] | None = None) -> None:
 
 
 def coverage_environment() -> dict[str, str]:
-    real_php = shutil.which("php")
+    real_php = shutil.which(os.environ.get("CONTROLBOT_REAL_PHP") or "php")
     if real_php is None:
         raise RuntimeError("php no está disponible en PATH")
 
@@ -39,9 +39,16 @@ def coverage_environment() -> dict[str, str]:
     wrapper.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "exec \"$CONTROLBOT_REAL_PHP\" "
-        "-d xdebug.mode=coverage "
-        "-d auto_prepend_file=\"$CONTROLBOT_PHP_COVERAGE_BOOTSTRAP\" \"$@\"\n",
+        "if [[ \"${1:-}\" == \"-r\" && $# -ge 2 ]]; then\n"
+        "  inline_code=\"$2\"\n"
+        "  shift 2\n"
+        "  inline_file=\"$(mktemp \"$CONTROLBOT_PHP_COVERAGE_DIR/inline-XXXXXXXX.php\")\"\n"
+        "  trap 'rm -f \"$inline_file\"' EXIT\n"
+        "  printf '<?php\\n%s\\n' \"$inline_code\" > \"$inline_file\"\n"
+        "  \"$CONTROLBOT_REAL_PHP\" -d xdebug.mode=coverage -d auto_prepend_file=\"$CONTROLBOT_PHP_COVERAGE_BOOTSTRAP\" \"$inline_file\" \"$@\"\n"
+        "  exit $?\n"
+        "fi\n"
+        "exec \"$CONTROLBOT_REAL_PHP\" -d xdebug.mode=coverage -d auto_prepend_file=\"$CONTROLBOT_PHP_COVERAGE_BOOTSTRAP\" \"$@\"\n",
         encoding="utf-8",
     )
     wrapper.chmod(0o755)

@@ -47,7 +47,10 @@ final class OwnerLoginGate {
         } catch (Throwable) {
             return self::response(503, 'Service unavailable.');
         }
-        if ($result === 'limited') return self::response(429, 'Demasiados intentos. Inténtalo más tarde.', ['Retry-After' => '30']);
+        if (is_array($result) && $result['status'] === 'limited') {
+            return self::response(429, 'Demasiados intentos. Inténtalo más tarde.',
+                ['Retry-After' => (string) $result['retry_after']]);
+        }
         if ($result !== 'authenticated') return self::failurePage($session);
         if ($regenerate !== null && $regenerate() !== true) return self::response(503, 'Service unavailable.');
         $session['_cb_owner_web'] = true;
@@ -109,78 +112,73 @@ final class OwnerLoginGate {
             unset($session['_cb_owner_web'], $session['_cb_owner_last_seen']);
         }
     }
+    /**
+     * Throttle exclusively by caller IP, never by a globally shared username.
+     * Filename contains a keyed pseudonym rather than the raw IP or account.
+     *
+     * @return string|array{status:'limited',retry_after:int}
+     */
     private static function checkAndRecord(
         array $config,
         string $ip,
         string $login,
         string $password,
         int $now,
-    ): string {
+    ): string|array {
         $hash = $config['password_hash'];
         $dir = realpath($config['rate_limit_dir']);
         if (!is_string($dir) || !is_dir($dir)) {
             throw new \RuntimeException('Private throttle directory unavailable.');
         }
-        // Identidades no se guardan ni siquiera en nombres de archivo.
-        $keys = ['ip:' . hash_hmac('sha256', $ip, $hash),
-                 'user:' . hash_hmac('sha256', strtolower($login), $hash)];
-        sort($keys, SORT_STRING);
-        $resources = [];
+        $ipKey = 'ip:' . hash_hmac('sha256', $ip, $hash);
+        $file = $dir . '/cb-owner-' . hash('sha256', $ipKey) . '.json';
+        if (is_link($file) || (file_exists($file) && !is_file($file))) {
+            throw new \RuntimeException('Invalid throttle file.');
+        }
+        $handle = @fopen($file, 'c+');
+        if (!is_resource($handle)) {
+            throw new \RuntimeException('Throttle unavailable.');
+        }
         try {
-            foreach ($keys as $key) {
-                $file = $dir . '/cb-owner-' . hash('sha256', $key) . '.json';
-                if (is_link($file) || (file_exists($file) && !is_file($file))) {
-                    throw new \RuntimeException('Invalid throttle file.');
-                }
-                $handle = @fopen($file, 'c+');
-                if (!is_resource($handle)) {
-                    throw new \RuntimeException('Throttle unavailable.');
-                }
-                $resources[] = $handle;
-                @chmod($file, 0600);
-                if (!flock($handle, LOCK_EX)) {
-                    throw new \RuntimeException('Throttle lock failed.');
-                }
+            @chmod($file, 0600);
+            if (!flock($handle, LOCK_EX)) {
+                throw new \RuntimeException('Throttle lock failed.');
             }
-            $states = [];
-            foreach ($resources as $handle) {
-                rewind($handle);
-                $raw = stream_get_contents($handle);
-                $state = is_string($raw) && $raw !== '' ? json_decode($raw, true) : null;
-                if (!is_array($state) || !isset($state['start'], $state['count'], $state['blocked_until'])
-                    || !is_int($state['start']) || !is_int($state['count']) || !is_int($state['blocked_until'])
-                    || $now - $state['start'] >= self::WINDOW_SECONDS || $now < $state['start']) {
-                    $state = ['start' => $now, 'count' => 0, 'blocked_until' => 0];
-                }
-                $states[] = $state;
+            rewind($handle);
+            $raw = stream_get_contents($handle);
+            if (!is_string($raw)) {
+                throw new \RuntimeException('Throttle read failed.');
             }
-            $blocked = false;
-            foreach ($states as $state) {
-                if ($state['blocked_until'] > $now || $state['count'] >= self::MAX_FAILURES) {
-                    $blocked = true;
-                }
+            $state = $raw !== '' ? json_decode($raw, true) : null;
+            if (!is_array($state) || !isset($state['start'], $state['count'], $state['blocked_until'])
+                || !is_int($state['start']) || !is_int($state['count']) || !is_int($state['blocked_until'])
+                || $now - $state['start'] >= self::WINDOW_SECONDS || $now < $state['start']) {
+                $state = ['start' => $now, 'count' => 0, 'blocked_until' => 0];
             }
-            if ($blocked) return 'limited';
-            // Ambos checks ocurren siempre, con independencia del usuario.
+            if ($state['blocked_until'] > $now || $state['count'] >= self::MAX_FAILURES) {
+                // Saturating the window blocks until its expiry, even after a short delay.
+                $windowRemaining = $state['count'] >= self::MAX_FAILURES
+                    ? max(0, $state['start'] + self::WINDOW_SECONDS - $now) : 0;
+                return ['status' => 'limited', 'retry_after' => max(
+                    1, $state['blocked_until'] - $now, $windowRemaining,
+                )];
+            }
+            // Both comparisons are performed, regardless of account existence.
             $passwordOk = password_verify($password, $hash);
             $ownerOk = hash_equals($config['owner_login'], $login);
             if ($passwordOk && $ownerOk) {
-                foreach ($resources as $handle) { self::saveThrottle($handle, ['start' => $now, 'count' => 0, 'blocked_until' => 0]); }
+                self::saveThrottle($handle, ['start' => $now, 'count' => 0, 'blocked_until' => 0]);
                 return 'authenticated';
             }
-            foreach ($resources as $i => $handle) {
-                $state = $states[$i];
-                $state['count']++;
-                if ($state['count'] >= 3) {
-                    $state['blocked_until'] = $now + min(300, 2 ** min(8, $state['count'] - 2));
-                }
-                self::saveThrottle($handle, $state);
+            $state['count']++;
+            if ($state['count'] >= 3) {
+                $state['blocked_until'] = $now + min(300, 2 ** min(8, $state['count'] - 2));
             }
+            self::saveThrottle($handle, $state);
             return 'invalid';
         } finally {
-            foreach (array_reverse($resources) as $handle) {
-                flock($handle, LOCK_UN); fclose($handle);
-            }
+            flock($handle, LOCK_UN);
+            fclose($handle);
         }
     }
     private static function saveThrottle($handle, array $state): void {

@@ -95,5 +95,80 @@ check(!OwnerLoginGate::isAuthenticated($s,$now+1901) && $regen===3);
             self.assertIn(token, source)
         self.assertNotIn("_github_token_sealed", entry)
 
+
+    def test_retry_after_matches_effective_ip_lock(self):
+        php_run(r"""
+OwnerLoginGate::handle($get, [], $s, $cfg, $now);
+$csrf=$s['_cb_login_csrf'];
+$bad=['csrf'=>$csrf,'username'=>'pl0n3r','password'=>'bad-fixture'];
+for ($i=0;$i<3;$i++) {
+    $r=OwnerLoginGate::handle($post,$bad,$s,$cfg,$now,$regenerate);
+    check($r['status']===401);
+}
+$r=OwnerLoginGate::handle($post,$bad,$s,$cfg,$now,$regenerate);
+check($r['status']===429 && $r['headers']['Retry-After']==='2');
+$r=OwnerLoginGate::handle($post,$bad,$s,$cfg,$now+1,$regenerate);
+check($r['status']===429 && $r['headers']['Retry-After']==='1');
+$r=OwnerLoginGate::handle($post,$bad,$s,$cfg,$now+2,$regenerate);
+check($r['status']===401);
+$r=OwnerLoginGate::handle($post,$bad,$s,$cfg,$now+3,$regenerate);
+check($r['status']===429 && $r['headers']['Retry-After']==='3');
+$r=OwnerLoginGate::handle($post,$bad,$s,$cfg,$now+6,$regenerate);
+check($r['status']===401);
+$r=OwnerLoginGate::handle($post,$bad,$s,$cfg,$now+6,$regenerate);
+check($r['status']===429 && $r['headers']['Retry-After']==='894');
+$good=['csrf'=>$csrf,'username'=>'pl0n3r','password'=>'fixture-only'];
+$r=OwnerLoginGate::handle($post,$good,$s,$cfg,$now+900,$regenerate);
+check($r['status']===303);
+""")
+
+    def test_blocked_ip_does_not_create_username_files(self):
+        php_run(r"""
+OwnerLoginGate::handle($get, [], $s, $cfg, $now);
+$csrf=$s['_cb_login_csrf'];
+for ($i=0;$i<3;$i++) {
+    OwnerLoginGate::handle($post,['csrf'=>$csrf,'username'=>'random'.$i,'password'=>'wrong'],$s,$cfg,$now,$regenerate);
+}
+$before=glob($cfg['rate_limit_dir'].'/cb-owner-*.json');
+check(is_array($before) && count($before)===1);
+for ($i=0;$i<80;$i++) {
+    $r=OwnerLoginGate::handle($post,['csrf'=>$csrf,'username'=>'random'.$i,'password'=>'wrong'],$s,$cfg,$now,$regenerate);
+    check($r['status']===429);
+}
+$after=glob($cfg['rate_limit_dir'].'/cb-owner-*.json');
+check(is_array($after) && count($after)===1);
+check($before===$after);
+""")
+
+    def test_cross_ip_owner_login_is_not_globally_locked(self):
+        php_run(r"""
+OwnerLoginGate::handle($get, [], $s, $cfg, $now);
+$csrf=$s['_cb_login_csrf'];
+$attacker=$post;
+$attacker['REMOTE_ADDR']='198.51.100.99';
+for ($i=0;$i<5;$i++) {
+    $r=OwnerLoginGate::handle($attacker,['csrf'=>$csrf,'username'=>'pl0n3r','password'=>'wrong'],$s,$cfg,$now,$regenerate);
+    check(in_array($r['status'],[401,429],true));
+}
+$good=['csrf'=>$csrf,'username'=>'pl0n3r','password'=>'fixture-only'];
+$r=OwnerLoginGate::handle($post,$good,$s,$cfg,$now,$regenerate);
+check($r['status']===303 && $r['headers']['Location']==='/overview');
+check($regen===1);
+check(count(glob($cfg['rate_limit_dir'].'/cb-owner-*.json'))===2);
+""")
+
+    def test_throttle_security_runbook_and_inventory(self):
+        import json
+        doc = ROOT / "docs/security/owner-login-throttle.md"
+        content = doc.read_text(encoding="utf-8")
+        for required in ("Retry-After", "IP", "limpieza", "bloqueo global", "Basic Auth", "D-059"):
+            self.assertIn(required, content)
+        datos = json.loads((ROOT / "datos.yml").read_text(encoding="utf-8"))
+        self.assertEqual(datos["phase"], "construccion")
+        self.assertTrue(datos["d063_attestation"]["nothing_live"])
+        self.assertTrue(datos["d063_attestation"]["no_real_customer_data"])
+        entry = next(x for x in datos["treatments"] if x["id"] == "owner_login_credentials")
+        self.assertEqual(entry["fields"], ["password_hash"])
+
 if __name__ == "__main__":
     unittest.main()

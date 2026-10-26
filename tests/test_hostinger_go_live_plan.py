@@ -1,9 +1,13 @@
 """AC-01..04: offline, fail-closed and process-level behavior (#915)."""
 from __future__ import annotations
 import json
+import io
+import runpy
 import subprocess
 import sys
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/hostinger_go_live_plan.py'
@@ -21,10 +25,19 @@ def fixture():
 
 
 def execute(payload):
+    """Exercise the CLI's actual __main__ in-process so coverage.py records it."""
     raw = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
-    proc = subprocess.run([sys.executable, str(SCRIPT)], input=raw,
-                          capture_output=True, timeout=15, check=False)
-    return json.loads(proc.stdout), proc
+    output = io.StringIO()
+    with patch.object(sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(raw))), \
+            patch.object(sys, 'stdout', output):
+        try:
+            runpy.run_path(str(SCRIPT), run_name='__main__')
+        except SystemExit as exc:
+            returncode = exc.code
+        else:
+            raise AssertionError('CLI must exit explicitly')
+    text = output.getvalue()
+    return json.loads(text), SimpleNamespace(returncode=returncode, stdout=text.encode())
 
 
 class HostingerGoLivePlanTests(unittest.TestCase):
@@ -76,6 +89,11 @@ class HostingerGoLivePlanTests(unittest.TestCase):
         self.assertEqual(set(report['gate_status']), set(GATES))
         self.assertEqual(set(report['next_steps']), set(GATES))
         self.assertIn('operator', report['reason'])
+        # Independent real-process smoke; in-process tests above remain instrumented.
+        external = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(fixture()).encode(),
+                                  capture_output=True, timeout=15, check=False)
+        self.assertEqual(external.returncode, 0)
+        self.assertEqual(json.loads(external.stdout)['decision'], 'REVIEW_ONLY')
         self.never_runtime(report)
         minimal = fixture()
         minimal['evidence'] = []

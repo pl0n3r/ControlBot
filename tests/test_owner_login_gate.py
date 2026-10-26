@@ -193,6 +193,7 @@ echo json_encode([
                 self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
         entry = ENTRY.read_text(encoding="utf-8")
         source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn("main{box-sizing:border-box;width:min(92vw,390px)", source)
         self.assertIn("session_regenerate_id(true)", entry)
         self.assertIn("session.use_strict_mode", entry)
         self.assertIn("'samesite' => 'Strict'", entry)

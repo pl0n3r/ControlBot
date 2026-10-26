@@ -283,7 +283,7 @@ final class OwnerLoginGate
                 . '<button type="submit">Entrar</button></form>';
         $html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>Acceso del propietario | ControlBot</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;'
-            . 'font-family:system-ui,sans-serif;background:#0e182b;color:#f4f7ff}main{width:min(92vw,390px);padding:2rem;'
+            . 'font-family:system-ui,sans-serif;background:#0e182b;color:#f4f7ff}main{box-sizing:border-box;width:min(92vw,390px);padding:2rem;'
             . 'border-radius:16px;background:#172943}label,input,button{display:block;width:100%;box-sizing:border-box;margin-top:.65rem}'
             . 'input,button{padding:.75rem;border-radius:8px;border:1px solid #7589aa}button{background:#51b9db;color:#082038;'
             . 'font-weight:700;cursor:pointer;margin-top:1.25rem}a{color:#90e6ff}.error{color:#ffb7b7}</style></head>'

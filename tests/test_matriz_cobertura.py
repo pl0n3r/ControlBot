@@ -27,6 +27,7 @@ CODE_EVIDENCE = re.compile(r"^Código (?P<code>[-A-Za-z0-9_./]+); prueba (?P<tes
 # Hoja posterior al snapshot histórico: catálogo explícito de PRs abiertos,
 # sin incrementar ni relajar los 1.194 IDs de la matriz canónica.
 POST_SNAPSHOT = {
+    "docs/contraste-cb_0301_0600.md": (972, 982, "tests/test_contraste_cb_0301_0600.py"),
     "docs/operator-runbook.md": (959, 965, "tests/test_runbook_operador_doc.py"),
     "docs/dr-drill-plan.md": (960, 968, "tests/test_simulacro_dr_doc.py"),
     "docs/owner-login-acceptance-script.md": (961, 969, "tests/test_guion_login_doc.py"),
@@ -286,11 +287,11 @@ class MatrizCoberturaTests(unittest.TestCase):
     def test_union_global_1194_estricta(self):
         rows = full_matrix()
         counts = Counter(row[3] for row in rows)
-        self.assertEqual(counts, {"CUBIERTO": 2, "NO_VERIFICABLE": 1192})
+        self.assertEqual(counts, {"CUBIERTO": 12, "NO_VERIFICABLE": 1182})
         self.assertEqual(len(rows), 1194)
-        summary = ("**Consolidado de 1.194 obligaciones:** CUBIERTO=2, "
+        summary = ("**Consolidado de 1.194 obligaciones:** CUBIERTO=12, "
                    "EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, "
-                   "NO_VERIFICABLE=1192; porcentaje CUBIERTO=0.17%. "
+                   "NO_VERIFICABLE=1182; porcentaje CUBIERTO=1.01%. "
                    "**Hojas nuevas creadas: 0.**")
         self.assertIn(summary, self.text)
 

@@ -121,7 +121,7 @@ class MatrizCoberturaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_rows(self.text.replace("| NO_VERIFICABLE |", "| CERTIFICADO |", 1))
         with self.assertRaises(ValueError):
-            parse_rows(self.text.replace("CB-0001", "CB-0002", 1))
+            parse_rows(self.text.replace("CB-0001", "CB-0011", 1))
         with self.assertRaises(ValueError):
             parse_rows(self.text.replace(self.rows[0][5],
                                          "[#0](https://github.com/otro/proyecto/issues/0)", 1))

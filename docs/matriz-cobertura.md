@@ -255,3 +255,16 @@ Cada partición conserva una fila por obligación con ID, fuente, estado, eviden
 ### Resultado consolidado de las cinco matrices
 
 **Consolidado de 1.194 obligaciones:** CUBIERTO=2, EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, NO_VERIFICABLE=1192; porcentaje CUBIERTO=0.17%. **Hojas nuevas creadas: 0.** El recuento local de 215 filas en la tabla precedente describe únicamente este índice; la función `full_matrix` valida el agregado de 1.194 filas reales. No autoriza go-live ni concluye que los requisitos NO_VERIFICABLE estén ausentes.
+
+## Fuentes de preparación posteriores al corte
+
+Este registro **separa** las hojas documentales posteriores al snapshot normativo de 1.194 IDs. Cada ruta e Issue/PR fue comprobado en GitHub; los PR pueden seguir OPEN, por lo que ninguna fila implica MERGED, despliegue, prueba de servicio instalado, ni cobertura `CUBIERTO`. El estado operativo sigue `NO_VERIFICABLE` / `NO ENSAYADO`, **NO-GO**. Cualquier otro documento nuevo exige una nueva entrada exacta, no una exención por prefijo.
+
+| Ruta | Issue | PR de preparación | Test de contrato | Estado |
+| --- | --- | --- | --- | --- |
+| `docs/operator-runbook.md` | [#959](https://github.com/pl0n3r/ControlBot/issues/959) | [#965](https://github.com/pl0n3r/ControlBot/pull/965) | `tests/test_runbook_operador_doc.py` | NO_VERIFICABLE / NO ENSAYADO |
+| `docs/dr-drill-plan.md` | [#960](https://github.com/pl0n3r/ControlBot/issues/960) | [#968](https://github.com/pl0n3r/ControlBot/pull/968) | `tests/test_simulacro_dr_doc.py` | NO_VERIFICABLE / NO ENSAYADO |
+| `docs/owner-login-acceptance-script.md` | [#961](https://github.com/pl0n3r/ControlBot/issues/961) | [#969](https://github.com/pl0n3r/ControlBot/pull/969) | `tests/test_guion_login_doc.py` | NO_VERIFICABLE / NO ENSAYADO |
+| `docs/emergency-shutdown-plan.md` | [#962](https://github.com/pl0n3r/ControlBot/issues/962) | [#966](https://github.com/pl0n3r/ControlBot/pull/966) | `tests/test_apagado_emergencia_doc.py` | NO_VERIFICABLE / NO ENSAYADO |
+| `docs/evidence-receipts.md` | [#963](https://github.com/pl0n3r/ControlBot/issues/963) | [#967](https://github.com/pl0n3r/ControlBot/pull/967) | `tests/test_recibos_evidencia_doc.py` | NO_VERIFICABLE / NO ENSAYADO |
+| `docs/signal-budget-load-script.md` | [#964](https://github.com/pl0n3r/ControlBot/issues/964) | [#970](https://github.com/pl0n3r/ControlBot/pull/970) | `tests/test_carga_senales_doc.py` | NO_VERIFICABLE / NO ENSAYADO |

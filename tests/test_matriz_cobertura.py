@@ -24,6 +24,69 @@ ISSUE = re.compile(r"^\[#(?P<id>\d+)\]\(https://github\.com/pl0n3r/ControlBot/is
 CODE_EVIDENCE = re.compile(r"^Código (?P<code>[-A-Za-z0-9_./]+); prueba (?P<test>[-A-Za-z0-9_./]+); PR #(?P<pr>\d+) MERGED;")
 
 
+# Hoja posterior al snapshot histórico: catálogo explícito de PRs abiertos,
+# sin incrementar ni relajar los 1.194 IDs de la matriz canónica.
+POST_SNAPSHOT = {
+    "docs/operator-runbook.md": (959, 965, "tests/test_runbook_operador_doc.py"),
+    "docs/dr-drill-plan.md": (960, 968, "tests/test_simulacro_dr_doc.py"),
+    "docs/owner-login-acceptance-script.md": (961, 969, "tests/test_guion_login_doc.py"),
+    "docs/emergency-shutdown-plan.md": (962, 966, "tests/test_apagado_emergencia_doc.py"),
+    "docs/evidence-receipts.md": (963, 967, "tests/test_recibos_evidencia_doc.py"),
+    "docs/signal-budget-load-script.md": (964, 970, "tests/test_carga_senales_doc.py"),
+}
+POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
+POST_CELL = re.compile(
+    r"^\u0060(?P<path>docs/[a-z0-9_./-]+\.md)\u0060$"
+)
+POST_LINK_ISSUE = re.compile(
+    r"^\[#(?P<n>\d+)\]\(https://github\.com/pl0n3r/ControlBot/issues/(?P=n)\)$"
+)
+POST_LINK_PR = re.compile(
+    r"^\[#(?P<n>\d+)\]\(https://github\.com/pl0n3r/ControlBot/pull/(?P=n)\)$"
+)
+POST_TEST = re.compile(r"^\u0060(tests/test_[a-z0-9_./-]+\.py)\u0060$")
+
+
+def parse_post_snapshot(text: str) -> dict[str, tuple[int, int, str]]:
+    """Contrato de fuente exacta; detecta duplicados, metadatos falsos y wildcards."""
+    if text.count(POST_TITLE) != 1:
+        raise ValueError("Registro post-snapshot único obligatorio")
+    block = text.split(POST_TITLE, 1)[1].split("\n## ", 1)[0]
+    rows = {}
+    for line in block.splitlines():
+        if not line.startswith("| "):
+            continue
+        if line.startswith("| Ruta |") or line.startswith("| --- |"):
+            continue
+        cells = [x.strip() for x in line.strip("|").split("|")]
+        if len(cells) != 5:
+            raise ValueError("Fila post-snapshot sin cinco columnas")
+        path_match = POST_CELL.fullmatch(cells[0])
+        issue_match = POST_LINK_ISSUE.fullmatch(cells[1])
+        pr_match = POST_LINK_PR.fullmatch(cells[2])
+        test_match = POST_TEST.fullmatch(cells[3])
+        if not all((path_match, issue_match, pr_match, test_match)):
+            raise ValueError("Ruta, Issue, PR o test post-snapshot inválido")
+        path = path_match["path"]
+        if path in rows or path.endswith("/matriz-cobertura.md") or "matriz-cobertura-parte-" in path:
+            raise ValueError("Documento duplicado o partición derivada prohibida")
+        if cells[4] != "NO_VERIFICABLE / NO ENSAYADO":
+            raise ValueError("Registro post-snapshot no acredita producción")
+        rows[path] = (int(issue_match["n"]), int(pr_match["n"]), test_match.group(1))
+    if rows != POST_SNAPSHOT:
+        raise ValueError("Rutas/Issues/PRs de preparación no coinciden con catálogo verificado")
+    return rows
+
+
+def missing_normative_sources(text: str, discovered: set[str]) -> set[str]:
+    """Solo índice histórico + entradas explícitas cubren fuentes documentales."""
+    historical = {SOURCE.fullmatch(row[1])["path"] for row in parse_rows(text)}
+    post = set(parse_post_snapshot(text))
+    if historical & post:
+        raise ValueError("Fuente histórica y post-snapshot duplicada")
+    return discovered - historical - post
+
+
 def parse_rows(text: str) -> list[tuple[str, ...]]:
     if text.count("\n## Matriz\n") != 1 or text.count("\n## Resumen\n") != 1:
         raise ValueError("Secciones Matriz y Resumen únicas obligatorias")
@@ -132,7 +195,14 @@ class MatrizCoberturaTests(unittest.TestCase):
                  for p in (ROOT / "docs").rglob("*.md") if is_normative_document(p)}
         sources = {SOURCE.fullmatch(r[1])["path"] for r in self.rows}
         self.assertGreaterEqual(len(files), 191)
-        self.assertTrue(files <= sources, sorted(files - sources))
+        post = parse_post_snapshot(self.text)
+        self.assertFalse(sources & set(post))
+        self.assertFalse(missing_normative_sources(self.text, files),
+                         sorted(missing_normative_sources(self.text, files)))
+        # Un documento posterior ya presente en HEAD requiere también prueba real.
+        for path, (_, _, test_path) in post.items():
+            if (ROOT / path).is_file():
+                self.assertTrue((ROOT / test_path).is_file(), path)
         self.assertTrue({"README.md", "AGENTES.md"} <= sources)
         self.assertTrue({f"issues/{i}" for i in CONTAINERS} <= sources)
         self.assertGreaterEqual(sum(r[1].startswith("[issues/1:") for r in self.rows), 11)
@@ -156,6 +226,35 @@ class MatrizCoberturaTests(unittest.TestCase):
                      "matriz-cobertura-parte-01-extra.md",
                      "nueva-fuente-normativa.md"):
             self.assertTrue(is_normative_document(ROOT / "docs" / name), name)
+
+    def test_post_snapshot_registro_exacto_y_negativos(self):
+        expected = parse_post_snapshot(self.text)
+        self.assertEqual(expected, POST_SNAPSHOT)
+        self.assertIn("docs/owner-login-acceptance-script.md", expected)
+        unknown = "docs/no-registrada.md"
+        self.assertEqual(missing_normative_sources(self.text, {unknown}), {unknown})
+        self.assertEqual(missing_normative_sources(self.text, set(expected)), set())
+        with self.assertRaisesRegex(ValueError, "único obligatorio"):
+            parse_post_snapshot(self.text.replace(POST_TITLE, "", 1))
+        with self.assertRaisesRegex(ValueError, "duplicado"):
+            line = next(line for line in self.text.splitlines()
+                        if line.startswith("| \u0060docs/owner-login-acceptance-script.md\u0060 |"))
+            parse_post_snapshot(self.text + line + "\n")
+        with self.assertRaisesRegex(ValueError, "no coinciden"):
+            parse_post_snapshot(self.text.replace("issues/961", "issues/9999", 1))
+        with self.assertRaisesRegex(ValueError, "no coinciden"):
+            parse_post_snapshot(self.text.replace("pull/969", "pull/9999", 1))
+        with self.assertRaisesRegex(ValueError, "no coinciden"):
+            parse_post_snapshot(self.text.replace("tests/test_guion_login_doc.py",
+                                                  "tests/test_inexistente.py", 1))
+        with self.assertRaisesRegex(ValueError, "inválido"):
+            parse_post_snapshot(self.text.replace("\u0060docs/owner-login-acceptance-script.md\u0060",
+                                                  "\u0060docs/../owner-login-acceptance-script.md\u0060", 1))
+        with self.assertRaisesRegex(ValueError, "no acredita"):
+            parse_post_snapshot(self.text.replace("NO_VERIFICABLE / NO ENSAYADO", "CUBIERTO", 1))
+        with self.assertRaisesRegex(ValueError, "prohibida"):
+            parse_post_snapshot(self.text.replace("docs/owner-login-acceptance-script.md",
+                                                  "docs/matriz-cobertura-parte-01.md", 1))
 
     def test_sin_cobertura_tiene_issue(self):
         for row in self.rows:

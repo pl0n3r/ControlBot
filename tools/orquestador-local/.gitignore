@@ -6,3 +6,8 @@ agent_blocked.json
 planner_state.json
 config.json
 __pycache__/
+decididas.json
+data_cache.json
+release_state.json
+release_flow.lock
+automerge_pausa.txt

@@ -10,6 +10,12 @@ SOURCE = re.compile(
     r"\[(?P<path>docs/[-\w./]+|README\.md|AGENTES\.md|issues/\d+):L(?P<line>[1-9]\d*)\]"
     r"\(https://github\.com/pl0n3r/ControlBot/(?P<target>blob/[0-9a-f]{40}/[-\w./]+#L\d+|issues/\d+)\)"
 )
+# Exclusiones autenticadas en el corte inicial de #940 (main@cf54959d).
+# Este registro es estable aunque más tarde el integrador incluya todas las partes.
+IN_MAIN_CUT = {int(n) for n in (
+    "604 609 624 635 640 646 653 659 665 673 683 692 698 709 717 722 725 729 731 737 741 744 756 760 767 770 777 780 783 791 794 809 814 820 835 850 855 862 871 877 881 885 887 889 890 891 892 894"
+).split()}
+
 ISSUE = re.compile(r"\[#(?P<id>\d+)\]\(https://github\.com/pl0n3r/ControlBot/issues/(?P=id)\)")
 
 
@@ -29,7 +35,8 @@ class MatrizParte03Tests(unittest.TestCase):
     def test_filas_y_origen(self):
         _, rows = load_rows()
         self.assertEqual([r[0] for r in rows],
-                         [f"CB-{n:04d}" for n in range(599, 897)])
+                         [f"CB-{n:04d}" for n in range(599, 897) if n not in IN_MAIN_CUT])
+        self.assertEqual(len(IN_MAIN_CUT), 48)
         for rid, source, requirement, status, evidence, issue in rows:
             with self.subTest(id=rid):
                 src = SOURCE.fullmatch(source)
@@ -47,12 +54,12 @@ class MatrizParte03Tests(unittest.TestCase):
     def test_estados_y_conteo(self):
         text, rows = load_rows()
         counts = Counter(row[3] for row in rows)
-        self.assertEqual(len(rows), 298)
+        self.assertEqual(len(rows), 250)
         self.assertEqual(set(counts) - set(STATES), set())
         for state in STATES:
             self.assertIn(f"| {state} | {counts[state]} |", text)
-        self.assertIn("| TOTAL | 298 |", text)
-        self.assertEqual(counts["NO_VERIFICABLE"], 298)
+        self.assertIn("| TOTAL | 250 |", text)
+        self.assertEqual(counts["NO_VERIFICABLE"], 250)
         for rid, source, requirement, state, evidence, issue in rows:
             with self.subTest(id=rid):
                 if state == "CUBIERTO":

@@ -243,9 +243,11 @@ class MatrizCoberturaTests(unittest.TestCase):
                         if line.startswith("| \u0060docs/owner-login-acceptance-script.md\u0060 |"))
             parse_post_snapshot(self.text + line + "\n")
         with self.assertRaisesRegex(ValueError, "no coinciden"):
-            parse_post_snapshot(self.text.replace("issues/961", "issues/9999", 1))
+            parse_post_snapshot(self.text.replace("[#961](https://github.com/pl0n3r/ControlBot/issues/961)",
+                                                  "[#9999](https://github.com/pl0n3r/ControlBot/issues/9999)", 1))
         with self.assertRaisesRegex(ValueError, "no coinciden"):
-            parse_post_snapshot(self.text.replace("pull/969", "pull/9999", 1))
+            parse_post_snapshot(self.text.replace("[#969](https://github.com/pl0n3r/ControlBot/pull/969)",
+                                                  "[#9999](https://github.com/pl0n3r/ControlBot/pull/9999)", 1))
         with self.assertRaisesRegex(ValueError, "no coinciden"):
             parse_post_snapshot(self.text.replace("tests/test_guion_login_doc.py",
                                                   "tests/test_inexistente.py", 1))

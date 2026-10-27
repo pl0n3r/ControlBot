@@ -45,27 +45,51 @@ class ContrasteTests(unittest.TestCase):
                 self.assertEqual(r[1], self.index[rid][1])
                 self.assertEqual(r[2], self.index[rid][2])
                 self.assertEqual(r[3], self.index[rid][3])
-                self.assertEqual(r[3], "NO_VERIFICABLE")
+                self.assertEqual(r[3], "CUBIERTO" if rid == "CB-0058" else "NO_VERIFICABLE")
                 self.assertTrue(r[1].startswith("[docs/"))
-                self.assertIn("offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN", r[7])
+                self.assertIn("live=UNKNOWN; operando=UNKNOWN", r[7])
+                self.assertIn("offline=VERIFICADO" if rid == "CB-0058" else "offline=UNKNOWN", r[7])
                 self.assertGreater(len(r[7]), 95)
                 for candidate, prefix in ((r[4], "src/"), (r[5], "tests/")):
                     if candidate == "—":
                         continue
                     self.assertTrue(candidate.startswith("`" + prefix))
                     self.assertTrue((ROOT / candidate.strip("`")).is_file())
+        # Evita contrastes que cortan las cláusulas antes del nombre o salida críticos.
+        for rid, expected in {
+            "CB-0058": "tests/recovery_evidence_scenarios.php",
+            "CB-0117": "CustomerSuccessCore",
+            "CB-0271": "bindings con `ExternalApiSession`",
+            "CB-0296": "body nunca entra al resultado",
+        }.items():
+            self.assertIn(expected, self.report_rows[rid][2])
+            self.assertEqual(self.report_rows[rid][2], self.index[rid][2])
         first = next(line for line in self.document.splitlines() if line.startswith("| CB-0001 |"))
         with self.assertRaisesRegex(AssertionError, "duplicada"):
             rows(self.document.replace(first, first + "\n" + first, 1), "\n## Veredictos\n", 8)
 
     def test_cubierto_enlaza_prueba_existente(self) -> None:
-        # Sin aserción exacta y PR fusionado auditables, jamás promover por nombre.
-        for rid, row in self.report_rows.items():
-            with self.subTest(rid=rid):
-                self.assertEqual(row[3], "NO_VERIFICABLE")
-                self.assertEqual(row[6], "—")
+        # La única promoción offline comprobada usa aserción concreta y PR ya fusionado.
+        covered = {rid: row for rid, row in self.report_rows.items() if row[3] == "CUBIERTO"}
+        self.assertEqual(set(covered), {"CB-0058"})
+        row = covered["CB-0058"]
+        self.assertEqual(row[4], "`src/BackupReceipt.php`")
+        self.assertEqual(row[5], "`tests/test_backup_integrity.py`")
+        self.assertEqual(row[6], "[PR #899](https://github.com/pl0n3r/ControlBot/pull/899)")
+        self.assertTrue((ROOT / row[4].strip("`")).is_file())
+        test_path = ROOT / row[5].strip("`")
+        self.assertTrue(test_path.is_file())
+        source = test_path.read_text(encoding="utf-8")
+        self.assertIn("def test_sha256_digest_shape_fail_closed(", source)
+        self.assertIn("for invalid in (\"short\", \"non_hex\", \"long\"):", source)
+        self.assertIn("def test_no_payload_leak_or_provider_io(", source)
+        self.assertIn("PR #899 MERGED;", self.index["CB-0058"][4])
+        self.assertIn("Código src/BackupReceipt.php; prueba tests/test_backup_integrity.py;", self.index["CB-0058"][4])
+        for rid, item in self.report_rows.items():
+            if rid != "CB-0058":
+                self.assertEqual(item[3], "NO_VERIFICABLE")
+                self.assertEqual(item[6], "—")
                 self.assertIn("UNKNOWN", self.index[rid][4])
-        self.assertNotIn("CUBIERTO", {r[3] for r in self.report_rows.values()})
 
     def test_faltante_tiene_issue(self) -> None:
         for rid, row in self.report_rows.items():

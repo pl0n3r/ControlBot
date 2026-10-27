@@ -28,6 +28,7 @@ CODE_EVIDENCE = re.compile(r"^Código (?P<code>[-A-Za-z0-9_./]+); prueba (?P<tes
 # sin incrementar ni relajar los 1.194 IDs de la matriz canónica.
 POST_SNAPSHOT = {
     "docs/contraste-cb_0301_0600.md": (972, 982, "tests/test_contraste_cb_0301_0600.py"),
+    "docs/contraste-cb_0601_0900.md": (973, 987, "tests/test_contraste_cb_0601_0900.py"),
     "docs/operator-runbook.md": (959, 965, "tests/test_runbook_operador_doc.py"),
     "docs/dr-drill-plan.md": (960, 968, "tests/test_simulacro_dr_doc.py"),
     "docs/owner-login-acceptance-script.md": (961, 969, "tests/test_guion_login_doc.py"),

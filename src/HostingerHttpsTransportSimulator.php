@@ -63,7 +63,7 @@ final class HostingerHttpsTransportSimulator
                 return false;
             }
         }
-        // No documents, emails, phone numbers, names, URLs, tokens or arbitrary payloads.
+        // No documents, emails, contact details, names, URLs, tokens or arbitrary payloads.
         return preg_match('~^fixture:tenant/[a-z][a-z0-9_-]{0,31}$~D', $input['tenant_ref']) === 1
             && preg_match('~^fixture:mutation/[a-z][a-z0-9_-]{0,31}$~D', $input['operation_ref']) === 1
             && in_array($input['method'], ['POST','PATCH','DELETE'], true)

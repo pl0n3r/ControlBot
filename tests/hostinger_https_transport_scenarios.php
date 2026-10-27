@@ -55,7 +55,7 @@ if ($mode === 'contract') {
 } elseif ($mode === 'privacy') {
     $bad = [
         'email' => ['tenant_ref'=>'person@example.com'],
-        'phone' => ['operation_ref'=>'+573001234567'],
+        'numeric_contact' => ['operation_ref'=>'+573001234567'],
         'document' => ['operation_ref'=>'1234567890'],
         'secret' => ['idempotency_key'=>'ghp_example-secret'],
         'unsafe_url' => ['endpoint'=>'https://real.example.net'],

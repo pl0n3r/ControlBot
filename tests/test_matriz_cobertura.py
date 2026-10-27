@@ -123,8 +123,8 @@ class MatrizCoberturaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_rows(self.text.replace("CB-0001", "CB-0002", 1))
         with self.assertRaises(ValueError):
-            parse_rows(self.text.replace("https://github.com/pl0n3r/ControlBot/issues/",
-                                         "https://github.com/otro/proyecto/issues/", 1))
+            parse_rows(self.text.replace(self.rows[0][5],
+                                         "[#0](https://github.com/otro/proyecto/issues/0)", 1))
 
     def test_resumen_por_estado(self):
         actual = Counter(row[3] for row in self.rows)

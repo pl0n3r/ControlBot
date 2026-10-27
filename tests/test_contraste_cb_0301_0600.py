@@ -67,7 +67,7 @@ EXPECTED = frozenset({
 COVERED = {
     "CB-0305": ("src/FactoryAgentActivity.php", "tests/factory_agent_activity_scenarios.php", 756, "b193fe724ff2356e59b304b22038971cc166026c"),
     "CB-0310": ("src/FactoryOrchestratorLiveUi.php", "tests/factory_blockers_panel_scenarios.php", 784, "076041ae28e9b37fff187b500f57c69e12b7700b"),
-    "CB-0358": ("src/FinancialPlanning.php", "tests/financial_planning_scenarios.php", 152, "5a06c508c5fe4a99fc95f45cc5ccf641554757d1"),
+    "CB-0545": ("src/HostingerPublicApi.php", "tests/test_hostinger_public_api.py", 711, "9b7ab6a18b948b8be5ae53e9efa86afd23c0dcf1"),
     "CB-0367": ("src/GitHubHttpTransport.php", "tests/github_http_transport_scenarios.php", 768, "ff810b8da2c3ea60f67ea304947d0d6c80620da9"),
     "CB-0486": ("src/GlobalSearchCore.php", "tests/global_search_scenarios.php", 346, "af2eb3da018bf4dee6e61d80ea1045d7818bdca0"),
     "CB-0489": ("src/GlobalSearchIndex.php", "tests/global_search_index_scenarios.php", 371, "24863694ec8fe12190978fb7830bd54110d29a05"),

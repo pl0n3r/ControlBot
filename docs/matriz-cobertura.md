@@ -4,22 +4,11 @@
 
 ## Alcance, estado y semántica
 
-- **Integración distribuida exacta (ControlBot #940):** `docs/matriz-cobertura.md` conserva el índice exhaustivo de 203 fuentes y 215 obligaciones de referencia, incluidas las 11 AC de #1 y las dos evidencias offline. Cuatro particiones normativas, cada una en un archivo Markdown con filas reales y pruebas propias, completan **1.194 obligaciones de IDs consecutivos** sin duplicarlas ni relajar el máximo de 400 líneas por PR. Las particiones #948–#951 se validan como dependencias requeridas: hasta su merge exacto, la integración permanece DRAFT/UNKNOWN.
+- **Corte incremental 1 de 4:** la auditoría completa tiene 1.194 filas normativas identificadas; esta integración incluye 215 filas y una representante de cada una de las 203 fuentes (191 docs, README, AGENTES y diez Issues), más todas las AC macro de #1 y dos ejemplos CUBIERTO. **Restan 979 filas** en el snapshot completo (blob `104c0155fe636e287698fce3fd4a91b65411ad37`) para los siguientes PRs; este corte NO satisface AC-01 integral ni cierra #940. No se descarta ningún requisito para esquivar el límite de líneas del CI.
 - `CUBIERTO` solo se usa para entregas offline con código/artefacto, prueba y PR fusionado identificado; `EN_CURSO` exige PR OPEN u hoja realmente ejecutable (un epic no cuenta). `SIN_COBERTURA` exige hoja creada con contrato/claims; ante falta de evidencia se usa `NO_VERIFICABLE`, sin inventar backlog. `DESCARTADO` exige motivo y autoridad.
 - Cada capacidad distingue **código offline**, **conexión live** y **operación real**. `UNKNOWN` significa sin prueba completa: no equivale a ausencia demostrada de implementación. La clasificación es conservadora por cláusula; la coincidencia del nombre de un archivo con un contrato no establece `CUBIERTO`.
 - **Puertas que faltan:** correlación exacta cláusula→prueba/PR, autenticidad y alcance de permiso, integración live, operador aprobado, evidencia D-043/D-059 de backup/restore/rollback, privacidad real, acceso owner-only HTTPS y prueba productiva de >400 señales (#625, #760). Un CI verde no constituye atestación operativa.
 - Las líneas de Issue usan numeración ordinal del conjunto de AC normativos extraídos; las líneas de documentos apuntan al archivo y línea original inmutable. Esta matriz no modifica el runtime ni verifica requisitos cuyo acceso exige decisiones humanas o sistemas live.
-
-## Particiones exigidas para la auditoría integral
-
-| Documento de requisitos | Filas esperadas | Issue responsable |
-| --- | ---: | --- |
-| [Parte 01](matriz-cobertura-parte-01.md) | 245 | #948 |
-| [Parte 02](matriz-cobertura-parte-02.md) | 298 | #949 |
-| [Parte 03](matriz-cobertura-parte-03.md) | 298 | #950 |
-| [Parte 04](matriz-cobertura-parte-04.md) | 138 | #951 |
-
-**Integridad de la matriz:** 215 filas en este índice + 245 + 298 + 298 + 138 = **1194** filas únicas. `tests/test_matriz_cobertura.py` exige IDs `CB-0001` a `CB-1194`, orígenes, resúmenes y estados coherentes. Las partes son componentes de esta misma matriz, no otros productos o requisitos nuevos.
 
 ## Matriz
 
@@ -249,9 +238,9 @@
 | EN_CURSO | 0 |
 | SIN_COBERTURA | 0 |
 | DESCARTADO | 0 |
-| NO_VERIFICABLE | 1192 |
-| TOTAL | 1194 |
+| NO_VERIFICABLE | 213 |
+| TOTAL | 215 |
 
-**Porcentaje CUBIERTO:** 0.17%. **Hojas nuevas creadas por esta auditoría: 0**. El índice de 215 filas y las cuatro particiones aportan 1194 requisitos sin inventar coverage o trabajos en curso. El porcentaje representa evidencia rigurosa, no readiness real.
+**Porcentaje CUBIERTO:** 0.93%. **Hojas nuevas creadas por esta auditoría: 0**. El porcentaje corresponde SOLO a este corte parcial, no al resultado completo. No se inventan hojas para estados UNKNOWN.
 
-**Gates pendientes antes del merge de #940:** PRs #948, #949, #950 y #951 fusionados con V3/CI auténticos; integrador exact-HEAD, recuento total, IDs únicos, validación de seguridad y revisión final. Ninguna activación live.
+**Incompleto hasta el último PR de #940:** 979 requisitos pendientes de incorporar desde el blob de referencia. Ningún PR intermedio cierra la hoja ni certifica cobertura funcional o live.

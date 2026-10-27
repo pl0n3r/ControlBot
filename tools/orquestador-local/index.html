@@ -98,12 +98,22 @@ const coD=iso=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bo
 const COL={Factory:"#4cc9f0",Condor:"#f72585",GrindFlow:"#7bd88f",brvtal:"#ff9f43",ControlBot:"#b794f6",AutoFactory:"#ffd166",FactoryRunner:"#9aa5b1"};
 const OWNER="pl0n3r";
 let last=null,sel=null;
+let loadRetry=null;
 async function load(force){
   $('#reload').disabled=true;
-  try{const r=await fetch('/api/data'+(force?'?refresh=1':''));const j=await r.json();
-    if(j.data){last=j;if(!dragging)render()}else{$('#app').innerHTML='<div class="card bad">'+esc(j.error||'Sin datos')+'</div>'}
-  }catch(e){$('#app').innerHTML='<div class="card bad">No se pudo leer el servidor local: '+esc(e)+'</div>'}
+  clearTimeout(loadRetry);
+  const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),90000);
+  let ok=false;
+  try{const r=await fetch('/api/data'+(force?'?refresh=1':''),{signal:ctl.signal});const j=await r.json();
+    if(j.data){const e=j.extra||{};const sig=JSON.stringify([j.data.generated_at,e.release_flow,e.decided,e.planner_on,e.refreshing,(e.agents||[]).map(a=>(a.chats||[]).map(c=>c.chat_id+c.state)),(e.assigned||[]).map(x=>x.issue+x.chat),(e.commands||[]).length]);
+      const changed=sig!==window._sig;window._sig=sig;last=j;ok=true;
+      if(!dragging&&(changed||force)&&!document.hidden)render();
+      if(e.refreshing||(force&&changed)){clearTimeout(window._rf);window._rf=setTimeout(()=>load(false),15000)}}else if(!last){$('#app').innerHTML='<div class="card bad">'+esc(j.error||'Sin datos')+' · reintentando solo…</div>'}
+  }catch(e){if(!last)$('#app').innerHTML='<div class="card bad">No se pudo leer el servidor local ('+esc(e&&e.name==='AbortError'?'tardó demasiado':e)+') · reintentando solo…</div>'}
+  clearTimeout(to);
   $('#reload').disabled=false;
+  // Sin datos todavía (servidor recién arrancado o GitHub sin cuota): reintenta cada 8 s hasta tenerlos.
+  if(!ok&&!last)loadRetry=setTimeout(()=>load(false),8000);
 }
 function hrs(h){return h==null?'—':h<1?(Math.max(1,Math.round(h*60))+' min'):h<48?Math.round(h)+' h':Math.round(h/24)+' d'}
 function ageText(){if(!last)return;const s=Math.round(Date.now()/1000-last.cached_at);$('#age').textContent='leído hace '+(s<90?s+' s':Math.round(s/60)+' min')+(last.error?' · '+last.error:'')}
@@ -125,24 +135,60 @@ function ownerCard(ex,d){
   const pend=it.filter(x=>!x.hecho),done=it.filter(x=>x.hecho);
   const row=x=>`<details style="margin:7px 0;border:1px solid rgba(255,159,67,.25);border-radius:10px;padding:8px 11px;background:rgba(255,159,67,.05)"><summary style="cursor:pointer"><b style="color:#ffd9b0">${esc(x.titulo)}</b> <span class="mut">· destraba ~${x.destraba} · ${esc(x.estado)}</span></summary><div style="margin-top:6px"><div>${esc(x.como)}</div>${(()=>{const g=x.decision&&d?gateOf(d,x.decision.repo,x.decision.n):null;return g?decisionBlock(x.decision.repo,g):''})()}<div class="mut" style="margin-top:4px">Issues: ${x.issues.map(esc).join(', ')}</div></div></details>`;
   const ok=d=>`<div class="mut" style="margin:3px 0">✓ ${esc(d.titulo)} · ${esc(d.estado)}</div>`;
-  return `<div class="sec">Decisiones y acciones tuyas <small>${pend.length} pendientes · se comprueban solas</small></div><div class="card">${pend.length?pend.map(row).join(''):'<div class="alert i" style="border-color:var(--ok);background:rgba(63,185,80,.08)"><b>Nada pendiente tuyo</b></div>'}${done.length?`<details class="fold" style="margin-top:8px"><summary>Ya resueltas (${done.length})</summary><div class="in">${done.map(ok).join('')}</div></details>`:''}</div>`;
+  return `<div class="sec">Decisiones y acciones tuyas <small>${pend.length} ${pend.length===1?'pendiente':'pendientes'} · se comprueban solas</small></div><div class="card">${pend.length?pend.map(row).join(''):'<div class="alert i" style="border-color:var(--ok);background:rgba(63,185,80,.08)"><b>Nada pendiente tuyo</b></div>'}${done.length?`<details class="fold" style="margin-top:8px"><summary>Ya resueltas (${done.length})</summary><div class="in">${done.map(ok).join('')}</div></details>`:''}</div>`;
 }
 function heroKpis(d,ex){
   const t=d.totals,ag=(ex.agents||[]).filter(a=>a.age_s<300);
   let w=0,f=0,e=0,n=0;ag.forEach(a=>(a.chats||[]).forEach(c=>{if(!c.directed)return;n++;if(c.state==='generando')w++;else if(c.state==='esperando_envio')f++;else if(c.state==='error'||c.state==='desconocido')e++}));
-  const own=(d.alerts||[]).filter(a=>a.startsWith('Decisión tuya')).length+(ex.owner_tasks||[]).filter(x=>!x.hecho).length;
+  const own=pendAlerts(d,ex).length+(ex.owner_tasks||[]).filter(x=>!x.hecho).length;
   const T=(v,l,c,i)=>`<div class="tile" style="--c:${c}"><i>${i}</i><b>${v}</b><span>${l}</span></div>`;
   const open=d.repos.reduce((a,r)=>a+r.total,0);
   return '<div class="hero">'+T(open,'issues abiertos · meta 0',open?'#e3a008':'#3fb950','🎯')+T(w,'chats trabajando','#4cc9f0','⚙')+T(f,'chats libres',f?'#3fb950':'#7d8a9a','✓')+T(e,'chats a reemplazar',e?'#f85149':'#7d8a9a','⚠')
     +T((d.ready||[]).length,'PRs listos para fusionar',(d.ready||[]).length?'#3fb950':'#7d8a9a','⇄')+T(t.recover,'frentes sin recuperar (límite '+RECOVER_LIMIT+')',t.recover>RECOVER_LIMIT?'#ff9f43':'#7d8a9a','↺')
     +T(t.merged24,'fusionados en 24 h','#8957e5','★')+T(own,'decisiones tuyas',own?'#f85149':'#3fb950','☝')+'</div>';
 }
+let releaseBusy=false;
+async function relAct(action,extra,msg){
+  if(releaseBusy)return;
+  if(!TOKEN){toast('Sin token: recarga la página',true);return}
+  if(msg&&!confirm(msg))return;
+  releaseBusy=true;
+  const controls=[...document.querySelectorAll('button')].filter(b=>(b.getAttribute('onclick')||'').startsWith('relAct('));
+  controls.forEach(b=>b.disabled=true);
+  try{const r=await fetch('/api/release',{method:'POST',headers:{'Content-Type':'application/json','X-Orq-Token':TOKEN},body:JSON.stringify(Object.assign({action},extra||{}))});const j=await r.json();if(!j.ok)alert(j.error||'No se pudo');else load(true)}catch(e){alert('No se pudo completar la acción')}
+  finally{releaseBusy=false;controls.forEach(b=>b.disabled=false)}
+}
+function releaseCard(ex,d){
+  const rl=(d&&d.release)||{};const upToDate=rl.main_version&&('v'+rl.main_version)===rl.last_release;
+  const r=ex.release_flow||{state:'idle'};const st=r.state||'idle';
+  const btn=(t,c,f)=>`<button onclick="${f}" style="cursor:pointer;padding:5px 14px;border-radius:6px;border:1px solid ${c};background:transparent;color:${c};font-weight:600;margin:4px 6px 0 0">${t}</button>`;
+  let body='';
+  if(st==='idle'||st==='done'||st==='error'){
+    if(st==='done')body+=`<div class="ok"><b>Paso 5 de 5 · completado</b><br>✓ ${esc(r.mensaje||'Release terminado')} (versión ${esc(r.version)})</div>`;
+    if(st==='error')body+=`<div class="bad">✗ ${esc(r.mensaje||'Falló el release')}</div>`;
+    body+=`<div class="mut">Prepara una versión nueva de Factory. Yo hago todo: pauso las fusiones, espero que pase todo, abro la puerta y publico. Tú solo contestas dos preguntas.</div>`+(upToDate?`<div class="ok" style="margin-top:6px">Al día: main tiene la versión ${esc(rl.main_version)} y ya está publicada. No hay nada que preparar hasta que se suba la versión en main.</div>`:btn('▶ Preparar release','#3fb950',"relAct('start',{})"));
+  }else{
+    const txt={ci:'Esperando que todas las pruebas de main pasen en verde…',gate:'Abriendo la puerta de release…',decision:'Todo listo. Necesito tu decisión:',release:'Publicando el release… (unos minutos)',mover_v1:'Casi listo. Falta un paso que solo tú puedes dar:',selftest:'Comprobando que el canal v1 quedó bien…'}[st]||st;
+    const STEPS=[['Pruebas y puerta','Espero que todo esté en verde y abro la puerta','auto'],['Tu decisión','Confirmas si publicamos','tú'],['Publicando','Corre el release de Factory','auto'],['Mover v1','Apuntas la etiqueta v1 al commit nuevo','tú'],['Verificación','Compruebo que el canal v1 quedó bien','auto']];
+    const idx={ci:1,gate:1,decision:2,release:3,mover_v1:4,selftest:5}[st]||1;
+    body+=`<div style="margin:2px 0 10px"><b>Versión ${esc(r.version)} · paso ${idx} de 5</b><ol style="list-style:none;margin:8px 0 0;padding:0">`+STEPS.map(([t,dsc,who],n)=>{const s=n+1<idx?'done':n+1===idx?'now':'next';const ic=s==='done'?'✓':s==='now'?'●':'○';const col=s==='done'?'#3fb950':s==='now'?'#4cc9f0':'#6b7a90';
+      return `<li style="display:flex;gap:10px;padding:5px 0;color:${s==='next'?'#8b949e':'inherit'}"><span style="color:${col};font-weight:700;width:16px">${ic}</span><span><b>${n+1}. ${esc(t)}</b> <span class="mut">· ${who==='tú'?'lo haces tú':'lo hago yo'}</span><br><span class="mut">${esc(dsc)}</span>${s==='now'?`<br><span style="color:#4cc9f0">${esc(txt)}</span>`:''}</span></li>`}).join('')+`</ol></div>`;
+    if(st==='ci'&&(r.missing||[]).length)body+=`<div class="mut">Faltan: ${(r.missing||[]).map(esc).join(', ')}</div>`;
+    if(st==='decision'){
+      body+=`<div class="mut" style="margin:4px 0">¿Publicamos la versión ${esc(r.version)} de Factory ahora? Es lo que usan todos los proyectos. <a target="_blank" href="https://github.com/${OWNER}/Factory/issues/${r.gate}">ver puerta #${r.gate} ↗</a></div>`;
+      body+=r.decision?`<div class="mut">Enviaste ${esc(r.decision)}; esperando que se cierre la puerta…</div>`:btn('A · Sí, publicar','#3fb950',"relAct('decide',{option:'A'},'¿Publicar Factory "+esc(r.version||'')+" ahora?')")+btn('B · No, esperar','#e3a008',"relAct('decide',{option:'B'})");
+    }
+    if(st==='mover_v1')body+=`<div class="mut" style="margin:4px 0">Hay que apuntar la etiqueta <code>v1</code> a la versión nueva (${esc((r.sha||'').slice(0,8))}). Es lo que hace que los demás proyectos reciban el cambio.</div>`+btn('Mover v1 ahora','#f85149',"relAct('move_v1',{},'¿Mover v1 al commit "+esc((r.sha||'').slice(0,8))+"? Todos los proyectos recibirán esta versión.')");
+    body+=btn('Cancelar','#8b949e',"relAct('cancel',{},'¿Cancelar el release y reanudar las fusiones?')");
+  }
+  return `<div class="card"><h2>Release de Factory</h2>${body}</div>`;
+}
 function chatCards(ex){
   const ag=(ex.agents||[]).filter(a=>a.age_s<300);
   if(!ag.length)return '<div class="card"><div class="mut">Ningún navegador conectado. Abre chatgpt.com con la extensión AutoFactory (1.7.27+) y pulsa PLAY: cada pestaña nueva se convierte en un agente.</div></div>';
   const asg={};(ex.assigned||[]).forEach(a=>asg[a.iid+'|'+a.chat]=a);
   const COLS={generando:'#4cc9f0',esperando_envio:'#3fb950',error:'#f85149',desconocido:'#e3a008',detenido:'#7d8a9a',limite:'#e3a008',sesion_cerrada:'#f85149'};
-  const TXT={generando:'Trabajando',esperando_envio:'Libre · esperando orden',error:'En error · ciérrala y abre una nueva',desconocido:'Sin script nuevo · ciérrala y abre una nueva',detenido:'Detenido · pulsa PLAY en esa ventana',limite:'Límite de uso',sesion_cerrada:'Sesión cerrada'};
+  const TXT={generando:'Trabajando',detenido:'Detenido · pulsa PLAY en esa ventana',esperando_envio:'Libre · esperando orden',error:'En error · ciérrala y abre una nueva',desconocido:'Sin script nuevo · ciérrala y abre una nueva',detenido:'Detenido',limite:'Límite de uso',sesion_cerrada:'Sesión cerrada'};
   let html='';
   ag.forEach((a,gi)=>(a.chats||[]).forEach(c=>{
     const st=c.state,col=COLS[st]||'#7d8a9a',as=asg[a.instance_id+'|'+c.chat_id];
@@ -275,7 +321,7 @@ function graph(d,ex){
   const head=`<div style="position:absolute;left:${cx0-130}px;top:6px;width:260px;height:56px;border:1px solid #4cc9f0;border-radius:10px;background:#0f1a2b;text-align:center;padding:6px 8px;line-height:1.35">
     <div style="color:#4cc9f0">● orquestador · ${esc(ex.kill||'?')}</div><div style="font-size:11.5px">${act} frentes · ${t.available} disponibles · <span style="color:${t.recover?'#ff9f43':'inherit'}">${t.recover} sin recuperar</span></div></div>`;
   const heads=repos.map((r,ci)=>`<div style="position:absolute;left:${PADX+ci*COLW}px;top:${TOP-6}px;width:${CW}px;height:36px;border:1px solid ${COL[r]||'#456'};border-radius:8px;background:#0f1722;padding:7px 10px;font-weight:700;color:${COL[r]||'#fff'}">${esc(r)} <span class="mut" style="font-weight:400">${by[r].length} frente${by[r].length>1?'s':''}</span></div>`).join('');
-  const cardsHtml=cards.map(c=>{const f=c.f,p=pct(f);return `<div class="card2" role="button" tabindex="0" aria-label="${esc(f.repo+' #'+f.n+' · '+c.st.k)}" data-key="${esc(c.key)}" data-r="${esc(f.repo)}" data-n="${f.n}" data-x="${c.x}" data-y="${c.y}" style="left:${c.x}px;top:${c.y}px;width:${CW}px;height:${CH}px;border-color:${c.st.c}${c.st.dash?';border-style:dashed':''}">
+  const cardsHtml=cards.map(c=>{const f=c.f,p=pct(f);return `<div class="card2" role="button" tabindex="0" aria-label="Abrir detalle de ${esc(f.repo)} #${f.n}: ${esc(f.title)}" data-key="${esc(c.key)}" data-r="${esc(f.repo)}" data-n="${f.n}" data-x="${c.x}" data-y="${c.y}" style="left:${c.x}px;top:${c.y}px;width:${CW}px;height:${CH}px;border-color:${c.st.c}${c.st.dash?';border-style:dashed':''}">
     <div style="display:flex;justify-content:space-between"><b style="color:${COL[f.repo]||'#fff'}">#${f.n}</b><span style="color:${c.st.c}">${esc(c.st.k)}${f.pr&&f.pr.fails?' ✕'+f.pr.fails:f.pr&&!f.pr.draft&&f.pr.merge==='CLEAN'?' ✓':''}</span></div>
     <div class="ttl">${esc(f.title)}</div>
     <div class="bar"><i style="width:${p}%;background:${c.st.c}"></i></div><div class="mut" style="font-size:10.5px">${hrs(f.h)} sin actividad${f.pr?' · PR #'+f.pr.n:''}</div>${chatFor(ex,f)}</div>`}).join('');
@@ -397,7 +443,21 @@ async function mergeAll(){
   toast('Fusionados '+ok+(bad.length?' · fallaron '+bad.join(', '):''),bad.length>0);load(true);
 }
 function gateOf(d,repo,n){const r=(d.repos||[]).find(x=>x.repo===repo);const g=r&&(r.gates||[]).find(x=>x.n===n);return g&&g.gate?g:null}
+function simpleDecision(repo,g){
+  const sm=g.simple,gt=g.gate;const rec=sm.recomendada;
+  const opts=Object.entries(sm.opciones||{}).map(([id,o])=>`<div style="border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:10px 12px;margin:8px 0;display:flex;gap:12px;align-items:center;justify-content:space-between"><div style="min-width:0"><div style="font-size:15px"><b>${esc(o.titulo)}</b>${id===rec?' <span class="ok">★ lo que yo haría</span>':''}</div><div class="mut" style="margin-top:4px;font-size:14px">${esc(o.que_pasa)}</div></div><button onclick="decide('${esc(repo)}',${g.n},'${esc(id)}')" style="cursor:pointer;flex:none;padding:9px 16px;border-radius:8px;border:1px solid ${id===rec?'#3fb950':'#58a6ff'};background:transparent;color:${id===rec?'#3fb950':'#58a6ff'};font-weight:700;font-size:14px">Elegir ${esc(id)}</button></div>`).join('');
+  const tech=gt?`<details style="margin-top:6px"><summary class="mut" style="cursor:pointer">Ver el detalle técnico (lo que escribieron los chats)</summary><div style="margin-top:6px">${decisionBlockTech(repo,g)}</div></details>`:'';
+  return `<div style="margin:10px 0"><div class="mut" style="font-size:12px">${esc(repo)} #${g.n} · <a target="_blank" href="https://github.com/${OWNER}/${esc(repo)}/issues/${g.n}">abrir ↗</a></div><div style="font-size:17px;margin:4px 0"><b>${esc(sm.pregunta)}</b></div><div style="font-size:14px;line-height:1.5">${esc(sm.resumen)}</div>${sm.por_que?`<div class="mut" style="margin-top:6px;font-size:13px">Por qué lo recomiendo: ${esc(sm.por_que)}</div>`:''}${opts}${tech}</div>`;
+}
+function pendAlerts(d,ex){const dc=(ex&&ex.decided)||{};return (d.alerts||[]).filter(a=>{if(!a.startsWith('Decisión tuya'))return false;const m=a.match(/en (\S+) #(\d+)/);return !(m&&dc[m[1]+'#'+m[2]])})}
 function decisionBlock(repo,g){
+  const dc=(window.LASTEX&&window.LASTEX.decided||{})[repo+'#'+g.n];
+  if(dc){const so=g.simple&&g.simple.opciones&&g.simple.opciones[dc.opt];const o=g.gate&&g.gate.options.find(x=>x.id===dc.opt);
+    return `<div style="margin:8px 0;padding:10px 12px;border:1px solid #2f6f3d;border-radius:10px;background:rgba(63,185,80,.08)"><b>${esc(repo)} #${g.n}</b> · <a target="_blank" href="https://github.com/${OWNER}/${esc(repo)}/issues/${g.n}">abrir ↗</a><div class="ok" style="margin-top:4px">✓ Ya elegiste la opción ${esc(dc.opt)}${so?' · '+esc(so.titulo):o?' · '+esc(o.label):''}</div><div class="mut">GitHub lo está procesando; en unos minutos esta tarjeta desaparece sola.</div></div>`}
+  if(g.simple)return simpleDecision(repo,g);
+  return decisionBlockTech(repo,g);
+}
+function decisionBlockTech(repo,g){
   const gt=g.gate,rec=gt.recommendation,safe=gt.safe_default;
   const opts=gt.options.map(o=>{
     const tag=(o.id===rec?'<span class="ok"> ★ recomendada</span>':'')+(o.id===safe?' <span class="mut">· opción segura por defecto</span>':'');
@@ -406,21 +466,59 @@ function decisionBlock(repo,g){
 }
 async function decide(repo,n,opt){
   if(!TOKEN){toast('Sin token: recarga la página',true);return}
-  const g=gateOf(last.data,repo,n);const o=g&&g.gate.options.find(x=>x.id===opt);
-  if(!confirm('Vas a registrar tu decisión en '+repo+' #'+n+':\n\nOpción '+opt+' · '+(o?o.label:'')+'\n\n'+(o?o.effect:'')+'\n\nSe publicará /decidir '+opt+' en el issue. ¿Confirmas?'))return;
+  const g=gateOf(last.data,repo,n);const so=g&&g.simple&&g.simple.opciones&&g.simple.opciones[opt];const o=g&&g.gate.options.find(x=>x.id===opt);
+  const titulo=so?so.titulo:(o?o.label:''),efecto=so?so.que_pasa:(o?o.effect:'');
+  if(!confirm((g&&g.simple?g.simple.pregunta+'\n\n':'')+'Vas a responder: «'+titulo+'» (opción '+opt+')\n\n'+efecto+'\n\nEsto queda registrado en '+repo+' #'+n+'. ¿Confirmas?'))return;
   try{const r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json','X-Orq-Token':TOKEN},body:JSON.stringify({action:'decide',repo,number:n,option:opt})});const j=await r.json();toast(j.ok?(j.msg||'Decisión registrada'):(j.error||'No se pudo registrar'),!j.ok);if(j.ok)load(true)}catch(e){toast('No se pudo registrar la decisión',true)}
 }
+
+function stallItems(d,ex){
+  const out=[],now=Date.now()/1000;
+  const st={};(ex.agents||[]).filter(a=>a.age_s<300).forEach(a=>(a.chats||[]).forEach(c=>{st[a.instance_id+'|'+c.chat_id]=c.state}));
+  (ex.assigned||[]).forEach(a=>{const s=st[a.iid+'|'+a.chat];if(!s)return;const m=Math.round((a.age_s||0)/60);
+    if(s==='generando'&&m>=45&&m<720)out.push(['w','Chat sin avanzar: '+a.issue,'lleva '+m+' min generando desde el último envío; revisa si se trabó.']);
+    if((s==='error'||s==='desconocido')&&m>=10&&m<720)out.push(['w','Chat a reemplazar: '+a.issue,'está en estado «'+s+'» desde hace '+m+' min.'])});
+  const r=ex.release_flow||{};if(r.since&&['ci','gate','release','selftest','mover_v1','decision'].includes(r.state)){const m=Math.round((now-r.since)/60);
+    const lim=(r.state==='ci'||r.state==='gate')?90:(r.state==='decision'||r.state==='mover_v1')?60:30;
+    if(m>lim)out.push([(r.state==='decision'||r.state==='mover_v1')?'bad':'w','Release detenido en «'+r.state+'»','lleva '+m+' min en este paso'+((r.state==='decision'||r.state==='mover_v1')?': te toca a ti, abre la pestaña Release.':'.')])}
+  let seen={};try{seen=JSON.parse(localStorage.getItem('orq_gates')||'{}')}catch(e){}
+  const dc=ex.decided||{};const cur={};
+  (d.repos||[]).forEach(rp=>(rp.gates||[]).forEach(g=>{const k=rp.repo+'#'+g.n;if(dc[k])return;cur[k]=seen[k]||now;const h=(now-cur[k])/3600;
+    if(h>=24)out.push(['bad','Decisión sin responder hace '+Math.round(h)+' h: '+k,(g.simple&&g.simple.pregunta)||g.title||'']) }));
+  try{localStorage.setItem('orq_gates',JSON.stringify(cur))}catch(e){}
+  return out;
+}
+function liveCard(d,ex){
+  const by={};(d.goals||[]).forEach(g=>{const o=by[g.repo]||(by[g.repo]={done:0,total:0,n:0});o.done+=g.done;o.total+=g.total;o.n++});
+  let D=0,T=0;Object.values(by).forEach(o=>{D+=o.done;T+=o.total});const pct=T?Math.round(D/T*100):0;
+  const bars=Object.entries(by).sort((a,b)=>(b[1].done/b[1].total)-(a[1].done/a[1].total)).map(([r,o])=>{const p=o.total?Math.round(o.done/o.total*100):0;
+    return `<div style="display:grid;grid-template-columns:110px 1fr 120px;gap:10px;align-items:center;margin:6px 0"><b style="color:${COL[r]||'inherit'}">${esc(r)}</b><div style="height:10px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden"><i style="display:block;height:100%;width:${p}%;background:#4cc9f0"></i></div><span class="mut">${o.done}/${o.total} · ${p}%</span></div>`}).join('');
+  const tasks=ex.owner_tasks||[];const pend=pendAlerts(d,ex).length;const rl=d.release||{};
+  const gate=(ok,t,m)=>`<div style="display:flex;gap:10px;margin:6px 0;align-items:flex-start"><b style="color:${ok?'#3fb950':'#e3a008'};min-width:18px">${ok?'✓':'○'}</b><div><b>${esc(t)}</b>${m?` <span class="mut">· ${esc(m)}</span>`:''}</div></div>`;
+  const gates=tasks.map(x=>gate(x.hecho,x.titulo,x.estado)).join('')
+    +gate(pend===0,'Decisiones tuyas en el panel',pend?pend+' por responder':'ninguna pendiente')
+    +gate(rl.main_version&&('v'+rl.main_version)===rl.last_release,'Release de Factory al día',rl.main_version?('main '+rl.main_version+' · publicada '+(rl.last_release||'?')):'')
+    +gate((d.health||[]).length>0&&(d.health||[]).every(x=>x.ok),'Sitios en producción arriba',(d.health||[]).length?(d.health||[]).map(x=>x.nombre).join(', '):'sin verificaciones');
+  const open=d.repos.reduce((a,r)=>a+r.total,0);
+  const ownerOpen=d.repos.reduce((a,r)=>a+((r.counts||{})['del dueño (live/decisión)']||0),0);
+  return `<div class="sec">Camino al live <small>lo que falta para publicar de verdad; el go-live lo decides tú</small></div>
+  <div class="card"><div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap"><div style="font-size:42px;font-weight:800;color:#4cc9f0">${pct}%</div><div><b>del plan de metas está hecho</b><div class="mut">${D} de ${T} tareas de las metas · ${open} issues abiertos en total · ${ownerOpen} esperan decisión del dueño</div></div></div></div>
+  <div class="card"><h2>Avance por proyecto</h2>${bars||'<div class="mut">Sin metas calculadas.</div>'}</div>
+  <div class="card"><h2>Puertas y requisitos</h2>${gates}<div class="mut" style="margin-top:8px">Salir en vivo (go-live), gasto y datos reales no se activan desde aquí: solo cuando tú lo digas.</div></div>`;
+}
 function attentionCard(d,ex){
-  const items=[];const rel=d.release||{},t=d.totals;
-  (d.repos||[]).forEach(r=>(r.gates||[]).forEach(g=>{if(g.gate)items.push(['bad','Decisión tuya pendiente',decisionBlock(r.repo,g),true]);else items.push(['bad','Decisión tuya pendiente',r.repo+' #'+g.n+': '+g.title])}));
+  const items=[];stallItems(d,ex).forEach(i=>items.push(i));const rel=d.release||{},t=d.totals;
+  (d.repos||[]).forEach(r=>(r.gates||[]).forEach(g=>{const dn=((ex&&ex.decided)||{})[r.repo+'#'+g.n];if(dn&&g.gate){items.push(['ok','Decisión tomada',decisionBlock(r.repo,g),true]);return}if(g.gate)items.push(['bad','Decisión tuya pendiente',decisionBlock(r.repo,g),true]);else items.push(['bad','Decisión tuya pendiente',r.repo+' #'+g.n+': '+g.title])}));
   if(rel.main_version&&rel.last_release&&('v'+rel.main_version)!==rel.last_release)items.push(['bad','Release preparada sin publicar',`main tiene la versión ${rel.main_version} y la última release es ${rel.last_release}: abre la puerta de release (release-window).`]);
   else if(rel.ahead>=15)items.push(['w','Muchos cambios sin publicar en v1',`main lleva ${rel.ahead} commits por delante de v1; conviene preparar la siguiente release.`]);
   (ex.owner_blockers||[]).slice(-6).forEach(b=>items.push(['w','Bloqueado, ningún chat puede avanzarlo: '+b.issue,'frenado por '+((b.blockers||[]).join(', ')||'causa no identificada')+' · '+b.why]));
   if(ex.kill&&ex.kill!=='RUNNING')items.push(['bad','Kill switch en '+ex.kill,'Los agentes no avanzan hasta que vuelva a RUNNING (Factory #767).']);
   (d.health||[]).filter(x=>!x.ok).forEach(x=>items.push(['bad','Sitio caído: '+x.nombre,(x.code?('HTTP '+x.code):x.error||'sin respuesta')]));
   if(d.rate.remaining<800)items.push(['w','Cupo de la API de GitHub bajo',d.rate.remaining+'/'+d.rate.limit+': evita consultas amplias.']);
-  const body=items.length?items.map(([c,t,m,trustedHtml])=>`<div class="alert ${c==='bad'?'':'w'}"><b>${esc(t)}</b> · ${trustedHtml?m:esc(m)}</div>`).join(''):'<div class="alert i" style="border-color:var(--ok);background:rgba(63,185,80,.08)"><b>Nada requiere tu atención ahora.</b> Los agentes avanzan solos.</div>';
-  return `<div class="card"><h2>Necesita tu atención (${items.length})</h2>${body}</div>`;
+  const done=items.filter(i=>i[0]==='ok'),todo=items.filter(i=>i[0]!=='ok');
+  const body=todo.length?todo.map(([c,t,m,trustedHtml])=>`<div class="alert ${c==='bad'?'':'w'}"><b>${esc(t)}</b> · ${trustedHtml?m:esc(m)}</div>`).join(''):'<div class="alert i" style="border-color:var(--ok);background:rgba(63,185,80,.08)"><b>Nada requiere tu atención ahora.</b> Los agentes avanzan solos.</div>';
+  const doneH=done.length?`<details class="fold" style="margin-top:10px"><summary>Decisiones ya tomadas (${done.length}) <small>GitHub las está procesando</small></summary><div class="in">${done.map(([c,t,m])=>m).join('')}</div></details>`:'';
+  return `<div class="card"><h2>Necesita tu atención (${todo.length})</h2>${body}${doneH}</div>`;
 }
 function goalsRows(g){
   return g.map(x=>{const p=x.total?Math.round(x.done/x.total*100):0;const c=p>=100?'#3fb950':p>=40?'#4cc9f0':'#e3a008';
@@ -462,24 +560,52 @@ function render(){
   const j=last,d=j.data,ex=j.extra||{},t=d.totals;window.LASTEX=ex;
   const kp=(v,l,c)=>`<div class="card kpi"><b class="${c||''}">${v}</b><span>${l}</span></div>`;
   $('#p-kill').className='pill '+(ex.kill==='RUNNING'?'ok':'bad');$('#p-kill').innerHTML='kill switch <b>'+esc(ex.kill||'?')+'</b>';
-  const own=(d.alerts||[]).filter(a=>a.startsWith('Decisión tuya')).length;$('#p-owner').className='pill '+(own?'bad':'ok');$('#p-owner').innerHTML='decisiones tuyas <b>'+own+'</b>';
+  const own=pendAlerts(d,ex).length;$('#p-owner').className='pill '+(own?'bad':'ok');$('#p-owner').innerHTML='decisiones tuyas <b>'+own+'</b>';
   const c=ex.condor;$('#p-condor').innerHTML='Condor <b>'+(c&&c.version?('v'+esc(c.version)):'?')+'</b>';
   $('#p-rate').className='pill '+(d.rate.remaining<800?'warn':'');$('#p-rate').innerHTML='API <b>'+d.rate.remaining+'/'+d.rate.limit+'</b>';
-  let h='';
+  const P={};let h='',curp='resumen';const pg=n=>{P[curp]=(P[curp]||'')+h;h='';curp=n};
+  const freeN=(ex.agents||[]).filter(a=>a.age_s<300).reduce((t,a)=>t+(a.chats||[]).filter(c=>c.directed&&c.state==='esperando_envio').length,0);
+  const rf=ex.release_flow||{state:'idle'},pon=ex.planner_on!==false;
+  const qt=(pgn,ico,n,l,cls)=>`<a href="#${pgn}" class="card kpi qt" style="cursor:pointer;text-decoration:none;color:inherit"><b class="${cls||''}">${ico} ${n}</b><span>${l}</span></a>`;
+  const qa=(t,c,f)=>`<button onclick="${f}" style="cursor:pointer;padding:6px 14px;border-radius:6px;border:1px solid ${c};background:transparent;color:${c};font-weight:600;margin:4px 8px 0 0">${t}</button>`;
   h+=heroKpis(d,ex);
-  h+=ownerCard(ex,d);
+  h+='<div class="sec">Accesos rápidos</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">'+
+    qt('decisiones','⚑',own,'decisiones y avisos tuyos',own?'bad':'ok')+
+    qt('release','⬆',rf.state==='idle'?'—':rf.state,'release de Factory',rf.state==='decision'||rf.state==='mover_v1'?'bad':'')+
+    qt('agentes','💬',freeN,'chats libres',freeN?'warn':'ok')+
+    qt('live','🚀',(()=>{let D=0,T=0;(d.goals||[]).forEach(g=>{D+=g.done;T+=g.total});return T?Math.round(D/T*100)+'%':'—'})(),'camino al live')+
+    qt('avance','✓',d.ready.length,'PRs listos para fusionar')+
+    qt('frentes','◎',fronts(d).length,'frentes en el mapa')+'</div>';
+  h+='<div class="card"><h2>Acciones rápidas</h2>'+
+    ((d.release&&d.release.main_version&&('v'+d.release.main_version)===d.release.last_release)?'':qa('▶ Preparar release de Factory','#3fb950',"location.hash='release';relAct('start',{})"))+
+    qa(pon?'■ Detener reparto':'▶ Iniciar reparto',pon?'#f85149':'#3fb950',`setPlanner(${pon?'false':'true'})`)+
+    qa('Ver decisiones','#4cc9f0',"location.hash='decisiones'")+
+    qa('Actualizar ahora','#8b949e',"load(true)")+'</div>';
+  {let w=0,f=0,e=0,o=0;(ex.agents||[]).filter(a=>a.age_s<300).forEach(a=>(a.chats||[]).forEach(c=>{if(!c.directed)return;if(c.state==='generando')w++;else if(c.state==='esperando_envio')f++;else if(c.state==='error')e++;else o++}));
+   h+=`<div class="card"><h2>Chats ahora</h2><div style="display:flex;flex-wrap:wrap;gap:18px"><span class="ok">● trabajando <b>${w}</b></span><span class="warn">● libres <b>${f}</b></span><span class="bad">● en error <b>${e}</b></span><span class="mut">● otros <b>${o}</b></span><span class="mut">reparto ${pon?'activo':'detenido'}</span></div><a href="#agentes">ver detalle por chat →</a></div>`}
   h+=roadTo0(d);
+  pg('decisiones');
+  h+=ownerCard(ex,d);
   h+=attentionCard(d,ex);
+  pg('frentes');
   h+='<div class="sec">Mapa de frentes <small>'+fronts(d).length+' frentes · cada uno con su chat</small></div>';
   h+='<div class="card">'+graph(d,ex)+legend()+'</div>';
   h+='<div class="card"><h2>Detalle del frente</h2><div id="detail">'+detail()+'</div></div>';
+  pg('agentes');
   h+='<div class="sec">Agentes en vivo <small>'+chatsSummary(ex)+'</small></div>';
   h+=chatCards(ex);
+  pg('release');
+  h+=releaseCard(ex,d);
+  h+=prodCard(d);
+  pg('avance');
   if(d.ready.length){const cmd=d.ready.map(p=>`gh pr merge ${p.n} -R ${OWNER}/${p.repo} --squash`).join('\n');
     h+='<div class="sec">Listo para fusionar</div><div class="card"><h2>Un clic en el panel, o copia los comandos</h2><table><tr><th>Repo</th><th>PR</th><th>Título</th></tr>'+d.ready.map(p=>`<tr><td>${esc(p.repo)}</td><td><a target="_blank" href="https://github.com/${OWNER}/${p.repo}/pull/${p.n}">#${p.n}</a></td><td>${esc(p.title)}</td></tr>`).join('')+'</table><button id="copy" style="margin-top:8px">Copiar comandos</button><pre id="cmds">'+esc(cmd)+'</pre></div>'}
   h+='<div class="sec">Avance <small>metas calculadas con el trabajo pendiente real</small></div>';
-  h+='<div class="grid2">'+goalsCard(d)+prodCard(d)+'</div>';
+  h+=goalsCard(d);
   h+=unlockCard(d);
+  pg('live');
+  h+=liveCard(d,ex);
+  pg('detalle');
   h+='<div class="sec">Detalle <small>despliega lo que necesites</small></div>';
   h+='<details class="fold"><summary>Bloqueados y cuellos de botella</summary><div class="in">'+blockedBoard(d)+'<div class="card" style="box-shadow:none"><h2>Cuellos de botella</h2>'+bottlenecks(d)+'</div></div></details>';
   h+='<details class="fold"><summary>Hitos y ritmo de fusión</summary><div class="in">'+hitosCard(d)+'<div class="card" style="box-shadow:none"><h2>PRs fusionados por día (hora Colombia)</h2>'+daysChart(d)+'</div></div></details>';
@@ -487,8 +613,25 @@ function render(){
    d.repos.map(r=>{const c=r.counts;return `<tr><td><b style="color:${COL[r.repo]||'inherit'}">${esc(r.repo)}</b></td><td class="n ${c.disponible?'ok':''}">${c.disponible||0}</td><td class="n">${c.reservado||0}</td><td class="n">${c['en revisión']||0}</td><td class="n ${c['requiere recuperación']?'warn':''}">${c['requiere recuperación']||0}</td><td class="n">${c.bloqueado||0}</td><td class="n">${c['del dueño (live/decisión)']||0}</td><td class="n">${c.planificado||0}</td><td class="n">${r.merged24}</td><td class="n">${r.merged96}</td><td class="n">${r.merged168}</td><td class="n ${r.last_merge_h>12?'bad':''}">${hrs(r.last_merge_h)}</td><td class="n">${r.prs.length}</td></tr>`}).join('')+'</table></div>')+'</div></details>';
   h+='<details class="fold"><summary>Bus de mensajes</summary><div class="in">'+('<div class="card"><h2>Bus de mensajes (comentarios y eventos reales)</h2><div class="bus">'+((ex.bus||[]).slice().reverse().map(b=>`<div><span class="tag">${esc(coT(b.t))}</span> <span class="tag">${esc(b.repo)}#${esc(b.n)}</span> <span class="tag or">${esc(b.tipo)}</span> ${esc(b.txt)}</div>`).join('')||'<div class="mut">Sin mensajes recientes</div>')+'</div></div>')+'</div></details>';
   if(Object.keys(d.errors).length)h+='<div class="card bad">Repos con error de lectura: '+esc(JSON.stringify(d.errors))+'</div>';
-  h+='<div class="mut" style="text-align:center">Lectura y control de agentes · '+esc(d.generated_at)+' · se refresca cada 60 s (caché de 3 min para cuidar el cupo de GitHub)</div>';
+  P[curp]=(P[curp]||'')+h;
+  const NAV=[['resumen','Resumen'],['decisiones','Decisiones'+(own?' ('+own+')':'')],['release','Release'],['live','Live'],['agentes','Agentes'],['frentes','Frentes'],['avance','Avance'],['detalle','Detalle']];
+  let tab=(location.hash||'#resumen').slice(1);if(!P[tab])tab='resumen';
+  const nav='<nav id="menu" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 -2px 14px;position:sticky;top:0;z-index:20;background:rgba(11,15,20,.92);backdrop-filter:blur(8px);padding:10px 4px;border-bottom:1px solid rgba(88,166,255,.18)">'+NAV.map(([k,l])=>`<a href="#${k}" style="padding:6px 14px;border-radius:8px;text-decoration:none;font-weight:600;border:1px solid ${k===tab?'#4cc9f0':'#2b3b52'};color:${k===tab?'#4cc9f0':'#cfe3ff'};background:${k===tab?'rgba(76,201,240,.12)':'transparent'}">${l}</a>`).join('')+'</nav>';
+  if(tab==='detalle'){
+    const tmp=document.createElement('div');tmp.innerHTML=P.detalle;
+    const fs=[...tmp.querySelectorAll(':scope > details.fold')];
+    if(fs.length){
+      let cur=0;try{cur=+localStorage.getItem('orq_dsub')||0}catch(e){}if(cur>=fs.length)cur=0;
+      const subnav='<div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px">'+fs.map((f,i)=>`<button onclick="try{localStorage.setItem('orq_dsub',${i})}catch(e){};render()" style="cursor:pointer;padding:6px 14px;border-radius:8px;border:1px solid ${i===cur?'#58a6ff':'rgba(88,166,255,.25)'};background:${i===cur?'rgba(88,166,255,.15)':'transparent'};color:inherit;font-weight:${i===cur?700:500}">${f.querySelector('summary').textContent}</button>`).join('')+'</div>';
+      P.detalle='<div class="sec">Detalle <small>elige qué ver</small></div>'+subnav+'<div style="display:grid;gap:14px">'+fs[cur].querySelector('.in').innerHTML+'</div>';
+    }
+  }
+  h=nav+P[tab]+'<div class="mut" style="text-align:center;margin-top:10px">Lectura y control de agentes · '+esc(d.generated_at)+' · se refresca cada 60 s</div>';
+  const _open=new Set([...document.querySelectorAll('#app details[open]')].map(x=>(x.querySelector('summary')||{}).textContent));
+  const _sy=window.scrollY;
   $('#app').innerHTML=h;
+  document.querySelectorAll('#app details').forEach(x=>{const k=(x.querySelector('summary')||{}).textContent;if(_open.has(k))x.open=true});
+  if(_sy&&Math.abs(window.scrollY-_sy)>2)window.scrollTo(0,_sy);
   document.querySelectorAll('.node').forEach(n=>n.onclick=()=>{sel={repo:n.dataset.r,n:+n.dataset.n};$('#detail').innerHTML=detail()});
   wire(d);
   recoverAlert(d);
@@ -496,6 +639,8 @@ function render(){
   const b=$('#copy');if(b)b.onclick=()=>{navigator.clipboard.writeText($('#cmds').textContent);b.textContent='Copiado'};
   ageText();
 }
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&last)render()});
+window.addEventListener('hashchange',()=>{if(last){render();window.scrollTo(0,0)}});
 $('#reload').onclick=()=>load(true);
 load(false);setInterval(()=>load(false),60000);setInterval(ageText,5000);
 </script>

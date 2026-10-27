@@ -288,11 +288,11 @@ class MatrizCoberturaTests(unittest.TestCase):
     def test_union_global_1194_estricta(self):
         rows = full_matrix()
         counts = Counter(row[3] for row in rows)
-        self.assertEqual(counts, {"CUBIERTO": 12, "NO_VERIFICABLE": 1182})
+        self.assertEqual(counts, {"CUBIERTO": 30, "NO_VERIFICABLE": 1164})
         self.assertEqual(len(rows), 1194)
-        summary = ("**Consolidado de 1.194 obligaciones:** CUBIERTO=12, "
+        summary = ("**Consolidado de 1.194 obligaciones:** CUBIERTO=30, "
                    "EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, "
-                   "NO_VERIFICABLE=1182; porcentaje CUBIERTO=1.01%. "
+                   "NO_VERIFICABLE=1164; porcentaje CUBIERTO=2.51%. "
                    "**Hojas nuevas creadas: 0.**")
         self.assertIn(summary, self.text)
 

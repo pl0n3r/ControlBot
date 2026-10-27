@@ -495,8 +495,14 @@ function liveCard(d,ex){
     +gate((d.health||[]).every(x=>x.ok),'Sitios en producción arriba',(d.health||[]).map(x=>x.nombre).join(', '));
   const open=d.repos.reduce((a,r)=>a+r.total,0);
   const ownerOpen=d.repos.reduce((a,r)=>a+((r.counts||{})['del dueño (live/decisión)']||0),0);
+  const mx=(ex&&ex.matrices)||{};
+  const mrow=(r)=>{const m=mx[r]||{};const cell=(o,good)=>{if(!o)return '<span class="mut">pendiente</span>';const c=o.counts||{},t=o.total||0;const g=good.reduce((a,k)=>a+(c[k]||0),0);const sc=c.SIN_COBERTURA||0;const nv=(c.NO_VERIFICABLE||0)+(c.DEL_DUEÑO||0);return `<b>${t}</b> filas · <span class="ok">${g} hechas</span> · ${c.EN_CURSO||0} en curso · <span style="color:${sc?'#f85149':'inherit'}">${sc} sin cobertura</span>${nv?` · ${nv} por verificar o del dueño`:''}`};
+    return `<tr><td><b style="color:${COL[r]||'inherit'}">${esc(r)}</b></td><td>${cell(m.matriz,['CUBIERTO'])}</td><td>${cell(m.salida,['LISTO'])}</td></tr>`};
+  const have=Object.values(mx).filter(m=>m.matriz||m.salida).length;
+  const mtab=`<div class="card"><h2>Matrices de cobertura y salida a producción <small class="mut">${have} de ${Object.keys(d.repos.reduce((o,r)=>(o[r.repo]=1,o),{})).length||7} repos con datos · se leen de GitHub cada 15 min</small></h2><table><tr><th>Proyecto</th><th>Matriz de cobertura</th><th>Lista de salida a producción</th></tr>${d.repos.map(r=>mrow(r.repo)).join('')}</table><div class="mut" style="margin-top:6px">«Hechas» solo cuenta filas con evidencia. «Sin cobertura» son tareas que aún no existen y que los chats deben crear.</div></div>`;
   return `<div class="sec">Camino al live <small>lo que falta para publicar de verdad; el go-live lo decides tú</small></div>
   <div class="card"><div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap"><div style="font-size:42px;font-weight:800;color:#4cc9f0">${pct}%</div><div><b>del plan de metas está hecho</b><div class="mut">${D} de ${T} tareas de las metas · ${open} issues abiertos en total · ${ownerOpen} esperan decisión del dueño</div></div></div></div>
+  ${mtab}
   <div class="card"><h2>Avance por proyecto</h2>${bars||'<div class="mut">Sin metas calculadas.</div>'}</div>
   <div class="card"><h2>Puertas y requisitos</h2>${gates}<div class="mut" style="margin-top:8px">Salir en vivo (go-live), gasto y datos reales no se activan desde aquí: solo cuando tú lo digas.</div></div>`;
 }

@@ -206,5 +206,37 @@
     "que_pasa": "No se crea nada. Lo que depende de esto en ControlBot sigue parado."
    }
   }
+ },
+ "ControlBot#939": {
+  "pregunta": "¿Probamos juntas las piezas de GitHub que ya construimos?",
+  "resumen": "ControlBot ya tiene varias piezas separadas para LEER GitHub. Esta tarea las une en una prueba, con datos de mentira y todo apagado. No se conecta a tu GitHub real ni enciende nada.",
+  "recomendada": "A",
+  "por_que": "Comprueba que las piezas encajan sin ningún riesgo. Si no encajan, es mejor saberlo ahora que al salir en vivo.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, hacer la prueba de unión",
+    "que_pasa": "Se crea una tarea pequeña. Todo con datos inventados y apagado. Sin claves ni conexión real."
+   },
+   "B": {
+    "titulo": "No, esperar",
+    "que_pasa": "No se crea nada. Las piezas siguen separadas y sin probarse juntas."
+   }
+  }
+ },
+ "brvtal#1033": {
+  "pregunta": "¿Dejamos que DeepL traduzca brvtal al inglés, gratis y empezando por una página?",
+  "resumen": "Ya creaste tu cuenta gratuita de DeepL. Con A, los chats construyen la conexión y se prueba con una sola página pública que tú revisas. Tú guardas la clave en el servidor; nunca va en GitHub ni en el chat.",
+  "recomendada": "A",
+  "por_que": "No cuesta nada, solo toca texto público y si falla el sitio muestra el español. Se apaga con un interruptor.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, probar DeepL gratis en pequeño",
+    "que_pasa": "Se crea la tarea de la conexión real. Tú guardas la clave en el servidor. Cualquier cobro o traducción masiva pide otra decisión."
+   },
+   "B": {
+    "titulo": "No, mantenerlo apagado",
+    "que_pasa": "El sitio sigue solo en español y la cuenta de DeepL queda sin uso."
+   }
+  }
  }
 }

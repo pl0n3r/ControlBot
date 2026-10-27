@@ -609,6 +609,44 @@ def build_alerts(repos, avail, recover):
     return out
 
 
+
+MATRIX = {"at": 0, "data": {}}
+MATRIX_DOCS = (("matriz", "docs/matriz-cobertura.md"), ("salida", "docs/lista-salida-produccion.md"))
+MATRIX_STATES = ("CUBIERTO", "LISTO", "EN_CURSO", "SIN_COBERTURA", "DEL_DUEÑO", "DESCARTADO", "NO_APLICA", "NO_VERIFICABLE")
+
+
+def matrix_collect():
+    """Cuenta los estados de la matriz de cobertura y de la lista de salida a producción de cada repo (solo lectura)."""
+    import base64
+    out = {}
+    for repo in [r for r in READY_REPOS] + [r for r in REPOS if r not in READY_REPOS]:
+        row = {}
+        for key, path in MATRIX_DOCS:
+            try:
+                raw = gh(["api", f"repos/{OWNER}/{repo}/contents/{path}", "-q", ".content"], timeout=40)
+                text = base64.b64decode(raw).decode("utf-8", "replace")
+            except Exception:
+                continue
+            counts = {}
+            for line in text.splitlines():
+                cells = [c.strip() for c in line.strip().strip("|").split("|")]
+                if line.startswith("|") and len(cells) >= 3 and cells[2].strip("*` ") in MATRIX_STATES:
+                    st = cells[2].strip("*` ")
+                    counts[st] = counts.get(st, 0) + 1
+            if counts:
+                row[key] = {"counts": counts, "total": sum(counts.values())}
+        out[repo] = row
+    MATRIX["data"], MATRIX["at"] = out, time.time()
+
+
+def matrix_loop():
+    while True:
+        try:
+            matrix_collect()
+        except Exception as exc:
+            log_action(f"FALLO lectura de matrices -> {str(exc)[:120]}")
+        time.sleep(900)
+
 DATA_CACHE_FILE = HERE / "data_cache.json"
 
 
@@ -1730,7 +1768,7 @@ class Handler(BaseHTTPRequestHandler):
             cmds = [{"instance_id": k[0], "chat_id": (None if k[1] == "*" else k[1]), "want": c["want"], "acked": c["acked"], "age_s": round(now - c["at"])} for k, c in CMD.items()]
             assigned = [{"iid": k[0], "chat": k[1], "issue": v.get("issue"), "n": v.get("n", 1), "age_s": round(now - v["at"])}
                         for k, v in ASSIGNED.items() if v.get("issue")]
-            extra = {"decided": DECIDED, "refreshing": _refreshing.is_set(), "release_flow": release_flow.public_state(), "planner_on": PLANNER["on"], "commands": cmds, "assigned": assigned, "owner_blockers": [{"issue": k, **v} for k, v in OWNER_BLOCKERS.items()], "owner_tasks": OWNER_TASKS["items"], "agents": sorted(agents, key=lambda a: a["label"]), "kill": g.get("kill"), "condor": g.get("condor"), "bus": g.get("bus", [])[-40:], "owner": g.get("owner", [])}
+            extra = {"decided": DECIDED, "refreshing": _refreshing.is_set(), "release_flow": release_flow.public_state(), "matrices": MATRIX["data"], "planner_on": PLANNER["on"], "commands": cmds, "assigned": assigned, "owner_blockers": [{"issue": k, **v} for k, v in OWNER_BLOCKERS.items()], "owner_tasks": OWNER_TASKS["items"], "agents": sorted(agents, key=lambda a: a["label"]), "kill": g.get("kill"), "condor": g.get("condor"), "bus": g.get("bus", [])[-40:], "owner": g.get("owner", [])}
             self._send(200, json.dumps({"data": data, "error": err, "cached_at": _cache["at"], "extra": extra}), "application/json")
         elif self.path.startswith("/data.json"):
             self._send(200, json.dumps(grafo_orq.DATA), "application/json")
@@ -1855,6 +1893,7 @@ if __name__ == "__main__":
     release_flow._acquire_leader()
     release_flow.load()
     threading.Thread(target=keep_warm, daemon=True).start()
+    threading.Thread(target=matrix_loop, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
     threading.Thread(target=grafo_orq.loop, daemon=True).start()
     srv = ThreadingHTTPServer((HOST, port), Handler)

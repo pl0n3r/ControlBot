@@ -8,6 +8,12 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs" / "matriz-cobertura.md"
+DERIVED_PART = re.compile(r"matriz-cobertura-parte-0[1-4]\.md")
+
+
+def is_normative_document(path: Path) -> bool:
+    """Solo las cuatro particiones canónicas son salidas, no fuentes."""
+    return path.name != DOC.name and DERIVED_PART.fullmatch(path.name) is None
 ALLOWED = frozenset({"CUBIERTO", "EN_CURSO", "SIN_COBERTURA", "DESCARTADO", "NO_VERIFICABLE"})
 CONTAINERS = frozenset({1, 45, 55, 182, 561, 567, 625, 750, 751, 760})
 SOURCE = re.compile(
@@ -95,13 +101,31 @@ class MatrizCoberturaTests(unittest.TestCase):
 
     def test_cubre_todas_las_fuentes(self):
         files = {f"docs/{p.relative_to(ROOT / 'docs').as_posix()}"
-                 for p in (ROOT / "docs").rglob("*.md") if p.name != DOC.name}
+                 for p in (ROOT / "docs").rglob("*.md") if is_normative_document(p)}
         sources = {SOURCE.fullmatch(r[1])["path"] for r in self.rows}
         self.assertGreaterEqual(len(files), 191)
         self.assertTrue(files <= sources, sorted(files - sources))
         self.assertTrue({"README.md", "AGENTES.md"} <= sources)
         self.assertTrue({f"issues/{i}" for i in CONTAINERS} <= sources)
         self.assertGreaterEqual(sum(r[1].startswith("[issues/1:") for r in self.rows), 11)
+
+    def test_particiones_son_salidas_no_fuentes(self):
+        self.assertFalse(is_normative_document(DOC))
+        for number in range(1, 5):
+            name = f"matriz-cobertura-parte-{number:02d}.md"
+            path = ROOT / "docs" / name
+            self.assertFalse(is_normative_document(path), name)
+            if path.is_file():
+                self.assertTrue(
+                    (ROOT / "tests" / f"test_matriz_parte_{number:02d}.py").is_file(),
+                    f"Partición sin test de integridad: {name}",
+                )
+        for name in ("matriz-cobertura-parte-externa.md",
+                     "matriz-cobertura-parte-00.md",
+                     "matriz-cobertura-parte-05.md",
+                     "matriz-cobertura-parte-01-extra.md",
+                     "nueva-fuente-normativa.md"):
+            self.assertTrue(is_normative_document(ROOT / "docs" / name), name)
 
     def test_sin_cobertura_tiene_issue(self):
         for row in self.rows:

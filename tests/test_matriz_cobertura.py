@@ -68,6 +68,8 @@ def parse_post_snapshot(text: str) -> dict[str, tuple[int, int, str]]:
         if not all((path_match, issue_match, pr_match, test_match)):
             raise ValueError("Ruta, Issue, PR o test post-snapshot inválido")
         path = path_match["path"]
+        if any(segment in ("", ".", "..") for segment in path.split("/")):
+            raise ValueError("Ruta post-snapshot inválido (path traversal)")
         if path in rows or path.endswith("/matriz-cobertura.md") or "matriz-cobertura-parte-" in path:
             raise ValueError("Documento duplicado o partición derivada prohibida")
         if cells[4] != "NO_VERIFICABLE / NO ENSAYADO":

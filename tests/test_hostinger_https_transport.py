@@ -11,7 +11,7 @@ CLASS = ROOT / "src/HostingerHttpsTransportSimulator.php"
 
 def scenario(name):
     command = [
-        "php", "-n", "-d", "allow_url_fopen=0",
+        "php", "-d", "allow_url_fopen=0",
         str(SCRIPT), name,
     ]
     run = subprocess.run(

@@ -27,6 +27,7 @@ CODE_EVIDENCE = re.compile(r"^Código (?P<code>[-A-Za-z0-9_./]+); prueba (?P<tes
 # Hoja posterior al snapshot histórico: catálogo explícito de PRs abiertos,
 # sin incrementar ni relajar los 1.194 IDs de la matriz canónica.
 POST_SNAPSHOT = {
+    "docs/contraste-cb_0001_0300.md": (971, 996, "tests/test_contraste_cb_0001_0300.py"),
     "docs/contraste-cb_0301_0600.md": (972, 982, "tests/test_contraste_cb_0301_0600.py"),
     "docs/contraste-cb_0601_0900.md": (973, 987, "tests/test_contraste_cb_0601_0900.py"),
     "docs/contraste-cb_0901_1189.md": (974, 995, "tests/test_contraste_cb_0901_1189.py"),
@@ -284,7 +285,7 @@ class MatrizCoberturaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_rows(self.text.replace("| NO_VERIFICABLE |", "| CERTIFICADO |", 1))
         with self.assertRaises(ValueError):
-            parse_rows(self.text.replace("CB-0001", "CB-0011", 1))
+            parse_rows(self.text.replace("| CB-0001 |", "| CB-0011 |", 1))
         with self.assertRaises(ValueError):
             parse_rows(self.text.replace(self.rows[0][5],
                                          "[#0](https://github.com/otro/proyecto/issues/0)", 1))
@@ -292,11 +293,11 @@ class MatrizCoberturaTests(unittest.TestCase):
     def test_union_global_1194_estricta(self):
         rows = full_matrix()
         counts = Counter(row[3] for row in rows)
-        self.assertEqual(counts, {"CUBIERTO": 30, "NO_VERIFICABLE": 1164})
+        self.assertEqual(counts, {"CUBIERTO": 31, "NO_VERIFICABLE": 1163})
         self.assertEqual(len(rows), 1194)
-        summary = ("**Consolidado de 1.194 obligaciones:** CUBIERTO=30, "
+        summary = ("**Consolidado de 1.194 obligaciones:** CUBIERTO=31, "
                    "EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, "
-                   "NO_VERIFICABLE=1164; porcentaje CUBIERTO=2.51%. "
+                   "NO_VERIFICABLE=1163; porcentaje CUBIERTO=2.60%. "
                    "**Hojas nuevas creadas: 0.**")
         self.assertIn(summary, self.text)
 

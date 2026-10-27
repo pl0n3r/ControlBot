@@ -4,11 +4,20 @@
 
 ## Alcance, estado y semántica
 
-- **Corte incremental 1 de 4:** la auditoría completa tiene 1.194 filas normativas identificadas; esta integración incluye 215 filas y una representante de cada una de las 203 fuentes (191 docs, README, AGENTES y diez Issues), más todas las AC macro de #1 y dos ejemplos CUBIERTO. **Restan 979 filas** en el snapshot completo (blob `104c0155fe636e287698fce3fd4a91b65411ad37`) para los siguientes PRs; este corte NO satisface AC-01 integral ni cierra #940. No se descarta ningún requisito para esquivar el límite de líneas del CI.
+- **Matriz de cinco artefactos:** este índice conserva 215 filas representativas (203 fuentes, todas las AC macro de #1 y 2 entregas offline); cuatro particiones gobernadas contienen las 979 filas restantes. El test de integración exige unión disjunta **1.194/1.194 IDs** procedentes del blob inmutable `104c0155fe636e287698fce3fd4a91b65411ad37`. Ningún requisito se elimina, duplica ni promociona por inferencia para esquivar el límite de 400 líneas/PR. Los cinco archivos constituyen la matriz completa.
 - `CUBIERTO` solo se usa para entregas offline con código/artefacto, prueba y PR fusionado identificado; `EN_CURSO` exige PR OPEN u hoja realmente ejecutable (un epic no cuenta). `SIN_COBERTURA` exige hoja creada con contrato/claims; ante falta de evidencia se usa `NO_VERIFICABLE`, sin inventar backlog. `DESCARTADO` exige motivo y autoridad.
 - Cada capacidad distingue **código offline**, **conexión live** y **operación real**. `UNKNOWN` significa sin prueba completa: no equivale a ausencia demostrada de implementación. La clasificación es conservadora por cláusula; la coincidencia del nombre de un archivo con un contrato no establece `CUBIERTO`.
 - **Puertas que faltan:** correlación exacta cláusula→prueba/PR, autenticidad y alcance de permiso, integración live, operador aprobado, evidencia D-043/D-059 de backup/restore/rollback, privacidad real, acceso owner-only HTTPS y prueba productiva de >400 señales (#625, #760). Un CI verde no constituye atestación operativa.
 - Las líneas de Issue usan numeración ordinal del conjunto de AC normativos extraídos; las líneas de documentos apuntan al archivo y línea original inmutable. Esta matriz no modifica el runtime ni verifica requisitos cuyo acceso exige decisiones humanas o sistemas live.
+
+## Particiones integrantes de la misma matriz
+
+- [Parte 01 — 245 requisitos](matriz-cobertura-parte-01.md) · [#948](https://github.com/pl0n3r/ControlBot/issues/948)
+- [Parte 02 — 245 requisitos](matriz-cobertura-parte-02.md) · [#949](https://github.com/pl0n3r/ControlBot/issues/949)
+- [Parte 03 — 250 requisitos](matriz-cobertura-parte-03.md) · [#950](https://github.com/pl0n3r/ControlBot/issues/950)
+- [Parte 04 — 239 requisitos](matriz-cobertura-parte-04.md) · [#951](https://github.com/pl0n3r/ControlBot/issues/951)
+
+Cada partición conserva una fila por obligación con ID, fuente, estado, evidencia y issue, además de una prueba de integridad independiente. El índice conserva las 215 filas de las fuentes originales. La prueba integradora falla si falta una parte, una fila, un test, si se duplica un ID o si aparece un ID extraño; no infiere completitud desde un enlace.
 
 ## Matriz
 
@@ -243,4 +252,6 @@
 
 **Porcentaje CUBIERTO:** 0.93%. **Hojas nuevas creadas por esta auditoría: 0**. El porcentaje corresponde SOLO a este corte parcial, no al resultado completo. No se inventan hojas para estados UNKNOWN.
 
-**Incompleto hasta el último PR de #940:** 979 requisitos pendientes de incorporar desde el blob de referencia. Ningún PR intermedio cierra la hoja ni certifica cobertura funcional o live.
+### Resultado consolidado de las cinco matrices
+
+**Consolidado de 1.194 obligaciones:** CUBIERTO=2, EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, NO_VERIFICABLE=1192; porcentaje CUBIERTO=0.17%. **Hojas nuevas creadas: 0.** El recuento local de 215 filas en la tabla precedente describe únicamente este índice; la función `full_matrix` valida el agregado de 1.194 filas reales. No autoriza go-live ni concluye que los requisitos NO_VERIFICABLE estén ausentes.

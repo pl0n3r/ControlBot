@@ -13,7 +13,7 @@ DERIVED_PART = re.compile(r"matriz-cobertura-parte-0[1-4]\.md")
 
 def is_normative_document(path: Path) -> bool:
     """Solo las cuatro particiones canónicas son salidas, no fuentes."""
-    return path.name != DOC.name and DERIVED_PART.fullmatch(path.name) is None
+    return path != DOC and not (path.parent == ROOT / "docs" and DERIVED_PART.fullmatch(path.name))
 ALLOWED = frozenset({"CUBIERTO", "EN_CURSO", "SIN_COBERTURA", "DESCARTADO", "NO_VERIFICABLE"})
 CONTAINERS = frozenset({1, 45, 55, 182, 561, 567, 625, 750, 751, 760})
 SOURCE = re.compile(
@@ -93,6 +93,34 @@ def parse_summary(text: str) -> dict[str, int]:
     return totals
 
 
+PART_NUMBERS = (1, 2, 3, 4)
+PART_COUNTS = (245, 245, 250, 239)
+
+
+def full_matrix() -> list[tuple[str, ...]]:
+    """Fail-closed ante parte ausente, IDs ausentes/duplicados o pruebas faltantes."""
+    gathered = parse_rows(DOC.read_text(encoding="utf-8"))
+    ids = {row[0] for row in gathered}
+    if len(gathered) != 215:
+        raise ValueError("Índice de fuentes original no esperado")
+    for number, expected in zip(PART_NUMBERS, PART_COUNTS):
+        path = ROOT / "docs" / f"matriz-cobertura-parte-{number:02d}.md"
+        qa = ROOT / "tests" / f"test_matriz_parte_{number:02d}.py"
+        if not path.is_file() or not qa.is_file():
+            raise ValueError(f"Parte o prueba de integridad ausente: {number}")
+        subset = parse_rows(path.read_text(encoding="utf-8"))
+        if len(subset) != expected:
+            raise ValueError(f"Cardinalidad de parte {number} distinta")
+        for row in subset:
+            if row[0] in ids:
+                raise ValueError(f"Requisito duplicado: {row[0]}")
+            ids.add(row[0])
+        gathered.extend(subset)
+    expected_ids = {f"CB-{n:04d}" for n in range(1, 1195)}
+    if ids != expected_ids or len(gathered) != 1194:
+        raise ValueError("Matriz incompleta o IDs ajenos al snapshot")
+    return gathered
+
 class MatrizCoberturaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -120,7 +148,9 @@ class MatrizCoberturaTests(unittest.TestCase):
                     (ROOT / "tests" / f"test_matriz_parte_{number:02d}.py").is_file(),
                     f"Partición sin test de integridad: {name}",
                 )
-        for name in ("matriz-cobertura-parte-externa.md",
+        for name in ("sub/matriz-cobertura-parte-01.md",
+                     "sub/matriz-cobertura-parte-04.md",
+                     "matriz-cobertura-parte-externa.md",
                      "matriz-cobertura-parte-00.md",
                      "matriz-cobertura-parte-05.md",
                      "matriz-cobertura-parte-01-extra.md",
@@ -149,6 +179,17 @@ class MatrizCoberturaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_rows(self.text.replace(self.rows[0][5],
                                          "[#0](https://github.com/otro/proyecto/issues/0)", 1))
+
+    def test_union_global_1194_estricta(self):
+        rows = full_matrix()
+        counts = Counter(row[3] for row in rows)
+        self.assertEqual(counts, {"CUBIERTO": 2, "NO_VERIFICABLE": 1192})
+        self.assertEqual(len(rows), 1194)
+        summary = ("**Consolidado de 1.194 obligaciones:** CUBIERTO=2, "
+                   "EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, "
+                   "NO_VERIFICABLE=1192; porcentaje CUBIERTO=0.17%. "
+                   "**Hojas nuevas creadas: 0.**")
+        self.assertIn(summary, self.text)
 
     def test_resumen_por_estado(self):
         actual = Counter(row[3] for row in self.rows)

@@ -610,6 +610,7 @@ def build_alerts(repos, avail, recover):
 
 
 DATA_CACHE_FILE = HERE / "data_cache.json"
+_fresh_collection = threading.Event()
 
 
 def _load_disk_cache():
@@ -671,6 +672,8 @@ def get_data(force=False):
         try:
             data = collect()
             _cache.update(at=time.time(), data=data, error=None)
+            if force:
+                _fresh_collection.set()
             try:
                 DATA_CACHE_FILE.write_text(json.dumps({"at": _cache["at"], "data": data}, ensure_ascii=False), encoding="utf-8")
             except (OSError, TypeError, ValueError):
@@ -682,10 +685,11 @@ def get_data(force=False):
 
 
 _refreshing = threading.Event()
+_refresh_guard = threading.Lock()
 
 
 def request_refresh():
-    if _refreshing.is_set():
+    if not _refresh_guard.acquire(blocking=False):
         return
 
     def run():
@@ -696,7 +700,12 @@ def request_refresh():
             pass
         finally:
             _refreshing.clear()
-    threading.Thread(target=run, daemon=True).start()
+            _refresh_guard.release()
+    try:
+        threading.Thread(target=run, daemon=True).start()
+    except Exception:
+        _refresh_guard.release()
+        raise
 
 
 DELIVERED = {}
@@ -1835,6 +1844,8 @@ if __name__ == "__main__":
         tick_n = 0
         while True:
             time.sleep(30)
+            if not _fresh_collection.is_set():
+                continue  # ninguna acción basada en la caché persistida antes de una lectura real
             tick_n += 1
             try:
                 t0 = time.time()

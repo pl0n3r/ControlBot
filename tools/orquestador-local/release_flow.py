@@ -12,6 +12,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -32,6 +33,7 @@ ACTIVE = ("ci", "gate", "decision", "release", "mover_v1", "selftest")
 V1_JOB = "Verificar canal v1 antes del self-test"
 
 LOCK_FILE = HERE / "release_flow.lock"
+_FLOW_LOCK = threading.RLock()
 _lock_fd = None
 LEADER = False  # solo el proceso que tiene el candado puede escribir el estado y avanzar el flujo
 FLOW = {"state": "idle"}
@@ -201,87 +203,92 @@ def current_version():
 
 
 def start(version=None, adopt_gate=None, sha=None):
-    version = version or current_version()
-    published = gh(["release", "list", "-R", FULL, "--limit", "5", "--json", "tagName", "-q", ".[].tagName"]).split()
-    if f"v{version}" in published:
-        raise ValueError(f"la versión {version} ya está publicada; sube la versión en main antes de preparar otra release")
-    if FLOW.get("state") in ACTIVE:
-        raise ValueError("ya hay un release en curso")
-    if not _valid_release_version(version):
-        raise ValueError("versión inválida")
-    rev = max(FLOW.get("rev", 0), _disk_rev())
-    FLOW.clear()
-    FLOW["rev"] = rev
-    FLOW["version"] = version
-    pause(True)
-    if adopt_gate:
-        _set("decision", gate=int(adopt_gate), sha=sha or main_sha())
-    else:
-        _set("ci", missing=[])
-    return public_state()
+    with _FLOW_LOCK:
+        version = version or current_version()
+        published = gh(["release", "list", "-R", FULL, "--limit", "5", "--json", "tagName", "-q", ".[].tagName"]).split()
+        if f"v{version}" in published:
+            raise ValueError(f"la versión {version} ya está publicada; sube la versión en main antes de preparar otra release")
+        if FLOW.get("state") in ACTIVE:
+            raise ValueError("ya hay un release en curso")
+        if not _valid_release_version(version):
+            raise ValueError("versión inválida")
+        rev = max(FLOW.get("rev", 0), _disk_rev())
+        FLOW.clear()
+        FLOW["rev"] = rev
+        FLOW["version"] = version
+        pause(True)
+        if adopt_gate:
+            _set("decision", gate=int(adopt_gate), sha=sha or main_sha())
+        else:
+            _set("ci", missing=[])
+        return public_state()
 
 
 def cancel():
-    pause(False)
-    rev = max(FLOW.get("rev", 0), _disk_rev())
-    FLOW.clear()
-    FLOW["rev"] = rev
-    FLOW["state"] = "idle"
-    save()
-    _log("OK   release Factory: cancelado por el dueño")
-    return public_state()
+    with _FLOW_LOCK:
+        pause(False)
+        rev = max(FLOW.get("rev", 0), _disk_rev())
+        FLOW.clear()
+        FLOW["rev"] = rev
+        FLOW["state"] = "idle"
+        save()
+        _log("OK   release Factory: cancelado por el dueño")
+        return public_state()
 
 
 def decide(option):
-    if FLOW.get("state") != "decision":
-        raise ValueError("no hay una decisión de release pendiente")
-    if option not in ("A", "B"):
-        raise ValueError("opción inválida")
-    gate = FLOW["gate"]
-    state, _ = gate_decision(gate)
-    if state != "open":
-        raise ValueError("la puerta ya no está abierta")
-    gh(["issue", "comment", str(gate), "-R", FULL, "--body", f"/decidir {option}"])
-    FLOW["decision"] = option
-    save()
-    _log(f"OK   release Factory: decisión del dueño desde el panel -> /decidir {option} en #{gate}")
-    return public_state()
+    with _FLOW_LOCK:
+        if FLOW.get("state") != "decision":
+            raise ValueError("no hay una decisión de release pendiente")
+        if option not in ("A", "B"):
+            raise ValueError("opción inválida")
+        gate = FLOW["gate"]
+        state, recorded = gate_decision(gate)
+        if FLOW.get("decision") is not None or recorded is not None:
+            raise ValueError("esta puerta ya tiene una decisión registrada")
+        if state != "open":
+            raise ValueError("la puerta ya no está abierta")
+        gh(["issue", "comment", str(gate), "-R", FULL, "--body", f"/decidir {option}"])
+        FLOW["decision"] = option
+        save()
+        _log(f"OK   release Factory: decisión del dueño desde el panel -> /decidir {option} en #{gate}")
+        return public_state()
 
 
 def move_v1():
-    if FLOW.get("state") != "mover_v1":
-        raise ValueError("todavía no toca mover v1")
-    target = FLOW.get("sha")
-    if not target or main_sha() != target:
-        raise ValueError("main cambió: hay que repetir la puerta antes de mover v1")
-    gh(["api", "-X", "PATCH", f"repos/{FULL}/git/refs/tags/v1", "-f", f"sha={target}", "-F", "force=true"])
-    _log(f"OK   release Factory: v1 movido a {target[:8]} desde el panel")
-    _set("selftest", target_sha=target)
-    dispatch_release(FLOW["gate"])
-    FLOW["selftest_since"] = time.time()
-    save()
-    return public_state()
+    with _FLOW_LOCK:
+        if FLOW.get("state") != "mover_v1":
+            raise ValueError("todavía no toca mover v1")
+        target = FLOW.get("sha")
+        if not target or main_sha() != target:
+            raise ValueError("main cambió: hay que repetir la puerta antes de mover v1")
+        gh(["api", "-X", "PATCH", f"repos/{FULL}/git/refs/tags/v1", "-f", f"sha={target}", "-F", "force=true"])
+        _log(f"OK   release Factory: v1 movido a {target[:8]} desde el panel")
+        dispatch_release(FLOW["gate"])
+        _set("selftest", target_sha=target, selftest_since=time.time())
+        return public_state()
 
 
 # ----------------------------------------------------------------------------- motor
 def tick():
-    if not LEADER:
-        return
-    st = FLOW.get("state")
-    if st not in ACTIVE:
-        return
-    now = time.time()
-    if now - FLOW.get("polled", 0) < INTERVAL.get(st, 30):
-        return
-    FLOW["polled"] = now
-    try:
-        _step(st, now)
-    except Exception as exc:  # noqa: BLE001 — un fallo de red no rompe el flujo; se reintenta en el siguiente ciclo
-        FLOW["mensaje"] = f"reintentando: {str(exc)[:120]}"
-        if "rate limit" in str(exc).lower():
-            FLOW["polled"] = now + 240  # espera 5 min completos antes de volver a preguntar
-        _log(f"FALLO release Factory ({st}) -> {str(exc)[:160]}")
-    save()
+    with _FLOW_LOCK:
+        if not LEADER:
+            return
+        st = FLOW.get("state")
+        if st not in ACTIVE:
+            return
+        now = time.time()
+        if now - FLOW.get("polled", 0) < INTERVAL.get(st, 30):
+            return
+        FLOW["polled"] = now
+        try:
+            _step(st, now)
+        except Exception as exc:  # noqa: BLE001 — un fallo de red no rompe el flujo; se reintenta en el siguiente ciclo
+            FLOW["mensaje"] = f"reintentando: {str(exc)[:120]}"
+            if "rate limit" in str(exc).lower():
+                FLOW["polled"] = now + 240  # espera 5 min completos antes de volver a preguntar
+            _log(f"FALLO release Factory ({st}) -> {str(exc)[:160]}")
+        save()
 
 
 def _fail(msg):

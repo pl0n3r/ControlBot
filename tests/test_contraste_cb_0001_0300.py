@@ -19,7 +19,7 @@ def rows(text: str, heading: str, width: int) -> dict[str, tuple[str, ...]]:
     section = text.split(heading, 1)[1].split(HEAD, 1)[0]
     result: dict[str, tuple[str, ...]] = {}
     for line in section.splitlines():
-        if not re.match(r"^\\| CB-\\d{4} \\|", line):
+        if not re.match(r"^\| CB-\d{4} \|", line):
             continue
         cells = tuple(c.strip() for c in line.strip("|").split("|"))
         if len(cells) != width or cells[0] in result:
@@ -70,13 +70,13 @@ class ContrasteTests(unittest.TestCase):
     def test_faltante_tiene_issue(self) -> None:
         for rid, row in self.report_rows.items():
             if row[3] == "SIN_COBERTURA":
-                match = re.search(r"Hoja ejecutable #(\\d+)", row[7])
+                match = re.search(r"Hoja ejecutable #(\d+)", row[7])
                 self.assertIsNotNone(match, rid)
                 self.assertNotIn(int(match[1]), CONTAINERS)
                 self.assertIn("Hoja ejecutable", self.index[rid][4])
         forged = list(self.report_rows["CB-0001"])
         forged[3] = "SIN_COBERTURA"
-        self.assertIsNone(re.search(r"Hoja ejecutable #(\\d+)", forged[7]))
+        self.assertIsNone(re.search(r"Hoja ejecutable #(\d+)", forged[7]))
 
     def test_matriz_actualizada(self) -> None:
         self.assertEqual(len(self.index), 215)

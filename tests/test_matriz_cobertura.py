@@ -27,6 +27,7 @@ CODE_EVIDENCE = re.compile(r"^Código (?P<code>[-A-Za-z0-9_./]+); prueba (?P<tes
 # Hoja posterior al snapshot histórico: catálogo explícito de PRs abiertos,
 # sin incrementar ni relajar los 1.194 IDs de la matriz canónica.
 POST_SNAPSHOT = {
+    "docs/contraste-cb_0001_0300.md": (971, 996, "tests/test_contraste_cb_0001_0300.py"),
     "docs/contraste-cb_0301_0600.md": (972, 982, "tests/test_contraste_cb_0301_0600.py"),
     "docs/contraste-cb_0601_0900.md": (973, 987, "tests/test_contraste_cb_0601_0900.py"),
     "docs/contraste-cb_0901_1189.md": (974, 995, "tests/test_contraste_cb_0901_1189.py"),

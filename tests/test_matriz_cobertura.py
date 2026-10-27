@@ -29,6 +29,8 @@ CODE_EVIDENCE = re.compile(r"^Código (?P<code>[-A-Za-z0-9_./]+); prueba (?P<tes
 POST_SNAPSHOT = {
     "docs/contraste-cb_0301_0600.md": (972, 982, "tests/test_contraste_cb_0301_0600.py"),
     "docs/contraste-cb_0601_0900.md": (973, 987, "tests/test_contraste_cb_0601_0900.py"),
+    "docs/contraste-cb_0901_1189.md": (974, 995, "tests/test_contraste_cb_0901_1189.py"),
+    "docs/github-projection-owner-e2e.md": (993, 994, "tests/test_github_projection_owner_e2e.py"),
     "docs/operator-runbook.md": (959, 965, "tests/test_runbook_operador_doc.py"),
     "docs/dr-drill-plan.md": (960, 968, "tests/test_simulacro_dr_doc.py"),
     "docs/owner-login-acceptance-script.md": (961, 969, "tests/test_guion_login_doc.py"),
@@ -235,6 +237,8 @@ class MatrizCoberturaTests(unittest.TestCase):
         expected = parse_post_snapshot(self.text)
         self.assertEqual(expected, POST_SNAPSHOT)
         self.assertIn("docs/owner-login-acceptance-script.md", expected)
+        self.assertIn("docs/contraste-cb_0901_1189.md", expected)
+        self.assertIn("docs/github-projection-owner-e2e.md", expected)
         unknown = "docs/no-registrada.md"
         self.assertEqual(missing_normative_sources(self.text, {unknown}), {unknown})
         self.assertEqual(missing_normative_sources(self.text, set(expected)), set())

@@ -8,6 +8,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs" / "matriz-cobertura.md"
+PART_FILES = tuple(ROOT / "docs" / f"matriz-cobertura-parte-{n:02d}.md" for n in range(1, 5))
+PART_COUNTS = (245, 298, 298, 138)
 ALLOWED = frozenset({"CUBIERTO", "EN_CURSO", "SIN_COBERTURA", "DESCARTADO", "NO_VERIFICABLE"})
 CONTAINERS = frozenset({1, 45, 55, 182, 561, 567, 625, 750, 751, 760})
 SOURCE = re.compile(
@@ -92,11 +94,18 @@ class MatrizCoberturaTests(unittest.TestCase):
     def setUpClass(cls):
         cls.text = DOC.read_text(encoding="utf-8")
         cls.rows = parse_rows(cls.text)
+        cls.parts = [parse_rows(p.read_text(encoding="utf-8")) for p in PART_FILES]
+        cls.all_rows = cls.rows + [row for rows in cls.parts for row in rows]
 
     def test_cubre_todas_las_fuentes(self):
         files = {f"docs/{p.relative_to(ROOT / 'docs').as_posix()}"
-                 for p in (ROOT / "docs").rglob("*.md") if p.name != DOC.name}
-        sources = {SOURCE.fullmatch(r[1])["path"] for r in self.rows}
+                 for p in (ROOT / "docs").rglob("*.md") if p.name != DOC.name and not p.name.startswith('matriz-cobertura-parte-')}
+        sources = {SOURCE.fullmatch(r[1])["path"] for r in self.all_rows}
+        ids = [r[0] for r in self.all_rows]
+        self.assertEqual(len(ids), 1194)
+        self.assertEqual(set(ids), {f"CB-{n:04d}" for n in range(1, 1195)})
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual([len(rows) for rows in self.parts], list(PART_COUNTS))
         self.assertGreaterEqual(len(files), 191)
         self.assertTrue(files <= sources, sorted(files - sources))
         self.assertTrue({"README.md", "AGENTES.md"} <= sources)
@@ -104,7 +113,7 @@ class MatrizCoberturaTests(unittest.TestCase):
         self.assertGreaterEqual(sum(r[1].startswith("[issues/1:") for r in self.rows), 11)
 
     def test_sin_cobertura_tiene_issue(self):
-        for row in self.rows:
+        for row in self.all_rows:
             if row[3] == "SIN_COBERTURA":
                 self.assertIsNotNone(ISSUE.fullmatch(row[5]))
                 self.assertIn("Hoja ejecutable", row[4])
@@ -116,8 +125,13 @@ class MatrizCoberturaTests(unittest.TestCase):
             parse_rows(bad)
 
     def test_formato_y_estados(self):
-        self.assertEqual(len(self.rows), len({row[0] for row in self.rows}))
-        self.assertEqual({row[3] for row in self.rows} - ALLOWED, set())
+        self.assertEqual(len(self.all_rows), len({row[0] for row in self.all_rows}))
+        self.assertEqual({row[3] for row in self.all_rows} - ALLOWED, set())
+        for part, rows in zip(PART_FILES, self.parts):
+            totals = parse_summary(part.read_text(encoding='utf-8'))
+            self.assertEqual(totals['TOTAL'], len(rows))
+            for state in ALLOWED:
+                self.assertEqual(totals[state], Counter(r[3] for r in rows)[state])
         with self.assertRaises(ValueError):
             parse_rows(self.text.replace("| NO_VERIFICABLE |", "| CERTIFICADO |", 1))
         with self.assertRaises(ValueError):
@@ -127,13 +141,13 @@ class MatrizCoberturaTests(unittest.TestCase):
                                          "[#0](https://github.com/otro/proyecto/issues/0)", 1))
 
     def test_resumen_por_estado(self):
-        actual = Counter(row[3] for row in self.rows)
+        actual = Counter(row[3] for row in self.all_rows)
         found = parse_summary(self.text)
-        self.assertEqual(found["TOTAL"], len(self.rows))
+        self.assertEqual(found["TOTAL"], len(self.all_rows))
         for status in ALLOWED:
             self.assertEqual(found[status], actual[status])
         self.assertIn("Hojas nuevas creadas por esta auditoría: 0", self.text)
-        percentage = 100 * actual["CUBIERTO"] / len(self.rows)
+        percentage = 100 * actual["CUBIERTO"] / len(self.all_rows)
         self.assertIn(f"**Porcentaje CUBIERTO:** {percentage:.2f}%", self.text)
         with self.assertRaises(ValueError):
             parse_summary(self.text.replace("| TOTAL |", "| TOTAL_FAKE |", 1))

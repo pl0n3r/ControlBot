@@ -71,7 +71,7 @@ function render(){
  // pills
  const pk=$("p-kill");pk.className="pill "+(paused?"bad":"ok");pk.innerHTML="kill switch <b>"+D.kill+"</b>";
  const po=$("p-own");po.className="pill "+(D.owner.length?"bad":"ok");po.innerHTML="decisiones tuyas <b>"+D.owner.length+"</b>";
- const pc=$("p-condor");pc.className="pill "+(D.condor&&D.condor.status==="ok"?"ok":"warn");pc.textContent="Condor ";const label=document.createElement("b");label.textContent=D.condor?("v"+D.condor.version+(D.condor.schema_up_to_date?" ✓":" esquema?")):"sin lectura";pc.appendChild(label);
+ const pc=$("p-condor");pc.className="pill "+(D.condor&&D.condor.status==="ok"?"ok":"warn");pc.innerHTML="Condor <b>"+(D.condor?("v"+D.condor.version+(D.condor.schema_up_to_date?" ✓":" esquema?")):"sin lectura")+"</b>";
  const pu=$("p-up");pu.className="pill "+(D.errores?"warn":"ok");pu.innerHTML="actualizado <b>"+tz(D.generado)+"</b>"+(D.errores?" · "+D.errores+" errores API":"");
  // chips por repo
  $("chips").innerHTML=Object.keys(D.repos).map(r=>{const c=D.repos[r];return `<span class="chip"><b>${r}</b><i class="g">${c.disponible} listos</i><i class="o">${c.reservado} reserv.</i><i class="c">${c["en revisión"]} rev.</i><i class="y">${c.bloqueado} bloq.</i></span>`}).join("");

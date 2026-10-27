@@ -24,9 +24,13 @@ Requiere `python3`, la CLI `gh` autenticada y, para dirigir chats, la extensión
 
 `vigia.sh` reinicia el orquestador si deja de responder; combínalo con `caffeinate -dimsu` en macOS para que no se duerma.
 
+## Flujo guiado de release de Factory
+
+`release_flow.py` automatiza el release: pausa fusiones, espera la Release Window (CI, Sonar, CodeQL, watchdog), abre la puerta, publica y verifica `v1`. El dueño solo responde `/decidir A` y confirma mover `v1`. El panel (pestaña Release) muestra el paso N de 5. `decisiones_simples.json` trae el texto en lenguaje simple de cada decisión del dueño. La pestaña Live resume el camino al go-live; el go-live nunca se activa desde aquí.
+
 ## Archivos de estado (ignorados por git)
 
-`acciones.log`, `af_logs.jsonl`, `agent_key.txt`, `assigned.json`, `agent_blocked.json`, `planner_state.json` y `config.json` se generan al ejecutar y no deben versionarse.
+`acciones.log`, `af_logs.jsonl`, `agent_key.txt`, `assigned.json`, `agent_blocked.json`, `planner_state.json` y `config.json`, `decididas.json`, `data_cache.json`, `release_state.json`, `release_flow.lock` y `automerge_pausa.txt` se generan al ejecutar y no deben versionarse.
 
 ## Límites conocidos
 

@@ -9,6 +9,7 @@ import json
 import re
 import secrets
 import grafo_orq
+import release_flow
 import subprocess
 import sys
 import threading
@@ -161,6 +162,7 @@ def run_action(body):
         if not gate or opt not in {o["id"] for o in gate["options"]}:
             raise ValueError("la opción no existe en esta decisión")
         gh(["issue", "comment", str(num), "-R", full, "--body", f"/decidir {opt}"])
+        mark_decided(repo, num, opt)
         log_action(f"OK   decisión del dueño desde el panel: {repo}#{num} -> /decidir {opt}")
         return f"decisión registrada: /decidir {opt} en {repo}#{num}"
     if action == "release_forced":
@@ -336,6 +338,16 @@ NORMAL = {
 }
 
 
+def simple_decision(repo, n):
+    """Explicación en palabras simples escrita para el dueño (decisiones_simples.json, clave «Repo#N»); opcional."""
+    try:
+        data = json.loads((HERE / "decisiones_simples.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    item = data.get(f"{repo}#{n}")
+    return item if isinstance(item, dict) else None
+
+
 def parse_gate(body):
     """Lee la puerta humana (<!-- factory-human-gate {...} -->) de un issue y la deja lista para mostrar al dueño."""
     m = re.search(r"<!-- factory-human-gate (\{.*?\}) -->", body or "", re.S)
@@ -465,7 +477,8 @@ def collect_repo(repo):
             except Exception:
                 pass
         if any(re.search(r"decisi.n: due|decision: owner", n) for n in labels):
-            gates.append({"n": i["number"], "title": i["title"][:90], "gate": parse_gate(i.get("body") or "")})
+            gates.append({"n": i["number"], "title": i["title"][:90], "gate": parse_gate(i.get("body") or ""),
+                          "simple": simple_decision(repo, i["number"])})
         if st == "bloqueado":
             k = classify_block(i["title"])
             blockers[k] = blockers.get(k, 0) + 1
@@ -596,18 +609,94 @@ def build_alerts(repos, avail, recover):
     return out
 
 
+DATA_CACHE_FILE = HERE / "data_cache.json"
+
+
+def _load_disk_cache():
+    # Arranque rápido: el panel muestra la última lectura guardada mientras keep_warm trae la nueva.
+    try:
+        saved = json.loads(DATA_CACHE_FILE.read_text(encoding="utf-8"))
+        if isinstance(saved.get("data"), dict):
+            _cache.update(at=saved.get("at", 0), data=saved["data"], error=None)
+    except (OSError, ValueError):
+        pass
+
+
+DECIDED_FILE = HERE / "decididas.json"
+try:
+    DECIDED = json.loads(DECIDED_FILE.read_text(encoding="utf-8"))
+except (OSError, ValueError):
+    DECIDED = {}  # "Repo#N" -> {"opt": "A", "at": ts}
+
+
+def mark_decided(repo, num, opt):
+    DECIDED[f"{repo}#{num}"] = {"opt": opt, "at": time.time()}
+    try:
+        DECIDED_FILE.write_text(json.dumps(DECIDED, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def sync_decided():
+    """Detecta decisiones del dueño tomadas directo en GitHub (/decidir X) y olvida las viejas."""
+    data = _cache.get("data") or {}
+    open_gates = set()
+    for r in data.get("repos", []):
+        for g in r.get("gates", []):
+            key = f"{r['repo']}#{g['n']}"
+            open_gates.add(key)
+            if key in DECIDED:
+                continue
+            try:
+                cs = gh_json(["issue", "view", str(g["n"]), "-R", f"{OWNER}/{r['repo']}", "--json", "comments"]).get("comments", [])
+            except Exception:
+                continue
+            for c in reversed(cs):
+                m = re.match(r"\s*/decidir\s+([A-Z])\b", c.get("body") or "")
+                if m and (c.get("author") or {}).get("login") == OWNER:
+                    mark_decided(r["repo"], g["n"], m.group(1))
+                    break
+    stale = [k for k, v in DECIDED.items() if time.time() - v["at"] > 6 * 3600 and k not in open_gates]
+    for k in stale:
+        DECIDED.pop(k, None)
+
+
 def get_data(force=False):
+    # Con datos en caché (aunque viejos) responde al instante; keep_warm los renueva en segundo plano.
+    if _cache["data"] and not force:
+        return _cache["data"], None
     with _lock:
-        fresh = time.time() - _cache["at"] < CACHE_SECONDS
-        if fresh and _cache["data"] and not force:
+        if _cache["data"] and not force and time.time() - _cache["at"] < CACHE_SECONDS:
             return _cache["data"], None
         try:
             data = collect()
             _cache.update(at=time.time(), data=data, error=None)
+            try:
+                DATA_CACHE_FILE.write_text(json.dumps({"at": _cache["at"], "data": data}, ensure_ascii=False), encoding="utf-8")
+            except (OSError, TypeError, ValueError):
+                pass
             return data, None
         except Exception as exc:
             _cache["error"] = str(exc)[:300]
             return _cache["data"], _cache["error"]
+
+
+_refreshing = threading.Event()
+
+
+def request_refresh():
+    if _refreshing.is_set():
+        return
+
+    def run():
+        _refreshing.set()
+        try:
+            get_data(force=True)
+        except Exception:
+            pass
+        finally:
+            _refreshing.clear()
+    threading.Thread(target=run, daemon=True).start()
 
 
 DELIVERED = {}
@@ -1027,8 +1116,8 @@ def plan_tick():
         for w_ in rd_.get("work", []):
             if w_.get("state") != "requiere recuperación" or n_tomar >= 10:
                 continue
-            if re.match(r"(epic|roadmap|planificaci|planning)", (w_.get("title") or "").strip().lower()):
-                continue  # un contenedor de roadmap no se reserva ni se recupera: no es trabajo de un chat
+            # Una épica en «requiere recuperación» TAMBIÉN se renueva: Factory pospone todo trabajo nuevo del repo
+            # mientras quede un frente sin recuperar, así que dejarla caída frena al repo entero.
             tk = f"{rname}#{w_['n']}"
             if now - TOMAR_AT.get(tk, 0) < 900:
                 continue
@@ -1141,6 +1230,8 @@ def plan_tick():
                 for it in chat_items(v):
                     if k == key and it not in items and it["issue"] not in {i["issue"] for i in items}:
                         continue  # los descartados de este chat quedan libres
+                    if k != key and now - it.get("at", now) > 2 * 3600:
+                        continue  # enviado hace más de 2 h a otro chat y sin movimiento: abandonado, no cuenta como tomado
                     taken.add(it["issue"])
                     per_repo[it["issue"].split("#")[0]] = per_repo.get(it["issue"].split("#")[0], 0) + 1
             pick, why, chosen = None, "", None
@@ -1499,6 +1590,28 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps({"ok": True, "on": PLANNER["on"]}), "application/json")
             except Exception as exc:
                 return self._send(400, json.dumps({"ok": False, "error": str(exc)[:200]}), "application/json")
+        if self.path == "/api/release":
+            try:
+                if not self._same_origin() or self.headers.get("X-Orq-Token") != TOKEN:
+                    return self._send(403, '{"error":"no autorizado"}', "application/json")
+                n = int(self.headers.get("Content-Length", "0"))
+                if not 0 < n <= 256:
+                    raise ValueError("tamaño inválido")
+                body = json.loads(self.rfile.read(n).decode("utf-8"))
+                act = body.get("action")
+                if act == "start":
+                    res = release_flow.start(body.get("version") or None, body.get("gate"), body.get("sha"))
+                elif act == "cancel":
+                    res = release_flow.cancel()
+                elif act == "decide":
+                    res = release_flow.decide(str(body.get("option", "")))
+                elif act == "move_v1":
+                    res = release_flow.move_v1()
+                else:
+                    raise ValueError("acción desconocida")
+                return self._send(200, json.dumps({"ok": True, "release": res}), "application/json")
+            except Exception as exc:
+                return self._send(400, json.dumps({"ok": False, "error": str(exc)[:200]}), "application/json")
         if self.path == "/api/agent-cmd":
             try:
                 if not self._same_origin() or self.headers.get("X-Orq-Token") != TOKEN:
@@ -1608,14 +1721,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(403, '{"error":"no autorizado"}', "application/json")
             return self._send(200, json.dumps({"token": TOKEN}), "application/json")
         if self.path.startswith("/api/data"):
-            data, err = get_data(force="refresh=1" in self.path)
+            if "refresh=1" in self.path:
+                request_refresh()  # la lectura nueva corre en segundo plano; el panel no se queda esperando
+            data, err = get_data()
             g = grafo_orq.DATA
             now = time.time()
             agents = [dict(a, age_s=round(now - a["seen"])) for a in AF.values()]
             cmds = [{"instance_id": k[0], "chat_id": (None if k[1] == "*" else k[1]), "want": c["want"], "acked": c["acked"], "age_s": round(now - c["at"])} for k, c in CMD.items()]
             assigned = [{"iid": k[0], "chat": k[1], "issue": v.get("issue"), "n": v.get("n", 1), "age_s": round(now - v["at"])}
                         for k, v in ASSIGNED.items() if v.get("issue")]
-            extra = {"planner_on": PLANNER["on"], "commands": cmds, "assigned": assigned, "owner_blockers": [{"issue": k, **v} for k, v in OWNER_BLOCKERS.items()], "owner_tasks": OWNER_TASKS["items"], "agents": sorted(agents, key=lambda a: a["label"]), "kill": g.get("kill"), "condor": g.get("condor"), "bus": g.get("bus", [])[-40:], "owner": g.get("owner", [])}
+            extra = {"decided": DECIDED, "refreshing": _refreshing.is_set(), "release_flow": release_flow.public_state(), "planner_on": PLANNER["on"], "commands": cmds, "assigned": assigned, "owner_blockers": [{"issue": k, **v} for k, v in OWNER_BLOCKERS.items()], "owner_tasks": OWNER_TASKS["items"], "agents": sorted(agents, key=lambda a: a["label"]), "kill": g.get("kill"), "condor": g.get("condor"), "bus": g.get("bus", [])[-40:], "owner": g.get("owner", [])}
             self._send(200, json.dumps({"data": data, "error": err, "cached_at": _cache["at"], "extra": extra}), "application/json")
         elif self.path.startswith("/data.json"):
             self._send(200, json.dumps(grafo_orq.DATA), "application/json")
@@ -1630,6 +1745,8 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
     PORT = port
+    _load_disk_cache()
+
     def keep_warm():
         while True:
             try:
@@ -1642,7 +1759,14 @@ if __name__ == "__main__":
                 log_action(f"FALLO tareas del dueño -> {str(exc)[:120]}")
             time.sleep(CACHE_SECONDS)
 
-    AUTOMERGE_DONE = set()
+    def automerge_paused_repos():
+        # Un repo listado en automerge_pausa.txt (uno por línea) no encola fusiones automáticas; se usa durante un release.
+        try:
+            return {l.strip() for l in (HERE / "automerge_pausa.txt").read_text(encoding="utf-8").splitlines() if l.strip()}
+        except OSError:
+            return set()
+
+    AUTOMERGE_DONE = {}  # (repo, pr) -> ts del último intento; un fallo se reintenta a los 5 min
 
     def auto_merge_ready():
         # El dueño activó fusión automática hasta el MVP: los PR listos (CI verde, limpios) se encolan solos.
@@ -1650,14 +1774,62 @@ if __name__ == "__main__":
         data = _cache.get("data") or {}
         for p in (data.get("ready") or []) if isinstance(data, dict) else []:
             repo, num = p.get("repo"), p.get("n")
-            if not repo or not num or p.get("auto") or (repo, num) in AUTOMERGE_DONE:
+            if not repo or not num or p.get("auto"):
                 continue
-            AUTOMERGE_DONE.add((repo, num))
+            if repo in automerge_paused_repos():
+                continue  # release en curso: nada se encola, para no mover main entre la puerta y el bootstrap
+            if time.time() - AUTOMERGE_DONE.get((repo, num), 0) < 300:
+                continue
+            AUTOMERGE_DONE[(repo, num)] = time.time()
             try:
                 gh(["pr", "merge", str(num), "-R", f"{OWNER}/{repo}", "--squash", "--auto"], timeout=90)
                 log_action(f"OK   fusión automática activada {repo}#{num}")
             except Exception as exc:
-                log_action(f"FALLO fusión automática {repo}#{num} -> {str(exc)[:120]}")
+                msg = str(exc)
+                log_action(f"FALLO fusión automática {repo}#{num} -> {msg[:120]}")
+                if "out of date" in msg or "not up to date" in msg:
+                    try:  # rama atrasada: se actualiza con main y se reintenta en el siguiente barrido
+                        gh(["api", "-X", "PUT", f"repos/{OWNER}/{repo}/pulls/{num}/update-branch"], timeout=60)
+                        log_action(f"OK   rama de {repo}#{num} actualizada con main")
+                        AUTOMERGE_DONE[(repo, num)] = time.time() - 240
+                    except Exception as exc2:
+                        log_action(f"FALLO update-branch {repo}#{num} -> {str(exc2)[:100]}")
+
+    READY_MARKED = {}  # (repo, pr) -> ts del último intento de marcarlo listo
+    READY_REPOS = ("Condor", "brvtal", "AutoFactory")  # alcance autorizado por el dueño (Condor 2026-10-22, brvtal 2026-10-25, AutoFactory 2026-10-26)
+    READY_EXCLUDED_ISSUES = {"Condor": {718, 802}}  # RRHH (decisión B, pausado) y la épica de cumplimiento
+    READY_MAX_PER_TICK = 2
+    READY_MIN_QUIET_H = 0.5  # sin cambios en los últimos 30 min: no se pisa a un chat que lo esté editando
+
+    def mark_clean_drafts_ready():
+        # Con D-070 los chats ya no deben esperar el turno de CodeRabbit, pero siguen dejando PRs limpios en borrador.
+        # Un borrador con CI verde, sin conflicto y sin cambios recientes se marca listo; de ahí sigue la fusión automática.
+        data = _cache.get("data") or {}
+        repos = data.get("repos") if isinstance(data, dict) else None
+        if not isinstance(repos, list):
+            return
+        marked = 0
+        for rd in repos:
+            repo = rd.get("repo")
+            if repo not in READY_REPOS:
+                continue
+            for p in sorted(rd.get("prs", []), key=lambda x: x["n"]):
+                if marked >= READY_MAX_PER_TICK:
+                    return
+                issue = p.get("issue")
+                if (not p.get("draft") or p.get("fails", 0) != 0 or p.get("pend", 0) != 0 or p.get("merge") != "CLEAN"
+                        or not issue or issue in READY_EXCLUDED_ISSUES.get(repo, set())
+                        or agent_blocked(f"{repo}#{issue}") or (p.get("h") or 0) < READY_MIN_QUIET_H):
+                    continue
+                if time.time() - READY_MARKED.get((repo, p["n"]), 0) < 3600:
+                    continue
+                READY_MARKED[(repo, p["n"])] = time.time()
+                try:
+                    gh(["pr", "ready", str(p["n"]), "-R", f"{OWNER}/{repo}"], timeout=60)
+                    log_action(f"OK   borrador limpio marcado listo {repo}#{p['n']} (issue #{issue}, {round(p.get('h') or 0, 1)} h sin cambios)")
+                    marked += 1
+                except Exception as exc:
+                    log_action(f"FALLO marcar listo {repo}#{p['n']} -> {str(exc)[:120]}")
 
     def planner_loop():
         tick_n = 0
@@ -1668,13 +1840,20 @@ if __name__ == "__main__":
                 t0 = time.time()
                 done = plan_tick()
                 auto_merge_ready()
+                mark_clean_drafts_ready()
                 review_queue_tick()
+                release_flow.tick()
+                if tick_n % 4 == 0:
+                    sync_decided()
                 if tick_n % 10 == 0 or done:
                     idle = sum(1 for ag in AF.values() for ch in ag["chats"] if ch["directed"] and ch["state"] == "esperando_envio")
                     log_action(f"OK   planner ciclo {tick_n}: {len(done)} órdenes, {idle} chats ociosos, {round(time.time() - t0, 1)} s")
             except Exception as exc:
                 log_action(f"FALLO planner -> {str(exc)[:160]}")
 
+    release_flow.set_logger(log_action)
+    release_flow._acquire_leader()
+    release_flow.load()
     threading.Thread(target=keep_warm, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
     threading.Thread(target=grafo_orq.loop, daemon=True).start()

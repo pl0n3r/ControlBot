@@ -1,0 +1,210 @@
+{
+ "Condor#924": {
+  "pregunta": "¿Estás seguro de que todavía nadie usa Condor de verdad?",
+  "resumen": "Para armar la parte de empleados hay que guardar datos de personas, como nombres y a qué hora entran y salen. Antes de hacerlo hay que estar 100 % seguros de que Condor sigue en pruebas, sin clientes reales. El código no puede decirlo: solo tú lo sabes.",
+  "recomendada": "B",
+  "por_que": "Si hay duda, lo más seguro es dejarlo apagado. Se puede reabrir cuando quieras.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, estoy seguro",
+    "que_pasa": "Los chats pueden construir la parte de empleados, pero solo con datos inventados."
+   },
+   "B": {
+    "titulo": "No, o no estoy seguro",
+    "que_pasa": "No se construye nada con datos de personas. La parte de empleados sigue apagada."
+   }
+  }
+ },
+ "Condor#920": {
+  "pregunta": "¿Hacemos una revisión de seguridad con datos de mentira?",
+  "resumen": "Ya está lista la tabla de leyes que le aplican a Condor. Ahora los chats pueden hacer una revisión que busca fallos y deja una lista de arreglos. Todo se prueba con datos inventados y no se toca nada real.",
+  "recomendada": "A",
+  "por_que": "No tiene riesgo y ayuda a encontrar problemas antes del lanzamiento.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, hacerla ahora",
+    "que_pasa": "Los chats hacen la revisión y dejan una lista de cosas por arreglar."
+   },
+   "B": {
+    "titulo": "Mejor más adelante",
+    "que_pasa": "No se hace por ahora. No pasa nada."
+   }
+  }
+ },
+ "GrindFlow#603": {
+  "pregunta": "¿Arreglamos el aviso de cambio de semana para personas ciegas?",
+  "resumen": "En el calendario del piloto, cuando alguien cambia de semana, quien usa un lector de pantalla no se entera de que cambió. Es un arreglo chico para que la pantalla lo anuncie en voz alta.",
+  "recomendada": "A",
+  "por_que": "Es pequeño, no cambia nada más y hace la app usable para más personas.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, arreglarlo",
+    "que_pasa": "Un chat hace el arreglo y lo prueba."
+   },
+   "B": {
+    "titulo": "Dejarlo para después",
+    "que_pasa": "El calendario queda como está."
+   }
+  }
+ },
+ "GrindFlow#604": {
+  "pregunta": "¿Volvemos a pensar el piloto con cinco personas?",
+  "resumen": "La app ya está lista para probarla con cinco personas reales. Pero antes dijiste que no, porque habría que pedirles permiso para usar sus datos. Esta pregunta solo decide si se vuelve a pensar. No invita a nadie todavía.",
+  "recomendada": "B",
+  "por_que": "Todavía faltan los permisos de las personas y una revisión legal.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, volver a pensarlo",
+    "que_pasa": "Los chats preparan los requisitos (permisos y privacidad). No se invita a nadie hasta que tú lo apruebes."
+   },
+   "B": {
+    "titulo": "No, seguir como estaba",
+    "que_pasa": "No hay piloto por ahora. Todo sigue igual."
+   }
+  }
+ },
+ "GrindFlow#605": {
+  "pregunta": "¿Volvemos a pensar una publicación de prueba en Facebook?",
+  "resumen": "GrindFlow ya sabe publicar en Facebook, pero antes dijiste que no se hiciera ninguna prueba real. Esta pregunta solo decide si se vuelve a pensar UNA sola publicación. Esta respuesta por sí sola no publica nada.",
+  "recomendada": "B",
+  "por_que": "Publicar en una página real es irreversible. Mejor esperar a tener todo listo.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, volver a pensarlo",
+    "que_pasa": "Se prepara el plan para UNA publicación de prueba. Tú tendrías que aprobarla antes de que salga."
+   },
+   "B": {
+    "titulo": "No, mantener el no",
+    "que_pasa": "No se publica nada en Facebook."
+   }
+  }
+ },
+ "ControlBot#894": {
+  "pregunta": "¿Preparamos una prueba del respaldo (backup) de ControlBot?",
+  "resumen": "Para abrir el sitio de ControlBot hace falta un respaldo de verdad, por si algo sale mal. Esto prepara un revisor que comprueba que el respaldo está bien hecho. Se prueba solo con datos inventados y sin tocar Hostinger.",
+  "recomendada": "A",
+  "por_que": "No toca nada real y acerca el día en que se pueda abrir el sitio.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, prepararlo",
+    "que_pasa": "Los chats construyen el revisor y lo prueban con datos de mentira."
+   },
+   "B": {
+    "titulo": "Dejarlo para después",
+    "que_pasa": "El sitio de ControlBot sigue cerrado y sin revisor de respaldo."
+   }
+  }
+ },
+ "AutoFactory#243": {
+  "pregunta": "¿Preparamos un aviso para cuando un chat no avanza?",
+  "resumen": "Se trata de una función chica que detecta cuando un chat lleva mucho rato sin hacer progreso. No lee lo que se escribe en las conversaciones y se puede quitar fácil.",
+  "recomendada": "B",
+  "por_que": "No es urgente y ya tenemos otros avisos funcionando.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, prepararla",
+    "que_pasa": "Un chat construye el aviso y lo prueba."
+   },
+   "B": {
+    "titulo": "Dejarlo para después",
+    "que_pasa": "Todo sigue igual."
+   }
+  }
+ },
+ "ControlBot#904": {
+  "pregunta": "¿Construimos un «portero» para el robot de ControlBot?",
+  "resumen": "ControlBot es un robot que trabaja por ti en GitHub. El portero le pregunta «¿tienes permiso?» antes de cada cosa. Hoy la respuesta es siempre «no», así que el robot no hace nada real.",
+  "recomendada": "A",
+  "por_que": "No arriesgas nada: todo queda apagado. Y los chats pueden seguir avanzando en esa parte.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, construir el portero",
+    "que_pasa": "Se construye. El robot sigue sin poder hacer nada real. Si algún día quieres darle un permiso, lo decides tú aparte."
+   },
+   "B": {
+    "titulo": "No, por ahora no",
+    "que_pasa": "No se construye y lo que depende de esto sigue parado. Puedes cambiar de idea cuando quieras."
+   }
+  }
+ },
+ "Condor#946": {
+  "pregunta": "¿Pedimos que un abogado revise los datos personales de Condor antes de salir en vivo?",
+  "resumen": "Los chats añadieron en Condor algo que maneja datos de personas (los flujos de trabajo y para qué se usan sus datos). Por ley, eso hay que revisarlo con un abogado antes de abrir el producto al público. No frena el desarrollo de ahora: solo la salida a producción.",
+  "recomendada": "A",
+  "por_que": "Es el paso seguro y no cuesta nada por ahora: queda anotado que hay que pedir la revisión. Cuando se acerque el lanzamiento, ya estará listo.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, pedir la revisión legal",
+    "que_pasa": "Se anota que falta la revisión del abogado. El desarrollo sigue normal; solo el lanzamiento en vivo espera ese visto bueno."
+   },
+   "B": {
+    "titulo": "No por ahora",
+    "que_pasa": "Todo queda en pausa para este tema y el lanzamiento en vivo seguirá bloqueado hasta que decidas."
+   }
+  }
+ },
+ "GrindFlow#611": {
+  "pregunta": "¿Pedimos que un abogado revise los datos personales de GrindFlow antes de salir en vivo?",
+  "resumen": "Los chats añadieron en GrindFlow algo que maneja datos de personas (incidentes de diagnóstico y publicar reels en Instagram con un proveedor nuevo). Por ley, eso hay que revisarlo con un abogado antes de abrir el producto al público. No frena el desarrollo de ahora: solo la salida a producción.",
+  "recomendada": "A",
+  "por_que": "Es el paso seguro y no cuesta nada por ahora: queda anotado que hay que pedir la revisión. Cuando se acerque el lanzamiento, ya estará listo.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, pedir la revisión legal",
+    "que_pasa": "Se anota que falta la revisión del abogado. El desarrollo sigue normal; solo el lanzamiento en vivo espera ese visto bueno."
+   },
+   "B": {
+    "titulo": "No por ahora",
+    "que_pasa": "Todo queda en pausa para este tema y el lanzamiento en vivo seguirá bloqueado hasta que decidas."
+   }
+  }
+ },
+ "AutoFactory#249": {
+  "pregunta": "¿Hacemos una pantalla que muestre si los chats avanzan o están trabados?",
+  "resumen": "AutoFactory es la extensión del navegador que maneja los chats. Esta pantalla mostraría, con datos de ejemplo, si un chat lleva rato sin avanzar. No lee tus chats de verdad ni se conecta a ControlBot.",
+  "recomendada": "A",
+  "por_que": "No arriesga nada y le da trabajo nuevo a AutoFactory, que hoy no tiene tareas disponibles. Ojo: los chats recomiendan B por prudencia, pero A solo permite crear la tarea cuando termine la que está en curso.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, hacer la pantalla",
+    "que_pasa": "Cuando termine la tarea actual (#246), se crea esta tarea. Con datos de ejemplo; nada se instala ni se activa."
+   },
+   "B": {
+    "titulo": "No, esperar",
+    "que_pasa": "No se crea tarea nueva. AutoFactory sigue con lo que ya tiene."
+   }
+  }
+ },
+ "Condor#973": {
+  "pregunta": "¿Hacemos una pantalla de ejemplo para ver los pendientes de seguridad en el trabajo (SG-SST)?",
+  "resumen": "Es una pantalla para distinguir qué asuntos de seguridad laboral están pendientes y cuáles ya los revisó un profesional. Usaría solo datos inventados. No certifica que cumplas la ley ni activa nada.",
+  "recomendada": "A",
+  "por_que": "Es de solo lectura y con datos falsos, así que no hay riesgo. Además te da algo visible del cumplimiento legal. Los chats recomiendan B porque aún tienen otras tareas abiertas; A solo crea la tarea cuando terminen.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, hacer la pantalla de ejemplo",
+    "que_pasa": "Cuando cierren las tareas actuales, se crea una tarea pequeña con pruebas. Datos ficticios; no se conecta nada real ni se publica."
+   },
+   "B": {
+    "titulo": "No, esperar",
+    "que_pasa": "No se crea nada nuevo por ahora. Puedes reabrirlo cuando quieras."
+   }
+  }
+ },
+ "ControlBot#926": {
+  "pregunta": "¿Preparamos una pieza de prueba para que ControlBot pueda LEER GitHub (sin escribir)?",
+  "resumen": "Es la siguiente pieza del «portero» que ya aprobaste: una conexión de prueba, apagada, que solo sabe leer y es falsa. No entra a tu GitHub real ni usa claves.",
+  "recomendada": "A",
+  "por_que": "Sigue el camino que ya elegiste, sin riesgo: todo apagado y de mentira. Los chats también recomiendan A.",
+  "opciones": {
+   "A": {
+    "titulo": "Sí, preparar la pieza de prueba",
+    "que_pasa": "Se crea una tarea pequeña. La pieza queda apagada y de mentira. Para usarla de verdad habría que autorizarla aparte."
+   },
+   "B": {
+    "titulo": "No, esperar",
+    "que_pasa": "No se crea nada. Lo que depende de esto en ControlBot sigue parado."
+   }
+  }
+ }
+}

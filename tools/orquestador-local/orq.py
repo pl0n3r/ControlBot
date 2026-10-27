@@ -495,7 +495,14 @@ def collect_repo(repo):
         roll = latest_checks(p.get("statusCheckRollup") or [])
         fails = sum(1 for c in roll if c.get("conclusion") == "FAILURE")
         pend = sum(1 for c in roll if c.get("status") not in (None, "COMPLETED"))
+        pol_fail = [c for c in roll if c.get("conclusion") == "FAILURE" and re.search(r"pol[ií]tica|policy", c.get("name") or c.get("workflowName") or "", re.I)]
+        pol_run = None
+        for c in pol_fail:
+            m = re.search(r"/actions/runs/(\d+)", c.get("detailsUrl") or "")
+            if m:
+                pol_run = int(m.group(1))
         pr_rows.append({
+            "pol_only": bool(pol_fail) and fails == len(pol_fail) and pend == 0 and pol_run is not None, "pol_run": pol_run,
             "n": p["number"], "title": p["title"][:80], "draft": p["isDraft"],
             "merge": p["mergeStateStatus"], "auto": p.get("autoMergeRequest") is not None,
             "fails": fails, "pend": pend, "h": age_h(p["updatedAt"]),
@@ -1806,6 +1813,28 @@ if __name__ == "__main__":
 
     AUTOMERGE_DONE = {}  # (repo, pr) -> ts del último intento; un fallo se reintenta a los 5 min
 
+    POLICY_RERUN = {}  # (repo, pr, run) -> [intentos, ts del último]
+
+    def rerun_stale_policy():
+        # La «Política Factory v1» solo repite su veredicto cuando se relanza: si falló porque otro check estaba rojo
+        # y ese check ya está verde, queda un rojo viejo que frena la fusión. Si en un PR solo falla la política y
+        # todo lo demás terminó en verde, se relanza (máximo 2 veces por ejecución, separadas 10 min).
+        data = _cache.get("data") or {}
+        for rd in (data.get("repos") or []) if isinstance(data, dict) else []:
+            for p in rd.get("prs", []):
+                if not p.get("pol_only") or p.get("draft"):
+                    continue
+                key = (rd["repo"], p["n"], p["pol_run"])
+                tries, last = POLICY_RERUN.get(key, [0, 0])
+                if tries >= 2 or time.time() - last < 600:
+                    continue
+                POLICY_RERUN[key] = [tries + 1, time.time()]
+                try:
+                    gh(["run", "rerun", str(p["pol_run"]), "-R", f"{OWNER}/{rd['repo']}", "--failed"], timeout=60)
+                    log_action(f"OK   política relanzada {rd['repo']}#{p['n']} (solo fallaba la política; intento {tries + 1})")
+                except Exception as exc:
+                    log_action(f"FALLO relanzar política {rd['repo']}#{p['n']} -> {str(exc)[:120]}")
+
     def auto_merge_ready():
         # El dueño activó fusión automática hasta el MVP: los PR listos (CI verde, limpios) se encolan solos.
         # `--auto` respeta las reglas de la rama (ControlBot incluido: main protegida el 2026-10-21 por el dueño).
@@ -1878,6 +1907,7 @@ if __name__ == "__main__":
                 t0 = time.time()
                 done = plan_tick()
                 auto_merge_ready()
+                rerun_stale_policy()
                 mark_clean_drafts_ready()
                 review_queue_tick()
                 release_flow.tick()

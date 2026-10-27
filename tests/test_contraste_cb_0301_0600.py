@@ -1,14 +1,11 @@
 """ControlBot #972: contrato auditable de las 53 filas del índice CB-0301..0600.
-
 Es un contraste offline de evidencia histórica, no una prueba de servicios reales.
 """
 from __future__ import annotations
-
 from collections import Counter
 from pathlib import Path
 import re
 import unittest
-
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "docs/contraste-cb_0301_0600.md"
 MATRIX = ROOT / "docs/matriz-cobertura.md"
@@ -80,7 +77,6 @@ COVERED = {
     "CB-0587": ("src/IncidentUi.php", "tests/incident_ui_scenarios.php", 378, "ace664f9d9ced8ee56b56dc6aceeff112a9abeb2"),
 }
 STATES = {"CUBIERTO", "NO_VERIFICABLE", "NO_APLICA", "DESCARTADO", "SIN_COBERTURA"}
-
 def parse_rows(text: str) -> dict[str, tuple[str, ...]]:
     if text.count("\n## Veredictos\n") != 1:
         raise AssertionError("Tabla de contraste única y obligatoria")
@@ -99,7 +95,6 @@ def parse_rows(text: str) -> dict[str, tuple[str, ...]]:
             raise AssertionError("Veredicto/razón inválidos")
         result[rid] = cells
     return result
-
 def index_rows(text: str) -> dict[str, tuple[str, ...]]:
     matrix: dict[str, tuple[str, ...]] = {}
     for line in text.splitlines():
@@ -112,7 +107,6 @@ def index_rows(text: str) -> dict[str, tuple[str, ...]]:
             raise AssertionError("ID de matriz duplicado")
         matrix[cells[0]] = cells
     return matrix
-
 def require_missing_issue(row: tuple[str, ...], index: tuple[str, ...]) -> None:
     if row[3] != "SIN_COBERTURA":
         return
@@ -122,7 +116,6 @@ def require_missing_issue(row: tuple[str, ...], index: tuple[str, ...]) -> None:
         raise AssertionError("Matriz carece de hoja ejecutable")
     if re.search(r"/issues/(?:1|45|55|182|561|567|625|750|751|760)\)", index[5]):
         raise AssertionError("Un épico/roadmap no es una hoja ejecutable")
-
 class ContrasteTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -130,7 +123,6 @@ class ContrasteTests(unittest.TestCase):
         cls.matrix = MATRIX.read_text(encoding="utf-8")
         cls.rows = parse_rows(cls.report)
         cls.index = index_rows(cls.matrix)
-
     def test_cada_fila_tiene_veredicto(self) -> None:
         self.assertEqual(set(self.rows), EXPECTED)
         self.assertEqual(len(self.rows), 53)
@@ -150,7 +142,6 @@ class ContrasteTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "duplicada"):
             first = next(line for line in self.report.splitlines() if line.startswith("| CB-0305 |"))
             parse_rows(self.report.replace(first, first + "\n" + first, 1))
-
     def test_cubierto_enlaza_prueba_existente(self) -> None:
         actual = {rid for rid, row in self.rows.items() if row[3] == "CUBIERTO"}
         self.assertEqual(actual, set(COVERED))
@@ -169,7 +160,6 @@ class ContrasteTests(unittest.TestCase):
             if rid not in COVERED:
                 self.assertEqual(row[6], "—")
                 self.assertEqual(row[3], "NO_VERIFICABLE")
-
     def test_faltante_tiene_issue(self) -> None:
         for rid, row in self.rows.items():
             with self.subTest(rid=rid):
@@ -178,7 +168,6 @@ class ContrasteTests(unittest.TestCase):
         sample[3] = "SIN_COBERTURA"
         with self.assertRaisesRegex(AssertionError, "hoja canónica"):
             require_missing_issue(tuple(sample), self.index["CB-0305"])
-
     def test_matriz_actualizada(self) -> None:
         self.assertIn("contraste-cb_0301_0600.md", self.matrix)
         self.assertEqual(len(self.index), 215)
@@ -195,6 +184,5 @@ class ContrasteTests(unittest.TestCase):
         self.assertIn("docs/contraste-cb_0301_0600.md", self.matrix)
         with self.assertRaisesRegex(AssertionError, "ocho columnas"):
             parse_rows(self.report.replace("| CB-0305 |", "| CB-0305 | extra |", 1))
-
 if __name__ == "__main__":
     unittest.main()

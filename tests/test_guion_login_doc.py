@@ -76,11 +76,11 @@ class DocContractTests(unittest.TestCase):
             with self.subTest(case=number):
                 self.assertIn("**Estado: NO ENSAYADO.**", segment)
                 self.assertIn("**Resultado esperado (PROPUESTA):**", segment)
-        self.assertIn("**Estado de ejecución:** \`NO ENSAYADO\`", self.text)
-        self.assertIn("**Resultado observado:** \`NO ENSAYADO\` / \`UNKNOWN\`", self.text)
+        self.assertIn("**Estado de ejecución:** `NO ENSAYADO`", self.text)
+        self.assertIn("**Resultado observado:** `NO ENSAYADO` / `UNKNOWN`", self.text)
 
     def test_enlaza_fila_de_salida(self) -> None:
-        self.assertIn("\`docs/lista-salida-produccion.md\`", self.text)
+        self.assertIn("`docs/lista-salida-produccion.md`", self.text)
         self.assertIn(ROW_TITLE, self.text)
         matches = [line for line in self.exit.splitlines() if line.startswith("| ") and ROW_TITLE in line]
         self.assertEqual(len(matches), 1)

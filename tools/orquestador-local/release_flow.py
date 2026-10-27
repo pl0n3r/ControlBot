@@ -185,6 +185,15 @@ def failed_jobs(run_id):
 
 
 # ----------------------------------------------------------------------------- acciones del dueño
+def _valid_release_version(version):
+    """Validación lineal y acotada de X.Y.Z, sin regex sobre entrada externa."""
+    if not isinstance(version, str) or not 1 <= len(version) <= 32:
+        return False
+    parts = version.split(".")
+    return (len(parts) == 3 and all(
+        part and part.isascii() and part.isdecimal() for part in parts
+    ))
+
 def current_version():
     import base64
     raw = gh(["api", f"repos/{FULL}/contents/config/version.json", "-q", ".content"])
@@ -198,7 +207,7 @@ def start(version=None, adopt_gate=None, sha=None):
         raise ValueError(f"la versión {version} ya está publicada; sube la versión en main antes de preparar otra release")
     if FLOW.get("state") in ACTIVE:
         raise ValueError("ya hay un release en curso")
-    if not re.fullmatch(r"\d+\.\d+\.\d+", version or ""):
+    if not _valid_release_version(version):
         raise ValueError("versión inválida")
     rev = max(FLOW.get("rev", 0), _disk_rev())
     FLOW.clear()

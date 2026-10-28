@@ -131,7 +131,7 @@ final class GitHubReadOnlyAdmissionProjectionGate
             || ($i['owner'] ?? null) !== 'pl0n3r'
             || ($i['repository'] ?? null) !== 'pl0n3r/ControlBot'
             || ($i['status'] ?? null) !== 'active'
-            || ($i['revoked_at'] ?? false) !== null
+            || !array_key_exists('revoked_at', $i) || $i['revoked_at'] !== null
             || !is_int($i['installation_id'] ?? null) || $i['installation_id'] <= 0
             || !is_int($i['revision'] ?? null) || $i['revision'] <= 0
             || !is_int($i['issued_at'] ?? null)

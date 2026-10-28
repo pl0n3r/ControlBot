@@ -36,14 +36,14 @@ foreach ($cases as $name => $raw) {
     try {
         if ($raw === null) {
             $out[$name] = ['accepted' => false,
-                'status' => \\ControlBot\\Infrastructure\\RecoveryProfile::effectiveStatus(null)];
+                'status' => \ControlBot\Infrastructure\RecoveryProfile::effectiveStatus(null)];
             continue;
         }
-        $profile = \\ControlBot\\Infrastructure\\RecoveryProfile::normalize($raw);
+        $profile = \ControlBot\Infrastructure\RecoveryProfile::normalize($raw);
         $out[$name] = ['accepted' => true,
-            'status' => \\ControlBot\\Infrastructure\\RecoveryProfile::effectiveStatus($raw),
+            'status' => \ControlBot\Infrastructure\RecoveryProfile::effectiveStatus($raw),
             'profile' => $profile];
-    } catch (\\Throwable $e) {
+    } catch (\Throwable $e) {
         $out[$name] = ['accepted' => false, 'status' => 'unknown'];
     }
 }
@@ -179,7 +179,7 @@ class BrechasControlbot11Tests(unittest.TestCase):
             ),
             "CB-0160": (
                 "no autoriza provisión" in doc
-                and "no" in doc
+                and all("provider" not in p and "storage_ref" not in p for p in declared.values())
                 and operational_state("CB-0160", {"bucket": "declared"}) == UNKNOWN
             ),
             "CB-0161": (

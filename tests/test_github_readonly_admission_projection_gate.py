@@ -1,6 +1,5 @@
 """Contract tests for ControlBot #1003: REAL offline PHP admission + pipeline + writer."""
 from __future__ import annotations
-
 import base64
 import copy
 import json
@@ -8,7 +7,6 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-
 from tests.test_github_readonly_installation_admission import (
     fixture as installation_fixture,
     grant as owner_grant,
@@ -21,7 +19,6 @@ from tests.test_github_readonly_installation_source import (
 )
 from tests.test_github_readonly_projection_writer import canonical_snapshot, manifest_for
 from tests.test_github_readonly_https_transport import request as https_request
-
 ROOT = Path(__file__).resolve().parents[1]
 GATE = ROOT / "src/GitHubReadOnlyAdmissionProjectionGate.php"
 PHP = r"""
@@ -89,8 +86,6 @@ try {
     ], JSON_THROW_ON_ERROR);
 } catch (Throwable) { echo json_encode(['error' => 'synthetic_fixture_invalid']); }
 """
-
-
 def fixture_payload(directory):
     installation = installation_fixture()
     source = source_fixture()
@@ -98,37 +93,15 @@ def fixture_payload(directory):
     https = https_request()
     https["expires_at"] = source["expires_at"]
     payload = {
-        "enabled": True,
-        "installation": installation,
-        "grant": owner_grant(),
-        "admission_request": admission_request(),
-        "source_fixture": source,
-        "source_request": source_request(),
-        "https_request": https,
-        "snapshots": [snapshot],
-        "expected": manifest_for([snapshot]),
-        "now": 1050,
-        "directory": str(directory),
-        "key": SECRET,
-        "race_at": 0,
-        "manifest_wrong": False,
-        "omit_binding": False,
-        "omit_manifest": False,
+        "enabled": True, "installation": installation, "grant": owner_grant(), "admission_request": admission_request(), "source_fixture": source, "source_request": source_request(), "https_request": https,
+        "snapshots": [snapshot], "expected": manifest_for([snapshot]), "now": 1050, "directory": str(directory), "key": SECRET, "race_at": 0, "manifest_wrong": False, "omit_binding": False, "omit_manifest": False,
         "source_mode": "ok",
     }
     payload["binding"] = {
-        "installation_id": installation["installation_id"],
-        "revision": installation["revision"],
-        "owner": installation["owner"],
-        "repository": installation["repository"],
-        "resource": "issues",
-        "main_sha": source["sha"],
-        "observed_at": source["observed_at"],
-        "expires_at": source["expires_at"],
+        "installation_id": installation["installation_id"], "revision": installation["revision"], "owner": installation["owner"], "repository": installation["repository"], "resource": "issues", "main_sha": source["sha"],
+        "observed_at": source["observed_at"], "expires_at": source["expires_at"],
     }
     return payload
-
-
 def run(directory, **changes):
     payload = fixture_payload(directory)
     for name, value in changes.items():
@@ -142,8 +115,6 @@ def run(directory, **changes):
     if "error" in result:
         raise AssertionError(result["error"])
     return result
-
-
 class GitHubReadOnlyAdmissionProjectionGateTests(unittest.TestCase):
     def safe(self, data):
         r = data["result"]
@@ -153,7 +124,6 @@ class GitHubReadOnlyAdmissionProjectionGateTests(unittest.TestCase):
         self.assertEqual(r["authority"], "unchanged")
         for value in ("Authorization", "Bearer", "github_pat_", "ghp_"):
             self.assertNotIn(value, json.dumps(r))
-
     def denied_without_sender(self, directory, **updates):
         got = run(directory, **updates)
         self.safe(got)
@@ -161,9 +131,8 @@ class GitHubReadOnlyAdmissionProjectionGateTests(unittest.TestCase):
         self.assertEqual(got["source_calls"], 0)
         self.assertEqual(got["http_calls"], 0)
         return got
-
     def test_matching_synthetic_installation_and_projection_stay_offline(self):
-        with tempfile.TemporaryDirectory(prefix="cb-offline-projection-") as root:
+        with tempfile.TemporaryDirectory(prefix="cb-projection-fixture-") as root:
             got = run(root)
             self.safe(got)
             self.assertEqual(got["result"]["status"], "OFFLINE_VALIDATED")
@@ -175,9 +144,8 @@ class GitHubReadOnlyAdmissionProjectionGateTests(unittest.TestCase):
             self.denied_without_sender(root, enabled=False)
             self.denied_without_sender(root, omit_binding=True)
             self.denied_without_sender(root, omit_manifest=True)
-
     def test_revoked_or_expired_installation_never_reaches_projection(self):
-        with tempfile.TemporaryDirectory(prefix="cb-offline-projection-") as root:
+        with tempfile.TemporaryDirectory(prefix="cb-projection-fixture-") as root:
             old = run(root)["file"]
             f = installation_fixture()
             g = owner_grant()
@@ -197,17 +165,15 @@ class GitHubReadOnlyAdmissionProjectionGateTests(unittest.TestCase):
                 with self.subTest(case=case):
                     result = self.denied_without_sender(root, **case)
                     self.assertEqual(result["file"], old)
-
     def test_repository_revision_scope_or_evidence_mismatch_fails_closed(self):
-        with tempfile.TemporaryDirectory(prefix="cb-offline-projection-") as root:
+        with tempfile.TemporaryDirectory(prefix="cb-projection-fixture-") as root:
             good = fixture_payload(root)
             old = run(root)["file"]
             variants = [
                 {"admission_request": {**good["admission_request"], "resource": "pulls"}},
                 {"admission_request": {**good["admission_request"], "revision": 3}},
                 {"admission_request": {**good["admission_request"], "method": "POST"}},
-                {"installation": {**good["installation"], "permissions": {
-                    "metadata": "read", "pull_requests": "read"}}},
+                {"installation": {**good["installation"], "permissions": { "metadata": "read", "pull_requests": "read"}}},
                 {"source_fixture": {**good["source_fixture"], "installation_id": 888}},
                 {"source_fixture": {**good["source_fixture"], "repository": "pl0n3r/Condor"}},
                 {"source_request": {**good["source_request"], "resource": "pulls"}},
@@ -229,9 +195,8 @@ class GitHubReadOnlyAdmissionProjectionGateTests(unittest.TestCase):
                     self.assertFalse(list(Path(root).glob(".projection-stage-*")))
             # This tests the real writer's before/after-staging witness calls,
             # NOT a hypothetical revocation after its final check/rename.
-
     def test_no_runtime_permissions_network_tokens_or_mutations_are_enabled(self):
-        with tempfile.TemporaryDirectory(prefix="cb-offline-projection-") as root:
+        with tempfile.TemporaryDirectory(prefix="cb-projection-fixture-") as root:
             result = run(root)
             self.safe(result)
             self.assertEqual(result["result"]["status"], "OFFLINE_VALIDATED")
@@ -249,7 +214,5 @@ class GitHubReadOnlyAdmissionProjectionGateTests(unittest.TestCase):
                              "production_verified=false", "OFFLINE", "rename"):
                 self.assertIn(contract, doc)
             self.assertFalse(list(Path(root).glob(".projection-stage-*")))
-
-
 if __name__ == "__main__":
     unittest.main()

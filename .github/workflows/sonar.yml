@@ -40,6 +40,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          # Anclar al HEAD del evento PR; refs/pull/*/merge cambia al avanzar main.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Validar configuración CI-based
         env:

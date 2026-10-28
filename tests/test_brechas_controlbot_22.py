@@ -116,7 +116,11 @@ def operational_state(_clause: str, _claimed: object = None) -> str:
 
 def isolated_environment() -> dict[str, str]:
     """Prevent inherited tokens and passwords from reaching subprocess fixtures."""
-    allow = ("PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "SYSTEMROOT")
+    # Preserve only the dedicated PHP-coverage wrapper used by ControlBot CI;
+    # dropping this allowlisted plumbing causes synthetic PHP fixtures to fail.
+    allow = ("PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "SYSTEMROOT",
+             "CONTROLBOT_REAL_PHP", "CONTROLBOT_PHP_COVERAGE_BOOTSTRAP",
+             "CONTROLBOT_PHP_COVERAGE_DIR", "CONTROLBOT_REPO_ROOT", "XDEBUG_MODE")
     return {name: os.environ[name] for name in allow if name in os.environ}
 
 

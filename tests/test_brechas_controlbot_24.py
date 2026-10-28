@@ -74,6 +74,17 @@ def matrix_states(text: str) -> dict[str, str]:
     return result
 
 
+def php_environment(php: str) -> dict[str, str]:
+    """Keep only coverage plumbing, never inherited secrets or provider data."""
+    safe = {"PATH": os.path.dirname(php) + os.pathsep + "/usr/bin:/bin"}
+    for name in ("CONTROLBOT_REAL_PHP", "CONTROLBOT_PHP_COVERAGE_BOOTSTRAP",
+                 "CONTROLBOT_PHP_COVERAGE_DIR", "CONTROLBOT_REPO_ROOT",
+                 "XDEBUG_MODE"):
+        if name in os.environ:
+            safe[name] = os.environ[name]
+    return safe
+
+
 @lru_cache(maxsize=32)
 def scenario(which: str, name: str) -> dict | None:
     """Execute an existing PHP fixture in a scrubbed offline environment."""
@@ -87,7 +98,7 @@ def scenario(which: str, name: str) -> dict | None:
     try:
         result = subprocess.run(
             [php, str(path), name], cwd=ROOT,
-            env={"PATH": os.path.dirname(php) + os.pathsep + "/usr/bin:/bin"},
+            env=php_environment(php),
             capture_output=True, text=True, check=False, timeout=40,
         )
         if result.returncode != 0 or result.stderr.strip():
@@ -130,7 +141,7 @@ def actual_unknown() -> dict | None:
     try:
         result = subprocess.run(
             [php, "-r", ACTUAL_UNKNOWN_PHP], cwd=ROOT,
-            env={"PATH": os.path.dirname(php) + os.pathsep + "/usr/bin:/bin"},
+            env=php_environment(php),
             capture_output=True, text=True, check=False, timeout=20,
         )
         if result.returncode or result.stderr.strip():

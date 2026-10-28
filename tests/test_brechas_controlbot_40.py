@@ -103,7 +103,7 @@ class BrechasControlbot40Tests(unittest.TestCase):
         verdicts = {
             "CB-0597": (
                 database["backup_refs"] == ["controlbot:backup/db-primary-2000"]
-                and database["cost_ref"] is None
+                and database["cost_ref"] == "controlbot:cost/project-controlbot"
                 and "cost_amount" not in database and "backup_content" not in database),
             "CB-0598": (
                 primary["kind"] == "hosting" and primary["vendor"] == "vendor-one"

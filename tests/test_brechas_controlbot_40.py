@@ -182,9 +182,11 @@ class BrechasControlbot40Tests(unittest.TestCase):
         parts = tuple((ROOT / part).read_text(encoding="utf-8")
                       for part in MATRIX_PARTS)
         for clause in IDS:
-            index = 2 if clause == "CB-0604" else (0 if int(clause[-4:]) <= 600 else 1)
-            row = next(line for line in parts[index].splitlines()
-                       if line.startswith(f"| {clause} |"))
+            locations = [(index, line) for index, content in enumerate(parts)
+                         for line in content.splitlines()
+                         if line.startswith(f"| {clause} |")]
+            self.assertEqual(len(locations), 1, clause)
+            index, row = locations[0]
             for changed in (
                 parts[index].replace(row + "\n", "", 1),
                 parts[index] + "\n" + row,

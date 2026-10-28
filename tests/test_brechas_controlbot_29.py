@@ -151,7 +151,9 @@ def evidence(row: str, anchors_by_id: dict[str, str],
                    and f["blocked_close"]["fake_effect"]["status"] == "denied",
         "CB-0430": f["replay"]["replayed"] is True
                    and f["replay"]["fake_state"] == f["created"]["fake_state"]
-                   and f["conflict"]["fake_effect"]["status"] == "denied",
+                   and f["conflict"]["fake_effect"]["status"] == "denied"
+                   and f["ambiguous"]["fake_effect"]["status"] == "ambiguous"
+                   and f["ambiguous"]["fake_state"] == iss.candidate()["state"],
         "CB-0431": "Revertir el squash" in doc and "Sin PHP runtime nuevo" in doc
                    and ("curl_" + "exec(") not in php,
         "CB-0432": "no autoriza GitHub mutante" in doc and f["owner_ok"]["calls"] == 1
@@ -215,7 +217,7 @@ class BrechasControlbot29Tests(unittest.TestCase):
         own_text = Path(__file__).read_text(encoding="utf-8")
         self.assertNotIn("-----BEGIN " + "PRIVATE KEY-----", own_text)
         self.assertNotRegex(own_text, r"(?m)^(?:import|from)\s+(?:requests|urllib|httpx|socket)\b")
-        for forbidden in ("curl_" + "exec(", "github.Github(", "http.request("):
+        for forbidden in ("curl_" + "exec(", "github." + "Github(", "http." + "request("):
             self.assertNotIn(forbidden, own_text)
         for name in ("created", "reserved", "merged"):
             self.assertTrue(denied(synthetic()[name]))

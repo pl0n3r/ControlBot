@@ -165,7 +165,7 @@ class BrechasControlbot38Tests(unittest.TestCase):
                     "reason"] == "healthy_sha_mismatch"
                 and preflight("backup", baseline_verified=False)[1][
                     "reason"] == "baseline_unverified"
-                and all(s in self.backup_doc for s in (
+                and all(s in self.backup_doc.lower() for s in (
                     "public_html", "D-059 satisfecho", "referencia opaca",
                 ))
             ),
@@ -174,7 +174,8 @@ class BrechasControlbot38Tests(unittest.TestCase):
                 and all(p["status"] == 403 for p in (
                     no_tls, not_owner, not_basic,
                 ))
-                and "owner-only" in self.health_doc
+                and "Basic Auth" in self.health_doc
+                and "REMOTE_USER" in self.health_doc
                 and health["headers"]["Cache-Control"].startswith("no-store")
             ),
             "CB-0570": (

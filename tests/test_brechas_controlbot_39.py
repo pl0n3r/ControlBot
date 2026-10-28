@@ -61,9 +61,25 @@ def php_run(filename: str, *arguments: str) -> object:
         [php, str(script), *arguments], cwd=ROOT, env=safe_environment(),
         capture_output=True, text=True, check=False, timeout=35,
     )
-    if run.returncode or run.stderr.strip():
+    if run.returncode:
         raise AssertionError(
             f"UNKNOWN: offline fixture {filename} failed: {run.stderr[-600:]}"
+        )
+    # This one existing synthetic fixture emits a PHP compiler warning for an
+    # ineffectual global use statement. Ignore only that exact known warning,
+    # never an unknown diagnostic, nonzero exit code or malformed JSON.
+    diagnostics = [line.strip() for line in run.stderr.splitlines() if line.strip()]
+    expected = re.compile(
+        r"PHP Warning:\s+The use statement with non-compound name "
+        r"'InvalidArgumentException' has no effect in "
+        r".*/tests/infrastructure_action_projection_scenarios\.php on line 22"
+    )
+    if diagnostics and not (
+        filename == "infrastructure_action_projection_scenarios.php"
+        and all(expected.fullmatch(line) for line in diagnostics)
+    ):
+        raise AssertionError(
+            f"UNKNOWN: offline fixture {filename} diagnostics: {run.stderr[-600:]}"
         )
     try:
         return json.loads(run.stdout)

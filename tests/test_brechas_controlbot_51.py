@@ -98,7 +98,7 @@ class BrechasControlbot51Tests(unittest.TestCase):
                 and sample["severity"] == "error"
                 and re.fullmatch(r"[0-9a-f]{64}", sample["primary_fingerprint"])
                 and sample["event_fingerprints"]
-                and sample["correlation_reason"] == "new_incident"
+                and sample["correlation_reason"] == "repeated_fingerprint"
                 and sample["occurrence_count"] == 2
                 and sample["opened_at"] <= sample["last_event_at"]
                 and bool(sample["timeline_events"])

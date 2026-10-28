@@ -21,6 +21,7 @@ IDS = (
 MATRIX_PARTS = (
     "docs/matriz-cobertura-parte-02.md",
     "docs/matriz-cobertura-parte-03.md",
+    "docs/matriz-cobertura.md",
 )
 FIXTURES = (
     "infrastructure_inventory_scenarios.php",
@@ -181,7 +182,7 @@ class BrechasControlbot40Tests(unittest.TestCase):
         parts = tuple((ROOT / part).read_text(encoding="utf-8")
                       for part in MATRIX_PARTS)
         for clause in IDS:
-            index = 0 if int(clause[-4:]) <= 600 else 1
+            index = 2 if clause == "CB-0604" else (0 if int(clause[-4:]) <= 600 else 1)
             row = next(line for line in parts[index].splitlines()
                        if line.startswith(f"| {clause} |"))
             for changed in (

@@ -38,7 +38,10 @@ def php_command(args: list[str], *, payload: dict | None = None) -> dict:
     run = subprocess.run(
         [php, *args], cwd=ROOT, text=True, capture_output=True,
         input=None if payload is None else json.dumps(payload),
-        env={"PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")},
+        env={key: value for key, value in os.environ.items() if key in {
+            "PATH", "CONTROLBOT_REAL_PHP", "CONTROLBOT_PHP_COVERAGE_BOOTSTRAP",
+            "CONTROLBOT_PHP_COVERAGE_DIR", "CONTROLBOT_REPO_ROOT", "XDEBUG_MODE",
+        }},
         timeout=30, check=False,
     )
     if run.returncode:
@@ -198,8 +201,7 @@ class BrechasControlbot44Tests(unittest.TestCase):
             # CB-0671: no projection gains authority or executes anything.
             "CB-0671": all(
                 obj["authority_effect"] == "none" and obj["auto_execute"] is False
-                for obj in [construction, *list(live.values())[:0],
-                            live["approved"], live["pending"], risk["material"]]
+                for obj in (construction, live["approved"], live["pending"], risk["material"])
             ),
             # CB-0672: human review is limited to its approved scope.
             "CB-0672": (

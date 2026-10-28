@@ -58,7 +58,7 @@ def row_for(clause: str, data: dict[str, str]) -> tuple[str, ...] | None:
             or not all(token in row[4].lower() for token in
                        ("offline=unknown", "live=unknown", "operando=unknown"))):
         return None
-    if row[1].count("docs/hostinger-") != 1:
+    if not row[1].startswith("[docs/hostinger-"):
         return None
     return row
 

@@ -166,7 +166,7 @@ class BrechasControlbot38Tests(unittest.TestCase):
                 and preflight("backup", baseline_verified=False)[1][
                     "reason"] == "baseline_unverified"
                 and all(s in self.backup_doc.lower() for s in (
-                    "public_html", "D-059 satisfecho", "referencia opaca",
+                    "public_html", "d-059 satisfecho", "referencia opaca",
                 ))
             ),
             "CB-0569": (

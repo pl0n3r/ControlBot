@@ -54,7 +54,6 @@ def scenario(group: str, name: str) -> dict:
     run = subprocess.run(
         [php, str(ROOT / "tests" / SCRIPTS[group]), name],
         cwd=ROOT, text=True, capture_output=True, timeout=25, check=False,
-        env={"PATH": "/usr/local/bin:/usr/bin:/bin"},
     )
     if run.returncode:
         raise AssertionError(

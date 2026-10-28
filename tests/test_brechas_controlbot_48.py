@@ -195,10 +195,12 @@ class BrechasControlbot48Tests(unittest.TestCase):
                     "L2_VENTURE_ADMIN"
                 and paid["array"]["status"] == "denied"
                 and paid["object"]["status"] == "denied"
-                and all(authority[k]["status"] == "denied" for k in
-                        ("caller", "launch_l1", "pause_l1", "reallocate_l1"))
+                and authority["caller"]["status"] == "denied"
+                and all(authority[k]["status"] == "owner_decision_required"
+                        for k in ("launch_l1", "pause_l1", "reallocate_l1"))
                 and all(mismatch[k]["status"] == "denied" for k in
-                        ("scope", "capability", "policy", "owner", "invalid"))
+                        ("scope", "capability", "policy", "invalid"))
+                and mismatch["owner"]["status"] == "owner_decision_required"
             ),
         }
         self.assertEqual(set(checks), set(TARGETS))

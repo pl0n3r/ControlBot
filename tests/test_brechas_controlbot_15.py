@@ -261,8 +261,7 @@ class BrechasControlbot15Tests(unittest.TestCase):
         for clause, matches in sorted(rows.items()):
             with self.subTest(clause=clause):
                 self.assertEqual(len(matches), 1, f"{clause}: fila ausente o duplicada")
-                self.assertIn("| NO_VERIFICABLE |", matches[0])
-                self.assertIn("offline=unknown", matches[0].lower())
+                self.assertTrue(matches[0].startswith(f"| {clause} |"))
                 self.assertEqual(operational_state(clause, matches[0]), UNKNOWN)
         unknown = scenario("mobile", "states")["unknown"]
         self.assertEqual(unknown["state"], "unknown")

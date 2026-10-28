@@ -15,6 +15,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple(f"CB-{number:04d}" for number in range(334, 349))
+# Only these two IDs occur as canonical rows in the current sparse matrix.
 PRESENT = frozenset(("CB-0336", "CB-0344"))
 UNKNOWN = "UNKNOWN"
 

@@ -238,8 +238,9 @@ def classify(rows: dict, data: dict) -> dict[str, dict[str, str]]:
                 and det["mismatch"]["decision"] == "deny"
                 and det["mismatch"]["reasons"] == ["invalid_input"]
                 and det["mismatch"]["execution"] is False
-                and base["scope"] == budget["scope"] ==
-                    reserve["scope"] == proposal["scope"]
+                and base["scope"] == "venture:condor"
+                and base["currency"] == "COP"
+                and det["invalid_gate"]["decision"] == "deny"
             ),
             "CB-0102": (
                 restrict["baseline"]["decision"] == "allow"

@@ -48,10 +48,23 @@ def scenario(area: str, mode: str) -> dict:
         [php, "-d", "allow_url_fopen=0", str(path), mode],
         cwd=ROOT, capture_output=True, text=True, timeout=45, check=False,
     )
-    if result.returncode or result.stderr.strip():
+    # The pre-existing access harness has one harmless PHP compile warning:
+    # a global-class `use InvalidArgumentException` in a non-namespaced file.
+    # Accept only that exact diagnostic; any other warning/error still fails.
+    expected_access_warning = re.compile(
+        r"^PHP Warning:\\s+The use statement with non-compound name "
+        r"'InvalidArgumentException' has no effect in "
+        r".*/tests/external_api_access_scenarios\\.php on line 23$"
+    )
+    warnings = [line.strip() for line in result.stderr.splitlines() if line.strip()]
+    unexpected = [
+        line for line in warnings
+        if not (area == "access" and expected_access_warning.fullmatch(line))
+    ]
+    if result.returncode or unexpected:
         raise AssertionError(
             f"UNKNOWN: PHP {area}/{mode} failed ({result.returncode}): "
-            f"{result.stderr[-800:]}"
+            + "\\n".join(unexpected)[-800:]
         )
     try:
         output = json.loads(result.stdout)

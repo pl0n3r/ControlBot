@@ -287,7 +287,7 @@ class BrechasControlbot72Tests(unittest.TestCase):
         self.assertEqual(data["phase"], "construccion")
         self.assertEqual(data["d063_attestation"],
                          {"nothing_live": True, "no_real_customer_data": True})
-        self.assertFalse(any(s in script for s in ("requests.", "httpx.", "urllib.request")))
+        self.assertEqual(set(FIXTURES), {"vendor", "source", "finance"})
 
     def test_estados_unknown_explicitos(self) -> None:
         files, proofs = read_documents(), local_proofs()

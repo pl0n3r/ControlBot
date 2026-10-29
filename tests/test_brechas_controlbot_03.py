@@ -336,7 +336,7 @@ class BrechasControlbot03Tests(unittest.TestCase):
         self.assertNotRegex(
             own, r"(?m)^(?:from|import)\s+(?:requests|httpx|pymysql|socket|urllib)\b"
         )
-        self.assertNotIn("-----BEGIN PRIVATE KEY-----", own)
+        self.assertNotIn("-----BEGIN " + "PRIVATE KEY-----", own)
 
     def test_estados_unknown_explicitos(self) -> None:
         rows, docs = read_sources()

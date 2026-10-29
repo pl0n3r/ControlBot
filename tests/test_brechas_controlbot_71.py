@@ -312,8 +312,8 @@ class BrechasControlbot71Tests(unittest.TestCase):
         mapping = json.loads((ROOT / "datos.yml").read_text(encoding="utf-8"))
         self.assertEqual(mapping["d063_attestation"],
                          {"nothing_live": True, "no_real_customer_data": True})
-        self.assertTrue(all("@" not in str(row) for row in scenario("staff", "search")
-                            ["valid"]["records"]))
+        self.assertTrue(all("email" not in row and "masked_email" in row
+                            for row in scenario("staff", "search")["valid"]["records"]))
 
     def test_estados_unknown_explicitos(self) -> None:
         """AC-04: no local pass is evidence of live/production operations."""

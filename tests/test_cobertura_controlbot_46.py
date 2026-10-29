@@ -52,10 +52,19 @@ def php(family: str, case: str) -> dict:
     if binary is None or not script.is_file():
         raise AssertionError("UNKNOWN: PHP interpreter or checked-in scenario missing")
     with tempfile.TemporaryDirectory(prefix="cb-1229-") as home:
+        allowed_env = {
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "HOME": home,
+            "LANG": "C",
+        }
+        # The coverage harness wraps php and needs this local executable path.
+        real_php = os.environ.get("CONTROLBOT_REAL_PHP")
+        if real_php:
+            allowed_env["CONTROLBOT_REAL_PHP"] = real_php
         result = subprocess.run(
             [binary, "-d", "allow_url_fopen=0", "-d", "enable_dl=0", str(script), case],
             cwd=ROOT,
-            env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": home, "LANG": "C"},
+            env=allowed_env,
             capture_output=True, text=True, timeout=60, check=False,
         )
     if result.returncode or result.stderr.strip():

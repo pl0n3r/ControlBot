@@ -94,6 +94,8 @@ class CoberturaControlbot14Tests(unittest.TestCase):
                          ["venture-alpha", "venture-beta"])
         self.assertNotIn("score", json.dumps(base).lower())
         self.assertNotIn("ranking", json.dumps(base).lower())
+        self.assertNotIn("score", json.dumps(ordered).lower())
+        self.assertNotIn("ranking", json.dumps(ordered).lower())
 
         # CB-0205: stale business and unknown technical never turn healthy.
         aged = stale["ventures"][0]
@@ -163,6 +165,14 @@ class CoberturaControlbot14Tests(unittest.TestCase):
         projected = scenario("read", "shape")
         self.assertEqual(set(projected["cockpit"]["data"]), {"ventures"})
         self.assertEqual(set(projected["inbox"]["data"]), {"entries"})
+        self.assertEqual(set(projected["cockpit"]["data"]["ventures"][0]), {
+            "venture_ref", "business_state", "technical_state",
+            "pending_decisions", "critical_events",
+        })
+        self.assertEqual(set(projected["inbox"]["data"]["entries"][0]), {
+            "entry_id", "kind", "venture_ref", "title", "summary",
+            "decision_id", "deadline_at",
+        })
         self.assertEqual(projected["cockpit"]["meta"]["freshness"], {
             "state": "unknown", "observed_at": None, "source_ref": None,
         })
@@ -176,7 +186,7 @@ class CoberturaControlbot14Tests(unittest.TestCase):
 
         # CB-0216: actual runtime context, not caller data, supplies authority.
         self.assertEqual(item["authority_level"], "l4_owner")
-        self.assertTrue(item["producer_ref"].startswith("controlbot:identity/"))
+        self.assertEqual(item["producer_ref"], "controlbot:identity/identity-owner")
         self.assertEqual(item["policy_ref"], "controlbot:policy/external-owner-v1")
         self.assertEqual(item["origin_mode"], "directed")
         self.assertEqual(item["origin_system"], "human")

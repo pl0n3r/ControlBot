@@ -245,7 +245,7 @@ def verdict(ident: object, src: object, evidence: object) -> str:
         rows = matrix_rows(src)
         group, clause = CLAUSES[ident]
         # Matrix phrasing and normative document syntax can differ.
-        doc_clause = ("\`severity\` (\`info|warning|critical\`)"
+        doc_clause = ("`severity` (`info|warning|critical`)"
                       if ident == "CB-1068" else clause)
         if doc_clause not in src[DOCS[group]]:
             return UNKNOWN

@@ -49,7 +49,7 @@ def run_php(script: str, name: str) -> dict:
     if result.stderr:
         raise AssertionError("Unexpected diagnostic output")
     value = json.loads(result.stdout)
-    if not isinstance(value, dict):
+    if not isinstance(value, (dict, list)):
         raise AssertionError("Invalid scenario evidence")
     return value
 

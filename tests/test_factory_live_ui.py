@@ -49,7 +49,9 @@ class FactoryLiveUiTests(unittest.TestCase):
         for token in ('name="viewport"',"grid-template-columns:1fr","@media(min-width:760px)","@media(prefers-reduced-motion:reduce)",":focus-visible"):
             self.assertIn(token,html)
         colors=dict(re.findall(r"--([a-z-]+):\s*(#[0-9a-fA-F]{6})",html))
-        self.assertEqual(colors["bg"].lower(),"#0a0e13");self.assertEqual(colors["panel"].lower(),"#10161d")
+        self.assertEqual(colors["bg"].lower(),"#0c1419");self.assertEqual(colors["panel"].lower(),"#122129")
+        self.assertIn("@media (prefers-color-scheme: dark)", html)
+        self.assertIn("--bg: #f1f7f5", html);self.assertIn("--panel: #ffffff", html)
         for name in ("text","muted","cyan","green","amber","red"):
             self.assertGreaterEqual(contrast(colors[name],colors["panel"]),4.5,name)
 

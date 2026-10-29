@@ -5,6 +5,8 @@
 
 Un estado `NO_VERIFICABLE` no equivale a ausencia de implementación. `CUBIERTO` requiere código, prueba y PR fusionado; `EN_CURSO` requiere hoja ejecutable o PR abierto; las puertas humanas, D-043 y D-059 permanecen vigentes.
 
+**Etapa 1/4 — #1089:** [inventario verificable de las hojas #1008–#1027 y sus PRs](matriz-cobertura.md#reconciliación-de-evidencia--etapa-14-1089). No se modifican filas ni totales de esta partición; cobertura operativa sin verificar (UNKNOWN).
+
 ## Matriz
 
 | ID | Fuente | Requisito verificable | Estado | Evidencia y planos | Issue |

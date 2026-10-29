@@ -304,11 +304,15 @@ class BrechasControlbot73Tests(unittest.TestCase):
             self.assertEqual(local_status("CB-1122", files, altered), UNKNOWN)
         for key in LOCAL:
             with self.subTest(invalid_fixture=key):
-                destroyed = {**p, "focus": {"broken": True}}
-                self.assertEqual(local_status(key, files, destroyed), UNKNOWN
-                                 if key not in {"CB-1117", "CB-1118",
-                                                "CB-1119", "CB-1120"} else
-                                 local_status(key, files, p))
+                dependency = (
+                    "structural" if key in {"CB-1117", "CB-1118"}
+                    else "secrets" if key == "CB-1119"
+                    else "readonly" if key == "CB-1120"
+                    else "ui" if key in {"CB-1122", "CB-1123"}
+                    else "focus"
+                )
+                damaged = {**p, dependency: {"broken": True}}
+                self.assertEqual(local_status(key, files, damaged), UNKNOWN)
         self.assertFalse(witness("CB-1127", {**p, "focus": {"first": {}}}))
 
     def test_sin_datos_reales(self) -> None:

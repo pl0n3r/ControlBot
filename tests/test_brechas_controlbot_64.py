@@ -186,14 +186,14 @@ def exercises(ident: str, source: dict[str, str]) -> bool:
                 and "Explicit security category" in scenario("u", "explicit", "security")
                 and "Explicit security category" not in scenario("u", "explicit", "ci"))
     if ident == "CB-0996":
-        html = scenario("u", "states", "ci")
-        other = scenario("u", "states", "security")
+        html = scenario("u", "states")
+        code = source[SRC["u"]]
         return (all(x in html for x in ("skipped", "startup_failure",
                                        "failure", "success"))
                 and "unknown" in html
                 and "conflicting_evidence" in html
                 and "step_failure" not in html
-                and "CI check evidence" not in other)
+                and "isset($eventCategories[$conflict['event_id']][$filter])" in code)
     return False
 
 

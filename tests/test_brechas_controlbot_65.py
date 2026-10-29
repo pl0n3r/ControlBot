@@ -218,6 +218,9 @@ def exercises(key: str, data: dict, p: dict) -> bool:
 def evidence(key: object, data: object, p: object) -> str:
     if type(key) is not str or key not in CLAUSES or type(p) is not dict:
         return UNKNOWN
+    if set(p) != {"ui", "intake", "idempotent", "rejected",
+                  "existing", "project-choice", "receipt"}:
+        return UNKNOWN
     try:
         coverage_rows(data)
         doc, phrase = CLAUSES[key][1:3]
@@ -263,6 +266,8 @@ class BrechasControlbot65Tests(unittest.TestCase):
                 key, {**self.data, doc: self.data[doc].replace(phrase, "")},
                 self.proof))
             self.assertEqual(UNKNOWN, evidence(key, self.data, {}))
+            self.assertEqual(UNKNOWN, evidence(
+                key, self.data, {**self.proof, "extra": {"approved": True}}))
         self.assertEqual(UNKNOWN, evidence("CB-9999", self.data, self.proof))
         self.assertEqual(UNKNOWN, evidence(None, self.data, self.proof))
         with self.assertRaisesRegex(ValueError, "UNKNOWN"):

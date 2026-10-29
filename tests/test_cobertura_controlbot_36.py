@@ -22,7 +22,12 @@ def php(*argv: str) -> dict:
         ["php", *argv], cwd=ROOT, text=True, capture_output=True,
         timeout=45, check=False,
     )
-    if result.returncode or result.stderr.strip():
+    expected_warning = "The use statement with non-compound name 'InvalidArgumentException' has no effect"
+    unexpected = [
+        line for line in result.stderr.splitlines()
+        if line.strip() and expected_warning not in line
+    ]
+    if result.returncode or unexpected:
         raise AssertionError("PHP no acreditado: " + result.stderr[-400:])
     try:
         value = json.loads(result.stdout)

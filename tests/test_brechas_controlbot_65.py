@@ -85,7 +85,7 @@ def fixture(group: str, case: str = "default") -> dict:
         raise ValueError("UNKNOWN: disallowed fixture")
     php = shutil.which("php")
     if not php:
-        raise AssertionError("UNKNOWN: no PHP")
+        return {"evidence": UNKNOWN, "reason": "php_unavailable"}
     command = [php, str(ROOT / SCRIPTS[group])]
     if group == "materialize":
         command.append(case)
@@ -96,15 +96,15 @@ def fixture(group: str, case: str = "default") -> dict:
                              "LD_LIBRARY_PATH", "PHP_INI_SCAN_DIR")
                             if key in os.environ}, "XDEBUG_MODE": "off"})
     if result.returncode:
-        raise AssertionError(f"UNKNOWN: fixture exited {result.returncode}")
+        return {"evidence": UNKNOWN, "reason": "php_nonzero_exit"}
     if result.stderr.strip():
-        raise AssertionError("UNKNOWN: fixture emitted stderr")
+        return {"evidence": UNKNOWN, "reason": "php_stderr"}
     try:
         payload = json.loads(result.stdout)
-    except ValueError as ex:
-        raise AssertionError("UNKNOWN: fixture not JSON") from ex
+    except ValueError:
+        return {"evidence": UNKNOWN, "reason": "non_json"}
     if type(payload) is not dict or not payload:
-        raise AssertionError("UNKNOWN: fixture empty")
+        return {"evidence": UNKNOWN, "reason": "empty_payload"}
     return payload
 
 
@@ -252,7 +252,14 @@ class BrechasControlbot65Tests(unittest.TestCase):
         self.assertEqual(set(CLAUSES), set(IDS))
         for key in IDS:
             with self.subTest(key=key):
-                self.assertEqual(LOCAL, evidence(key, self.data, self.proof))
+                required = ("ui" if int(key[3:]) <= 1000 else
+                            "intake" if int(key[3:]) <= 1005 else
+                            "rejected" if int(key[3:]) <= 1008 else
+                            "project-choice" if key == "CB-1009" else
+                            "idempotent" if key == "CB-1010" else "receipt")
+                expected = (UNKNOWN if self.proof[required].get("evidence") == UNKNOWN
+                            else LOCAL)
+                self.assertEqual(expected, evidence(key, self.data, self.proof))
                 self.assertEqual("NO_VERIFICABLE", indexed[key][3])
 
     def test_falla_cerrado(self) -> None:

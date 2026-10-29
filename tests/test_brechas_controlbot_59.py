@@ -64,7 +64,7 @@ def matrix_rows(documents: object) -> dict[str, tuple[str, ...]]:
                 continue
             ident = match.group(1)
             fields = tuple(cell.strip() for cell in line.strip().strip("|").split("|"))
-            if (ident in rows or len(fields) != 7 or fields[0] != ident
+            if (ident in rows or len(fields) != 6 or fields[0] != ident
                     or fields[3] != "NO_VERIFICABLE"
                     or "Offline=UNKNOWN" not in fields[4]
                     or not all(fields[:5])):
@@ -78,7 +78,7 @@ def matrix_verdict(ident: object, rows: object) -> str:
     if not isinstance(ident, str) or ident not in IDS or not isinstance(rows, dict):
         return UNKNOWN
     row = rows.get(ident)
-    if not isinstance(row, tuple) or len(row) != 7 or row[3] != "NO_VERIFICABLE":
+    if not isinstance(row, tuple) or len(row) != 6 or row[3] != "NO_VERIFICABLE":
         return UNKNOWN
     return LOCAL if ident in PRESENT else UNKNOWN
 
@@ -212,12 +212,12 @@ class BrechasControlbot59Tests(unittest.TestCase):
         """AC-02: no false evidence from missing, duplicate or promoted rows."""
         row = next(x for x in self.documents[0].splitlines()
                    if x.startswith("| CB-0907 |"))
-        for mutated in (self.documents[0].replace(row, "", 1),
+        for index, mutated in enumerate((self.documents[0].replace(row, "", 1),
                         self.documents[0] + "\n" + row,
                         self.documents[0].replace(row,
-                                                  row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1)):
+                                                  row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1))):
             docs = (mutated, *self.documents[1:])
-            if row not in mutated:
+            if index == 0:
                 self.assertEqual(matrix_verdict("CB-0907", matrix_rows(docs)), UNKNOWN)
             else:
                 with self.assertRaisesRegex(ValueError, UNKNOWN):

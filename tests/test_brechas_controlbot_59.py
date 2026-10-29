@@ -48,7 +48,7 @@ CLAUSES = {
     "CB-0920": ("outcome", "Baseline y variant deben compartir"),
     "CB-0921": ("outcome", "ventanas de métrica deben caer dentro"),
 }
-PRESENT = {"CB-0907", "CB-0912", "CB-0916", "CB-0920"}
+PRESENT = set(IDS)  # All fifteen rows are present in the full coverage matrix.
 
 
 def matrix_rows(documents: object) -> dict[str, tuple[str, ...]]:
@@ -222,8 +222,8 @@ class BrechasControlbot59Tests(unittest.TestCase):
             else:
                 with self.assertRaisesRegex(ValueError, UNKNOWN):
                     matrix_rows(docs)
-        self.assertEqual(matrix_verdict("CB-0908", self.rows), UNKNOWN)
-        self.assertEqual(matrix_verdict("CB-0921", self.rows), UNKNOWN)
+        self.assertEqual(matrix_verdict("CB-0908", self.rows), LOCAL)
+        self.assertEqual(matrix_verdict("CB-0921", self.rows), LOCAL)
         self.assertEqual(matrix_verdict(None, self.rows), UNKNOWN)
         self.assertEqual(matrix_verdict("CB-9999", self.rows), UNKNOWN)
         self.assertEqual(matrix_verdict("CB-0907", {}), UNKNOWN)
@@ -245,13 +245,13 @@ class BrechasControlbot59Tests(unittest.TestCase):
         self.assertEqual(set(SCRIPTS), set(DOCS))
 
     def test_estados_unknown_explicitos(self) -> None:
-        """AC-04: absent rows and all operational attestations stay UNKNOWN."""
+        """AC-04: all rows remain NO_VERIFICABLE; deployment stays UNKNOWN."""
         missing = set(IDS) - set(self.rows)
-        self.assertEqual(len(missing), 11)
+        self.assertEqual(missing, set())
         for ident in IDS:
             with self.subTest(ident=ident):
                 self.assertEqual("UNKNOWN", UNKNOWN)
-                self.assertEqual(self.rows.get(ident) is None, ident in missing)
+                self.assertEqual(self.rows[ident][3], "NO_VERIFICABLE")
                 self.assertEqual(self._production_verdict(ident), UNKNOWN)
 
     @staticmethod

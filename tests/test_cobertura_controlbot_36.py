@@ -48,7 +48,7 @@ def infrastructure() -> dict:
     return php(str(ROOT / "tests/infrastructure_action_projection_scenarios.php"))
 
 CHRONOLOGY = r"""
-require $argv[1];
+require end($argv);
 use ControlBot\Business\IncidentTimeline;
 $r=['version'=>1,'incident_ref'=>'incident:'.str_repeat('a',32),
 'opened_at'=>100,'detected_at'=>110,'recovered_at'=>140,'events'=>[[
@@ -68,7 +68,7 @@ JSON_THROW_ON_ERROR);
 """
 
 SINGLE_USE = r"""
-ob_start(); require $argv[1]; ob_end_clean();
+ob_start(); require end($argv); ob_end_clean();
 $token=authority205('allow','hostinger.read');
 $one=\ControlBot\Infrastructure\InfrastructureActionProjection::project(
 intent205(['intent_id'=>'replay-first']),$token,null,NOW);

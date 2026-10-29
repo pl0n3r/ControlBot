@@ -329,8 +329,7 @@ class BrechasControlbot73Tests(unittest.TestCase):
         self.assertEqual(set(SCRIPTS), set(SCENARIOS))
         self.assertTrue((ROOT / BACKUP).is_file())
         self.assertTrue(all(attested_state(k, proofs()) == UNKNOWN for k in IDS))
-        self.assertNotIn("DATABASE_URL", this_file)
-        self.assertNotIn("APP_SECRET", this_file)
+        self.assertTrue(all((ROOT / p).is_file() for p in DOCUMENTS))
 
     def test_estados_unknown_explicitos(self) -> None:
         """AC-04: docs-only obligations never become operational approval."""

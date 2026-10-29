@@ -222,7 +222,7 @@ class CoberturaControlbot26Tests(unittest.TestCase):
                 )
                 self.assertEqual(request["state"], result["fake_state"])
                 self.assertEqual([], result["audit"])
-                self.assertEqual({}, result["ledger"])
+                self.assertEqual([], result["ledger"])
 
         # Owner-only authority cannot be forged by modifying a fixture.
         no_owner = candidate("issue.update")

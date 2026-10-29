@@ -34,6 +34,7 @@ POST_SNAPSHOT = {
     "docs/github-projection-owner-e2e.md": (993, 994, "tests/test_github_projection_owner_e2e.py"),
     "docs/github-readonly-installation-admission.md": (998, 999, "tests/test_github_readonly_installation_admission.py"),
     "docs/github-readonly-admission-projection-gate.md": (1003, 1004, "tests/test_github_readonly_admission_projection_gate.py"),
+    "docs/DISENO-CONTROLBOT.md": (1169, 1171, "tests/test_control_theme_redesign.py"),
     "docs/operator-runbook.md": (959, 965, "tests/test_runbook_operador_doc.py"),
     "docs/dr-drill-plan.md": (960, 968, "tests/test_simulacro_dr_doc.py"),
     "docs/owner-login-acceptance-script.md": (961, 969, "tests/test_guion_login_doc.py"),
@@ -43,7 +44,7 @@ POST_SNAPSHOT = {
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
 POST_CELL = re.compile(
-    r"^\u0060(?P<path>docs/[a-z0-9_./-]+\.md)\u0060$"
+    r"^\u0060(?P<path>docs/(?:[a-z0-9_./-]+|DISENO-CONTROLBOT)\.md)\u0060$"
 )
 POST_LINK_ISSUE = re.compile(
     r"^\[#(?P<n>\d+)\]\(https://github\.com/pl0n3r/ControlBot/issues/(?P=n)\)$"
@@ -272,6 +273,27 @@ class MatrizCoberturaTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "prohibida"):
             parse_post_snapshot(self.text.replace("docs/owner-login-acceptance-script.md",
                                                   "docs/matriz-cobertura-parte-01.md", 1))
+
+    def test_controlbot_design_source_is_exact_and_unknown(self):
+        """El documento #1169 no aumenta los IDs ni acredita un deploy."""
+        target = "docs/DISENO-CONTROLBOT.md"
+        self.assertEqual(
+            parse_post_snapshot(self.text)[target],
+            (1169, 1171, "tests/test_control_theme_redesign.py"),
+        )
+        line = next(row for row in self.text.splitlines()
+                    if row.startswith("| " + chr(96) + target + chr(96) + " |"))
+        self.assertTrue(line.endswith("| NO_VERIFICABLE / NO ENSAYADO |"))
+        self.assertNotIn(target, {SOURCE.fullmatch(r[1])["path"] for r in self.rows})
+        self.assertEqual(missing_normative_sources(self.text, {target}), set())
+        with self.assertRaisesRegex(ValueError, "inválido"):
+            parse_post_snapshot(self.text.replace(
+                target, "docs/OTRA-FUENTE-NO-PERMITIDA.md", 1,
+            ))
+        with self.assertRaisesRegex(ValueError, "no acredita"):
+            parse_post_snapshot(self.text.replace(
+                line, line.replace("NO_VERIFICABLE / NO ENSAYADO", "CUBIERTO"), 1,
+            ))
 
     def test_sin_cobertura_tiene_issue(self):
         for row in self.rows:

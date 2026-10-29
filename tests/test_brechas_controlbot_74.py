@@ -90,8 +90,12 @@ def matrix_rows(files: object) -> dict[str, tuple[str, ...]]:
                     or phrase.casefold() not in columns[2].casefold()
                     or columns[3] != "NO_VERIFICABLE"
                     or "Fuente normativa sin verificación integral" not in columns[4]
-                    or any(f"{state}=unknown" not in columns[4].casefold()
-                           for state in ("offline", "live", "operando"))
+                    or {name.casefold() for name, _ in re.findall(
+                        r"(?i)\b(offline|live|operando)\s*=\s*([a-z_]+)", columns[4]
+                    )} != {"offline", "live", "operando"}
+                    or any(value.casefold() != "unknown" for _, value in re.findall(
+                        r"(?i)\b(offline|live|operando)\s*=\s*([a-z_]+)", columns[4]
+                    ))
                     or "/issues/1" not in columns[5]
                     or phrase.casefold() not in files[source].casefold()):
                 raise ValueError("UNKNOWN: invalid or promoted " + key)

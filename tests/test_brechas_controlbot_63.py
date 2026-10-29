@@ -163,8 +163,13 @@ def probe_result(key: object, probes: object) -> bool:
         return False
     try:
         if key == "CB-0967":
-            return (type(probes["orchestrator.auth"]) is dict
-                    and type(probes["orchestrator.unknown"]) is dict)
+            auth = probes["orchestrator.auth"]
+            unknown = probes["orchestrator.unknown"]
+            return (auth["wrong"]["status"] == 403
+                    and set(unknown) == {"missing", "invalid", "stale"}
+                    and all(x["status"] == 200
+                            and json.loads(x["body"])["snapshot"]["central"]["activity_state"] == UNKNOWN
+                            for x in unknown.values()))
         if key == "CB-0971":
             data = probes["orchestrator.auth"]
             return (data["wrong"]["status"] == 403

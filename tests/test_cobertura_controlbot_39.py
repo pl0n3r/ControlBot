@@ -64,7 +64,14 @@ def php(args: list[str], payload: dict | None = None) -> dict:
     binary = shutil.which("php")
     if not binary:
         raise AssertionError("UNKNOWN: PHP CLI unavailable")
-    env = {key: os.environ[key] for key in ("PATH", "LANG", "LC_ALL") if key in os.environ}
+    # Preserve only the nonsecret PHP coverage runner contract when CI prepends
+    # its instrumented php wrapper to PATH; never forward arbitrary credentials.
+    env_keys = (
+        "PATH", "LANG", "LC_ALL", "CONTROLBOT_REAL_PHP",
+        "CONTROLBOT_PHP_COVERAGE_BOOTSTRAP", "CONTROLBOT_PHP_COVERAGE_DIR",
+        "CONTROLBOT_REPO_ROOT", "XDEBUG_MODE",
+    )
+    env = {key: os.environ[key] for key in env_keys if key in os.environ}
     result = subprocess.run(
         [binary, *args], cwd=ROOT, env=env, timeout=30,
         input=json.dumps(payload) if payload is not None else None,

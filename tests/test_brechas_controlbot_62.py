@@ -341,8 +341,15 @@ class BrechasControlbot62Tests(unittest.TestCase):
         self.assertEqual(verdict("CB-9999", data, observed), UNKNOWN)
         self.assertEqual(verdict("CB-0952", {}, observed), UNKNOWN)
         self.assertEqual(verdict("CB-0953", data, {"promotion:provenance": {}}), UNKNOWN)
-        self.assertEqual(verdict("CB-0965", data,
+        self.assertEqual(verdict("CB-0966", data,
                                  {**observed, "web:unknown": {"stale": {}}}), UNKNOWN)
+        expected = "SetEnv CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH "
+        invalid_config = data[HTACCESS].replace(
+            expected + "/home/u151692719/domains/control.condorapp.com.co/private/orchestrator-live.json",
+            expected + "/home/u151692719/domains/control.condorapp.com.co/public_html/orchestrator-live.json", 1)
+        self.assertNotEqual(data[HTACCESS], invalid_config)
+        self.assertEqual(verdict("CB-0965", {**data, HTACCESS: invalid_config},
+                                 observed), UNKNOWN)
         self.assertEqual(verdict("CB-0956", data,
                                  {**observed, "registry:approved": {}}), UNKNOWN)
 

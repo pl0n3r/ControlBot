@@ -285,7 +285,7 @@ class BrechasControlbot65Tests(unittest.TestCase):
         self.assertLessEqual(imports, {"__future__", "ast", "functools", "json",
                                       "pathlib", "re", "shutil", "subprocess",
                                       "unittest"})
-        self.assertNotIn("-----BEGIN PRIVATE KEY-----", own)
+        self.assertNotIn("-----BEGIN " + "PRIVATE KEY-----", own)
         self.assertEqual(UNKNOWN, operational("CB-1011", {"owner": True}))
 
     def test_estados_unknown_explicitos(self) -> None:

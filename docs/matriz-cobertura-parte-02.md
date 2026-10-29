@@ -5,6 +5,10 @@
 
 **Integridad:** se preserva el orden del blob original y cada fila conserva texto/fuente/estado/Issue literales; se omiten únicamente IDs ya presentes en la matriz base `docs/matriz-cobertura.md` (`main@cf54959d527d0115c4a2002ac11e50d885fbbf4d`). `NO_VERIFICABLE` indica ausencia de correlación prueba/PR, no ausencia demostrada de código. `CUBIERTO` exige código, test y PR fusionado; `EN_CURSO`/`SIN_COBERTURA` exigen hoja real; `DESCARTADO` exige decisión motivada. La situación offline no acredita conexión ni operación. La prueba de la partición acepta exclusivamente dos estados auditados del padre: corte parcial inicial (215 IDs, sin solapamiento) o matriz final íntegra (1.194 IDs, donde estos 245 quedan incorporados). Los estados intermedios o incompletos se rechazan.
 
+**Etapa 1/4 — #1089:** [inventario verificable de las hojas #1008–#1027 y sus PRs](matriz-cobertura.md#reconciliación-de-evidencia--etapa-14-1089). No se modifican filas ni totales de esta partición; cobertura operativa sin verificar (UNKNOWN).
+
+**Etapa 2/4 — #1090:** [inventario verificable de las hojas #1028–#1047 y sus PRs fusionados](matriz-cobertura.md#reconciliación-de-evidencia--etapa-24-1090). Los estados y el texto original de cada fila se preservan; evidencia operativa real=UNKNOWN.
+
 ## Matriz
 
 | ID | Fuente | Requisito verificable | Estado | Evidencia y planos | Issue |

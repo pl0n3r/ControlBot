@@ -37,6 +37,77 @@ def project_snapshot(observed_at: int = 900) -> dict:
 
 
 class GitHubControlPlaneTests(unittest.TestCase):
+    # Offline acceptance adapters. These execute PHP-backed, synthetic-only
+    # pre-existing contracts; they DO NOT satisfy operational AC-01..06.
+    def test_typed_intent_requires_policy_before_execution(self):
+        policy = runpy.run_path(str(ROOT / "tests" / "test_github_intent_policy.py"))
+        legacy = policy["scenario"]("reuse")
+        self.assertTrue(legacy)
+        for receipt in legacy.values():
+            self.assertEqual(receipt["decision"], "deny")
+            self.assertIs(receipt["execution"], False)
+        trusted = policy["scenario"]("trusted_valid")
+        self.assertEqual(trusted["current"], {
+            "decision": "deny", "reasons": ["grant_required"], "execution": False,
+        })
+
+    def test_execution_is_audited_and_idempotent_when_supported(self):
+        gateway = runpy.run_path(str(ROOT / "tests" / "test_github_intent_execution_gateway.py"))
+        candidate, execute = gateway["candidate"], gateway["execute"]
+        valid = candidate()
+        changed = copy.deepcopy(valid)
+        changed["fake_action"]["fixture_ref"] = "controlbot:fixture/changed"
+        revoked = copy.deepcopy(valid)
+        revoked["revoked"] = ["cd" * 16]
+        result = execute(valid, copy.deepcopy(valid), changed, revoked)
+        self.assertEqual(result["calls"], 1)
+        self.assertEqual(result["receipts"][0], result["receipts"][1])
+        self.assertEqual(result["receipts"][0]["fixture_status"], "simulated")
+        self.assertEqual(result["receipts"][2]["reason"], "idempotency_conflict")
+        self.assertEqual(result["receipts"][3]["fixture_status"], "denied")
+        self.assertEqual(len(result["audit"]), 3)
+        for receipt in result["receipts"]:
+            self.assertIs(receipt["execution"], False)
+            self.assertIs(receipt["runtime_authorized"], False)
+
+    def test_ambiguous_or_failed_github_response_fails_closed(self):
+        gateway = runpy.run_path(str(ROOT / "tests" / "test_github_intent_execution_gateway.py"))
+        candidate, execute = gateway["candidate"], gateway["execute"]
+        for mode in ("throw", "malformed", "false_success", "mismatch", "extra"):
+            with self.subTest(mode=mode):
+                result = execute(candidate(), sender_mode=mode)
+                receipt = result["receipts"][0]
+                self.assertEqual(result["calls"], 1)
+                self.assertEqual(receipt["decision"], "deny")
+                self.assertIs(receipt["execution"], False)
+                self.assertIs(receipt["runtime_authorized"], False)
+                self.assertEqual(receipt["fixture_status"], "ambiguous")
+                self.assertEqual(receipt["reason"], "fake_sender_uncertain")
+                self.assertNotIn("DO_NOT_ECHO", str(result))
+        transport = runpy.run_path(str(ROOT / "tests" / "test_github_readonly_https_transport.py"))
+        response = transport["run"](enabled=True, replies=[transport["reply"]("{}", status=403)])
+        self.assertEqual(response["out"]["status"], "UNKNOWN")
+        self.assertIs(response["out"]["runtime_authorized"], False)
+
+    def test_permissions_are_minimal_scoped_and_revocable(self):
+        admission = runpy.run_path(str(ROOT / "tests" / "test_github_readonly_installation_admission.py"))
+        run = admission["run"]
+        valid = run()
+        self.assertEqual(valid["out"]["status"], "OFFLINE_VALIDATED")
+        self.assertIs(valid["out"]["runtime_authorized"], False)
+        for variant in (
+            {"f": {**admission["fixture"](), "permissions": {"metadata": "read", "issues": "write"}}},
+            {"f": {**admission["fixture"](), "status": "revoked"}},
+            {"g": {**admission["grant"](), "expires_at": 1050}},
+            {"req": {**admission["request"](), "repository": "pl0n3r/Other"}},
+            {"req": {**admission["request"](), "method": "POST"}},
+        ):
+            with self.subTest(variant=variant):
+                denied = run(**variant)
+                self.assertEqual(denied["out"]["status"], "UNKNOWN")
+                self.assertIs(denied["out"]["runtime_authorized"], False)
+                self.assertIs(denied["out"]["execute_actions"], False)
+
     def test_project_view_aggregates_real_repo_ci_pr_issue_and_release_state(self):
         """Integra los contratos PHP de repositorios reales con datos sintéticos."""
         view = project(project_snapshot())

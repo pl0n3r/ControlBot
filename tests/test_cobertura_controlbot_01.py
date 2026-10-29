@@ -164,7 +164,7 @@ class CoberturaControlbot01Tests(unittest.TestCase):
         self.assertIn("    name: Validar", workflow)
         self.assertIn("needs: [factory, contrato]", workflow)
         self.assertIn("phase: construccion", workflow)
-        self.assertIn("head.sha || github.sha", workflow)
+        self.assertIn("ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}", workflow)
 
 
 if __name__ == "__main__":

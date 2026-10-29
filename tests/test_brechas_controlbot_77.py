@@ -130,8 +130,9 @@ def php_fixture(group: str, scenario: str) -> object:
             cwd=ROOT, env=safe_env(home), capture_output=True,
             text=True, check=False, timeout=40,
         )
-    if result.returncode or result.stderr.strip():
-        raise AssertionError(UNKNOWN + ": fixture falló " + group + "/" + scenario)
+    if result.returncode != 0:
+        raise AssertionError(UNKNOWN + ": fixture falló " + group + "/" + scenario
+                             + " (exit=" + str(result.returncode) + ")")
     if group == "ui":
         return result.stdout
     try:

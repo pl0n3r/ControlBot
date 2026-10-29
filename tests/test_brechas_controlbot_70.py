@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 import unittest
+from tests import test_owner_login_gate as owner
 
 ROOT = Path(__file__).resolve().parents[1]
 UNKNOWN = "UNKNOWN"
@@ -117,8 +118,6 @@ def php_scenario(name: str) -> dict:
 @lru_cache(maxsize=1)
 def local_probes() -> dict[str, bool]:
     """Ejercita las pruebas PHP de login existentes y la proyección Staff sintética."""
-    from tests import test_owner_login_gate as owner
-
     owner.OwnerLoginGateTests("test_blocked_ip_does_not_create_username_files").test_blocked_ip_does_not_create_username_files()
     owner.OwnerLoginGateTests("test_cross_ip_owner_login_is_not_globally_locked").test_cross_ip_owner_login_is_not_globally_locked()
     summary, search, invalid = (php_scenario(x) for x in ("summary", "search", "invalid"))

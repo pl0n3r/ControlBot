@@ -49,6 +49,23 @@ C = {
 }
 
 
+def php_environment() -> dict[str, str]:
+    """Conservar solo el contrato del wrapper de coverage, nunca secretos."""
+    result = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "LANG": "C",
+        "HOME": os.environ.get("HOME", "/tmp"),
+    }
+    for key in (
+        "CONTROLBOT_REAL_PHP", "CONTROLBOT_PHP_COVERAGE_BOOTSTRAP",
+        "CONTROLBOT_PHP_COVERAGE_DIR", "CONTROLBOT_REPO_ROOT",
+        "XDEBUG_MODE",
+    ):
+        if key in os.environ:
+            result[key] = os.environ[key]
+    return result
+
+
 @lru_cache(maxsize=None)
 def actual(component: str, mode: str = "") -> dict:
     """Falla cerrado si el proceso PHP de producto no corre de verdad."""
@@ -64,8 +81,7 @@ def actual(component: str, mode: str = "") -> dict:
         cmd.append(mode)
     result = subprocess.run(
         cmd, cwd=ROOT, capture_output=True, text=True, check=False, timeout=40,
-        env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "C",
-             "HOME": os.environ.get("HOME", "/tmp")},
+        env=php_environment(),
     )
     if result.returncode != 0 or result.stderr.strip():
         raise AssertionError(
@@ -121,8 +137,7 @@ def negative_profile() -> dict:
     run = subprocess.run(
         [binary, "-d", "allow_url_fopen=0", "-r", PHP_NEGATIVE, str(ROOT)],
         cwd=ROOT, capture_output=True, text=True, timeout=35, check=False,
-        env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-             "LANG": "C", "HOME": os.environ.get("HOME", "/tmp")},
+        env=php_environment(),
     )
     if run.returncode or run.stderr.strip():
         raise AssertionError("UNKNOWN: prueba negativa PHP fallo: "

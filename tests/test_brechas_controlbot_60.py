@@ -115,10 +115,8 @@ def scenario(group: str, case: str) -> dict:
     cmd = [binary, str(ROOT / PHP[group]), case]
     run = subprocess.run(
         cmd, cwd=ROOT, text=True, capture_output=True, check=False, timeout=30,
-        env={**{key: os.environ[key] for key in
-                 ("PATH", "LANG", "LC_ALL", "HOME", "TMPDIR",
-                  "PHP_INI_SCAN_DIR", "PHPRC", "LD_LIBRARY_PATH")
-                 if key in os.environ}, "XDEBUG_MODE": "off"},
+        env={key: val for key, val in os.environ.items()
+             if not re.search(r"(?i)(?:token|secret|password|passwd|credential|private|authorization|api.?key|cookie|dsn)", key)},
     )
     if run.returncode != 0 or run.stderr.strip():
         raise AssertionError(

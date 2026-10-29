@@ -243,7 +243,7 @@ def local_status(key: object, files: object, p: object) -> str:
     if required not in files[source] or key not in rows:
         return UNKNOWN
     if key == "CB-1121":
-        return GAP if "no ejecuta acciones de infraestructura" in files[ACCESS] else UNKNOWN
+        return GAP if "ni ejecuta acciones de infraestructura" in files[ACCESS] else UNKNOWN
     if key == "CB-1130":
         return GAP if ("#625" in files[README]
                        and "D-059" in files[BACKUP]

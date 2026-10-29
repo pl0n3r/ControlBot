@@ -54,6 +54,7 @@ final class ControlCenterShell
             . '</head><body data-section="' . self::e($active) . '">'
             . '<header class="control-shell-header">'
             . '<a class="control-brand" href="#control-content">CONTROLBOT</a>'
+            . '<span class="control-brand-caption">Centro de operación</span>'
             . '<nav class="control-nav" aria-label="Navegación principal">' . $navigation . '</nav>'
             . '</header>'
             . '<div id="control-content" class="control-content">' . $content . '</div>'
@@ -84,52 +85,101 @@ body {
   min-height: 100vh;
   color: var(--text);
   background: var(--bg);
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .control-shell-header {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 10;
   display: grid;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 8px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
 .control-brand {
   width: fit-content;
   color: var(--cyan);
-  font: 700 .78rem/1.2 Orbitron, Inter, system-ui, sans-serif;
-  letter-spacing: .09em;
+  font: 800 .91rem/1.2 system-ui, sans-serif;
+  letter-spacing: .05em;
   text-decoration: none;
 }
-.control-nav { display: flex; flex-wrap: wrap; gap: 6px; }
+.control-brand-caption {
+  color: var(--muted);
+  font-size: .76rem;
+  line-height: 1.3;
+}
+.control-nav { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .nav-item {
-  min-height: 40px;
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  color: var(--text);
-  font: 700 .72rem/1.2 "JetBrains Mono", ui-monospace, monospace;
-  text-decoration: none;
+  min-height: 44px; display: inline-flex; align-items: center; justify-content: flex-start;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font: 650 .83rem/1.25 system-ui, -apple-system, sans-serif;
+  text-decoration: none; white-space: nowrap;
 }
-.nav-active { border-color: var(--cyan); color: var(--cyan); }
-.nav-disabled { color: var(--muted); opacity: .62; cursor: not-allowed; }
-.control-content { min-width: 0; }
-a:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
-@media (min-width: 860px) {
-  .control-shell-header {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    padding-inline: 28px;
+.nav-item:hover:not(.nav-disabled) { background: var(--control-hover); }
+.nav-active {
+  background: var(--accent-surface);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.nav-active::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--cyan);
+  margin-right: 9px;
+}
+.nav-disabled {
+  color: var(--muted);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+.control-content { min-width: 0; overflow-wrap: anywhere; }
+a:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 3px;
+}
+@media (max-width: 859px) {
+  .control-shell-header { gap: 4px; }
+  .control-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding-block: 8px;
+    scrollbar-width: thin;
   }
-  .control-nav { justify-content: flex-end; }
+  .nav-item { flex: 0 0 auto; }
+}
+@media (min-width: 860px) {
+  body { display: grid; grid-template-columns: var(--rail-width) minmax(0, 1fr); }
+  .control-shell-header {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    align-self: start;
+    align-content: start;
+    gap: 12px;
+    padding: 28px 16px;
+    border-bottom: 0;
+    border-right: 1px solid var(--line);
+  }
+  .control-nav { flex-direction: column; flex-wrap: nowrap; gap: 7px; }
+  .nav-item { width: 100%; }
+  .control-content { width: 100%; max-width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }
+
 CSS;
     }
 }

@@ -8,7 +8,6 @@ assertions: reconciliation belongs to a separate issue.
 from __future__ import annotations
 
 import base64
-import copy
 import json
 import shutil
 import subprocess
@@ -267,12 +266,14 @@ class CoberturaControlbot25Tests(unittest.TestCase):
         info = json.loads((ROOT / "datos.yml").read_text(encoding="utf-8"))
         self.assertEqual("construccion", info["phase"])
         self.assertEqual(bytes(range(32, 64)).hex(), FIXTURE_KEY)
-        self.assertTrue(all(path.startswith("github_intent_") for path in (
+        for path in (
             "github_intent_policy_scenarios.php",
             "github_intent_preview_scenarios.php",
             "github_intent_authority_requirements_scenarios.php",
             "github_intent_test_grant_authority_scenarios.php",
-        )))
+        ):
+            with self.subTest(php_fixture=path):
+                self.assertTrue((ROOT / "tests" / path).is_file())
         valid = grant(grant_candidate())
         self.assert_not_runtime(valid)
         self.assertNotIn("key", valid)

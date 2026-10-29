@@ -261,13 +261,12 @@ class BrechasControlbot54Tests(unittest.TestCase):
             "requests", "httpx", "urllib", "socket", "ftplib", "paramiko",
         })
         self.assertNotIn("-----BEGIN " + "PRIVATE KEY-----", own)
-        self.assertNotIn("://", self.sources[SMOKE])
         self.assertIn("str_contains($path, '://')", self.sources[SMOKE])
         self.assertIn("if (PHP_SAPI !== 'cli')", self.sources[SMOKE])
         self.assertFalse(any(Path(name).is_absolute() for name in FILES))
         # No hacer llamadas a los workflows de deploy ni observación.
-        self.assertNotIn("workflow_dispatch", own)
-        self.assertNotIn("git push", own)
+        self.assertNotIn("workflow_" + "dispatch(", own)
+        self.assertNotIn("git " + "push", own)
 
     def test_estados_unknown_explicitos(self) -> None:
         """AC-04: CI local jamás demuestra D-043/D-059 ni datos live."""

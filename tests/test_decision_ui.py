@@ -31,14 +31,13 @@ class DecisionUiTests(unittest.TestCase):
         self.assertIn("/ DECISIONES</p>", html)
 
 
-    def test_canonical_hud_palette_is_sober_and_non_neon(self):
+    def test_decision_ui_uses_both_themes_with_sober_tokens(self):
         html = render("ready")
-        self.assertIn("--bg: #0a0e13", html)
-        self.assertIn("--panel: #10161d", html)
-        self.assertIn("--cyan: #7cc9dd", html)
-        self.assertIn("--green: #6fcf9e", html)
-        self.assertIn("--amber: #e3a857", html)
-        self.assertIn("--red: #e0666f", html)
+        self.assertIn("color-scheme: light", html)
+        self.assertIn("color-scheme: dark", html)
+        self.assertIn("@media (prefers-color-scheme: dark)", html)
+        for token in ("bg", "panel", "cyan", "green", "amber", "red"):
+            self.assertIn("--" + token + ": ", html)
         self.assertNotIn("text-shadow", html)
         self.assertNotIn("box-shadow", html)
         self.assertNotIn("scanline", html)

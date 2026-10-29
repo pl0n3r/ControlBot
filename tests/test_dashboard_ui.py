@@ -50,17 +50,13 @@ class DashboardUiTests(unittest.TestCase):
         self.assertNotIn("$0.00", html)
         self.assertEqual(html.count("Sin evidencia disponible."), 4)
 
-    def test_dashboard_uses_canonical_sober_visual_contract(self):
+    def test_dashboard_uses_two_sober_system_themes(self):
         html = render("empty")
-        for token in [
-            "--bg: #0a0e13",
-            "--panel: #10161d",
-            "--cyan: #7cc9dd",
-            "--green: #6fcf9e",
-            "--amber: #e3a857",
-            "--red: #e0666f",
-        ]:
-            self.assertIn(token, html)
+        self.assertIn("color-scheme: light", html)
+        self.assertIn("color-scheme: dark", html)
+        self.assertIn("@media (prefers-color-scheme: dark)", html)
+        for token in ("bg", "panel", "cyan", "green", "amber", "red"):
+            self.assertIn("--" + token + ": ", html)
         self.assertNotIn("text-shadow", html)
         self.assertNotIn("box-shadow", html)
         self.assertNotIn("scanline", html)

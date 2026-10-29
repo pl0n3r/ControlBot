@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 namespace ControlBot\Security;
+require_once __DIR__ . '/UiTheme.php';
 use Throwable;
 final class OwnerLoginGate {
     private const IDLE_SECONDS = 900;
@@ -200,11 +201,20 @@ final class OwnerLoginGate {
                 . '<label for="password">Contraseña</label><input id="password" name="password" type="password" autocomplete="current-password" required>'
                 . '<button type="submit">Entrar</button></form>';
         $html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>Acceso del propietario | ControlBot</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;'
-            . 'font-family:system-ui,sans-serif;background:#0e182b;color:#f4f7ff}main{box-sizing:border-box;width:min(92vw,390px);padding:2rem;'
-            . 'border-radius:16px;background:#172943}label,input,button{display:block;width:100%;box-sizing:border-box;margin-top:.65rem}'
-            . 'input,button{padding:.75rem;border-radius:8px;border:1px solid #7589aa}button{background:#51b9db;color:#082038;'
-            . 'font-weight:700;cursor:pointer;margin-top:1.25rem}a{color:#90e6ff}.error{color:#ffb7b7}</style></head>'
+            . '<title>Acceso del propietario | ControlBot</title><style>'
+            . \ControlBot\Ui\UiTheme::tokensCss()
+            . 'body{margin:0;min-height:100vh;display:grid;place-items:center;'
+            . 'font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}'
+            . 'main{box-sizing:border-box;width:min(92vw,390px);padding:2rem;'
+            . 'border:1px solid var(--line);border-radius:16px;background:var(--panel)}'
+            . 'label,input,button{display:block;width:100%;box-sizing:border-box;margin-top:.65rem}'
+            . 'input,button{min-height:44px;padding:.75rem;border-radius:8px;border:1px solid var(--line-strong)}'
+            . 'input{background:var(--field-bg);color:var(--text);font:inherit}'
+            . 'button{background:var(--cyan);color:var(--on-accent);font-weight:700;cursor:pointer;margin-top:1.25rem}'
+            . 'button:hover{filter:brightness(.94)}a{color:var(--cyan)}.error{color:var(--red)}'
+            . ':focus-visible{outline:3px solid var(--amber);outline-offset:3px}'
+            . '@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}'
+            . '</style></head>'
             . '<body><main><h1>ControlBot</h1><p>Acceso del propietario</p>' . $noticeHtml . $content . '</main></body></html>';
         return self::response($status, $html, ['Content-Type' => 'text/html; charset=utf-8']);
     }

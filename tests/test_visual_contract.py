@@ -45,9 +45,16 @@ def contrast_ratio(first: str, second: str) -> float:
     return (high + 0.05) / (low + 0.05)
 
 
-def canonical_tokens() -> dict[str, str]:
+def theme_palettes() -> dict[str, dict[str, str]]:
     source = (ROOT / "src" / "UiTheme.php").read_text(encoding="utf-8")
-    return dict(re.findall(r"--([a-z-]+):\s*(#[0-9a-fA-F]{6});", source))
+    blocks = re.findall(r":root\s*\{([^}]+)\}", source)
+    if len(blocks) != 2:
+        raise AssertionError("Se esperan exactamente dos temas")
+    parsed = [
+        dict(re.findall(r"--([a-z-]+):\s*(#[0-9a-fA-F]{6});", block))
+        for block in blocks
+    ]
+    return {"light": parsed[0], "dark": parsed[1]}
 
 
 def css_min_width_values(css: str) -> list[str]:
@@ -58,17 +65,28 @@ def css_min_width_values(css: str) -> list[str]:
 
 
 class VisualContractTests(unittest.TestCase):
-    def test_canonical_palette_meets_wcag_aa(self):
-        tokens = canonical_tokens()
-        for required in ("bg", "panel", "text", "muted", "cyan", "green", "amber", "red"):
-            self.assertIn(required, tokens)
-
-        for foreground in ("text", "muted", "cyan", "green", "amber", "red"):
-            for background in ("bg", "panel"):
-                with self.subTest(foreground=foreground, background=background):
+    def test_both_palettes_meet_wcag_aa_on_every_surface(self):
+        for theme, tokens in theme_palettes().items():
+            with self.subTest(theme=theme):
+                for name in (
+                    "bg", "panel", "panel-raised", "text", "muted",
+                    "cyan", "green", "amber", "red", "body-soft",
+                ):
+                    self.assertIn(name, tokens)
+                for foreground in ("text", "muted", "cyan", "green", "amber", "red", "body-soft"):
+                    for background in ("bg", "panel", "panel-raised"):
+                        with self.subTest(theme=theme, foreground=foreground, background=background):
+                            self.assertGreaterEqual(
+                                contrast_ratio(tokens[foreground], tokens[background]),
+                                4.5,
+                            )
+                for foreground, background in (
+                    ("on-accent", "cyan"), ("on-green", "green"),
+                    ("warning-text", "warning-bg"),
+                ):
                     self.assertGreaterEqual(
                         contrast_ratio(tokens[foreground], tokens[background]),
-                        4.5,
+                        4.5, (theme, foreground, background),
                     )
 
     def test_decisions_are_iphone_safe(self):

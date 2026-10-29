@@ -57,10 +57,16 @@ def php(family: str, case: str) -> dict:
             "HOME": home,
             "LANG": "C",
         }
-        # The coverage harness wraps php and needs this local executable path.
-        real_php = os.environ.get("CONTROLBOT_REAL_PHP")
-        if real_php:
-            allowed_env["CONTROLBOT_REAL_PHP"] = real_php
+        # Pass only the local coverage harness paths; never inherit credentials.
+        for name in (
+            "CONTROLBOT_REAL_PHP",
+            "CONTROLBOT_PHP_COVERAGE_BOOTSTRAP",
+            "CONTROLBOT_PHP_COVERAGE_DIR",
+            "CONTROLBOT_REPO_ROOT",
+            "XDEBUG_MODE",
+        ):
+            if name in os.environ:
+                allowed_env[name] = os.environ[name]
         result = subprocess.run(
             [binary, "-d", "allow_url_fopen=0", "-d", "enable_dl=0", str(script), case],
             cwd=ROOT,

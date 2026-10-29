@@ -107,7 +107,7 @@ def run_php(payload: dict) -> tuple[dict | None, str]:
     php = shutil.which("php")
     if not php:
         raise AssertionError("PHP absent; real behavior unverified")
-    env = {key: os.environ[key] for key in ("PATH", "LANG", "LC_ALL") if key in os.environ}
+    env = {key: os.environ[key] for key in ("PATH", "LANG", "LC_ALL", "CONTROLBOT_REAL_PHP") if key in os.environ}
     result = subprocess.run(
         [php, "-d", "allow_url_fopen=0", "-r", PHP_RUNNER],
         input=json.dumps(payload, sort_keys=True),

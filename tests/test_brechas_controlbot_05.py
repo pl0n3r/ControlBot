@@ -153,8 +153,8 @@ def classify(rows: dict[str, tuple[str, ...]], data: dict) -> dict:
         checks = {
             "CB-0062": freshness,
             "CB-0063": expiry,
-            "CB-0064": ro["read_unbounded"]["allowed"] is True
-                and ro["read_unbounded"]["backup_required"] is False
+            "CB-0064": f["read_unbounded"]["allowed"] is True
+                and f["read_unbounded"]["backup_required"] is False
                 and f["no_expiration"]["allowed"] is False,
             "CB-0065": f["fresh"]["reason"] == "backup_verified"
                 and safe["evidence"]["status"] == "ready"

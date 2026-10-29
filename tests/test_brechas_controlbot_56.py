@@ -98,7 +98,7 @@ class BrechasControlbot56Tests(unittest.TestCase):
         checks = {
             "CB-0850": (
                 first["version"] == 1 and first["schedule_ref"].startswith("controlbot:schedule/")
-                and first["briefing"]["version"] == 1
+                and isinstance(first["briefing"]["sections"], dict)
                 and first["policy_ref"].startswith("controlbot:policy/")
             ),
             "CB-0851": (

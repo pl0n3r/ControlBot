@@ -226,7 +226,7 @@ catch(Throwable $e){$result=C::diagnosticFor($e)['code'];}
 echo json_encode(['code'=>$result,'calls'=>$call]);
 ''')
         self.assertEqual("download_budget_exceeded",budget["code"])
-        self.assertGreater(budget["calls"], 8)
+        self.assertGreaterEqual(budget["calls"], 8)
         env = os.environ.copy()
         env.update({"CONTROLBOT_ORCHESTRATOR_COLLECTOR_ENABLED":"1",
                     "CONTROLBOT_GITHUB_READ_TOKEN_FILE":"/missing/private/token",

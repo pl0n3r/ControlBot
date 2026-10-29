@@ -177,7 +177,7 @@ def local_checks(data: object, observed: object) -> dict[str, object]:
         expected_private = (
             configured_lines.count(configured) == 1
             and "/public_html/" not in private
-            and private in doc
+            and "$HOME/domains/control.condorapp.com.co/private/orchestrator-live.json" in doc
             and private in data[CRON_DOC]
         )
         unknown_snapshots = (

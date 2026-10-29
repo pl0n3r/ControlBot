@@ -23,11 +23,18 @@ def php(*argv: str) -> dict:
         timeout=45, check=False,
     )
     expected_warning = "The use statement with non-compound name 'InvalidArgumentException' has no effect"
-    unexpected = [
-        line for line in result.stderr.splitlines()
-        if line.strip() and expected_warning not in line
-    ]
-    if result.returncode or unexpected:
+    remaining = [line.strip() for line in result.stderr.splitlines() if line.strip()]
+    if (remaining and remaining[0].startswith("PHP Warning:")
+            and expected_warning in remaining[0]
+            and "infrastructure_action_projection_scenarios.php on line 22" in remaining[0]):
+        remaining.pop(0)
+        # PHP can emit this exact warning with an accompanying one-frame trace.
+        # Reject any other warning, trace frame, stderr or nonzero exit code.
+        if remaining and remaining[0] == "PHP Stack trace:":
+            remaining.pop(0)
+            if remaining and remaining[0] == "PHP   1. {main}() Command line code:0":
+                remaining.pop(0)
+    if result.returncode or remaining:
         raise AssertionError("PHP no acreditado: " + result.stderr[-400:])
     try:
         value = json.loads(result.stdout)
@@ -88,17 +95,6 @@ def single_use() -> dict:
     return php("-r", SINGLE_USE, "--", str(ROOT / "tests/infrastructure_action_projection_scenarios.php"))
 
 class CoberturaControlbot36Tests(unittest.TestCase):
-    # ACCEPTANCE_DIAGNOSTICS: expose real failure details hidden by Factory's
-    # in-memory runner, only for direct single-method acceptance execution.
-    def run(self, result=None):
-        outcome = super().run(result)
-        if type(self).__module__.startswith("_factory_acceptance_"):
-            import sys
-            for case, detail in outcome.failures + outcome.errors:
-                if case is self:
-                    print("ACCEPTANCE_DIAGNOSTIC: " + detail[-3000:], file=sys.stderr)
-        return outcome
-
     def test_contrato_principal(self) -> None:
         """AC-01: aserciones de comportamiento PHP real para 12 requisitos."""
         time = chronology()

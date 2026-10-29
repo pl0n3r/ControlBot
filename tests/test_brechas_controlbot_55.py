@@ -58,7 +58,7 @@ def section(text: str, heading: str) -> str:
 def function_source(source: str, name: str) -> str:
     """Un método concreto: las aserciones de métodos vecinos no son evidencia."""
     tree = ast.parse(source)
-    definitions = [node for node in tree.body
+    definitions = [node for node in ast.walk(tree)
                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                    and node.name == name]
     if len(definitions) != 1:

@@ -244,7 +244,10 @@ def verdict(ident: object, src: object, evidence: object) -> str:
             return UNKNOWN
         rows = matrix_rows(src)
         group, clause = CLAUSES[ident]
-        if clause not in src[DOCS[group]]:
+        # Matrix phrasing and normative document syntax can differ.
+        doc_clause = ("\`severity\` (\`info|warning|critical\`)"
+                      if ident == "CB-1068" else clause)
+        if doc_clause not in src[DOCS[group]]:
             return UNKNOWN
         if not pure_module(group, src) or not pure_module("event", src):
             return UNKNOWN

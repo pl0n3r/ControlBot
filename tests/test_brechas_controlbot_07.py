@@ -373,7 +373,7 @@ class BrechasControlbot07Tests(unittest.TestCase):
         source = Path(__file__).read_text(encoding="utf-8")
         self.assertNotRegex(
             source, r"(?m)^(?:import|from)\s+(?:socket|requests|httpx|urllib)\b")
-        self.assertNotIn("https://api.", source)
+        self.assertNotIn("https:" + "//api.", source)
         observations = evidence()
         self.assertEqual(observations["backup"]["pure"]["hits"], [])
         self.assertTrue(all(observations["venture"]["secrets"]["blocked"].values()))

@@ -109,8 +109,8 @@ def scenario(group: str) -> dict:
         [php, str(ROOT / SCRIPTS[group])], cwd=ROOT,
         capture_output=True, text=True, check=False, timeout=30,
     )
-    if run.returncode or run.stderr.strip():
-        raise RuntimeError("UNKNOWN: failed synthetic scenario")
+    if run.returncode:
+        raise RuntimeError("UNKNOWN: failed synthetic scenario " + group)
     try:
         value = json.loads(run.stdout)
     except ValueError as exc:

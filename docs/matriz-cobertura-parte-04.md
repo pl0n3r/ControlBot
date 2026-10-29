@@ -8,6 +8,8 @@ Todos los estados se conservan **NO_VERIFICABLE**, con evidencia original sin pr
 
 **Etapa 1/4 — #1089:** [inventario verificable de las hojas #1008–#1027 y sus PRs](matriz-cobertura.md#reconciliación-de-evidencia--etapa-14-1089). No se modifican filas ni totales de esta partición; cobertura operativa sin verificar (UNKNOWN).
 
+**Etapa 2/4 — #1090:** [inventario verificable de las hojas #1028–#1047 y sus PRs fusionados](matriz-cobertura.md#reconciliación-de-evidencia--etapa-24-1090). Los estados y el texto original de cada fila se preservan; evidencia operativa real=UNKNOWN.
+
 ## Matriz
 
 | ID | Fuente | Requisito verificable | Estado | Evidencia y planos | Issue |

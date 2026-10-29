@@ -49,9 +49,20 @@ def scenario(area: str, case: str, raw: bool = False):
         [php, "-d", "allow_url_fopen=0", str(script), case],
         cwd=ROOT, capture_output=True, text=True, check=False, timeout=35,
     )
-    if result.returncode or result.stderr.strip():
+    warning = result.stderr.strip()
+    # PHP 8.5 warns about a redundant global 'use' in this checked-in
+    # scenario. Match that exact fixture warning, never suppress other stderr.
+    if area == "work":
+        harmless = (
+            "PHP Warning:  The use statement with non-compound name "
+            "'InvalidArgumentException' has no effect in "
+            + str(script) + " on line 15"
+        )
+        if warning == harmless:
+            warning = ""
+    if result.returncode or warning:
         raise AssertionError(f"UNKNOWN: real PHP {area}/{case} failed: "
-                             + result.stderr[-350:])
+                             + warning[-350:])
     if raw:
         if not result.stdout.strip():
             raise AssertionError("UNKNOWN: empty HTML")
@@ -256,7 +267,7 @@ class CoberturaControlbot14Tests(unittest.TestCase):
         self.assertTrue(workflow.is_file())
         config = workflow.read_text(encoding="utf-8")
         self.assertIn("Pruebas de contrato e integración", config)
-        self.assertIn("python3 -m unittest", config)
+        self.assertIn("python3 scripts/generate_coverage.py", config)
         pure = scenario("read", "pure")
         self.assertEqual(pure["methods"], ["cockpit", "ownerInbox"])
         self.assertEqual(pure["first"], pure["second"])

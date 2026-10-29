@@ -52,9 +52,9 @@ def scenario(area: str, mode: str) -> dict:
     # a global-class `use InvalidArgumentException` in a non-namespaced file.
     # Accept only that exact diagnostic; any other warning/error still fails.
     expected_access_warning = re.compile(
-        r"^PHP Warning:\\s+The use statement with non-compound name "
+        r"^PHP Warning:\s+The use statement with non-compound name "
         r"'InvalidArgumentException' has no effect in "
-        r".*/tests/external_api_access_scenarios\\.php on line 23$"
+        r".*/tests/external_api_access_scenarios\.php on line 23$"
     )
     warnings = [line.strip() for line in result.stderr.splitlines() if line.strip()]
     unexpected = [
@@ -64,7 +64,7 @@ def scenario(area: str, mode: str) -> dict:
     if result.returncode or unexpected:
         raise AssertionError(
             f"UNKNOWN: PHP {area}/{mode} failed ({result.returncode}): "
-            + "\\n".join(unexpected)[-800:]
+            + "\n".join(unexpected)[-800:]
         )
     try:
         output = json.loads(result.stdout)

@@ -158,8 +158,7 @@ class BrechasControlbot74Tests(unittest.TestCase):
                 files[path] + "\n" + original,
                 files[path].replace(original, original.replace(
                     "NO_VERIFICABLE", "CUBIERTO", 1), 1),
-                files[path].replace(original, original.replace(
-                    "offline=UNKNOWN", "offline=GREEN", 1), 1),
+                files[path].replace(original, re.sub(r"(?i)offline=UNKNOWN", "offline=GREEN", original, count=1), 1),
             )
             for altered in variants:
                 with self.subTest(id=key):

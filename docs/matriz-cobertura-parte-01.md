@@ -6,6 +6,8 @@
 
 `NO_VERIFICABLE` no significa que la función no exista: falta correlación con prueba y PR fusionado. `CUBIERTO` exige ambos; `EN_CURSO` y `SIN_COBERTURA` requieren hoja ejecutable real; `DESCARTADO` requiere razón y autoridad. Diferenciar siempre offline, conexión live y operación real.
 
+**Etapa 1/4 — #1089:** [inventario verificable de las hojas #1008–#1027 y sus PRs](matriz-cobertura.md#reconciliación-de-evidencia--etapa-14-1089). No se modifican filas ni totales de esta partición; cobertura operativa sin verificar (UNKNOWN).
+
 ## Matriz
 
 | ID | Fuente | Requisito verificable | Estado | Evidencia y planos | Issue |

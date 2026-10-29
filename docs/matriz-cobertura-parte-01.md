@@ -12,6 +12,8 @@
 
 **Etapa 3/4 — #1091:** [inventario verificable de 300 IDs de #1048–#1067 y sus PRs MERGED](matriz-cobertura.md#reconciliación-de-evidencia--etapa-34-1091). Las filas y totales originales de esta partición permanecen intactos, incluso los marcadores históricos de brecha; el inventario distingue pruebas sintéticas de evidencia real (UNKNOWN).
 
+**Etapa 4/4 — #1088:** [inventario de 256 obligaciones, 18 hojas y PRs MERGED](matriz-cobertura.md#reconciliación-de-evidencia--etapa-44-1088). Correlación local y brechas vigentes sin modificar filas ni totales; integración y operación real siguen UNKNOWN.
+
 ## Matriz
 
 | ID | Fuente | Requisito verificable | Estado | Evidencia y planos | Issue |

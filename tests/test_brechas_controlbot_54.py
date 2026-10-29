@@ -77,7 +77,7 @@ SOURCE_MARKERS = {
     "CB-0831": {DOC: ("no borrar bases de datos", "no destructivo")},
     "CB-0832": {DOC: ("backup registrado", "cambio productivo")},
     "CB-0833": {SMOKE: ("hash_equals($expectedSha",)},
-    "CB-0834": {SMOKE: ("hash_equals($expectedVersion", "hash_equals($expectedSha"),
+    "CB-0834": {SMOKE: ("hash_equals($expectedVersion", "hash_equals($expectedSha",
                            "status", "release_sha")},
 }
 

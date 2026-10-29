@@ -278,6 +278,7 @@ Este registro **separa** las hojas documentales posteriores al snapshot normativ
 
 | Ruta | Issue | PR de preparación | Test de contrato | Estado |
 | --- | --- | --- | --- | --- |
+| `docs/DISENO-CONTROLBOT.md` | [#1169](https://github.com/pl0n3r/ControlBot/issues/1169) | [#1171](https://github.com/pl0n3r/ControlBot/pull/1171) | `tests/test_control_theme_redesign.py` | NO_VERIFICABLE / NO ENSAYADO |
 | `docs/operator-runbook.md` | [#959](https://github.com/pl0n3r/ControlBot/issues/959) | [#965](https://github.com/pl0n3r/ControlBot/pull/965) | `tests/test_runbook_operador_doc.py` | NO_VERIFICABLE / NO ENSAYADO |
 | `docs/dr-drill-plan.md` | [#960](https://github.com/pl0n3r/ControlBot/issues/960) | [#968](https://github.com/pl0n3r/ControlBot/pull/968) | `tests/test_simulacro_dr_doc.py` | NO_VERIFICABLE / NO ENSAYADO |
 | `docs/owner-login-acceptance-script.md` | [#961](https://github.com/pl0n3r/ControlBot/issues/961) | [#969](https://github.com/pl0n3r/ControlBot/pull/969) | `tests/test_guion_login_doc.py` | NO_VERIFICABLE / NO ENSAYADO |

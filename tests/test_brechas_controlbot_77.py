@@ -53,7 +53,7 @@ FIXTURES = {
     "CB-1190": (
         "tests/factory_orchestrator_snapshot_refresh_scenarios.php",
         "tests/test_factory_orchestrator_snapshot_refresh.py",
-        ("stale_fallback", "evidence_invalid"),
+        ("stale_fallback", "visible_last_success"),
     ),
     "CB-1191": (
         "tests/factory_orchestrator_live_ui_scenarios.php",

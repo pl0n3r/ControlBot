@@ -230,8 +230,9 @@ class BrechasControlbot58Tests(unittest.TestCase):
             original_body = path.read_text(encoding="utf-8")
             self.assertTrue(legal_guard(key, original_body))
             self.assertFalse(legal_guard(key, ""))
-            self.assertFalse(legal_guard(key, original_body.replace("[COMPLETAR POR EL DUEÑO]", "")
-                  if key != "CB-0893" else "revisión jurídica requerida antes de publicación")
+            altered = (original_body.replace("[COMPLETAR POR EL DUEÑO]", "")
+                       if key != "CB-0893" else "revisión jurídica requerida antes de publicación")
+            self.assertFalse(legal_guard(key, altered))
         for key in ("bad_group_scope", "bad_venture_scope"):
             self.assertTrue(discovery("initiative")[key])
         for key in ("missing_outcome", "missing_metric", "wrong_initiative"):

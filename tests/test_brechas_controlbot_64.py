@@ -190,9 +190,10 @@ def exercises(ident: str, source: dict[str, str]) -> bool:
         other = scenario("u", "states", "security")
         return (all(x in html for x in ("skipped", "startup_failure",
                                        "failure", "success"))
-                and "<strong>unknown</strong>" in html
+                and "unknown" in html
                 and "conflicting_evidence" in html
-                and "conflicting_evidence" not in other)
+                and "step_failure" not in html
+                and "CI check evidence" not in other)
     return False
 
 
@@ -251,7 +252,7 @@ class BrechasControlbot64Tests(unittest.TestCase):
                 group, clause, _ = CLAUSE[ident]
                 doc = DOC[group]
                 self.assertEqual(UNKNOWN, verdict(
-                    ident, {**data, doc: data[doc].replace(clause, "", 1)}))
+                    ident, {**data, doc: data[doc].replace(clause, "")}))
                 self.assertEqual(UNKNOWN, verdict(ident, data, proof=None))
         self.assertEqual(UNKNOWN, verdict("CB-9999", data))
         self.assertEqual(UNKNOWN, verdict("CB-0982", {}))

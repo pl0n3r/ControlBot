@@ -141,7 +141,9 @@ def privacy_and_preproduction_contract(text: object) -> dict[str, bool]:
             and by_id[key].get("retention") == "review_required"
             for key, fields in expected.items()
         )
-        placeholders = (type(controller) is dict and bool(controller)
+        required_keys = {"name", "identifier", "address", "rights_email"}
+        placeholders = (type(controller) is dict
+                        and set(controller) == required_keys
                         and all(value == "[COMPLETAR POR EL DUEÑO]"
                                 for value in controller.values()))
         result["CB-1149"] = bool(declared and placeholders)
@@ -171,7 +173,10 @@ def evidence(key: object, files: object) -> dict[str, str]:
         return out
     origin = AGENTS if key in POLICY_IDS else CONTRAST
     if (key in POLICY_IDS and CLAUSES[key].casefold() not in files[AGENTS].casefold()
-            or key not in POLICY_IDS and key not in files[CONTRAST]):
+            or key not in POLICY_IDS and re.search(
+                r"(?m)^\|\s*" + re.escape(key) + r"\s*\|",
+                files[CONTRAST],
+            ) is None):
         return out
     if CLAUSES[key].casefold() not in rows[key][2].casefold():
         return out
@@ -254,6 +259,61 @@ class BrechasControlbot75Tests(unittest.TestCase):
         for key in LOCAL_IDS:
             self.assertEqual(UNKNOWN, evidence(
                 key, {**files, DATA: "{}"})["local"])
+
+    def test_controller_placeholder_requires_exact_shape(self) -> None:
+        """AC-01: no partial privacy evidence for extra or missing owner keys."""
+        files = read_sources()
+        original = json.loads(files[DATA])
+        valid_controller = original["controller"]
+        expected_keys = {"name", "identifier", "address", "rights_email"}
+        self.assertEqual(set(valid_controller), expected_keys)
+        self.assertEqual(
+            privacy_and_preproduction_contract(files[DATA]),
+            {"CB-1149": True, "CB-1150": True},
+        )
+
+        invalid_controllers = (
+            {"other": "[COMPLETAR POR EL DUEÑO]"},
+            {**valid_controller, "other": "[COMPLETAR POR EL DUEÑO]"},
+            {k: v for k, v in valid_controller.items() if k != "name"},
+            {k: v for k, v in valid_controller.items() if k != "rights_email"},
+            {},
+            {**valid_controller, "address": "synthetic-not-placeholder"},
+        )
+        for controller in invalid_controllers:
+            with self.subTest(controller=controller):
+                altered_data = json.dumps({**original, "controller": controller})
+                self.assertEqual(
+                    privacy_and_preproduction_contract(altered_data),
+                    {"CB-1149": False, "CB-1150": False},
+                )
+                altered = {**files, DATA: altered_data}
+                for key in LOCAL_IDS:
+                    self.assertEqual(evidence(key, altered)["local"], UNKNOWN)
+                    self.assertEqual(
+                        gap(key, altered)["missing"],
+                        "source_or_local_evidence_missing",
+                    )
+
+    def test_contrast_requires_actual_table_row(self) -> None:
+        """AC-02: an isolated ID mention is not a provenance table row."""
+        files = read_sources()
+        for key in IDS[5:]:
+            with self.subTest(id=key):
+                exact_row = r"(?m)^\|\s*" + re.escape(key) + r"\s*\|[^\n]*$"
+                self.assertRegex(files[CONTRAST], exact_row)
+                without_row = re.sub(exact_row, "", files[CONTRAST], count=1)
+                # Keep the ID visible outside a table to reproduce the former bug.
+                altered = {
+                    **files,
+                    CONTRAST: without_row + "\nReferencia aislada: " + key,
+                }
+                self.assertIn(key, altered[CONTRAST])
+                self.assertEqual(evidence(key, altered)["local"], UNKNOWN)
+                self.assertEqual(
+                    gap(key, altered)["missing"],
+                    "source_or_local_evidence_missing",
+                )
 
     def test_sin_datos_reales(self) -> None:
         """AC-03: no network, secrets, credentials, personal data or IO writes."""

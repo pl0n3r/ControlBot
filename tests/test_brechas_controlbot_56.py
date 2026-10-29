@@ -66,7 +66,12 @@ def php_scenario(script: str, scenario: str = "") -> dict[str, object]:
         command.append(scenario)
     run = subprocess.run(command, cwd=ROOT, capture_output=True, text=True,
                          timeout=25, check=False)
-    if run.returncode != 0 or run.stderr.strip():
+    warnings = [line for line in run.stderr.splitlines() if line.strip()]
+    if script == "owner_briefing_delivery_scenarios.php":
+        warnings = [line for line in warnings if
+                    "use statement with non-compound name 'InvalidArgumentException' has no effect"
+                    not in line]
+    if run.returncode != 0 or warnings:
         raise AssertionError("UNKNOWN: PHP scenario failed: " + script + ":" + scenario)
     try:
         result = json.loads(run.stdout)

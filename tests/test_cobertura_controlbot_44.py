@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """#1227: 18 independent real-PHP, offline behavioral contracts (CB-0718..0736).
-
 Runs existing PHP scenario scripts which import the *real* Market/MOMENTUM
 classes. Their only input is checked-in synthetic fixtures. This suite never
 calls providers, reads secrets or certifies production/legal authorization.
 The coverage matrix remains unchanged pending the subsequent reconciliation.
 """
 from __future__ import annotations
-
 import json
 import re
 import shutil
@@ -15,7 +13,6 @@ import subprocess
 import unittest
 from functools import lru_cache
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[1]
 MATRICES = (
     ROOT / "docs/matriz-cobertura-parte-03.md",
@@ -48,8 +45,6 @@ OPTIONAL_WORK = {
     "repository_ref", "severity", "budget_ref", "approval_ref",
     "observed_at",
 }
-
-
 def matrix_rows() -> dict[str, tuple[str, ...]]:
     """Read the *whole* canonical row and reject absent/duplicate/malformed IDs."""
     seen: dict[str, tuple[str, ...]] = {}
@@ -72,8 +67,6 @@ def matrix_rows() -> dict[str, tuple[str, ...]]:
     if set(seen) != set(DOCUMENTS):
         raise AssertionError("Missing or extra expected coverage IDs")
     return seen
-
-
 @lru_cache(maxsize=40)
 def php(domain: str, case: str) -> dict:
     """Whitelisted local PHP processes importing production classes."""
@@ -108,13 +101,9 @@ def php(domain: str, case: str) -> dict:
     if not isinstance(result, dict):
         raise AssertionError("Non-object real-PHP scenario response")
     return result
-
-
 def pure_source(filename: str, forbidden: tuple[str, ...]) -> bool:
     content = (ROOT / "src" / filename).read_text(encoding="utf-8").lower()
     return all(piece not in content for piece in forbidden)
-
-
 class CoberturaControlbot44Tests(unittest.TestCase):
     def test_contrato_principal(self) -> None:
         """AC-01: 18 individual predicates backed by real PHP calls."""
@@ -126,7 +115,6 @@ class CoberturaControlbot44Tests(unittest.TestCase):
                 self.assertIn(doc, rows[identifier][1])
                 self.assertTrue(rows[identifier][2])
                 self.assertTrue((ROOT / doc).is_file())
-
         tbd = php("lifecycle", "tbd")
         delta = php("lifecycle", "delta")
         global_event = php("lifecycle", "global")["event"]
@@ -154,7 +142,6 @@ class CoberturaControlbot44Tests(unittest.TestCase):
         variant = creative["variant"]
         brief = creative["brief"]
         full = variants["full"]
-
         behaviors = {
             "CB-0718": (
                 tbd["first"] == tbd["second"]

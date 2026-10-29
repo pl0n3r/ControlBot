@@ -140,7 +140,6 @@ class BrechasControlbot58Tests(unittest.TestCase):
         bindings = assessment("bindings")
         unreliable = assessment("unreliable")
         numeric = assessment("numbers")
-        schema = assessment("schema")
         scopes = scope_rejections()
         core = (ROOT / "src/ProductDiscovery.php").read_text(encoding="utf-8").lower()
         assessment_source = (ROOT / "src/ProductDiscoveryAssessment.php").read_text(encoding="utf-8")

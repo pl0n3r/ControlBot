@@ -88,6 +88,17 @@ def single_use() -> dict:
     return php("-r", SINGLE_USE, "--", str(ROOT / "tests/infrastructure_action_projection_scenarios.php"))
 
 class CoberturaControlbot36Tests(unittest.TestCase):
+    # ACCEPTANCE_DIAGNOSTICS: expose real failure details hidden by Factory's
+    # in-memory runner, only for direct single-method acceptance execution.
+    def run(self, result=None):
+        outcome = super().run(result)
+        if type(self).__module__.startswith("_factory_acceptance_"):
+            import sys
+            for case, detail in outcome.failures + outcome.errors:
+                if case is self:
+                    print("ACCEPTANCE_DIAGNOSTIC: " + detail[-3000:], file=sys.stderr)
+        return outcome
+
     def test_contrato_principal(self) -> None:
         """AC-01: aserciones de comportamiento PHP real para 12 requisitos."""
         time = chronology()

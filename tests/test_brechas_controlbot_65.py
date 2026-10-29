@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 from functools import lru_cache
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -90,10 +91,14 @@ def fixture(group: str, case: str = "default") -> dict:
         command.append(case)
     result = subprocess.run(
         command, cwd=ROOT, capture_output=True, text=True, timeout=30,
-        check=False, env={"PATH": "/usr/local/bin:/usr/bin:/bin",
-                          "LANG": "C.UTF-8"})
-    if result.returncode or result.stderr.strip():
-        raise AssertionError("UNKNOWN: fixture failed")
+        check=False, env={**{key: os.environ[key] for key in
+                            ("PATH", "LANG", "LC_ALL", "HOME", "TMPDIR",
+                             "LD_LIBRARY_PATH", "PHP_INI_SCAN_DIR")
+                            if key in os.environ}, "XDEBUG_MODE": "off"})
+    if result.returncode:
+        raise AssertionError(f"UNKNOWN: fixture exited {result.returncode}")
+    if result.stderr.strip():
+        raise AssertionError("UNKNOWN: fixture emitted stderr")
     try:
         payload = json.loads(result.stdout)
     except ValueError as ex:
@@ -287,7 +292,7 @@ class BrechasControlbot65Tests(unittest.TestCase):
                 imports.update(a.name.split(".")[0] for a in node.names)
             elif isinstance(node, ast.ImportFrom):
                 imports.add((node.module or "").split(".")[0])
-        self.assertLessEqual(imports, {"__future__", "ast", "functools", "json",
+        self.assertLessEqual(imports, {"__future__", "ast", "functools", "json", "os",
                                       "pathlib", "re", "shutil", "subprocess",
                                       "unittest"})
         self.assertNotIn("-----BEGIN " + "PRIVATE KEY-----", own)

@@ -115,11 +115,15 @@ def scenario(group: str, case: str) -> dict:
     cmd = [binary, str(ROOT / PHP[group]), case]
     run = subprocess.run(
         cmd, cwd=ROOT, text=True, capture_output=True, check=False, timeout=30,
-        env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "C.UTF-8",
-             "HOME": "/tmp", "XDEBUG_MODE": "off"},
+        env={**{key: os.environ[key] for key in
+                 ("PATH", "LANG", "LC_ALL", "HOME", "TMPDIR",
+                  "PHP_INI_SCAN_DIR", "PHPRC", "LD_LIBRARY_PATH")
+                 if key in os.environ}, "XDEBUG_MODE": "off"},
     )
     if run.returncode != 0 or run.stderr.strip():
-        raise AssertionError("UNKNOWN: PHP scenario not executable")
+        raise AssertionError(
+            f"UNKNOWN: PHP {group}/{case} exit={run.returncode} "
+            f"stderr_bytes={len(run.stderr)}")
     try:
         value = json.loads(run.stdout)
     except ValueError as ex:
@@ -266,7 +270,15 @@ class BrechasControlbot60Tests(unittest.TestCase):
             with self.subTest(ident=ident):
                 group, phrase = CLAUSES[ident]
                 self.assertIn(phrase, self.sources[DOCS[group]])
-                self.assertEqual(LOCAL, local_verdict(ident, self.sources))
+                verdict = local_verdict(ident, self.sources)
+                if verdict != LOCAL:
+                    try:
+                        scenario(group, sorted(CASES[group])[0])
+                    except (AssertionError, ValueError, OSError,
+                            subprocess.TimeoutExpired) as exc:
+                        self.fail(f"{ident}: {exc}")
+                    self.fail(f"{ident}: behavioral predicate not verified")
+                self.assertEqual(LOCAL, verdict)
                 self.assertEqual("NO_VERIFICABLE", self.index[ident][3])
 
     def test_falla_cerrado(self) -> None:

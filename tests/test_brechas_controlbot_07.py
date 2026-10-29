@@ -53,7 +53,6 @@ ANCHORS = (
 )
 ANCHOR = dict(zip(IDS, ANCHORS))
 
-
 @lru_cache(maxsize=25)
 def scenario(group: str, case: str) -> dict:
     """Run only allowlisted, existing PHP fixtures with no network."""
@@ -76,11 +75,9 @@ def scenario(group: str, case: str) -> dict:
         raise AssertionError("UNKNOWN: local evidence must be an object")
     return output
 
-
 def matrix_parts() -> dict[str, str]:
     return {path: (ROOT / path).read_text(encoding="utf-8")
             for path in PARTITIONS}
-
 
 def matrix_rows(parts: object) -> dict[str, tuple[str, ...]]:
     if (not isinstance(parts, dict) or set(parts) != set(PARTITIONS)
@@ -113,11 +110,9 @@ def matrix_rows(parts: object) -> dict[str, tuple[str, ...]]:
         raise ValueError("UNKNOWN: missing matrix requirements")
     return rows
 
-
 def evidence() -> dict:
     return {group: {case: scenario(group, case) for case in sorted(cases)}
             for group, cases in CASES.items()}
-
 
 def classify(rows: dict, data: dict) -> dict[str, dict[str, str]]:
     """No incomplete fixture or promoted row can become local evidence."""
@@ -309,7 +304,6 @@ def classify(rows: dict, data: dict) -> dict[str, dict[str, str]]:
                 and checks[key]):
             verdicts[key]["code"] = LOCAL
     return verdicts
-
 
 class BrechasControlbot07Tests(unittest.TestCase):
     def test_contrato_principal(self) -> None:

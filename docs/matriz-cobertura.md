@@ -35,6 +35,35 @@ Las 49 obligaciones del índice, CB-0601..0900, quedan contrastadas en [reporte 
 
 Las **64** obligaciones del índice para este rango se contrastan en [reporte #974](contraste-cb_0901_1189.md) con fuente histórica, código y escenario candidatos existentes y un límite de evidencia explícito por fila. Sin correlación certificada de aserción exacta y PR fusionado, las 64 conservan `NO_VERIFICABLE`, no `SIN_COBERTURA`. La auditoría no amplía cobertura ni modifica las particiones fuera del claim; producción, respaldo real y autorización siguen `UNKNOWN` / **NO-GO**.
 
+### Reconciliación de evidencia · etapa 1/4 (#1089)
+
+Las 20 hojas #1008–#1027 quedaron cerradas como `completed` y sus PRs de pruebas están fusionados. Este inventario enlaza evidencia **offline** por rango/hoja, sin atribuir cobertura integral, instalación live ni operación real. Los IDs exactos están en cada prueba, que excluye los huecos de numeración; `NO_VERIFICABLE` y los totales permanecen intactos para conservar el contrato de integridad y no inventar `GREEN`. La promoción requiere evidencia adicional y actualización autorizada de los tests que hoy fijan el estado anterior.
+
+| Rango (IDs reales del test) | Hoja | Prueba ejecutable | PR fusionado | Límite actual |
+| --- | --- | --- | --- | --- |
+| CB-0001…CB-0015 | [#1008](https://github.com/pl0n3r/ControlBot/issues/1008) | [test_brechas_controlbot_01.py](../tests/test_brechas_controlbot_01.py) | [#1087 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1087) | Offline contractual; live/operando=UNKNOWN |
+| CB-0016…CB-0030 | [#1009](https://github.com/pl0n3r/ControlBot/issues/1009) | [test_brechas_controlbot_02.py](../tests/test_brechas_controlbot_02.py) | [#1166 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1166) | Offline contractual; live/operando=UNKNOWN |
+| CB-0031…CB-0045 | [#1010](https://github.com/pl0n3r/ControlBot/issues/1010) | [test_brechas_controlbot_03.py](../tests/test_brechas_controlbot_03.py) | [#1142 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1142) | Offline contractual; live/operando=UNKNOWN |
+| CB-0046…CB-0061 | [#1011](https://github.com/pl0n3r/ControlBot/issues/1011) | [test_brechas_controlbot_04.py](../tests/test_brechas_controlbot_04.py) | [#1141 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1141) | Offline contractual; live/operando=UNKNOWN |
+| CB-0062…CB-0076 | [#1012](https://github.com/pl0n3r/ControlBot/issues/1012) | [test_brechas_controlbot_05.py](../tests/test_brechas_controlbot_05.py) | [#1143 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1143) | Offline contractual; live/operando=UNKNOWN |
+| CB-0077…CB-0091 | [#1013](https://github.com/pl0n3r/ControlBot/issues/1013) | [test_brechas_controlbot_06.py](../tests/test_brechas_controlbot_06.py) | [#1145 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1145) | Offline contractual; live/operando=UNKNOWN |
+| CB-0092…CB-0106 | [#1014](https://github.com/pl0n3r/ControlBot/issues/1014) | [test_brechas_controlbot_07.py](../tests/test_brechas_controlbot_07.py) | [#1144 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1144) | Offline contractual; live/operando=UNKNOWN |
+| CB-0107…CB-0121 | [#1015](https://github.com/pl0n3r/ControlBot/issues/1015) | [test_brechas_controlbot_08.py](../tests/test_brechas_controlbot_08.py) | [#1128 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1128) | Offline contractual; live/operando=UNKNOWN |
+| CB-0122…CB-0136 | [#1016](https://github.com/pl0n3r/ControlBot/issues/1016) | [test_brechas_controlbot_09.py](../tests/test_brechas_controlbot_09.py) | [#1127 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1127) | Offline contractual; live/operando=UNKNOWN |
+| CB-0137…CB-0151 | [#1017](https://github.com/pl0n3r/ControlBot/issues/1017) | [test_brechas_controlbot_10.py](../tests/test_brechas_controlbot_10.py) | [#1131 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1131) | Offline contractual; live/operando=UNKNOWN |
+| CB-0152…CB-0166 | [#1018](https://github.com/pl0n3r/ControlBot/issues/1018) | [test_brechas_controlbot_11.py](../tests/test_brechas_controlbot_11.py) | [#1129 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1129) | Offline contractual; live/operando=UNKNOWN |
+| CB-0167…CB-0181 | [#1019](https://github.com/pl0n3r/ControlBot/issues/1019) | [test_brechas_controlbot_12.py](../tests/test_brechas_controlbot_12.py) | [#1130 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1130) | Offline contractual; live/operando=UNKNOWN |
+| CB-0182…CB-0196 | [#1020](https://github.com/pl0n3r/ControlBot/issues/1020) | [test_brechas_controlbot_13.py](../tests/test_brechas_controlbot_13.py) | [#1133 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1133) | Offline contractual; live/operando=UNKNOWN |
+| CB-0197…CB-0211 | [#1021](https://github.com/pl0n3r/ControlBot/issues/1021) | [test_brechas_controlbot_14.py](../tests/test_brechas_controlbot_14.py) | [#1137 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1137) | Offline contractual; live/operando=UNKNOWN |
+| CB-0212…CB-0226 | [#1022](https://github.com/pl0n3r/ControlBot/issues/1022) | [test_brechas_controlbot_15.py](../tests/test_brechas_controlbot_15.py) | [#1132 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1132) | Offline contractual; live/operando=UNKNOWN |
+| CB-0227…CB-0241 | [#1023](https://github.com/pl0n3r/ControlBot/issues/1023) | [test_brechas_controlbot_16.py](../tests/test_brechas_controlbot_16.py) | [#1168 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1168) | Offline contractual; live/operando=UNKNOWN |
+| CB-0242…CB-0256 | [#1024](https://github.com/pl0n3r/ControlBot/issues/1024) | [test_brechas_controlbot_17.py](../tests/test_brechas_controlbot_17.py) | [#1134 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1134) | Offline contractual; live/operando=UNKNOWN |
+| CB-0257…CB-0271 | [#1025](https://github.com/pl0n3r/ControlBot/issues/1025) | [test_brechas_controlbot_18.py](../tests/test_brechas_controlbot_18.py) | [#1136 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1136) | Offline contractual; live/operando=UNKNOWN |
+| CB-0272…CB-0286 | [#1026](https://github.com/pl0n3r/ControlBot/issues/1026) | [test_brechas_controlbot_19.py](../tests/test_brechas_controlbot_19.py) | [#1138 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1138) | Offline contractual; live/operando=UNKNOWN |
+| CB-0287…CB-0301 | [#1027](https://github.com/pl0n3r/ControlBot/issues/1027) | [test_brechas_controlbot_20.py](../tests/test_brechas_controlbot_20.py) | [#1140 · MERGED](https://github.com/pl0n3r/ControlBot/pull/1140) | Offline contractual; live/operando=UNKNOWN |
+
+**Pendiente por fila:** dictamen exacto de cláusula→código→prueba y autorización para actualizar los tests de integridad; para obligaciones de operación, pruebas reales de permisos, backup/restore, salud y despliegue. No se alteran estados por coincidencias de nombres.
+
 ## Matriz
 
 | ID | Fuente | Requisito verificable | Estado | Evidencia y planos | Issue |

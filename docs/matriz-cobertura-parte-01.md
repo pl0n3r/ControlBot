@@ -10,7 +10,7 @@
 
 **Etapa 2/4 — #1090:** [inventario verificable de las hojas #1028–#1047 y sus PRs fusionados](matriz-cobertura.md#reconciliación-de-evidencia--etapa-24-1090). Los estados y el texto original de cada fila se preservan; evidencia operativa real=UNKNOWN.
 
-**Etapa 3/4 — #1091:** [reconciliación de 20 hojas y 300 obligaciones](matriz-cobertura.md#reconciliación-de-evidencia--etapa-34-1091); solo el índice y partes 03–04 contienen filas del grupo. Se preservan las otras filas, estados y totales; evidencia de operación real=UNKNOWN.
+**Etapa 3/4 — #1091:** [inventario verificable de 300 IDs de #1048–#1067 y sus PRs MERGED](matriz-cobertura.md#reconciliación-de-evidencia--etapa-34-1091). Las filas y totales originales de esta partición permanecen intactos, incluso los marcadores históricos de brecha; el inventario distingue pruebas sintéticas de evidencia real (UNKNOWN).
 
 ## Matriz
 

@@ -197,9 +197,10 @@ def local_checks(data: object, observed: object) -> dict[str, object]:
                 and decision["better"]["decision"] == "eligible_for_human_approval"
             ),
             "CB-0953": (
-                all(provenance["out"][k] == provenance["evaluation"][k]
-                    for k in ("evaluation_fingerprint", "evaluation_set_fingerprint",
-                              "current_result_fingerprint", "candidate_result_fingerprint"))
+                provenance["out"]["evaluation_fingerprint"] == provenance["evaluation"]["fingerprint"]
+                and all(provenance["out"][k] == provenance["evaluation"][k]
+                        for k in ("evaluation_set_fingerprint",
+                                  "current_result_fingerprint", "candidate_result_fingerprint"))
                 and provenance["tampered_current"] is True
                 and provenance["tampered_candidate"] is True
                 and all(formats.values())

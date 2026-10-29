@@ -262,7 +262,7 @@ def local_checks(data: object, observed: object) -> dict[str, object]:
             "CB-0962": UNKNOWN,  # D-059 / Hostinger backup is owner evidence, not an offline test.
             "CB-0963": UNKNOWN,  # HTTP auth is outside runtime; real owner/session not attested.
             "CB-0964": (
-                expected_private and "/public_html/" in doc
+                expected_private and "/home/u151692719/domains/control.condorapp.com.co/public_html" in doc
                 and "no debe vivir dentro de" in data[CRON_DOC]
             ),
             "CB-0965": (

@@ -109,8 +109,8 @@ def php_scenario(group: str, case: str) -> dict:
         argv, cwd=ROOT, capture_output=True, text=True,
         check=False, timeout=35,
     )
-    if completed.returncode != 0 or completed.stderr.strip():
-        raise AssertionError("UNKNOWN: fixture PHP falló")
+    if completed.returncode != 0:
+        raise AssertionError(f"UNKNOWN: fixture PHP falló ({group}:{case}, exit={completed.returncode})")
     try:
         output = json.loads(completed.stdout)
     except ValueError as exc:

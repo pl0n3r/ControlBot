@@ -248,7 +248,7 @@ class CoberturaControlbot52Tests(unittest.TestCase):
         self.assertEqual(gate["released"]["authorization"], "not_granted")
         self.assertEqual(scenario("gate", "deterministic")["hits"], [])
         self.assertTrue(scenario("inbox", "pure")["methods"] == ["collection", "entry"])
-        self.assertFalse(scenario("inbox", "safe")["mail"] is False)
+        self.assertTrue(scenario("inbox", "safe")["mail"])
 
 
 if __name__ == "__main__":

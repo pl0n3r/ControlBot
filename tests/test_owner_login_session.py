@@ -177,6 +177,14 @@ chk($logout['status']===303,'logout after MFA');
 OwnerLoginGate::handle($get,[],$s,$cfg,$now+10);
 $pass['csrf']=$s['_cb_login_csrf'];
 chk(OwnerLoginGate::handle($post,$pass,$s,$cfg,$now+10,$regen)['status']===401,'password alone after TOTP');
+$pass['totp']=$recovery;
+chk(OwnerLoginGate::handle($post,$pass,$s,$cfg,$now+20,$regen)['status']===303,
+    'recovery code must authenticate once');
+OwnerLoginGate::handle($post,['action'=>'logout','csrf'=>$s['_cb_login_csrf']],$s,$cfg,$now+21,$regen);
+OwnerLoginGate::handle($get,[],$s,$cfg,$now+22);
+$pass['csrf']=$s['_cb_login_csrf'];
+chk(OwnerLoginGate::handle($post,$pass,$s,$cfg,$now+23,$regen)['status']===401,
+    'recovery reuse must fail');
 $pass['totp']=Totp::code($secret,$now+40);
 chk(OwnerLoginGate::handle($post,$pass,$s,$cfg,$now+40,$regen)['status']===303,'correct TOTP login');
 $policy=OwnerLoginGate::handle($post,[
@@ -197,7 +205,7 @@ $off=OwnerLoginGate::handle($post,[
 chk($off['status']===303 && !$state->status()['enabled'],'disable TOTP');
 $names=array_column($state->auditTrail(),'event');
 foreach (['login','logout','revoke','totp_setup_started','totp_enabled',
-          'totp_policy','totp_disabled','totp_used'] as $event) {
+          'totp_policy','totp_disabled','totp_used','recovery_used'] as $event) {
     chk(in_array($event,$names,true),'missing audit: '.$event);
 }
 $raw=file_get_contents(glob($cfg['rate_limit_dir'].'/cb-auth-*.json')[0]);

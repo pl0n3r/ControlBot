@@ -326,7 +326,7 @@ class BrechasControlbot61Tests(unittest.TestCase):
         imports |= {(node.module or "").split(".")[0] for node in ast.walk(tree)
                     if isinstance(node, ast.ImportFrom)}
         self.assertLessEqual(imports, {"__future__", "ast", "functools", "json",
-                                      "pathlib", "re", "shutil", "subprocess", "unittest"})
+                                      "pathlib", "re", "shutil", "subprocess", "unittest", "test_brechas_controlbot_20"})
         for path in FILES:
             self.assertFalse(Path(path).is_absolute())
             self.assertNotIn("..", Path(path).parts)

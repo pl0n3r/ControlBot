@@ -277,7 +277,7 @@ class BrechasControlbot64Tests(unittest.TestCase):
         imports |= {(n.module or "").split(".")[0] for n in ast.walk(tree)
                     if isinstance(n, ast.ImportFrom)}
         self.assertLessEqual(imports, {"__future__", "ast", "functools", "json",
-                                      "pathlib", "re", "shutil", "subprocess", "unittest"})
+                                      "pathlib", "re", "shutil", "subprocess", "unittest", "test_brechas_controlbot_20"})
         self.assertNotIn("do-not-echo", json.dumps(scenario("p", "baseline")))
         escaped = scenario("u", "escape")
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", escaped)

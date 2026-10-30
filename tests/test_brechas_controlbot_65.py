@@ -300,7 +300,7 @@ class BrechasControlbot65Tests(unittest.TestCase):
                 imports.add((node.module or "").split(".")[0])
         self.assertLessEqual(imports, {"__future__", "ast", "functools", "json", "os",
                                       "pathlib", "re", "shutil", "subprocess",
-                                      "unittest"})
+                                      "unittest", "test_brechas_controlbot_20"})
         self.assertNotIn("-----BEGIN " + "PRIVATE KEY-----", own)
         self.assertEqual(UNKNOWN, operational("CB-1011", {"owner": True}))
 

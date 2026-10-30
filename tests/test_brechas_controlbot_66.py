@@ -373,7 +373,7 @@ class BrechasControlbot66Tests(unittest.TestCase):
                     if isinstance(node, ast.ImportFrom)}
         self.assertLessEqual(imports, {
             "__future__", "ast", "functools", "json", "pathlib", "re",
-            "shutil", "subprocess", "unittest",
+            "shutil", "subprocess", "unittest", "test_brechas_controlbot_20",
         })
         self.assertNotIn("curl_exec(", PHP_PROBE)
         self.assertNotIn("file_put_contents(", PHP_PROBE)

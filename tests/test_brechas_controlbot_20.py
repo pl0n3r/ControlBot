@@ -44,6 +44,8 @@ def credible_offline_coverage_row(row):
     if not isinstance(row, (tuple, list)) or len(row) != 6:
         return False
     if row[3] == "NO_VERIFICABLE":
+        if not isinstance(row[4], str):
+            return False
         reason = re.split(r"(?i)offline\s*=\s*unknown", row[4], maxsplit=1)[0]
         if len(reason.strip()) < 12:
             return False
@@ -239,6 +241,8 @@ class BrechasControlbot20Tests(unittest.TestCase):
         self.assertFalse(credible_offline_coverage_row(python_row))
         without_reason = list(baseline)
         without_reason[4] = "Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN."
+        self.assertFalse(credible_offline_coverage_row(without_reason))
+        without_reason[4] = None
         self.assertFalse(credible_offline_coverage_row(without_reason))
 
     def test_contrato_principal(self) -> None:

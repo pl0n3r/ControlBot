@@ -34,8 +34,13 @@ final class OwnerLoginGate {
             $session['_cb_login_csrf'] = self::randomToken();
         }
         if ($method === 'GET') {
+            try {
+                $status = $store->status();
+            } catch (Throwable) {
+                return self::response(503, 'Service unavailable.');
+            }
             return self::loginPage($session, self::isAuthenticated($session, $now),
-                '', 200, $store->status());
+                '', 200, $status);
         }
         $action = $post['action'] ?? 'login';
         $token = $post['csrf'] ?? null;

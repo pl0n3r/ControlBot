@@ -98,7 +98,12 @@ final class OwnerLocalAuthStore
     {
         return $this->transaction(function (array &$s) use ($code, $now): array {
             if ($s['secret'] !== '' || $s['pending'] === '' || $now > $s['pending_until']
-                || $now <= 0 || !$this->matches($this->unseal($s['pending']), $code, $now, -1)) {
+                || $now <= 0) {
+                throw new RuntimeException('TOTP setup invalid.');
+            }
+            $pendingSecret = $this->unseal($s['pending']);
+            $confirmedCounter = $this->matchedCounter($pendingSecret, $code, $now);
+            if ($confirmedCounter < 0) {
                 throw new RuntimeException('TOTP setup invalid.');
             }
             $codes = [];
@@ -109,7 +114,8 @@ final class OwnerLocalAuthStore
             $s['secret'] = $s['pending'];
             $s['pending'] = '';
             $s['pending_until'] = 0;
-            $s['last_counter'] = -1;
+            // El código que activa TOTP no puede reutilizarse para entrar.
+            $s['last_counter'] = $confirmedCounter;
             $s['version']++;
             self::auditEvent($s, 'totp_enabled', $now);
             return $codes;

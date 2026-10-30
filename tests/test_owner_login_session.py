@@ -1,8 +1,8 @@
 """Evidencia offline de seguridad ya existente para ControlBot#1366.
 
-El baseline no debe confundirse con la entrega de revocación centralizada, MFA
-en el formulario local ni códigos de recuperación: requieren rutas de runtime
-no reclamadas por la reserva V3 de este issue.
+Pruebas sintéticas del backend local: revocación entre sesiones, MFA opcional,
+política obligatoria y recuperación de un uso. El cableado de public/ y
+.htaccess sigue en un contrato V3 ajeno y no se presenta como entregado.
 """
 import json
 import os
@@ -230,7 +230,9 @@ chk2(!$s->verify('123456',$now));
 try { $s->confirmEnrollment(Totp::code($secret,$now+400),$now+400); throw new RuntimeException('expired allowed'); }
 catch (RuntimeException $e) { chk2($e->getMessage()==='TOTP setup invalid.'); }
 $secret=$s->beginEnrollment($now+401);
-$s->confirmEnrollment(Totp::code($secret,$now+401),$now+401);
+$setupCode=Totp::code($secret,$now+401);
+$s->confirmEnrollment($setupCode,$now+401);
+chk2(!$s->verify($setupCode,$now+401));
 $good=Totp::code($secret,$now+460);
 chk2($s->verify($good,$now+460));
 chk2(!$s->verify($good,$now+460));

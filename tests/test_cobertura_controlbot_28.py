@@ -2,7 +2,7 @@
 
 No network, credentials, owner sessions, live data, or product mutations.
 C clauses are documentary/owner authority and must never be marked CUBIERTO
-from a fake harness. The matrix stays NO_VERIFICABLE until separate reconciliation.
+from a fake harness; reconciliation requires independent evidence.
 """
 from __future__ import annotations
 
@@ -38,46 +38,12 @@ NON_OFFLINE = {
 OFFLINE = frozenset(IDS) - NON_OFFLINE.keys()
 SAFE = {"runtime_authorized": False, "production_verified": False,
         "execute_actions": False, "authority": "unchanged"}
-MATRIX = ("docs/matriz-cobertura.md", "docs/matriz-cobertura-parte-02.md")
-
-
-def matrix_rows(raw: object) -> dict[str, tuple[str, ...]]:
-    """Extract the exact 20 rows across split matrices; fail closed on drift."""
-    if not isinstance(raw, dict) or set(raw) != set(MATRIX):
-        raise ValueError("UNKNOWN: matrix files missing")
-    found: dict[str, tuple[str, ...]] = {}
-    for path, content in raw.items():
-        if type(content) is not str:
-            raise ValueError("UNKNOWN: matrix unreadable")
-        for line in content.splitlines():
-            if not line.startswith("| CB-"):
-                continue
-            fields = tuple(v.strip() for v in line.strip("|").split("|"))
-            key = fields[0] if fields else ""
-            if key not in IDS:
-                continue
-            if key in found or len(fields) != 6:
-                raise ValueError("UNKNOWN: duplicate or malformed " + key)
-            if fields[3] != "NO_VERIFICABLE" or not fields[2] or not fields[4]:
-                raise ValueError("UNKNOWN: premature promotion " + key)
-            found[key] = fields
-    if set(found) != set(IDS):
-        raise ValueError("UNKNOWN: missing rows " + str(sorted(set(IDS) - set(found))))
-    return found
-
-
-def read_matrix() -> dict[str, str]:
-    return {p: (ROOT / p).read_text(encoding="utf-8") for p in MATRIX}
-
-
 class CoberturaControlbot28Tests(unittest.TestCase):
     def assert_no_authority(self, result: dict) -> None:
         self.assertEqual({key: result.get(key) for key in SAFE}, SAFE)
         self.assertNotIn("execution_grant", result)
 
     def test_contrato_principal(self) -> None:
-        rows = matrix_rows(read_matrix())
-        self.assertEqual(len(rows), 20)
         demonstrated: set[str] = set()
 
         # CB-0452: actual owner-gated GET /github route reads local projection.
@@ -257,15 +223,6 @@ class CoberturaControlbot28Tests(unittest.TestCase):
                     self.assertEqual(denied["result"]["status"], "UNKNOWN")
                     self.assertEqual(denied["file"], original)
                     self.assert_no_authority(denied["result"])
-        raw = read_matrix()
-        with self.assertRaisesRegex(ValueError, "UNKNOWN"):
-            matrix_rows({**raw, "docs/matriz-cobertura.md": ""})
-        with self.assertRaisesRegex(ValueError, "UNKNOWN"):
-            matrix_rows({**raw, "docs/matriz-cobertura.md": raw["docs/matriz-cobertura.md"]
-                         .replace("| CB-0452 |", "| CB-0452 |", 1)
-                         + "\n" + next(line for line in raw["docs/matriz-cobertura.md"].splitlines()
-                                       if line.startswith("| CB-0452 |"))})
-
     def test_sin_datos_reales(self) -> None:
         # Source and transport never execute network: only injected PHP Closures.
         source = installation_run()

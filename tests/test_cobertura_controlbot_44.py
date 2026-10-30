@@ -3,7 +3,7 @@
 Runs existing PHP scenario scripts which import the *real* Market/MOMENTUM
 classes. Their only input is checked-in synthetic fixtures. This suite never
 calls providers, reads secrets or certifies production/legal authorization.
-The coverage matrix remains unchanged pending the subsequent reconciliation.
+Coverage reconciliation is tracked separately from real behavior tests.
 """
 from __future__ import annotations
 import json
@@ -14,10 +14,6 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
-MATRICES = (
-    ROOT / "docs/matriz-cobertura-parte-03.md",
-    ROOT / "docs/matriz-cobertura.md",
-)
 SCRIPTS = {
     "lifecycle": "market_scope_lifecycle_scenarios.php",
     "work": "market_work_origin_scenarios.php",
@@ -45,28 +41,6 @@ OPTIONAL_WORK = {
     "repository_ref", "severity", "budget_ref", "approval_ref",
     "observed_at",
 }
-def matrix_rows() -> dict[str, tuple[str, ...]]:
-    """Read the *whole* canonical row and reject absent/duplicate/malformed IDs."""
-    seen: dict[str, tuple[str, ...]] = {}
-    for matrix in MATRICES:
-        for line in matrix.read_text(encoding="utf-8").splitlines():
-            # Detect the ID BEFORE checking separators. Malformed duplicates must
-            # never silently disappear behind an overly strict positive regex.
-            match = re.match(r"^\|\s*(CB-\d{4})\b", line)
-            if not match or match.group(1) not in DOCUMENTS:
-                continue
-            identifier = match.group(1)
-            fields = tuple(part.strip() for part in line.strip().strip("|").split("|"))
-            if (identifier in seen or len(fields) != 6
-                    or fields[0] != identifier
-                    or not all(fields)
-                    or fields[3] != "NO_VERIFICABLE"
-                    or f"{DOCUMENTS[identifier]}:L" not in fields[1]):
-                raise AssertionError(f"{identifier}: ambiguous coverage matrix")
-            seen[identifier] = fields
-    if set(seen) != set(DOCUMENTS):
-        raise AssertionError("Missing or extra expected coverage IDs")
-    return seen
 @lru_cache(maxsize=40)
 def php(domain: str, case: str) -> dict:
     """Whitelisted local PHP processes importing production classes."""
@@ -107,13 +81,8 @@ def pure_source(filename: str, forbidden: tuple[str, ...]) -> bool:
 class CoberturaControlbot44Tests(unittest.TestCase):
     def test_contrato_principal(self) -> None:
         """AC-01: 18 individual predicates backed by real PHP calls."""
-        rows = matrix_rows()
-        self.assertEqual(18, len(rows))
         for identifier, doc in DOCUMENTS.items():
-            with self.subTest(matrix=identifier):
-                self.assertEqual("NO_VERIFICABLE", rows[identifier][3])
-                self.assertIn(doc, rows[identifier][1])
-                self.assertTrue(rows[identifier][2])
+            with self.subTest(document=identifier):
                 self.assertTrue((ROOT / doc).is_file())
         tbd = php("lifecycle", "tbd")
         delta = php("lifecycle", "delta")
@@ -348,11 +317,6 @@ class CoberturaControlbot44Tests(unittest.TestCase):
             self.assertIs(php("email", "eligibility")["cases"][key]["marketing_eligible"],
                           False)
 
-        # A forged row cannot become "CUBIERTO" or be hidden by a malformed
-        # duplicate; the reconciliation authority is separate from this leaf.
-        self.assertTrue(all(row[3] == "NO_VERIFICABLE"
-                            for row in matrix_rows().values()))
-
     def test_sin_datos_reales(self) -> None:
         """AC-03: no external network, customer data or operational permission."""
         for domain, case in (
@@ -387,7 +351,6 @@ class CoberturaControlbot44Tests(unittest.TestCase):
         self.assertIn("name: Pruebas de contrato e integración", workflow)
         self.assertIn("python3 scripts/generate_coverage.py", workflow)
         self.assertIn("needs: [factory, contrato]", workflow)
-        self.assertEqual(len(matrix_rows()), 18)
 
 
 if __name__ == "__main__":

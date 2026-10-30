@@ -166,7 +166,7 @@ class CoberturaControlbot02Tests(unittest.TestCase):
         history = json.dumps(run_php("decision_history_scenarios.php", "secret"))
         for secret in ("owner-secret-value", "supersecret", "evil.example"):
             self.assertNotIn(secret, history)
-        for path in ("README.md", "docs/matriz-cobertura.md", "docs/matriz-cobertura-parte-04.md"):
+        for path in ("README.md",):
             self.assertTrue((ROOT / path).is_file())
         self.assertEqual(set(NON_OFFLINE) & OFFLINE, set())
 

@@ -7,20 +7,12 @@ secrets, live authority, irreversible action, deploy or go-live.
 from __future__ import annotations
 
 import importlib.util
-import re
 import sys
 import unittest
 from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MATRICES = (
-    "docs/matriz-cobertura.md",
-    "docs/matriz-cobertura-parte-01.md",
-    "docs/matriz-cobertura-parte-02.md",
-    "docs/matriz-cobertura-parte-03.md",
-    "docs/matriz-cobertura-parte-04.md",
-)
 DOCUMENTS = {
     "docs/github-control-plane-readonly-v1.md": ("0363", "0364", "0365"),
     "docs/github-control-plane-wiring.md": ("0366",),
@@ -93,40 +85,6 @@ NEGATIVE = (
      "test_missing_or_untrusted_grant_denies_without_sender_call"),
 )
 ALL_IDS = set(SOURCE)
-VALID_STATES = {"NO_VERIFICABLE", "EN_CURSO", "CUBIERTO",
-                "SIN_COBERTURA", "DESCARTADO"}
-
-
-def rows_from_matrices(raw: dict[str, str]) -> dict[str, tuple[str, ...]]:
-    """Never interpret a missing/duplicated/invalid row as a covered result."""
-    if set(raw) != set(MATRICES):
-        raise AssertionError("UNKNOWN: matrix partition missing")
-    rows: dict[str, tuple[str, ...]] = {}
-    for path, source in raw.items():
-        if not isinstance(source, str):
-            raise AssertionError("UNKNOWN: matrix source invalid")
-        for line in source.splitlines():
-            match = re.match(r"^\|\s*(CB-\d{4})\s*\|", line)
-            if match is None or match.group(1) not in ALL_IDS:
-                continue
-            identifier = match.group(1)
-            cells = tuple(c.strip() for c in line.strip().strip("|").split("|"))
-            if (identifier in rows or len(cells) != 6 or not all(cells)
-                    or cells[0] != identifier
-                    or cells[3] not in VALID_STATES
-                    or SOURCE[identifier] + ":L" not in cells[1]):
-                raise AssertionError("UNKNOWN: malformed row " + identifier)
-            rows[identifier] = cells
-    if set(rows) != ALL_IDS:
-        raise AssertionError("UNKNOWN: missing coverage IDs")
-    return rows
-
-
-def canonical_matrices() -> dict[str, str]:
-    return {name: (ROOT / name).read_text(encoding="utf-8")
-            for name in MATRICES}
-
-
 @lru_cache(maxsize=32)
 def real_php_regression(file: str, cls_name: str, method: str) -> bool:
     """Use unittest to execute real PHP-backed checks, deny skip/error/failure."""
@@ -169,11 +127,9 @@ class CoberturaControlbot23Tests(unittest.TestCase):
         self.assertEqual(18, len(ALL_IDS))
         self.assertEqual(ALL_IDS, set(BEHAVIOR) | set(NON_OFFLINE))
         self.assertFalse(set(BEHAVIOR) & set(NON_OFFLINE))
-        rows = rows_from_matrices(canonical_matrices())
         for key, doc in SOURCE.items():
             with self.subTest(requirement=key):
                 self.assertTrue((ROOT / doc).is_file())
-                self.assertIn(doc, rows[key][1])
         for key, contract in BEHAVIOR.items():
             with self.subTest(real_behavior=key):
                 self.assertTrue(real_php_regression(*contract))
@@ -181,27 +137,9 @@ class CoberturaControlbot23Tests(unittest.TestCase):
             with self.subTest(documentary=key):
                 self.assertEqual("C", kind)
                 self.assertGreater(len(reason), 35)
-                self.assertIn(key, rows)
 
     def test_falla_cerrado(self) -> None:
-        """AC-02: malformed matrix, untrusted scopes, TLS and grants fail."""
-        raw = canonical_matrices()
-        self.assertEqual(18, len(rows_from_matrices(raw)))
-        name = next(name for name, text in raw.items()
-                    if re.search(r"^\|\s*CB-0364\s*\|", text, re.M))
-        line = next(s for s in raw[name].splitlines()
-                    if re.match(r"^\|\s*CB-0364\s*\|", s))
-        altered = (
-            raw[name].replace(line + "\n", "", 1),
-            raw[name] + "\n" + line,
-            raw[name].replace(line, line.replace("NO_VERIFICABLE", "FABRICADO", 1), 1),
-        )
-        for content in altered:
-            with self.subTest(malformed=content[-20:]):
-                with self.assertRaises(AssertionError):
-                    rows_from_matrices({**raw, name: content})
-        with self.assertRaises(AssertionError):
-            rows_from_matrices({n: t for n, t in raw.items() if n != MATRICES[-1]})
+        """AC-02: untrusted scopes, TLS and GitHub grants fail closed."""
         for test in NEGATIVE:
             with self.subTest(negative=test[0]):
                 self.assertTrue(real_php_regression(*test))

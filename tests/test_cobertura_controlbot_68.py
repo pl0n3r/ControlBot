@@ -112,7 +112,11 @@ def _php(arguments: list[str]) -> str:
         result = subprocess.run(base + arguments, cwd=ROOT, env=env,
                                 capture_output=True, text=True, timeout=60,
                                 check=False)
-    if result.returncode != 0 or result.stderr.strip():
+    # Existing PHP fixture uses a harmless top-level non-compound use statement.
+    # Ignore only that known compile-time warning; fail on every other diagnostic.
+    benign = "The use statement with non-compound name 'InvalidArgumentException' has no effect"
+    unexpected = [line for line in result.stderr.splitlines() if benign not in line]
+    if result.returncode != 0 or unexpected:
         raise AssertionError("UNKNOWN: real PHP failed: " + result.stderr[-650:])
     return result.stdout.strip()
 

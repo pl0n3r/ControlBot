@@ -29,6 +29,11 @@ final class OwnerLocalAuthStore
         if (!is_string($dir)) {
             throw new RuntimeException('Private owner state unavailable.');
         }
+        $repoRoot = realpath(dirname(__DIR__));
+        if (is_string($repoRoot) && ($dir === $repoRoot
+            || str_starts_with($dir, $repoRoot . DIRECTORY_SEPARATOR))) {
+            throw new RuntimeException('Owner state must be outside web tree.');
+        }
         $this->path = $dir . '/cb-auth-' . hash('sha256', 'owner:' . $owner) . '.json';
         $decoded = is_string($base64Key) ? base64_decode($base64Key, true) : false;
         $this->key = is_string($decoded) && strlen($decoded) === SODIUM_CRYPTO_SECRETBOX_KEYBYTES

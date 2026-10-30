@@ -273,11 +273,11 @@
 
 | Estado | Filas |
 | --- | ---: |
-| CUBIERTO | 169 |
+| CUBIERTO | 168 |
 | EN_CURSO | 0 |
 | SIN_COBERTURA | 0 |
 | DESCARTADO | 0 |
-| NO_VERIFICABLE | 76 |
+| NO_VERIFICABLE | 77 |
 | TOTAL | 245 |
 
-**IDs únicos: 245 · suma ordinal: 110403. Porcentaje CUBIERTO: 68.98%.** Esta partición no crea hojas ni confirma GREEN, D-043 o D-059; las evidencias live permanecen pendientes.
+**IDs únicos: 245 · suma ordinal: 110403. Porcentaje CUBIERTO: 68.57%.** Esta partición no crea hojas ni confirma GREEN, D-043 o D-059; las evidencias live permanecen pendientes.

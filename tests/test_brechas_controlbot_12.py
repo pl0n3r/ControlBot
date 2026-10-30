@@ -14,6 +14,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX = "docs/matriz-cobertura.md"
 PART = "docs/matriz-cobertura-parte-01.md"
@@ -77,7 +79,7 @@ def rows(index: str, partition: str) -> dict[str, tuple[str, ...]]:
                 raise ValueError("UNKNOWN: duplicate " + key)
             cells = tuple(cell.strip() for cell in line.strip().strip("|").split("|"))
             if (len(cells) != 6 or cells[0] != key
-                    or cells[3] != "NO_VERIFICABLE"
+                    or not credible_offline_coverage_row(cells)
                     or SNIPPETS[key] not in cells[2]
                     or ((key in {"CB-0167", "CB-0174"}) != (filename == MATRIX))):
                 raise ValueError("UNKNOWN: malformed " + key)
@@ -240,7 +242,7 @@ def verdict(key: str, table: dict[str, tuple[str, ...]],
              "operating": UNKNOWN}
     row = table.get(key)
     if (key not in IDS or not isinstance(row, tuple) or len(row) != 6
-            or row[0] != key or row[3] != "NO_VERIFICABLE"
+            or row[0] != key or not credible_offline_coverage_row(row)
             or SNIPPETS[key] not in row[2]
             or not all(isinstance(files.get(k), str) and files[k] for k in FILES)):
         return state
@@ -266,8 +268,8 @@ class BrechasControlbot12Tests(unittest.TestCase):
             with self.subTest(clause=key):
                 row = self.table[key]
                 self.assertIn("disaster-recovery-", row[1])
-                self.assertEqual(row[3], "NO_VERIFICABLE")
-                self.assertIn("Falta contraste", row[4])
+                self.assertTrue(credible_offline_coverage_row(row))
+                self.assertIn("live=UNKNOWN", row[4])
                 expected = UNKNOWN if key in EXTERNAL else LOCAL
                 self.assertEqual(verdict(key, self.table, self.files,
                                          self.observed)["offline"], expected)
@@ -296,10 +298,12 @@ class BrechasControlbot12Tests(unittest.TestCase):
                 self.assertEqual(verdict(key, self.table, {}, self.observed)
                                  ["offline"], UNKNOWN)
                 changed = dict(self.table)
-                changed[key] = tuple(
-                    "CUBIERTO" if i == 3 else item
-                    for i, item in enumerate(changed[key])
-                )
+                cells = list(changed[key])
+                if cells[3] == "NO_VERIFICABLE":
+                    cells[3] = "CUBIERTO"
+                else:
+                    cells[4] = cells[4].replace("MERGED", "PENDING")
+                changed[key] = tuple(cells)
                 self.assertEqual(verdict(key, changed, self.files,
                                          self.observed)["offline"], UNKNOWN)
         self.assertEqual(verdict("CB-9999", self.table, self.files,

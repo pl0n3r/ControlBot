@@ -15,6 +15,8 @@ import re
 import subprocess
 import unittest
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple(f"CB-{n:04d}" for n in range(227, 242))
 UNKNOWN = "UNKNOWN"
@@ -54,7 +56,7 @@ def matrix_rows(contents: object) -> dict[str, str]:
             cells = [part.strip() for part in line.strip("|").split("|")]
             if (key in seen or len(cells) != 6 or cells[0] != key
                     or "docs/" not in cells[1] or not cells[2]
-                    or cells[3] != "NO_VERIFICABLE"
+                    or not credible_offline_coverage_row(cells)
                     or "UNKNOWN" not in cells[4]
                     or not cells[5].startswith("[#")):
                 raise ValueError(UNKNOWN + ": untrusted matrix row " + key)
@@ -295,8 +297,8 @@ class BrechasControlbot16Tests(unittest.TestCase):
             for corrupted in (
                 self.files[origin].replace(original, "", 1),
                 self.files[origin] + "\n" + original,
-                self.files[origin].replace(original, original.replace(
-                    "NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                self.files[origin].replace(original, (original.replace("MERGED", "PENDING", 1) if "CUBIERTO" in original
+                     else original.replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1),
             ):
                 altered = dict(self.files)
                 altered[origin] = corrupted

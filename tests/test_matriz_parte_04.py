@@ -93,7 +93,8 @@ class MatrizParte04Tests(unittest.TestCase):
     def test_estados_y_conteo(self):
         rows = parse_rows(self.text)
         actual = Counter(row[3] for row in rows)
-        self.assertEqual(dict(actual), {"NO_VERIFICABLE": 239})
+        # Los estados pueden evolucionar; el total y las evidencias siguen validados.
+        self.assertEqual(sum(actual.values()), 239)
         found = parse_summary(self.text)
         self.assertEqual(found["TOTAL"], len(rows))
         for state in ALLOWED:

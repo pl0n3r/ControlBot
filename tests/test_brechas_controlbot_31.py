@@ -5,6 +5,8 @@ significa fixture fresco, NUNCA instalación real, producción ni permisos.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_offline_coverage_row
+
 import inspect
 import json
 from pathlib import Path
@@ -298,8 +300,10 @@ class BrechasControlbot31Tests(unittest.TestCase):
                          if line.startswith("| " + requirement + " |")]
                 self.assertEqual(len(found), 1)
                 row = found[0].lower()
-                self.assertIn("| no_verificable |", row)
-                self.assertIn("offline=unknown", row)
+                cells = tuple(x.strip() for x in found[0].strip("|").split("|"))
+                self.assertTrue(credible_offline_coverage_row(cells))
+                if cells[3] == "NO_VERIFICABLE":
+                    self.assertIn("offline=unknown", row)
                 self.assertIn("live=unknown", row)
                 self.assertIn("operando=unknown", row)
         self.assertEqual(https.run()["out"]["status"], "UNKNOWN")

@@ -15,7 +15,7 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
-from test_matriz_cobertura import credible_offline_coverage_row
+from test_matriz_cobertura import credible_offline_coverage_row as _canonical_coverage_row
 
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple(f"CB-{n:04d}" for n in range(287, 302))
@@ -24,6 +24,61 @@ MATRICES = tuple(
     ["docs/matriz-cobertura.md"]
     + [f"docs/matriz-cobertura-parte-{n:02d}.md" for n in range(1, 5)]
 )
+# Reconciliación #1255: aceptar solo la evidencia documental offline E2 conocida.
+# La función canónica cubre E1 y no incluye los PRs del tramo CB-0292..CB-0594.
+_E2_PROVENANCE = (
+    (292, 309, 1294, 19, 1202), (311, 328, 1285, 20, 1203),
+    (329, 343, 1281, 21, 1204), (344, 362, 1277, 22, 1205),
+    (363, 381, 1278, 23, 1206), (382, 396, 1279, 24, 1207),
+    (397, 414, 1282, 25, 1208), (415, 431, 1273, 26, 1209),
+    (432, 451, 1274, 27, 1210), (452, 471, 1275, 28, 1211),
+    (472, 488, 1276, 29, 1212), (490, 505, 1283, 30, 1213),
+    (506, 513, 1284, 31, 1214), (514, 531, 1289, 32, 1215),
+    (533, 547, 1293, 33, 1216), (548, 559, 1297, 34, 1217),
+    (560, 579, 1262, 35, 1218), (581, 594, 1263, 36, 1219),
+)
+
+
+def credible_offline_coverage_row(row):
+    """E1 y E2 con procedencia verificable, nunca validación productiva."""
+    if not isinstance(row, (tuple, list)) or len(row) != 6:
+        return False
+    if row[3] == "NO_VERIFICABLE":
+        if not isinstance(row[4], str):
+            return False
+        reason = re.split(r"(?i)offline\s*=\s*unknown", row[4], maxsplit=1)[0]
+        if len(reason.strip()) < 12:
+            return False
+    if _canonical_coverage_row(row):
+        return True
+    key, source, requirement, status, evidence, reference = row
+    if (status != "CUBIERTO" or not isinstance(key, str)
+            or re.fullmatch(r"CB-\d{4}", key) is None
+            or not isinstance(source, str) or not source.startswith("[docs/")
+            or not isinstance(requirement, str) or not requirement.strip()
+            or not isinstance(reference, str) or not reference.startswith("[#")
+            or not isinstance(evidence, str)):
+        return False
+    match = re.fullmatch(
+        r"Código (src/[A-Za-z0-9_.-]+\.php|scripts/hostinger_go_live_plan\.py); "
+        r"prueba (tests/test_cobertura_controlbot_(\d{2})\.py); "
+        r"PR #(\d+) MERGED; requisito (CB-\d{4}) "
+        r"ejercido contra código real con fixtures offline \(#(\d+)\); "
+        r"sin validación productiva; live=UNKNOWN; operando=UNKNOWN\.",
+        evidence,
+    )
+    if match is None or match.group(5) != key:
+        return False
+    number = int(key[3:])
+    expected = next(((pr, test, issue) for low, high, pr, test, issue
+                     in _E2_PROVENANCE if low <= number <= high), None)
+    if expected != (int(match.group(4)), int(match.group(3)),
+                    int(match.group(6))):
+        return False
+    return (ROOT.joinpath(match.group(1)).is_file()
+            and ROOT.joinpath(match.group(2)).is_file())
+
+
 DOCS = {
     **{f"CB-{n:04d}": "external-api-threat-model-v1.md" for n in (287,)},
     **{f"CB-{n:04d}": "external-api-trusted-request-gate-v1.md" for n in range(288, 292)},
@@ -136,6 +191,60 @@ def opaque(value: object, prefix: str) -> bool:
 
 
 class BrechasControlbot20Tests(unittest.TestCase):
+    def test_evidencia_e2_estricta_y_negativos(self) -> None:
+        """La promoción offline #1255 no equivale a autorización live."""
+        text = (ROOT / "docs/matriz-cobertura-parte-02.md").read_text(encoding="utf-8")
+        line = next(line for line in text.splitlines()
+                    if line.startswith("| CB-0487 |"))
+        baseline = [cell.strip() for cell in line.strip("|").split("|")]
+        self.assertTrue(credible_offline_coverage_row(baseline))
+        verified = list(baseline)
+        verified[3] = "CUBIERTO"
+        verified[4] = (
+            "Código src/GitHubReadOnlyProjectionWriter.php; "
+            "prueba tests/test_cobertura_controlbot_29.py; "
+            "PR #1276 MERGED; requisito CB-0487 ejercido contra código real "
+            "con fixtures offline (#1212); sin validación productiva; "
+            "live=UNKNOWN; operando=UNKNOWN."
+        )
+        self.assertTrue(credible_offline_coverage_row(verified))
+        for before, after in (
+            ("MERGED", "PENDING"),
+            ("PR #1276", "PR #1275"),
+            ("(#1212)", "(#1213)"),
+            ("CB-0487 ejercido", "CB-0491 ejercido"),
+            ("src/GitHubReadOnlyProjectionWriter.php", "src/NoExiste.php"),
+            ("tests/test_cobertura_controlbot_29.py",
+             "tests/test_cobertura_controlbot_99.py"),
+            ("live=UNKNOWN", "live=VALIDATED_IN_PRODUCTION"),
+            ("operando=UNKNOWN", "operando=READY"),
+        ):
+            candidate = list(verified)
+            candidate[4] = candidate[4].replace(before, after)
+            with self.subTest(change=after):
+                self.assertFalse(credible_offline_coverage_row(candidate))
+        python_line = next(line for line in text.splitlines()
+                           if line.startswith("| CB-0518 |"))
+        python_row = [cell.strip() for cell in python_line.strip("|").split("|")]
+        python_row[3] = "CUBIERTO"
+        python_row[4] = (
+            "Código scripts/hostinger_go_live_plan.py; "
+            "prueba tests/test_cobertura_controlbot_32.py; "
+            "PR #1289 MERGED; requisito CB-0518 ejercido contra código real "
+            "con fixtures offline (#1215); sin validación productiva; "
+            "live=UNKNOWN; operando=UNKNOWN."
+        )
+        self.assertTrue(credible_offline_coverage_row(python_row))
+        python_row[4] = python_row[4].replace(
+            "scripts/hostinger_go_live_plan.py", "scripts/unsafe.py"
+        )
+        self.assertFalse(credible_offline_coverage_row(python_row))
+        without_reason = list(baseline)
+        without_reason[4] = "Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN."
+        self.assertFalse(credible_offline_coverage_row(without_reason))
+        without_reason[4] = None
+        self.assertFalse(credible_offline_coverage_row(without_reason))
+
     def test_contrato_principal(self) -> None:
         """AC-01: each of the fifteen clauses exercises concrete local behavior."""
         gate_read = scenario("gate", "read")

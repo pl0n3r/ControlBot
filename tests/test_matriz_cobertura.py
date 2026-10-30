@@ -217,7 +217,7 @@ def credible_offline_coverage_row(row):
     if not isinstance(requirement, str) or not requirement or not isinstance(evidence, str):
         return False
     if status == "NO_VERIFICABLE":
-        return "Offline=UNKNOWN" in evidence and "live=UNKNOWN" in evidence and "operando=UNKNOWN" in evidence
+        return "offline=unknown" in evidence.lower() and "live=UNKNOWN" in evidence and "operando=UNKNOWN" in evidence
     if status != "CUBIERTO":
         return False
     if "live=UNKNOWN" not in evidence or "operando=UNKNOWN" not in evidence:

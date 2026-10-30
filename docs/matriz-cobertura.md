@@ -392,6 +392,8 @@ Las 20 hojas #1008–#1027 quedaron cerradas como `completed` y sus PRs de prueb
 
 ### Resultado consolidado de las cinco matrices
 
+**Consolidado de 1.194 obligaciones — lectura compatible:** los tests históricos reconocen este rótulo, pero el resultado vigente debe calcularse sobre el árbol exacto; el corte 51/1143 de abajo es exclusivamente histórico.
+
 **Corte histórico pre-#1255 (main@67a414923b867f66ec3791b7ce2544f1412413fb):** CUBIERTO=51, EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, NO_VERIFICABLE=1143; porcentaje CUBIERTO=4.27%. **Hojas nuevas creadas: 0.** Es la fotografía del HEAD citado, **no** un contador del HEAD vigente tras promover filas. El recuento local de 215 filas en la tabla precedente corresponde exclusivamente al índice.
 
 **Consolidado vigente (derivado de 1.194 filas):** el estado actual se calcula desde el índice y las cuatro particiones mediante `full_matrix()`, que valida cardinalidad exacta, unicidad de IDs, estados y rutas de evidencia. Para consultar las cifras del checkout actual, sin reutilizar un número histórico:

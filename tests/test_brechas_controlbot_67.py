@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """ControlBot #1074: CB-1027..1041, synthetic contracts; live remains UNKNOWN."""
 from __future__ import annotations
+
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 import ast
 from functools import lru_cache
 import json
@@ -87,11 +89,7 @@ def coverage_rows(data: object) -> dict[str, tuple[str, ...]]:
             group, anchor = CLAUSES[ident]
             if (ident in found or len(cells) != 6 or cells[0] != ident
                     or DOCS[group] not in cells[1] or anchor not in cells[2]
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos."
-                       not in cells[4]
-                    or any(f"{stage}=unknown" not in cells[4].lower()
-                           for stage in ("offline", "live", "operando"))
+                    or not credible_e4_coverage_row(cells)
                     or "/issues/1" not in cells[5]
                     or (path == MAIN) != (ident in {"CB-1035", "CB-1040"})):
                 raise ValueError("UNKNOWN: malformed row " + ident)
@@ -312,7 +310,7 @@ def verdict(ident: object, data: object, evidence: object) -> str:
     except ValueError:
         return UNKNOWN
     group, anchor = CLAUSES[ident]
-    if anchor not in data[DOCS[group]] or rows[ident][3] != "NO_VERIFICABLE":
+    if anchor not in data[DOCS[group]] or not credible_e4_coverage_row(rows[ident]):
         return UNKNOWN
     return LOCAL if local_evidence(ident, evidence, data) else UNKNOWN
 
@@ -328,7 +326,7 @@ class BrechasControlbot67Tests(unittest.TestCase):
         self.assertEqual(set(IDS), set(CLAUSES))
         for ident in IDS:
             with self.subTest(ident=ident):
-                self.assertEqual("NO_VERIFICABLE", rows[ident][3])
+                self.assertTrue(credible_e4_coverage_row(rows[ident]))
                 expected = UNKNOWN if ident in HISTORICAL_GAPS else LOCAL
                 self.assertEqual(expected, verdict(ident, data, proof))
     def test_falla_cerrado(self) -> None:
@@ -341,7 +339,7 @@ class BrechasControlbot67Tests(unittest.TestCase):
                 for broken in (data[path].replace(row, "", 1),
                                data[path] + "\n" + row,
                                data[path].replace(
-                                   row, row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1)):
+                                   row, corrupted_e4_row(row), 1)):
                     self.assertEqual(UNKNOWN, verdict(
                         ident, {**data, path: broken}, proof))
                 doc, anchor = DOCS[CLAUSES[ident][0]], CLAUSES[ident][1]
@@ -367,7 +365,7 @@ class BrechasControlbot67Tests(unittest.TestCase):
                     if isinstance(node, ast.ImportFrom)}
         self.assertLessEqual(imports, {"__future__", "ast", "functools", "json",
                                       "os", "pathlib", "re", "shutil",
-                                      "subprocess", "tempfile", "unittest"})
+                                      "subprocess", "tempfile", "unittest", "test_brechas_controlbot_20"})
         self.assertTrue(all(not Path(p).is_absolute() and ".." not in Path(p).parts
                             for p in FILES))
         self.assertNotIn("curl_exec(", PHP_PROBE)

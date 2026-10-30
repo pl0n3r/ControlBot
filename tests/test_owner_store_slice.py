@@ -29,6 +29,31 @@ try { $store->login($now + 3, $version); throw new RuntimeException('stale login
 catch (RuntimeException $e) { ok1379($e->getMessage() !== 'stale login', 'stale login accepted'); }
 ok1379($store->verify($enrollment['codes'][0], $now + 4), 'recovery rejected');
 ok1379(!$store->verify($enrollment['codes'][0], $now + 4), 'recovery replay');
+$activeVersion = $store->status()['version'];
+ok1379($store->login($now + 5, $activeVersion) === $activeVersion, 'fresh login');
+$store->logout($now + 6);
+$otp1 = Totp::code($secret, $now + 31);
+ok1379($store->verify($otp1, $now + 31), 'valid TOTP rejected');
+ok1379(!$store->verify($otp1, $now + 31), 'TOTP replay accepted');
+$otp2 = Totp::code($secret, $now + 61);
+$requiredVersion = $store->setRequired(true, $otp2, $now + 61);
+ok1379($store->status()['required'] && $store->validVersion($requiredVersion), 'required policy');
+try { $store->disable(Totp::code($secret, $now + 91), $now + 91); throw new RuntimeException('disabled required'); }
+catch (RuntimeException $e) { ok1379($e->getMessage() !== 'disabled required', 'policy bypass'); }
+$optionalVersion = $store->setRequired(false, Totp::code($secret, $now + 91), $now + 91);
+ok1379(!$store->status()['required'] && $store->validVersion($optionalVersion), 'optional policy');
+$disabledVersion = $store->disable(Totp::code($secret, $now + 121), $now + 121);
+ok1379($store->validVersion($disabledVersion) && !$store->status()['enabled'], 'disable state');
+ok1379($store->verify('', $now + 122), 'optional MFA absence');
+ok1379(count($store->auditTrail()) >= 8, 'audit missing');
+try { $store->confirmEnrollment('000000', $now + 123); throw new RuntimeException('no pending accepted'); }
+catch (RuntimeException $e) { ok1379($e->getMessage() !== 'no pending accepted', 'pending bypass'); }
+$store->beginEnrollment($now + 124);
+try { $store->confirmEnrollment('000000', $now + 425); throw new RuntimeException('expired accepted'); }
+catch (RuntimeException $e) { ok1379($e->getMessage() !== 'expired accepted', 'expired enrollment bypass'); }
+$noKey = new OwnerLocalAuthStore($dir, 'pl0n3r', null);
+try { $noKey->beginEnrollment($now + 126); throw new RuntimeException('missing key accepted'); }
+catch (RuntimeException $e) { ok1379($e->getMessage() !== 'missing key accepted', 'key fail-open'); }
 $files = glob($dir . '/cb-auth-*.json');
 ok1379(count($files) === 1, 'private state absent');
 file_put_contents($files[0], '{corrupt-json');

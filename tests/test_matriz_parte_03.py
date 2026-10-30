@@ -59,7 +59,8 @@ class MatrizParte03Tests(unittest.TestCase):
         for state in STATES:
             self.assertIn(f"| {state} | {counts[state]} |", text)
         self.assertIn("| TOTAL | 250 |", text)
-        self.assertEqual(counts["NO_VERIFICABLE"], 250)
+        # No congelar el estado de las filas cuando haya evidencia probada.
+        self.assertEqual(sum(counts.values()), 250)
         for rid, source, requirement, state, evidence, issue in rows:
             with self.subTest(id=rid):
                 if state == "CUBIERTO":

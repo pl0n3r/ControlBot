@@ -94,7 +94,8 @@ class MatrizParte02Tests(unittest.TestCase):
 
     def test_estados_y_conteo(self):
         counts = Counter(r[3] for r in self.rows)
-        self.assertEqual(counts, {"NO_VERIFICABLE": 245})
+        # #1255 promovera filas auditadas sin cambiar los 245 IDs originales.
+        self.assertEqual(sum(counts.values()), 245)
         for state in STATES:
             self.assertIn(f"| {state} | {counts[state]} |", self.text)
         self.assertIn("| TOTAL | 245 |", self.text)

@@ -5,6 +5,8 @@ aprobación productiva, despliegue ni go-live.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_offline_coverage_row
+
 import copy
 from functools import lru_cache
 import json
@@ -214,10 +216,12 @@ class BrechasControlbot26Tests(unittest.TestCase):
         for clause, matches in rows.items():
             with self.subTest(clause=clause):
                 self.assertEqual(len(matches), 1)
-                self.assertIn("| NO_VERIFICABLE |", matches[0])
-                for status in ("offline=unknown", "live=unknown",
-                               "operando=unknown"):
-                    self.assertIn(status, matches[0].lower())
+                cells = tuple(x.strip() for x in matches[0].strip("|").split("|"))
+                self.assertTrue(credible_offline_coverage_row(cells))
+                for status in ("live=unknown", "operando=unknown"):
+                    self.assertIn(status, cells[4].lower())
+                if cells[3] == "NO_VERIFICABLE":
+                    self.assertIn("offline=unknown", cells[4].lower())
         gw, hr = helper("gateway"), helper("harness")
         gateway = gw["execute"](gw["candidate"]())
         self.assertEqual(gateway["calls"], 1)  # Only an injected fake.

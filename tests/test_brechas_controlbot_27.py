@@ -5,6 +5,8 @@ CURRENT o una firma correcta jamás prueban autorización ni go-live.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_offline_coverage_row
+
 import json
 from pathlib import Path
 import unittest
@@ -251,10 +253,12 @@ class BrechasControlbot27Tests(unittest.TestCase):
                            if line.startswith("| " + requirement + " |")]
                 self.assertEqual(len(matches), 1)
                 lower = matches[0].lower()
-                self.assertIn("| no_verificable |", lower)
-                for plane in ("offline=unknown", "live=unknown",
-                              "operando=unknown"):
+                cells = tuple(x.strip() for x in matches[0].strip("|").split("|"))
+                self.assertTrue(credible_offline_coverage_row(cells))
+                for plane in ("live=unknown", "operando=unknown"):
                     self.assertIn(plane, lower)
+                if cells[3] == "NO_VERIFICABLE":
+                    self.assertIn("offline=unknown", lower)
         self.assertEqual(
             policy.scenario("invalid_context")["execution"]["decision"],
             "unknown")

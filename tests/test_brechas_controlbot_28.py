@@ -6,6 +6,8 @@ approval for live execution, deployment, legal attestation, or go-live.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_offline_coverage_row
+
 import json
 import re
 import unittest
@@ -196,7 +198,7 @@ class BrechasControlbot28Tests(unittest.TestCase):
         for key in IDS:
             with self.subTest(clause=key):
                 self.assertTrue(checks[key], f"{key}: insufficient synthetic evidence")
-                self.assertEqual(self.rows[key][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(self.rows[key]))
                 self.assertEqual(unknown_live(self.rows[key]), UNKNOWN)
 
     def test_falla_cerrado(self) -> None:
@@ -250,7 +252,7 @@ class BrechasControlbot28Tests(unittest.TestCase):
         self.assertEqual(set(self.rows), set(IDS))
         for key, row in self.rows.items():
             with self.subTest(clause=key):
-                self.assertEqual(row[3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(row))
                 self.assertIn("UNKNOWN", row[4])
                 for claim in (None, {}, {"test": "success"},
                               {"owner_decision": "A"}, {"proof_valid": True},

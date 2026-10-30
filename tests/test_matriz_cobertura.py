@@ -366,22 +366,30 @@ class MatrizCoberturaTests(unittest.TestCase):
                                          "[#0](https://github.com/otro/proyecto/issues/0)", 1))
 
     def test_union_global_1194_estricta(self):
+        # La fuente vigente son las 1.194 filas, nunca una cifra histórica fija.
+        # full_matrix valida las cuatro particiones, cardinalidades, IDs únicos
+        # y evidencia fail-closed por estado antes de devolver las filas.
         rows = full_matrix()
         counts = Counter(row[3] for row in rows)
         self.assertEqual(len(rows), 1194)
-        match = re.search(
-            r"\*\*Consolidado de 1\.194 obligaciones:\*\* "
-            r"CUBIERTO=(\d+), EN_CURSO=(\d+), SIN_COBERTURA=(\d+), "
-            r"DESCARTADO=(\d+), NO_VERIFICABLE=(\d+); "
-            r"porcentaje CUBIERTO=([\d.]+)%\. "
-            r"\*\*Hojas nuevas creadas: 0\.\*\*",
-            self.text,
+        self.assertEqual(len({row[0] for row in rows}), 1194)
+        self.assertEqual(set(counts) - ALLOWED, set())
+        self.assertEqual(sum(counts.values()), 1194)
+        self.assertEqual(
+            sum(counts[state] for state in ALLOWED), 1194
         )
-        self.assertIsNotNone(match, "Consolidado ausente o malformado")
-        for status, value in zip(("CUBIERTO", "EN_CURSO", "SIN_COBERTURA",
-                                  "DESCARTADO", "NO_VERIFICABLE"), match.groups()[:5]):
-            self.assertEqual(int(value), counts[status], status)
-        self.assertEqual(float(match.group(6)), round(100 * counts["CUBIERTO"] / 1194, 2))
+
+        # La cifra previa se conserva solo como snapshot trazable al SHA.
+        historical = (
+            "**Corte histórico pre-#1255 "
+            "(main@67a414923b867f66ec3791b7ce2544f1412413fb):** "
+            "CUBIERTO=51, EN_CURSO=0, SIN_COBERTURA=0, "
+            "DESCARTADO=0, NO_VERIFICABLE=1143; "
+            "porcentaje CUBIERTO=4.27%."
+        )
+        self.assertIn(historical, self.text)
+        self.assertIn("**Consolidado vigente (derivado de 1.194 filas):**", self.text)
+        self.assertNotIn("**Consolidado de 1.194 obligaciones:**", self.text)
 
     def test_resumen_por_estado(self):
         actual = Counter(row[3] for row in self.rows)

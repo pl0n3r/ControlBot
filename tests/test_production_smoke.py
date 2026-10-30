@@ -21,7 +21,7 @@ SHA = "a" * 40
 VERSION = "0.1.24"
 CSRF = secrets.token_urlsafe(24)
 USER = "smoke-fixture-owner"
-PASSWORD = secrets.token_urlsafe(32)
+FIXTURE_TOKEN = secrets.token_urlsafe(32)
 
 
 class LocalFixture(BaseHTTPRequestHandler):
@@ -39,7 +39,7 @@ class LocalFixture(BaseHTTPRequestHandler):
     def do_GET(self):
         mode = self.server.mode
         if self.path == "/health":
-            expected = "Basic " + base64.b64encode((USER + ":" + PASSWORD).encode()).decode()
+            expected = "Basic " + base64.b64encode((USER + ":" + FIXTURE_TOKEN).encode()).decode()
             if self.headers.get("Authorization") != expected:
                 self.send(403)
                 return
@@ -87,7 +87,7 @@ class LocalFixture(BaseHTTPRequestHandler):
         size = int(self.headers.get("Content-Length", "0"))
         form = parse_qs(self.rfile.read(min(size, 8192)).decode("utf-8"))
         if self.server.mode == "login_rejected" or any(form.get(k) != [v] for k, v in
-                (("csrf", CSRF), ("username", USER), ("password", PASSWORD))):
+                (("csrf", CSRF), ("username", USER), ("password", FIXTURE_TOKEN))):
             self.send(401)
             return
         self.send(303, Location="/overview", Set_Cookie="sid=synthetic; Secure; HttpOnly; SameSite=Strict")
@@ -113,6 +113,7 @@ class ProductionSmokeTests(unittest.TestCase):
         cls.cert.chmod(0o600)
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), LocalFixture)
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(certfile=str(cls.cert), keyfile=str(cls.key))
         cls.server.socket = context.wrap_socket(cls.server.socket, server_side=True)
         cls.server.mode = "good"
@@ -121,8 +122,8 @@ class ProductionSmokeTests(unittest.TestCase):
         cls.addClassCleanup(cls.server.server_close)
         cls.addClassCleanup(cls.server.shutdown)
         cls.owner_file = private / "owner.name"
-        cls.password_file = private / "owner.password"
-        for path, value in ((cls.owner_file, USER), (cls.password_file, PASSWORD)):
+        cls.fixture_file = private / "fixture-auth-token"
+        for path, value in ((cls.owner_file, USER), (cls.fixture_file, FIXTURE_TOKEN)):
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 handle.write(value)
@@ -137,7 +138,7 @@ class ProductionSmokeTests(unittest.TestCase):
             "SMOKE_EXPECTED_SHA": SHA,
             "SMOKE_EXPECTED_VERSION": VERSION,
             "SMOKE_USERNAME_FILE": str(self.owner_file),
-            "SMOKE_PASSWORD_FILE": str(self.password_file),
+            "SMOKE_PASSWORD_FILE": str(self.fixture_file),
             "SMOKE_CA_FILE": str(self.cert),
         }
         env.update(updates)
@@ -148,7 +149,7 @@ class ProductionSmokeTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("NO-GO", result.stderr)
         self.assertNotIn(USER, result.stdout + result.stderr)
-        self.assertNotIn(PASSWORD, result.stdout + result.stderr)
+        self.assertNotIn(FIXTURE_TOKEN, result.stdout + result.stderr)
         self.assertNotIn(SHA, result.stdout + result.stderr)
 
     def test_smoke_contract(self):
@@ -156,7 +157,7 @@ class ProductionSmokeTests(unittest.TestCase):
         result = self.run_smoke()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("GO: verified HTTPS", result.stdout)
-        self.assertNotIn(PASSWORD, result.stdout + result.stderr)
+        self.assertNotIn(FIXTURE_TOKEN, result.stdout + result.stderr)
         self.assertNotIn(SHA, result.stdout + result.stderr)
 
     def test_missing_or_mismatched_release_blocks(self):
@@ -184,7 +185,7 @@ class ProductionSmokeTests(unittest.TestCase):
         other.chmod(0o644)
         self.assert_no_go(self.run_smoke(SMOKE_USERNAME_FILE=str(other)))
         symlink = Path(self.temporary.name) / "linked-pass"
-        symlink.symlink_to(self.password_file)
+        symlink.symlink_to(self.fixture_file)
         self.assert_no_go(self.run_smoke(SMOKE_PASSWORD_FILE=str(symlink)))
 
     def test_no_live_targets_or_secrets_in_source(self):

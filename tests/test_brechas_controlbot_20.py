@@ -279,7 +279,10 @@ def credible_e4_coverage_row(row):
         planes = {name: [] for name in ("offline", "live", "operando")}
         for name, state in tokens:
             planes[name.lower()].append(state.upper())
-        if any(states != ["UNKNOWN"] for states in planes.values()):
+        # Algunas filas originales conservan un segundo offline=UNKNOWN
+        # en el contraste histórico: nunca convertirlo en permiso operativo.
+        if any(not states or set(states) != {"UNKNOWN"}
+               for states in planes.values()):
             return False
         before = re.split(
             r"(?i)(?<![A-Za-z0-9_])offline\s*=\s*unknown\b",

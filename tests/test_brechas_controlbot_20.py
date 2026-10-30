@@ -307,6 +307,15 @@ def credible_e4_coverage_row(row):
     return True
 
 
+def corrupted_e4_row(line):
+    """Test-only mutant: a covered row loses its PR proof, others forge status."""
+    if not isinstance(line, str):
+        raise TypeError("UNKNOWN: invalid synthetic coverage row")
+    if "| CUBIERTO |" in line:
+        return line.replace("MERGED", "PENDING", 1)
+    return line.replace("NO_VERIFICABLE", "CUBIERTO", 1)
+
+
 def matrix_rows(documents: dict[str, str]) -> dict[str, tuple[str, ...]]:
     """Require one documented, unpromoted clause in the partitioned matrix."""
     found: dict[str, tuple[str, ...]] = {}

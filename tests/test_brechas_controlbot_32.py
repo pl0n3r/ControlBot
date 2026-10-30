@@ -1,7 +1,7 @@
 """Contraste ejecutable CB-0470..CB-0484 sin activar producción ni runtime."""
 from __future__ import annotations
 
-from test_matriz_cobertura import credible_offline_coverage_row
+from test_brechas_controlbot_20 import credible_offline_coverage_row
 
 import json
 import tempfile

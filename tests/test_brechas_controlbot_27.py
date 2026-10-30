@@ -5,7 +5,7 @@ CURRENT o una firma correcta jamás prueban autorización ni go-live.
 """
 from __future__ import annotations
 
-from test_matriz_cobertura import credible_offline_coverage_row
+from test_brechas_controlbot_20 import credible_offline_coverage_row
 
 import json
 from pathlib import Path

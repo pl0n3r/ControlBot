@@ -76,6 +76,7 @@ class CoberturaControlbot48Tests(unittest.TestCase):
         self.assertEqual(result["status"], "REJECTED")
         self.assertEqual(result["reason"], reason)
         self.assertEqual(result["readiness"], "UNKNOWN")
+        self.assertNotIn("synthetic-canary", proc.stdout + proc.stderr)
         if name == "backup":
             self.assertIs(result["backup_verified"], False)
             self.assertIs(result["live_authorized"], False)
@@ -133,7 +134,7 @@ class CoberturaControlbot48Tests(unittest.TestCase):
         for name, valid in (("backup", backup()), ("deploy", deploy())):
             with self.subTest(adapter=name, case="wrong-mode"):
                 self.assert_denied(name, valid, "mode_not_authorized", mode=())
-            for raw in ('{"kind":"synthetic","kind":"live"}', "x" * 8193):
+            for raw in ('{"kind":"synthetic","kind":"live"}', "x" * 8193, "", '{"kind":NaN}'):
                 with self.subTest(adapter=name, case="bad-json"):
                     self.assert_denied(name, valid, "invalid_synthetic_fixture", raw=raw)
             with self.subTest(adapter=name, case="extra-secret"):

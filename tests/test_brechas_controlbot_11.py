@@ -13,6 +13,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "docs" / "matriz-cobertura-parte-01.md"
 CONTRACT = ROOT / "docs" / "disaster-recovery-contract.md"
@@ -86,11 +88,8 @@ def matrix_states(text: str) -> dict[str, str]:
         if (len(rows) == 1 and len(rows[0]) == 6
                 and rows[0][0] == clause
                 and "docs/disaster-recovery-contract.md" in rows[0][1]
-                and rows[0][3] == "NO_VERIFICABLE"
-                and all(term in rows[0][4] for term in (
-                    "Offline=UNKNOWN", "live=UNKNOWN", "operando=UNKNOWN"
-                ))):
-            states[clause] = "NO_VERIFICABLE"
+                and credible_offline_coverage_row(rows[0])):
+            states[clause] = rows[0][3]
         else:
             states[clause] = UNKNOWN
     return states
@@ -220,7 +219,7 @@ class BrechasControlbot11Tests(unittest.TestCase):
         for clause in IDS:
             with self.subTest(clause=clause):
                 self.assertTrue(verdicts[clause], f"{clause}: contrato local no demostrado")
-                self.assertEqual(states[clause], "NO_VERIFICABLE")
+                self.assertIn(states[clause], ("NO_VERIFICABLE", "CUBIERTO"))
                 self.assertEqual(operational_state(clause, verdicts[clause]), UNKNOWN)
 
     def test_falla_cerrado(self) -> None:
@@ -263,7 +262,8 @@ class BrechasControlbot11Tests(unittest.TestCase):
             altered = (
                 raw.replace(row + "\n", "", 1),
                 raw + "\n" + row,
-                raw.replace(row, row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                raw.replace(row, (row.replace("MERGED", "PENDING", 1) if "CUBIERTO" in row
+                                  else row.replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1),
             )
             for candidate in altered:
                 with self.subTest(clause=clause):
@@ -300,7 +300,7 @@ class BrechasControlbot11Tests(unittest.TestCase):
         self.assertEqual(missing, {"accepted": False, "status": "unknown"})
         for clause in IDS:
             with self.subTest(clause=clause):
-                self.assertEqual(recorded[clause], "NO_VERIFICABLE")
+                self.assertIn(recorded[clause], ("NO_VERIFICABLE", "CUBIERTO"))
                 for claim in (None, {}, True, "success", "HEALTHY",
                               {"ci": "success"}, {"option": "A"},
                               {"configured": True}, {"restore": "claimed"},

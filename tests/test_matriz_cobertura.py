@@ -194,6 +194,53 @@ def full_matrix() -> list[tuple[str, ...]]:
         raise ValueError("Matriz incompleta o IDs ajenos al snapshot")
     return gathered
 
+
+_OFFLINE_RECONCILIATION = (
+    (1, 16, 1261, 3), (17, 30, 1260, 4), (31, 49, 1301, 5),
+    (50, 69, 1299, 6), (70, 86, 1306, 7), (87, 104, 1307, 8),
+    (105, 123, 1300, 9), (124, 140, 1302, 10),
+    (141, 166, 1290, 11), (167, 183, 1304, 12),
+    (184, 203, 1291, 13), (204, 220, 1296, 14),
+    (221, 238, 1286, 15), (239, 253, 1287, 16),
+    (254, 273, 1288, 17), (274, 291, 1292, 18),
+    (1130, 1144, 1258, 2), (1145, 1151, 1259, 1),
+)
+
+
+def credible_offline_coverage_row(row):
+    """Reject fabricated CUBIERTO while accepting a real offline transition."""
+    if not isinstance(row, (tuple, list)) or len(row) != 6:
+        return False
+    key, _, requirement, status, evidence, _ = row
+    if not isinstance(key, str) or re.fullmatch(r"CB-\d{4}", key) is None:
+        return False
+    if not isinstance(requirement, str) or not requirement or not isinstance(evidence, str):
+        return False
+    if status == "NO_VERIFICABLE":
+        return "offline=unknown" in evidence.lower() and "live=UNKNOWN" in evidence and "operando=UNKNOWN" in evidence
+    if status != "CUBIERTO":
+        return False
+    if "live=UNKNOWN" not in evidence or "operando=UNKNOWN" not in evidence:
+        return False
+    match = re.match(
+        r"^Código (src/[A-Za-z0-9_.-]+\.php|ops/factory/deploy); "
+        r"prueba (tests/test_cobertura_controlbot_(\d{2})\.py); "
+        r"PR #(\d+) MERGED; cláusula (CB-\d{4}) ejercida offline",
+        evidence,
+    )
+    if match is None or match.group(5) != key:
+        return False
+    number = int(key[3:])
+    expected = next(
+        ((pr, test) for low, high, pr, test in _OFFLINE_RECONCILIATION
+         if low <= number <= high), None
+    )
+    if expected is None or expected != (int(match.group(4)), int(match.group(3))):
+        return False
+    return (ROOT.joinpath(match.group(1)).is_file()
+            and ROOT.joinpath(match.group(2)).is_file())
+
+
 class MatrizCoberturaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -321,13 +368,20 @@ class MatrizCoberturaTests(unittest.TestCase):
     def test_union_global_1194_estricta(self):
         rows = full_matrix()
         counts = Counter(row[3] for row in rows)
-        self.assertEqual(counts, {"CUBIERTO": 31, "NO_VERIFICABLE": 1163})
         self.assertEqual(len(rows), 1194)
-        summary = ("**Consolidado de 1.194 obligaciones:** CUBIERTO=31, "
-                   "EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, "
-                   "NO_VERIFICABLE=1163; porcentaje CUBIERTO=2.60%. "
-                   "**Hojas nuevas creadas: 0.**")
-        self.assertIn(summary, self.text)
+        match = re.search(
+            r"\*\*Consolidado de 1\.194 obligaciones:\*\* "
+            r"CUBIERTO=(\d+), EN_CURSO=(\d+), SIN_COBERTURA=(\d+), "
+            r"DESCARTADO=(\d+), NO_VERIFICABLE=(\d+); "
+            r"porcentaje CUBIERTO=([\d.]+)%\. "
+            r"\*\*Hojas nuevas creadas: 0\.\*\*",
+            self.text,
+        )
+        self.assertIsNotNone(match, "Consolidado ausente o malformado")
+        for status, value in zip(("CUBIERTO", "EN_CURSO", "SIN_COBERTURA",
+                                  "DESCARTADO", "NO_VERIFICABLE"), match.groups()[:5]):
+            self.assertEqual(int(value), counts[status], status)
+        self.assertEqual(float(match.group(6)), round(100 * counts["CUBIERTO"] / 1194, 2))
 
     def test_resumen_por_estado(self):
         actual = Counter(row[3] for row in self.rows)

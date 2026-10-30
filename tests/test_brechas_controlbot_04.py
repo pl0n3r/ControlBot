@@ -14,6 +14,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 UNKNOWN = "UNKNOWN"
 LOCAL = "LOCAL_CONTRACT"
@@ -77,19 +79,21 @@ def rows_from_matrix(documents: object) -> dict[str, tuple[str, ...]]:
             if (key in found or len(cells) != 7 or cells[0] != key
                     or not cells[1].startswith("[docs/")
                     or not cells[2].startswith(ANCHORS[key])
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN" not in cells[4]
-                    or "Falta contraste de comportamiento con prueba y PR concretos"
-                    not in cells[4] or not cells[5].startswith("[#182]")
+                    or not credible_offline_coverage_row(cells)
+                    or (cells[3] == "NO_VERIFICABLE" and
+                        ("Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN" not in cells[4]
+                         or "Falta contraste de comportamiento con prueba y PR concretos"
+                         not in cells[4])) or not cells[5].startswith("[#182]")
                     or cells[6] != ""):
                 # GitHub matrix has six data columns (the final pipe is structural).
                 if (key in found or len(cells) != 6 or cells[0] != key
                         or not cells[1].startswith("[docs/")
                         or not cells[2].startswith(ANCHORS[key])
-                        or cells[3] != "NO_VERIFICABLE"
-                        or "Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN" not in cells[4]
-                        or "Falta contraste de comportamiento con prueba y PR concretos"
-                        not in cells[4] or not cells[5].startswith("[#182]")):
+                        or not credible_offline_coverage_row(cells)
+                        or (cells[3] == "NO_VERIFICABLE" and
+                            ("Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN" not in cells[4]
+                             or "Falta contraste de comportamiento con prueba y PR concretos"
+                             not in cells[4])) or not cells[5].startswith("[#182]")):
                     raise ValueError("UNKNOWN: fila contradictoria " + key)
             expected_path = DOCS[SOURCE_FOR_ID[key]]
             if not cells[1].startswith("[" + expected_path + ":"):
@@ -268,7 +272,7 @@ def local_verdict(key: object, rows: object, results: object) -> str:
             or not isinstance(results, dict) or set(results) != set(IDS)
             or results.get(key) is not True):
         return UNKNOWN
-    if len(rows[key]) not in (6, 7) or rows[key][3] != "NO_VERIFICABLE":
+    if len(rows[key]) not in (6, 7) or not credible_offline_coverage_row(rows[key]):
         return UNKNOWN
     return LOCAL
 
@@ -294,7 +298,7 @@ class BrechasControlbot04Tests(unittest.TestCase):
             with self.subTest(clause=key):
                 self.assertEqual(
                     local_verdict(key, self.rows, self.results), LOCAL)
-                self.assertEqual(self.rows[key][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(self.rows[key]))
                 self.assertIn(ANCHORS[key], read(DOCS[SOURCE_FOR_ID[key]]))
                 self.assertEqual(operational_verdict(key, LOCAL), UNKNOWN)
 
@@ -308,7 +312,8 @@ class BrechasControlbot04Tests(unittest.TestCase):
                 self.documents[path].replace(line, "", 1),
                 self.documents[path] + "\n" + line,
                 self.documents[path].replace(
-                    line, line.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                    line, (line.replace("MERGED", "PENDING", 1) if "CUBIERTO" in line
+                            else line.replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1),
                 self.documents[path].replace(
                     line, line.replace(ANCHORS[key], "texto-ambiguo", 1), 1),
             ):

@@ -16,6 +16,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple(f"CB-{i:04d}" for i in range(31, 46))
 UNKNOWN = "UNKNOWN"
@@ -255,7 +257,7 @@ def classify(identifier: str, rows: dict[str, tuple[str, ...]],
         return result
     group = group_for(identifier)
     doc_path = DOCS[group]
-    if (row[3] != "NO_VERIFICABLE" or not row[2]
+    if (not credible_offline_coverage_row(row) or not row[2]
             or doc_path not in row[1]
             or group not in docs or not docs[group]
             or group not in data or not isinstance(data[group], dict)):
@@ -275,7 +277,7 @@ class BrechasControlbot03Tests(unittest.TestCase):
                 self.assertTrue(supported(identifier, data), identifier)
                 verdict = classify(identifier, rows, docs, data)
                 self.assertEqual(verdict["local"], LOCAL, identifier)
-                self.assertEqual(rows[identifier][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(rows[identifier]))
 
     def test_falla_cerrado(self) -> None:
         rows, docs = read_sources()
@@ -289,7 +291,10 @@ class BrechasControlbot03Tests(unittest.TestCase):
                 )
                 changed = dict(rows)
                 c = list(rows[identifier])
-                c[3] = "CUBIERTO"
+                if c[3] == "NO_VERIFICABLE":
+                    c[3] = "CUBIERTO"
+                else:
+                    c[4] = c[4].replace("MERGED", "PENDING")
                 changed[identifier] = tuple(c)
                 self.assertEqual(
                     classify(identifier, changed, docs, data)["local"], UNKNOWN

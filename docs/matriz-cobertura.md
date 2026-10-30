@@ -124,7 +124,7 @@ Las 20 hojas #1008–#1027 quedaron cerradas como `completed` y sus PRs de prueb
 | [#1066](https://github.com/pl0n3r/ControlBot/issues/1066) | `CB-0907`, `CB-0908`, `CB-0909`, `CB-0910`, `CB-0911`, `CB-0912`, `CB-0913`, `CB-0914`, `CB-0915`, `CB-0916`, `CB-0917`, `CB-0918`, `CB-0919`, `CB-0920`, `CB-0921` | [test_59.py](../tests/test_brechas_controlbot_59.py) | [#1150](https://github.com/pl0n3r/ControlBot/pull/1150) | `NO_VERIFICABLE`; correspondencia integral/live=UNKNOWN |
 | [#1067](https://github.com/pl0n3r/ControlBot/issues/1067) | `CB-0922`, `CB-0923`, `CB-0924`, `CB-0925`, `CB-0926`, `CB-0927`, `CB-0928`, `CB-0929`, `CB-0930`, `CB-0931`, `CB-0932`, `CB-0933`, `CB-0934`, `CB-0935`, `CB-0936` | [test_60.py](../tests/test_brechas_controlbot_60.py) | [#1170](https://github.com/pl0n3r/ControlBot/pull/1170) | `NO_VERIFICABLE`; correspondencia integral/live=UNKNOWN |
 
-**Integridad:** cinco documentos, 1.194 IDs únicos; `CUBIERTO=31`, `NO_VERIFICABLE=1163`, demás estados=0. El estado de cada una de las 300 obligaciones sigue sin promoción por falta de evidencia integral. Los casos de impacto externo permanecen bajo D-043, D-059 y las puertas del dueño. Reversión: revertir este bloque y las anotaciones de etapa, sin afectar código ni runtime.
+**Integridad histórica antes de #1254:** cinco documentos, 1.194 IDs únicos; `CUBIERTO=31`, `NO_VERIFICABLE=1163`, demás estados=0. El estado de cada una de las 300 obligaciones sigue sin promoción por falta de evidencia integral. Los casos de impacto externo permanecen bajo D-043, D-059 y las puertas del dueño. Reversión: revertir este bloque y las anotaciones de etapa, sin afectar código ni runtime.
 
 ## Reconciliación de evidencia · etapa 4/4 (#1088)
 
@@ -153,7 +153,7 @@ Las 20 hojas #1008–#1027 quedaron cerradas como `completed` y sus PRs de prueb
 | [#1084](https://github.com/pl0n3r/ControlBot/issues/1084) | `CB-1177`, `CB-1178`, `CB-1179`, `CB-1180`, `CB-1181`, `CB-1182`, `CB-1183`, `CB-1184`, `CB-1185`, `CB-1186`, `CB-1187`, `CB-1188`, `CB-1189`, `CB-1190`, `CB-1191` | [test_77.py](../tests/test_brechas_controlbot_77.py) | [#1162](https://github.com/pl0n3r/ControlBot/pull/1162) | `NO_VERIFICABLE`; Faltan observación real de integración, Hostinger y presupuesto >400 señales; las pruebas PHP previas fallaron en CI. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN |
 | [#1085](https://github.com/pl0n3r/ControlBot/issues/1085) | `CB-1192` | [test_78.py](../tests/test_brechas_controlbot_78.py) | [#1086](https://github.com/pl0n3r/ControlBot/pull/1086) | `NO_VERIFICABLE`; Falta #760 AC-04: evidencia real de collector, cron, snapshot y UI con >400 señales. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN |
 
-**Integridad después de la etapa 4/4:** cinco documentos, **1.194 IDs únicos**, `CUBIERTO=31`, `NO_VERIFICABLE=1163`, `EN_CURSO=0`, `SIN_COBERTURA=0`, `DESCARTADO=0`. No se modifica el estado ni el texto original de ninguna fila. La cobertura documental de pruebas no es acreditación de despliegue, live, restore o resultado real; #625, #760 y #750 conservan sus puertas humanas/operativas.
+**Integridad de la revisión documental previa 4/4:** cinco documentos, **1.194 IDs únicos**, `CUBIERTO=31`, `NO_VERIFICABLE=1163`, `EN_CURSO=0`, `SIN_COBERTURA=0`, `DESCARTADO=0`. No se modifica el estado ni el texto original de ninguna fila. La cobertura documental de pruebas no es acreditación de despliegue, live, restore o resultado real; #625, #760 y #750 conservan sus puertas humanas/operativas.
 
 ## Matriz
 
@@ -388,9 +388,11 @@ Las 20 hojas #1008–#1027 quedaron cerradas como `completed` y sus PRs de prueb
 
 **Porcentaje CUBIERTO:** 14.42%. **Hojas nuevas creadas por esta auditoría: 0**. El porcentaje corresponde SOLO a este corte parcial, no al resultado completo. No se inventan hojas para estados UNKNOWN.
 
+**Corte histórico previo a #1254 (NO es el total vigente):** CUBIERTO=31, EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, NO_VERIFICABLE=1163. Esta referencia histórica mantiene la trazabilidad de contrastes previos; el consolidado actual se calcula abajo.
+
 ### Resultado consolidado de las cinco matrices
 
-**Consolidado de 1.194 obligaciones:** CUBIERTO=31, EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, NO_VERIFICABLE=1163; porcentaje CUBIERTO=2.60%. **Hojas nuevas creadas: 0.** El recuento local de 215 filas en la tabla precedente describe únicamente este índice; la función `full_matrix` valida el agregado de 1.194 filas reales. No autoriza go-live ni concluye que los requisitos NO_VERIFICABLE estén ausentes.
+**Consolidado de 1.194 obligaciones:** CUBIERTO=51, EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, NO_VERIFICABLE=1143; porcentaje CUBIERTO=4.27%. **Hojas nuevas creadas: 0.** El recuento local de 215 filas en la tabla precedente describe únicamente este índice; la función `full_matrix` valida el agregado de 1.194 filas reales. No autoriza go-live ni concluye que los requisitos NO_VERIFICABLE estén ausentes.
 
 ## Fuentes de preparación posteriores al corte
 

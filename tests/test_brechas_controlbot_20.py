@@ -15,6 +15,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple(f"CB-{n:04d}" for n in range(287, 302))
 UNKNOWN = "UNKNOWN"
@@ -88,10 +90,11 @@ def matrix_rows(documents: dict[str, str]) -> dict[str, tuple[str, ...]]:
                 raise ValueError("UNKNOWN: duplicate clause " + clause)
             if (len(cells) != 6 or DOCS[clause] not in cells[1]
                     or HINTS[clause].casefold() not in cells[2].casefold()
-                    or cells[3] != "NO_VERIFICABLE"
-                    or not all(x in cells[4] for x in (
-                        "Offline=UNKNOWN", "live=UNKNOWN", "operando=UNKNOWN"
-                    ))):
+                    or not credible_offline_coverage_row(cells)
+                    or (cells[3] == "NO_VERIFICABLE"
+                        and not all(x in cells[4] for x in (
+                            "Offline=UNKNOWN", "live=UNKNOWN", "operando=UNKNOWN"
+                        )))):
                 raise ValueError("UNKNOWN: malformed clause " + clause)
             found[clause] = cells
     if set(found) != set(IDS):
@@ -297,7 +300,7 @@ class BrechasControlbot20Tests(unittest.TestCase):
         rows = matrix_rows(matrix_texts())
         for clause in IDS:
             with self.subTest(clause=clause):
-                self.assertEqual(rows[clause][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(rows[clause]))
                 self.assertTrue(verdicts[clause], f"offline behavior missing: {clause}")
 
     def test_falla_cerrado(self) -> None:
@@ -322,10 +325,11 @@ class BrechasControlbot20Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "UNKNOWN"):
             matrix_rows(doubled)
         altered = dict(documents)
-        altered[location] = altered[location].replace(line, line.replace("NO_VERIFICABLE", "CUBIERTO"))
+        altered[location] = altered[location].replace(line, (line.replace("MERGED", "PENDING") if "CUBIERTO" in line
+                                   else line.replace("NO_VERIFICABLE", "CUBIERTO")))
         with self.assertRaisesRegex(ValueError, "UNKNOWN"):
             matrix_rows(altered)
-        self.assertEqual(rows[first][3], "NO_VERIFICABLE")
+        self.assertTrue(credible_offline_coverage_row(rows[first]))
         self.assertTrue(scenario("gate", "read")["revoked_device"])
         self.assertTrue(all(scenario("gate", "trusted_mismatch").values()))
         self.assertTrue(scenario("contract", "mutation")["missing_idempotency_rejected"])
@@ -367,7 +371,7 @@ class BrechasControlbot20Tests(unittest.TestCase):
             with self.subTest(clause=clause):
                 self.assertEqual(operational_state(clause), UNKNOWN)
                 self.assertEqual(operational_state(clause, {"offline": "pass"}), UNKNOWN)
-                self.assertEqual(rows[clause][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(rows[clause]))
                 self.assertIn("live=UNKNOWN", rows[clause][4])
                 self.assertIn("operando=UNKNOWN", rows[clause][4])
         self.assertEqual(

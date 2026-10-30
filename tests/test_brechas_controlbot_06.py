@@ -15,6 +15,8 @@ import shutil
 import subprocess
 import unittest
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple("CB-%04d" % number for number in range(77, 92))
 UNKNOWN, LOCAL = "UNKNOWN", "LOCAL_CONTRACT"
@@ -76,9 +78,10 @@ def matrix_rows(files: object) -> dict[str, tuple[str, ...]]:
                     or cells[0] != key
                     or ("[" + ROUTES[key] + ":") not in cells[1]
                     or not cells[2].startswith(START[key])
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos." not in cells[4]
-                    or "Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN." not in cells[4]):
+                    or not credible_offline_coverage_row(cells)
+                    or (cells[3] == "NO_VERIFICABLE"
+                        and ("Falta contraste de comportamiento con prueba y PR concretos." not in cells[4]
+                             or "Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN." not in cells[4]))):
                 raise ValueError("UNKNOWN: invalid row " + key)
             rows[key] = cells
     if set(rows) != set(IDS):
@@ -136,7 +139,7 @@ def classify(rows: object, proof: object, docs: object) -> dict[str, str]:
     try:
         if (set(rows) != set(IDS) or set(proof) != set(evidence())
                 or not all(isinstance(docs.get(p), str) for p in DOCUMENTS)
-                or not all(len(rows[k]) == 6 and rows[k][3] == "NO_VERIFICABLE"
+                or not all(len(rows[k]) == 6 and credible_offline_coverage_row(rows[k])
                            and "[" + ROUTES[k] + ":" in rows[k][1]
                            and rows[k][2].startswith(START[k]) for k in IDS)):
             return unknown
@@ -241,7 +244,10 @@ class BrechasControlbot06Tests(unittest.TestCase):
                 self.assertEqual(classify(missing, proof, files)[key], UNKNOWN)
                 changed = dict(rows)
                 cells = list(rows[key])
-                cells[3] = "CUBIERTO"
+                if cells[3] == "NO_VERIFICABLE":
+                    cells[3] = "CUBIERTO"
+                else:
+                    cells[4] = cells[4].replace("MERGED", "PENDING")
                 changed[key] = tuple(cells)
                 self.assertEqual(classify(changed, proof, files)[key], UNKNOWN)
                 altered = dict(files)

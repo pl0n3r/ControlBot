@@ -15,6 +15,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple("CB-%04d" % n for n in range(62, 77))
 UNKNOWN = "UNKNOWN"
@@ -203,7 +205,7 @@ def classify(rows: dict[str, tuple[str, ...]], data: dict) -> dict:
         row = rows.get(key)
         doc = ("docs/backup-receipt-integrity.md" if key <= "CB-0069"
                else "docs/brvtal-recovery-rollout.md")
-        if (row and len(row) == 6 and row[3] == "NO_VERIFICABLE"
+        if (row and len(row) == 6 and credible_offline_coverage_row(row)
                 and doc in row[1]
                 and ROW_START[key].lower()
                     in row[2].replace(chr(96), "").lower()
@@ -218,7 +220,7 @@ class BrechasControlbot05Tests(unittest.TestCase):
         self.assertEqual(set(rows), set(IDS))
         for key, verdict in classify(rows, evidence()).items():
             with self.subTest(requirement=key):
-                self.assertEqual(rows[key][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(rows[key]))
                 self.assertEqual(verdict["code"], "LOCAL_CONTRACT")
 
     def test_falla_cerrado(self) -> None:
@@ -238,7 +240,10 @@ class BrechasControlbot05Tests(unittest.TestCase):
                 self.assertEqual(classify(missing, sample)[key]["code"], UNKNOWN)
                 replaced = dict(rows)
                 cells = list(rows[key])
-                cells[3] = "CUBIERTO"
+                if cells[3] == "NO_VERIFICABLE":
+                    cells[3] = "CUBIERTO"
+                else:
+                    cells[4] = cells[4].replace("MERGED", "PENDING")
                 replaced[key] = tuple(cells)
                 self.assertEqual(classify(replaced, sample)[key]["code"], UNKNOWN)
         for group, slot, field, value, key in (

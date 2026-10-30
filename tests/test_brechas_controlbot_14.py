@@ -13,6 +13,8 @@ from pathlib import Path
 import subprocess
 import unittest
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 MATRICES = (
     ROOT / "docs" / "matriz-cobertura.md",
@@ -63,10 +65,11 @@ def matrix_states(content: str) -> dict[str, str]:
             continue
         cells = [cell.strip() for cell in rows[0].strip().strip("|").split("|")]
         states[identifier] = (
-            "NO_VERIFICABLE" if len(cells) == 6 and cells[0] == identifier
-            and cells[3] == "NO_VERIFICABLE"
-            and "Offline=UNKNOWN" in cells[4]
-            and "live=UNKNOWN" in cells[4]
+            cells[3] if len(cells) == 6 and cells[0] == identifier
+            and (credible_offline_coverage_row(cells)
+                 or (cells[3] == "NO_VERIFICABLE"
+                     and "Offline=UNKNOWN" in cells[4]
+                     and "live=UNKNOWN" in cells[4]))
             else UNKNOWN
         )
     return states
@@ -234,7 +237,7 @@ class BrechasControlbot14Tests(unittest.TestCase):
             path.read_text(encoding="utf-8") for path in MATRICES
         ))
         self.assertEqual(set(states), set(IDS))
-        self.assertEqual(set(states.values()), {"NO_VERIFICABLE"})
+        self.assertLessEqual(set(states.values()), {"NO_VERIFICABLE", "CUBIERTO"})
         for identifier in IDS:
             with self.subTest(identifier=identifier):
                 self.assertEqual(operational_state(identifier, states[identifier]), UNKNOWN)

@@ -13,6 +13,8 @@ from pathlib import Path
 import subprocess
 import unittest
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple(f"CB-{n:04d}" for n in range(16, 31))
 INDEX = "docs/matriz-cobertura.md"
@@ -119,11 +121,7 @@ def rows(raw, expected):
             if "UNKNOWN" not in cells[4]:
                 raise ValueError("UNKNOWN: absence not explained")
         elif cells[3] == "CUBIERTO":
-            # The subsequent reconciliation stage is allowed to promote only
-            # when it links code + this exact test + a merged PR.
-            if not all(t in cells[4] for t in (
-                "src/", "tests/test_brechas_controlbot_02.py", "MERGED",
-            )):
+            if not credible_offline_coverage_row(cells):
                 raise ValueError("UNKNOWN: unsupported promotion")
         else:
             raise ValueError("UNKNOWN: invented matrix status")
@@ -266,7 +264,8 @@ class BrechasControlbot02Tests(unittest.TestCase):
                 invalid_rows = (
                     matrix[path].replace(line, "", 1),
                     matrix[path] + "\n" + line,
-                    matrix[path].replace(line, line.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                    matrix[path].replace(line, (line.replace("MERGED", "PENDING", 1) if "CUBIERTO" in line
+                                             else line.replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1),
                 )
                 for bad in invalid_rows:
                     with self.subTest(identifier=identifier), self.assertRaisesRegex(ValueError, UNKNOWN):

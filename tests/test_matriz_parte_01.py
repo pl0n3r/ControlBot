@@ -79,7 +79,7 @@ class MatrizParte01Tests(unittest.TestCase):
         self.assertEqual(totals["TOTAL"], 245)
         for state in STATES:
             self.assertEqual(totals[state], counts[state])
-        self.assertEqual(counts, {"NO_VERIFICABLE": 245})
+        self.assertEqual(counts, {"CUBIERTO": 20, "NO_VERIFICABLE": 225})
         with self.assertRaises(ValueError):
             read_rows(self.text.replace("| NO_VERIFICABLE |", "| CUBIERTO |", 1))
         with self.assertRaises(ValueError):

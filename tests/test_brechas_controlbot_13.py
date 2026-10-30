@@ -13,6 +13,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple(f"CB-{i:04d}" for i in range(182, 197))
 MATRICES = (
@@ -274,8 +276,8 @@ class BrechasControlbot13Tests(unittest.TestCase):
         for clause, matches in rows.items():
             with self.subTest(clause=clause):
                 self.assertEqual(1, len(matches), f"{clause} missing or duplicated")
-                self.assertEqual("NO_VERIFICABLE", matches[0][3], clause)
-                self.assertIn("offline=unknown", matches[0][4].lower())
+                self.assertTrue(credible_offline_coverage_row(matches[0]), clause)
+                self.assertTrue(matches[0][3] == "CUBIERTO" or "offline=unknown" in matches[0][4].lower())
                 self.assertIn("live=unknown", matches[0][4].lower())
                 self.assertIn("operando=unknown", matches[0][4].lower())
         self.assertEqual(UNKNOWN, scenario("ui", "missing-health")["dr_status"])

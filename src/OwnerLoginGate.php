@@ -46,13 +46,14 @@ final class OwnerLoginGate {
         $token = $post['csrf'] ?? null;
         if (!is_string($token) || !hash_equals($session['_cb_login_csrf'], $token)) return self::response(403, 'Solicitud inválida.');
         if ($action === 'logout') {
+            $wasAuthenticated = self::isAuthenticated($session, $now);
+            unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
+            $session['_cb_login_csrf'] = self::randomToken();
             try {
-                if (self::isAuthenticated($session, $now)) $store->logout($now);
+                if ($wasAuthenticated) $store->logout($now);
             } catch (Throwable) {
                 return self::response(503, 'Service unavailable.');
             }
-            unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
-            $session['_cb_login_csrf'] = self::randomToken();
             if ($regenerate !== null && $regenerate() !== true) return self::response(503, 'Service unavailable.');
             return self::redirect('/login');
         }
@@ -70,8 +71,23 @@ final class OwnerLoginGate {
             // sensibles: revocar sesiones o enrolar MFA exige la clave actual.
             if (in_array($action, ['revoke_all', 'totp_begin'], true)) {
                 $password = $post['password'] ?? null;
-                if (!is_string($password) || strlen($password) > 4096
-                    || !password_verify($password, $config['password_hash'])) {
+                if (!is_string($password) || strlen($password) > 4096) {
+                    return self::response(403, 'Operación denegada.');
+                }
+                $ip = $server['REMOTE_ADDR'] ?? null;
+                if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+                    return self::response(503, 'Service unavailable.');
+                }
+                try {
+                    $check = self::checkAndRecord($config, $ip, $config['owner_login'], $password, $now);
+                } catch (Throwable) {
+                    return self::response(503, 'Service unavailable.');
+                }
+                if (is_array($check) && $check['status'] === 'limited') {
+                    return self::response(429, 'Demasiados intentos. Inténtalo más tarde.',
+                        ['Retry-After' => (string) $check['retry_after']]);
+                }
+                if ($check !== 'authenticated') {
                     return self::response(403, 'Operación denegada.');
                 }
             }
@@ -91,7 +107,7 @@ final class OwnerLoginGate {
                             'Configura el secreto TOTP, luego confirma un código: ' . $secret,
                             200, $store->status());
                     case 'totp_confirm':
-                        $enrollment = $store->confirmEnrollment($code, $now);
+                        $enrollment = $store->confirmEnrollment($code, $now, (int) ($session['_cb_owner_revision'] ?? -1));
                         // Nunca adoptar una revisión global posterior a esta operación:
                         // una revocación concurrente debe invalidar esta sesión.
                         $session['_cb_owner_revision'] = $enrollment['version'];
@@ -99,12 +115,13 @@ final class OwnerLoginGate {
                             'Guarda estos códigos de recuperación de un solo uso fuera del sistema: '
                             . implode(' ', $enrollment['codes']), 200, $store->status());
                     case 'totp_disable':
-                        $session['_cb_owner_revision'] = $store->disable($code, $now);
+                        $session['_cb_owner_revision'] = $store->disable($code, $now, (int) ($session['_cb_owner_revision'] ?? -1));
                         return self::redirect('/login');
                     case 'totp_required':
                     case 'totp_optional':
                         $session['_cb_owner_revision'] = $store->setRequired(
-                            $action === 'totp_required', $code, $now
+                            $action === 'totp_required', $code, $now,
+                            (int) ($session['_cb_owner_revision'] ?? -1)
                         );
                         return self::redirect('/login');
                     default:

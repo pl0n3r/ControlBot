@@ -18,6 +18,9 @@ Require valid-user
 # If mod_env is unavailable, the application fails closed because owner_login is missing.
 <IfModule mod_env.c>
 SetEnv CONTROLBOT_OWNER_LOGIN USUARIO
+# Secrets live in private files outside the repo (plans without environment variables); only the paths are here.
+SetEnv CONTROLBOT_VAULT_KEY_FILE /home/u151692719/domains/control.condorapp.com.co/private/vault.key
+SetEnv CONTROLBOT_OWNER_PASSWORD_HASH_FILE /home/u151692719/domains/control.condorapp.com.co/private/owner-password.hash
 SetEnv CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH /home/u151692719/domains/control.condorapp.com.co/private/orchestrator-live.json
 </IfModule>
 

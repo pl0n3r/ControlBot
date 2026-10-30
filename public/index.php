@@ -3,9 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../src/Approvals.php';
 require_once __DIR__ . '/../src/OwnerSession.php';
+require_once __DIR__ . '/../src/SecretSource.php';
 require_once __DIR__ . '/../src/ControlBotWebEntrypoint.php';
 
 use ControlBot\Security\OwnerSessionService;
+use ControlBot\Security\SecretSource;
 use ControlBot\Security\TokenVault;
 use ControlBot\Web\ControlBotWebEntrypoint;
 
@@ -18,7 +20,7 @@ $environment = [
 
 try {
     $owner = getenv('CONTROLBOT_OWNER_LOGIN');
-    $vaultKey = getenv('CONTROLBOT_VAULT_KEY');
+    $vaultKey = SecretSource::read('CONTROLBOT_VAULT_KEY', dirname(__DIR__));
     if (!is_string($owner) || $owner === '' || !is_string($vaultKey) || $vaultKey === '') {
         throw new RuntimeException('Owner session configuration unavailable.');
     }

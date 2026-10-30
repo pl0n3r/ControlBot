@@ -33,6 +33,8 @@ SCRIPTS = {
         "structural", "server", "copy", "readonly", "secrets", "decisions"
     })),
     "focus": ("weekly_focus_ui_scenarios.php", frozenset({""})),
+    "identity": ("venture_identity_scenarios.php", frozenset({"invalid-grants"})),
+    "projection": ("infrastructure_action_projection_scenarios.php", frozenset({""})),
 }
 
 
@@ -108,6 +110,8 @@ class CoberturaControlbot67Tests(unittest.TestCase):
         secret = scenario("verified", "secrets")
         decisions = scenario("verified", "decisions")
         focus = scenario("focus")
+        identity = scenario("identity", "invalid-grants")
+        projection = scenario("projection")
         gate = material["materialized"][0]
         view = focus["view"]
 
@@ -141,6 +145,8 @@ class CoberturaControlbot67Tests(unittest.TestCase):
                 and server["source_call"]["capability"] == "hostinger.read"
                 and structure["malicious_source_cannot_mint"] is True
                 and decisions["allow"]["decision"] == "allow"
+                and projection["planned"]["authority_decision"] == "allow"
+                and projection["planned"]["status"] == "planned"
             ),
             "CB-1112": (
                 "no puede ser verified" in finance["stale_verified"]
@@ -217,6 +223,7 @@ class CoberturaControlbot67Tests(unittest.TestCase):
                 and secret["normal_allowed"] is True
                 and decisions["deny"]["decision"] == "deny"
                 and decisions["deny"]["reasons"] == ["capability_not_granted"]
+                and all(identity["blocked"].values())
             ),
             "CB-1120": (
                 readonly["unchanged"] is True
@@ -231,6 +238,18 @@ class CoberturaControlbot67Tests(unittest.TestCase):
                 and decisions["deny"]["decision"] == "deny"
                 and copied["clone_blocked"] is True
                 and readonly["has_audit"] is False
+                and projection["planned"]["status"] == "planned"
+                and projection["planned"]["runner_request_ready"] is True
+                and projection["planned"]["execution"] is False
+                and projection["owner"]["status"] == "owner_decision_required"
+                and projection["owner"]["runner_request_ready"] is False
+                and projection["denied"]["status"] == "denied"
+                and projection["denied"]["runner_request_ready"] is False
+                and all(projection[key] for key in (
+                    "fabricated_array_rejected", "fabricated_object_rejected",
+                    "cross_capability_rejected", "fake_plan_rejected",
+                    "caller_status_rejected"
+                ))
             ),
             "CB-1122": (
                 view["accessibility"] == {
@@ -291,6 +310,12 @@ class CoberturaControlbot67Tests(unittest.TestCase):
         self.assertEqual(scenario("focus")["conflict"]["status"], "conflict")
         self.assertIsNone(scenario("focus")["conflict"]["save_request"])
         self.assertEqual(scenario("verified", "decisions")["deny"]["decision"], "deny")
+        self.assertTrue(all(scenario("identity", "invalid-grants")["blocked"].values()))
+        projection = scenario("projection")
+        self.assertTrue(projection["fabricated_array_rejected"])
+        self.assertTrue(projection["fabricated_object_rejected"])
+        self.assertTrue(projection["cross_capability_rejected"])
+        self.assertTrue(projection["secret_rejected"])
 
     def test_sin_datos_reales(self) -> None:
         """AC-03: source fixtures are synthetic; output contains no authority."""
@@ -298,6 +323,7 @@ class CoberturaControlbot67Tests(unittest.TestCase):
         summary = scenario("verified", "server")["summary"]
         gate = scenario("decision", "venture-materialize")["materialized"][0]
         focus = scenario("focus")
+        projection = scenario("projection")
         self.assertEqual(source["request_keys"],
                          ["identity_id", "scope", "capability"])
         self.assertEqual(summary["identity_id"], "identity-admin")
@@ -307,7 +333,7 @@ class CoberturaControlbot67Tests(unittest.TestCase):
             set(focus["desktop"]["save_request"]),
             {"ordered_refs", "expected_version"},
         )
-        for value in (source, summary, gate, focus):
+        for value in (source, summary, gate, focus, projection):
             encoded = json.dumps(value).lower()
             for forbidden in (
                 "fixture-client-value", "fixture-server-value",

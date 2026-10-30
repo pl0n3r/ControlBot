@@ -16,20 +16,7 @@ El monitor está **deshabilitado por defecto**: `CONTROLBOT_MONITOR_ENABLED` dis
 
 ## Ejemplo de laboratorio (no instalar en producción)
 
-Con un servidor TLS sintético local y un servidor SMTP falso escuchando en localhost, el operador puede activar temporalmente el tick usando:
-
-```sh
-CONTROLBOT_PRODUCTION_STAGE=construccion CONTROLBOT_MONITOR_ENABLED=1 \
-CONTROLBOT_MONITOR_SMTP_PORT=1025 \
-CONTROLBOT_MONITOR_RECIPIENTS_FILE=/ruta/privada/recipients.json \
-CONTROLBOT_MONITOR_STATE_FILE=/ruta/privada/health-state.json \
-SMOKE_BASE_URL=https://127.0.0.1:8443 SMOKE_EXPECTED_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-SMOKE_EXPECTED_VERSION=0.1.24 \
-SMOKE_USERNAME_FILE=/ruta/privada/smoke-user \
-SMOKE_PASSWORD_FILE=/ruta/privada/smoke-pass \
-SMOKE_CA_FILE=/ruta/privada/test-ca.pem \
-python3 scripts/health-monitor.py
-```
+Con un servidor TLS sintético y un servidor SMTP falso en localhost, configura `CONTROLBOT_PRODUCTION_STAGE=construccion`, `CONTROLBOT_MONITOR_ENABLED=1`, `CONTROLBOT_MONITOR_SMTP_PORT=1025`, `SMOKE_BASE_URL=https://127.0.0.1:8443`, `SMOKE_EXPECTED_VERSION=0.1.24` y el SHA esperado de 40 hex. Proporciona los archivos privados `CONTROLBOT_MONITOR_RECIPIENTS_FILE`, `CONTROLBOT_MONITOR_STATE_FILE`, `SMOKE_USERNAME_FILE`, `SMOKE_PASSWORD_FILE`, `SMOKE_CA_FILE`; después ejecuta `python3 scripts/health-monitor.py`.
 
 Un cron externo podría ejecutar **este mismo comando por tick cada 10 minutos** (entrada de referencia `*/10 * * * *`), con un bloqueo de ejecución exclusivo para no solapar ticks. **No programar ni instalar esa entrada en Hostinger ahora**. La CLI no proporciona daemon, ni cambia infraestructura. Sin el archivo de destinatarios, el SMTP local y el estado privado no hay éxito simulado. Para producción habría que definir transporte externo autorizado, autenticación SMTP, retry/backoff, colas y control de concurrencia por issue independiente; la salida de este laboratorio nunca se interpreta como entrega real.
 

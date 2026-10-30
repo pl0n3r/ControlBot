@@ -5,6 +5,8 @@ Missing matrix rows remain explicit UNKNOWN; this PR does not edit matrices.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row
+
 from functools import lru_cache
 import json
 from pathlib import Path
@@ -65,8 +67,7 @@ def matrix_rows(documents: object) -> dict[str, tuple[str, ...]]:
             ident = match.group(1)
             fields = tuple(cell.strip() for cell in line.strip().strip("|").split("|"))
             if (ident in rows or len(fields) != 6 or fields[0] != ident
-                    or fields[3] != "NO_VERIFICABLE"
-                    or "Offline=UNKNOWN" not in fields[4]
+                    or not credible_e4_coverage_row(fields)
                     or not all(fields[:5])):
                 raise ValueError("UNKNOWN: ambiguous or promoted " + ident)
             rows[ident] = fields
@@ -78,7 +79,7 @@ def matrix_verdict(ident: object, rows: object) -> str:
     if not isinstance(ident, str) or ident not in IDS or not isinstance(rows, dict):
         return UNKNOWN
     row = rows.get(ident)
-    if not isinstance(row, tuple) or len(row) != 6 or row[3] != "NO_VERIFICABLE":
+    if not isinstance(row, tuple) or len(row) != 6 or not credible_e4_coverage_row(row):
         return UNKNOWN
     return LOCAL if ident in PRESENT else UNKNOWN
 
@@ -251,7 +252,7 @@ class BrechasControlbot59Tests(unittest.TestCase):
         for ident in IDS:
             with self.subTest(ident=ident):
                 self.assertEqual("UNKNOWN", UNKNOWN)
-                self.assertEqual(self.rows[ident][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_e4_coverage_row(self.rows[ident]))
                 self.assertEqual(self._production_verdict(ident), UNKNOWN)
 
     @staticmethod

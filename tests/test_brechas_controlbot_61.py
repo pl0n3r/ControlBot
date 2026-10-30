@@ -6,6 +6,8 @@ No cambia ni promueve las filas NO_VERIFICABLE de la matriz.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row
+
 import ast
 from functools import lru_cache
 import json
@@ -104,10 +106,7 @@ def matrix_rows(data: object) -> dict[str, tuple[str, ...]]:
             if (key in found or len(cells) != 6 or cells[0] != key
                     or DOCS[group] not in cells[1]
                     or clause not in cells[2]
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos." not in cells[4]
-                    or any(f"{state}=unknown" not in cells[4].lower()
-                           for state in ("offline", "live", "operando"))
+                    or not credible_e4_coverage_row(cells)
                     or "/issues/1" not in cells[5]
                     or (path == MAIN) != (key in {"CB-0939", "CB-0941", "CB-0947"})):
                 raise ValueError("UNKNOWN: invalid/duplicate row " + key)
@@ -288,7 +287,7 @@ class BrechasControlbot61Tests(unittest.TestCase):
         for key in IDS:
             with self.subTest(id=key):
                 self.assertEqual(PARTIAL, local_verdict(key, source, probes))
-                self.assertEqual("NO_VERIFICABLE", rows[key][3])
+                self.assertTrue(credible_e4_coverage_row(rows[key]))
 
     def test_falla_cerrado(self) -> None:
         """AC-02: missing, duplicate, promoted and tampered sources fail closed."""

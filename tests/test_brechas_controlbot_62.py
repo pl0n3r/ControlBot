@@ -7,6 +7,8 @@ Hostinger attestation; unknown operational evidence always stays UNKNOWN.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row
+
 import ast
 from functools import lru_cache
 import json
@@ -86,10 +88,7 @@ def matrix_rows(data: object) -> dict[str, str]:
             if key in found:
                 raise ValueError("UNKNOWN: duplicated coverage row " + key)
             if (not line.startswith(f"| {key} | [{DOCS[key]}:")
-                    or line.count("| NO_VERIFICABLE |") != 1
-                    or "Falta contraste de comportamiento con prueba y PR concretos" not in line
-                    or any(f"{status}=UNKNOWN" not in line
-                           for status in ("Offline", "live", "operando"))):
+                    or not credible_e4_coverage_row(tuple(x.strip() for x in line.strip().strip("|").split("|"))):
                 raise ValueError("UNKNOWN: promoted or ambiguous coverage row " + key)
             found[key] = line
     if set(found) != set(IDS):

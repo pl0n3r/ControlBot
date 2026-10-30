@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """ControlBot #1072: synthetic contracts for CB-0997..CB-1011; never live."""
 from __future__ import annotations
+
+from test_brechas_controlbot_20 import credible_e4_coverage_row
 import ast
 from functools import lru_cache
 import json
@@ -68,10 +70,7 @@ def coverage_rows(data: object) -> dict[str, tuple[str, ...]]:
             cells = tuple(x.strip() for x in line.strip().strip("|").split("|"))
             if (key in result or matrix != expected or len(cells) != 6
                     or cells[0] != key or not all(cells)
-                    or doc not in cells[1] or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos." not in cells[4]
-                    or any(x + "=UNKNOWN" not in cells[4] for x in
-                           ("Offline", "live", "operando"))):
+                    or doc not in cells[1] or not credible_e4_coverage_row(cells)):
                 raise ValueError("UNKNOWN: invalid row " + key)
             result[key] = cells
     if set(result) != set(IDS):
@@ -260,7 +259,7 @@ class BrechasControlbot65Tests(unittest.TestCase):
                 expected = (UNKNOWN if self.proof[required].get("evidence") == UNKNOWN
                             else LOCAL)
                 self.assertEqual(expected, evidence(key, self.data, self.proof))
-                self.assertEqual("NO_VERIFICABLE", indexed[key][3])
+                self.assertTrue(credible_e4_coverage_row(indexed[key]))
 
     def test_falla_cerrado(self) -> None:
         for key in IDS:

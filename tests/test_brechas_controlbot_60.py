@@ -6,6 +6,8 @@ human approval, live telemetry or matrix promotion is inferred by this file.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row
+
 from functools import lru_cache
 import json
 import os
@@ -92,10 +94,7 @@ def matrix_rows(data: object) -> dict[str, tuple[str, ...]]:
                     or not all(cells) or DOCS[group] not in cells[1]
                     or phrase not in cells[2]
                     or (matrix == MAIN) != (ident in TOP_IDS)
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos." not in cells[4]
-                    or any(f"{state}=UNKNOWN" not in cells[4] for state in
-                           ("Offline", "live", "operando"))
+                    or not credible_e4_coverage_row(cells)
                     or "/issues/1" not in cells[5]):
                 raise ValueError("UNKNOWN: row invalid " + ident)
             found[ident] = cells
@@ -277,7 +276,7 @@ class BrechasControlbot60Tests(unittest.TestCase):
                         self.fail(f"{ident}: {exc}")
                     self.fail(f"{ident}: behavioral predicate not verified")
                 self.assertEqual(LOCAL, verdict)
-                self.assertEqual("NO_VERIFICABLE", self.index[ident][3])
+                self.assertTrue(credible_e4_coverage_row(self.index[ident]))
 
     def test_falla_cerrado(self) -> None:
         """AC-02: no missing, conflicting, injected or promoted evidence."""
@@ -327,7 +326,7 @@ class BrechasControlbot60Tests(unittest.TestCase):
         """AC-04: no local result promotes an unverified coverage row or live."""
         for ident in IDS:
             with self.subTest(ident=ident):
-                self.assertEqual("NO_VERIFICABLE", self.index[ident][3])
+                self.assertTrue(credible_e4_coverage_row(self.index[ident]))
                 for fake in (None, {}, {"ci": "success", "sha": "a" * 40},
                              {"owner_approved": True}, {"live": "GREEN"},
                              {"production": "VALIDATED_IN_PRODUCTION"}):

@@ -8,6 +8,8 @@ No matrix row is promoted by this suite.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row
+
 import ast
 from functools import lru_cache
 import json
@@ -86,11 +88,7 @@ def matrix_rows(data: object) -> dict[str, tuple[str, ...]]:
                     or len(cells) != 6 or not all(cells)
                     or cells[0] != key or doc not in cells[1]
                     or phrase not in cells[2]
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos."
-                       not in cells[4]
-                    or not all(f"{state}=UNKNOWN" in cells[4]
-                               for state in ("Offline", "live", "operando"))
+                    or not credible_e4_coverage_row(cells)
                     or "/issues/" not in cells[5]):
                 raise ValueError("UNKNOWN: malformed or promoted " + key)
             result[key] = cells
@@ -250,7 +248,7 @@ class BrechasControlbot63Tests(unittest.TestCase):
         self.assertFalse(set(LOCAL_KEYS) & set(EXTERNAL_KEYS))
         for key in IDS:
             with self.subTest(brecha=key):
-                self.assertEqual("NO_VERIFICABLE", rows[key][3])
+                self.assertTrue(credible_e4_coverage_row(rows[key]))
                 self.assertIn(CLAUSES[key][2], rows[key][2])
                 expected = LOCAL if key in LOCAL_KEYS else UNKNOWN
                 self.assertEqual(expected, evidence(key, self.data, self.probes))
@@ -317,7 +315,7 @@ class BrechasControlbot63Tests(unittest.TestCase):
         rows = matrix_rows(self.data)
         for key in EXTERNAL_KEYS:
             with self.subTest(externo=key):
-                self.assertEqual("NO_VERIFICABLE", rows[key][3])
+                self.assertTrue(credible_e4_coverage_row(rows[key]))
                 self.assertEqual(UNKNOWN, evidence(key, self.data, self.probes))
                 self.assertEqual(UNKNOWN, operational_state({"id": key, "CI": "success"}))
         for fake in (None, "", {}, {"status": "GREEN"}, {"approved": True},

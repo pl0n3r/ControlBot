@@ -15,6 +15,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple("CB-%04d" % i for i in range(107, 122))
 UNKNOWN = "UNKNOWN"
@@ -234,7 +236,7 @@ def classify(rows: dict[str, tuple[str, ...]], data: dict) -> dict[str, dict[str
     for key in IDS:
         row = rows.get(key)
         if (row is not None and len(row) == 6
-                and row[3] == "NO_VERIFICABLE"
+                and credible_offline_coverage_row(row)
                 and ROW_START[key].lower() in row[2].replace(chr(96), "").lower()
                 and checks[key]):
             verdicts[key]["code"] = LOCAL
@@ -248,7 +250,7 @@ class BrechasControlbot08Tests(unittest.TestCase):
         results = classify(rows, evidence())
         for key in IDS:
             with self.subTest(requirement=key):
-                self.assertEqual("NO_VERIFICABLE", rows[key][3])
+                self.assertTrue(credible_offline_coverage_row(rows[key]))
                 self.assertEqual(LOCAL, results[key]["code"])
 
     def test_falla_cerrado(self) -> None:
@@ -268,7 +270,10 @@ class BrechasControlbot08Tests(unittest.TestCase):
                 self.assertEqual(UNKNOWN, classify(missing, observations)[key]["code"])
                 promoted = dict(rows)
                 new_row = list(rows[key])
-                new_row[3] = "CUBIERTO"
+                if new_row[3] == "NO_VERIFICABLE":
+                    new_row[3] = "CUBIERTO"
+                else:
+                    new_row[4] = new_row[4].replace("MERGED", "PENDING")
                 promoted[key] = tuple(new_row)
                 self.assertEqual(UNKNOWN, classify(promoted, observations)[key]["code"])
         altered = copy.deepcopy(observations)

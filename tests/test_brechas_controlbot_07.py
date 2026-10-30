@@ -15,6 +15,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple(f"CB-{number:04d}" for number in range(92, 107))
 UNKNOWN = "UNKNOWN"
@@ -97,9 +99,9 @@ def matrix_rows(parts: object) -> dict[str, tuple[str, ...]]:
             if (key in rows or len(cells) != 6 or cells[0] != key
                     or not cells[1].startswith("[" + DOCS[key] + ":L")
                     or ANCHOR[key].casefold() not in norm.casefold()
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN"
-                    not in cells[4]):
+                    or not credible_offline_coverage_row(cells)
+                    or (cells[3] == "NO_VERIFICABLE"
+                        and "Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN" not in cells[4])):
                 raise ValueError("UNKNOWN: contradictory row " + key)
             expected = PARTITIONS[0] if key in (
                 "CB-0093", "CB-0099", "CB-0105") else PARTITIONS[1]
@@ -299,7 +301,7 @@ def classify(rows: dict, data: dict) -> dict[str, dict[str, str]]:
         return verdicts
     for key in IDS:
         if (key in rows and len(rows[key]) == 6
-                and rows[key][3] == "NO_VERIFICABLE"
+                and credible_offline_coverage_row(rows[key])
                 and DOCS[key] in rows[key][1]
                 and checks[key]):
             verdicts[key]["code"] = LOCAL
@@ -312,7 +314,7 @@ class BrechasControlbot07Tests(unittest.TestCase):
         report = classify(rows, evidence())
         for key in IDS:
             with self.subTest(requirement=key):
-                self.assertEqual(rows[key][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(rows[key]))
                 self.assertEqual(report[key]["code"], LOCAL)
 
     def test_falla_cerrado(self) -> None:
@@ -332,7 +334,10 @@ class BrechasControlbot07Tests(unittest.TestCase):
                 self.assertEqual(classify(missing, data)[key]["code"], UNKNOWN)
                 promoted = dict(rows)
                 cells = list(rows[key])
-                cells[3] = "CUBIERTO"
+                if cells[3] == "NO_VERIFICABLE":
+                    cells[3] = "CUBIERTO"
+                else:
+                    cells[4] = cells[4].replace("MERGED", "PENDING")
                 promoted[key] = tuple(cells)
                 self.assertEqual(classify(promoted, data)[key]["code"], UNKNOWN)
         for group, case, path, value, identifier in (

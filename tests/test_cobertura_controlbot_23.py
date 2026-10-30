@@ -85,6 +85,8 @@ NEGATIVE = (
      "test_missing_or_untrusted_grant_denies_without_sender_call"),
 )
 ALL_IDS = set(SOURCE)
+
+
 @lru_cache(maxsize=32)
 def real_php_regression(file: str, cls_name: str, method: str) -> bool:
     """Use unittest to execute real PHP-backed checks, deny skip/error/failure."""

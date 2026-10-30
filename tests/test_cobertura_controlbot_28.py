@@ -38,6 +38,8 @@ NON_OFFLINE = {
 OFFLINE = frozenset(IDS) - NON_OFFLINE.keys()
 SAFE = {"runtime_authorized": False, "production_verified": False,
         "execute_actions": False, "authority": "unchanged"}
+
+
 class CoberturaControlbot28Tests(unittest.TestCase):
     def assert_no_authority(self, result: dict) -> None:
         self.assertEqual({key: result.get(key) for key in SAFE}, SAFE)

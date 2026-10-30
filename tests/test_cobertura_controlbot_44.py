@@ -41,6 +41,8 @@ OPTIONAL_WORK = {
     "repository_ref", "severity", "budget_ref", "approval_ref",
     "observed_at",
 }
+
+
 @lru_cache(maxsize=40)
 def php(domain: str, case: str) -> dict:
     """Whitelisted local PHP processes importing production classes."""

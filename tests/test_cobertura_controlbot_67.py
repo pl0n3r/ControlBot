@@ -72,10 +72,26 @@ def scenario(group: str, case: str = "") -> dict:
             cwd=ROOT, env=env, capture_output=True, text=True,
             timeout=60, check=False,
         )
-    if run.returncode or run.stderr.strip():
+    stderr = run.stderr.strip()
+    # This checked-in driver emits one harmless PHP import warning. Do not
+    # silence PHP warnings globally: exclude only this exact pre-existing
+    # diagnostic and keep every other warning/error as a fail-closed result.
+    known_prefix = (
+        "PHP Warning:  The use statement with non-compound name "
+        "'InvalidArgumentException' has no effect in "
+    )
+    known_suffix = "/tests/infrastructure_action_projection_scenarios.php on line 22"
+    if (
+        group == "projection"
+        and stderr.startswith(known_prefix)
+        and stderr.endswith(known_suffix)
+        and "\\n" not in stderr
+    ):
+        stderr = ""
+    if run.returncode or stderr:
         raise AssertionError(
             f"UNKNOWN: PHP {group}/{case} failed (exit={run.returncode}): "
-            f"{run.stderr[-500:]}"
+            f"{stderr[-500:]}"
         )
     try:
         value = json.loads(run.stdout)

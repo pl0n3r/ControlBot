@@ -98,9 +98,10 @@ final class OwnerLocalAuthStore
     }
 
     /** Returns recovery codes once with the exact version created under the same lock. */
-    public function confirmEnrollment(string $code, int $now): array
+    public function confirmEnrollment(string $code, int $now, int $expectedVersion): array
     {
-        return $this->transaction(function (array &$s) use ($code, $now): array {
+        return $this->transaction(function (array &$s) use ($code, $now, $expectedVersion): array {
+            self::assertRevision($s, $expectedVersion);
             if ($s['secret'] !== '' || $s['pending'] === '' || $now > $s['pending_until']
                 || $now <= 0) {
                 throw new RuntimeException('TOTP setup invalid.');
@@ -155,9 +156,10 @@ final class OwnerLocalAuthStore
         });
     }
 
-    public function disable(string $code, int $now): int
+    public function disable(string $code, int $now, int $expectedVersion): int
     {
-        return $this->transaction(function (array &$s) use ($code, $now): int {
+        return $this->transaction(function (array &$s) use ($code, $now, $expectedVersion): int {
+            self::assertRevision($s, $expectedVersion);
             if ($s['required'] || $s['secret'] === ''
                 || !$this->matches($this->unseal($s['secret']), $code, $now, $s['last_counter'])) {
                 throw new RuntimeException('TOTP disable forbidden.');
@@ -173,9 +175,10 @@ final class OwnerLocalAuthStore
         });
     }
 
-    public function setRequired(bool $required, string $code, int $now): int
+    public function setRequired(bool $required, string $code, int $now, int $expectedVersion): int
     {
-        return $this->transaction(function (array &$s) use ($required, $code, $now): int {
+        return $this->transaction(function (array &$s) use ($required, $code, $now, $expectedVersion): int {
+            self::assertRevision($s, $expectedVersion);
             if ($s['secret'] === '' || !$this->matches(
                 $this->unseal($s['secret']), $code, $now, $s['last_counter']
             )) {
@@ -264,26 +267,42 @@ final class OwnerLocalAuthStore
         $s['audit'] = array_slice($s['audit'], -80);
     }
 
+    /** Compare the expected owner revision inside the same locked mutation. */
+    private static function assertRevision(array $state, int $expectedVersion): void
+    {
+        if ($expectedVersion < 0 || $state['version'] !== $expectedVersion) {
+            throw new RuntimeException('Owner session revision changed.');
+        }
+    }
+
     private function transaction(callable $fn): mixed
     {
-        if (is_link($this->path) || (file_exists($this->path) && !is_file($this->path))) {
-            throw new RuntimeException('Owner state file invalid.');
+        // Lock a stable inode: replacing the JSON file must not bypass flock.
+        $lock = $this->path . '.lock';
+        if (is_link($lock) || (file_exists($lock) && !is_file($lock))) {
+            throw new RuntimeException('Owner state lock invalid.');
         }
-        $handle = @fopen($this->path, 'c+');
+        $handle = @fopen($lock, 'c+');
         if ($handle === false) {
             throw new RuntimeException('Owner state unavailable.');
         }
         try {
-            @chmod($this->path, 0600);
+            @chmod($lock, 0600);
             if (!flock($handle, LOCK_EX)) {
                 throw new RuntimeException('Owner state lock failed.');
             }
-            rewind($handle);
-            $raw = stream_get_contents($handle, 65537);
-            if (!is_string($raw) || strlen($raw) > 65536) {
-                throw new RuntimeException('Owner state too large.');
+            clearstatcache(true, $this->path);
+            if (is_link($this->path) || (file_exists($this->path) && !is_file($this->path))) {
+                throw new RuntimeException('Owner state file invalid.');
             }
-            $s = $raw === '' ? [
+            $raw = null;
+            if (file_exists($this->path)) {
+                $raw = @file_get_contents($this->path, false, null, 0, 65537);
+                if (!is_string($raw) || $raw === '' || strlen($raw) > 65536) {
+                    throw new RuntimeException('Owner state unavailable or corrupt.');
+                }
+            }
+            $s = $raw === null ? [
                 'version' => 0, 'secret' => '', 'pending' => '', 'pending_until' => 0,
                 'required' => false, 'last_counter' => -1, 'recovery' => [], 'audit' => [],
             ] : json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
@@ -299,10 +318,41 @@ final class OwnerLocalAuthStore
             if (!is_string($encoded) || strlen($encoded) > 65536) {
                 throw new RuntimeException('Owner state too large.');
             }
-            rewind($handle);
-            if (!ftruncate($handle, 0) || fwrite($handle, $encoded) !== strlen($encoded)
-                || !fflush($handle)) {
+            if ($raw === $encoded) {
+                return $out;
+            }
+            // Write the entire new state before replacing the previous valid JSON.
+            $tmp = @tempnam(dirname($this->path), '.cb-auth-tmp-');
+            if (!is_string($tmp)) {
                 throw new RuntimeException('Owner state write failed.');
+            }
+            try {
+                $writer = @fopen($tmp, 'wb');
+                if ($writer === false) {
+                    throw new RuntimeException('Owner state write failed.');
+                }
+                try {
+                    $offset = 0;
+                    while ($offset < strlen($encoded)) {
+                        $written = fwrite($writer, substr($encoded, $offset));
+                        if (!is_int($written) || $written <= 0) {
+                            throw new RuntimeException('Owner state write failed.');
+                        }
+                        $offset += $written;
+                    }
+                    if (!fflush($writer) || !fsync($writer)) {
+                        throw new RuntimeException('Owner state write failed.');
+                    }
+                } finally {
+                    fclose($writer);
+                }
+                if (!@chmod($tmp, 0600) || !@rename($tmp, $this->path)) {
+                    throw new RuntimeException('Owner state write failed.');
+                }
+            } finally {
+                if (is_file($tmp)) {
+                    @unlink($tmp);
+                }
             }
             return $out;
         } finally {
@@ -310,4 +360,5 @@ final class OwnerLocalAuthStore
             fclose($handle);
         }
     }
+
 }

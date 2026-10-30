@@ -6,6 +6,8 @@ demuestran backup/restore real, D-059 ni autorización de producción.
 """
 from __future__ import annotations
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 import json
@@ -61,7 +63,7 @@ def matrix_rows(part: str, index: str) -> dict[str, tuple[str, ...]]:
             clause = fields[0]
             if clause in rows or len(fields) != 6:
                 raise ValueError("UNKNOWN: row duplicated/malformed " + clause)
-            if CLAUSE_TEXT[clause] not in fields[2] or fields[3] != "NO_VERIFICABLE":
+            if CLAUSE_TEXT[clause] not in fields[2] or not credible_offline_coverage_row(fields):
                 raise ValueError("UNKNOWN: row source or status drift " + clause)
             if not fields[1].startswith("[docs/") or "UNKNOWN" not in fields[4]:
                 raise ValueError("UNKNOWN: incomplete evidence " + clause)
@@ -278,8 +280,10 @@ class BrechasControlbot35Tests(unittest.TestCase):
         for bad_part in (
             self.part.replace(part_line, ""),
             self.part + "\n" + part_line,
-            self.part.replace(part_line, part_line.replace(
-                "NO_VERIFICABLE", "CUBIERTO", 1
+            self.part.replace(part_line, (
+                part_line.replace("MERGED", "PENDING", 1)
+                if "CUBIERTO" in part_line else
+                part_line.replace("NO_VERIFICABLE", "CUBIERTO", 1)
             )),
         ):
             if not bad_part:
@@ -346,7 +350,7 @@ class BrechasControlbot35Tests(unittest.TestCase):
                     operational_verdict(clause, record),
                     {"offline": UNKNOWN, "live": UNKNOWN, "operating": UNKNOWN},
                 )
-                self.assertEqual(self.rows[clause][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(self.rows[clause]))
         self.assertEqual(operational_verdict("CB-0532", None)["live"], UNKNOWN)
         self.assertEqual(self.gate["decision"], "REVIEW_ONLY")
         self.assertFalse(self.gate["go_live_authorized"])

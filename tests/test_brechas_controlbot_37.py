@@ -5,6 +5,8 @@ LiteSpeed, servidor autenticado, backup D-059 o despliegue.
 """
 from __future__ import annotations
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 import ast
 from pathlib import Path
 import re
@@ -54,9 +56,7 @@ def row_for(clause: str, data: dict[str, str]) -> tuple[str, ...] | None:
     if len(found) != 1 or len(found[0]) < 6:
         return None
     row = found[0]
-    if (row[3] != "NO_VERIFICABLE"
-            or not all(token in row[4].lower() for token in
-                       ("offline=unknown", "live=unknown", "operando=unknown"))):
+    if not credible_offline_coverage_row(row):
         return None
     if not row[1].startswith("[docs/hostinger-"):
         return None
@@ -201,7 +201,9 @@ class BrechasControlbot37Tests(unittest.TestCase):
                 self.assertEqual(classify(clause, duplicated), UNKNOWN)
                 promoted = dict(data)
                 promoted[owner] = promoted[owner].replace(
-                    rows[0], rows[0].replace("NO_VERIFICABLE", "CUBIERTO", 1), 1)
+                    rows[0], (rows[0].replace("MERGED", "PENDING", 1)
+                             if "CUBIERTO" in rows[0] else
+                             rows[0].replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1)
                 self.assertEqual(classify(clause, promoted), UNKNOWN)
         edits = (
             ("index.php", "http_response_code(503)", "http_response_code(200)", "CB-0549"),
@@ -256,7 +258,7 @@ class BrechasControlbot37Tests(unittest.TestCase):
             with self.subTest(clause=clause):
                 row = row_for(clause, data)
                 self.assertIsNotNone(row)
-                self.assertEqual(row[3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(row))
                 for status in ("offline=unknown", "live=unknown", "operando=unknown"):
                     self.assertIn(status, row[4].lower())
                 self.assertNotEqual(classify(clause, data), "LIVE")

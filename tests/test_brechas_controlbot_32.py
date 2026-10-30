@@ -1,6 +1,8 @@
 """Contraste ejecutable CB-0470..CB-0484 sin activar producción ni runtime."""
 from __future__ import annotations
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 import json
 import tempfile
 import unittest
@@ -77,7 +79,7 @@ class BrechasControlbot32Tests(unittest.TestCase):
                     and active["file"] == truncated["file"],
                 "CB-0471": safe(active["result"]) and safe(off["result"]),
                 # La autorización histórica no certifica permiso operativo vigente.
-                "CB-0472": rows["CB-0472"][3] == "NO_VERIFICABLE"
+                "CB-0472": credible_offline_coverage_row(rows["CB-0472"])
                     and active["result"]["production_verified"] is False,
                 "CB-0473": disabled_writer["result"]["status"] == "UNKNOWN"
                     and disabled_writer["calls"] == 0
@@ -187,7 +189,7 @@ class BrechasControlbot32Tests(unittest.TestCase):
         self.assertEqual(set(rows), CLAUSES)
         for clause, row in rows.items():
             with self.subTest(clause=clause):
-                self.assertEqual(row[3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(row))
                 self.assertIn("UNKNOWN", row[4])
                 self.assertIn("live=UNKNOWN", row[4])
                 self.assertIn("operando=UNKNOWN", row[4])

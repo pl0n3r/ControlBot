@@ -5,6 +5,8 @@ credenciales, deploy, aplicación efectiva de pausa ni evidencia productiva.
 """
 from __future__ import annotations
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 from functools import lru_cache
 import json
 from pathlib import Path
@@ -272,9 +274,12 @@ class BrechasControlbot33Tests(unittest.TestCase):
         for clause, matches in rows.items():
             with self.subTest(clause=clause):
                 self.assertEqual(len(matches), 1, "fila ausente o repetida")
-                self.assertIn("| NO_VERIFICABLE |", matches[0])
-                self.assertIn("offline=unknown", matches[0].lower())
-                self.assertIn("live=unknown", matches[0].lower())
+                cells = tuple(x.strip() for x in matches[0].strip("|").split("|"))
+                self.assertTrue(credible_offline_coverage_row(cells))
+                if cells[3] == "NO_VERIFICABLE":
+                    self.assertIn("offline=unknown", cells[4].lower())
+                self.assertIn("live=unknown", cells[4].lower())
+                self.assertIn("operando=unknown", cells[4].lower())
         recovery = scenario("recovery")
         self.assertEqual(recovery["dr_status"], "UNKNOWN")
         self.assertFalse(recovery["restorable"])

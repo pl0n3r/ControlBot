@@ -5,6 +5,8 @@ A passing LOCAL_CONTRACT is never owner authority, live, or production evidence.
 """
 from __future__ import annotations
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 import copy
 import json
 import re
@@ -89,7 +91,7 @@ def local_evidence(identifier: str, rows: dict, docs: dict,
     kind, anchor = SOURCE[identifier]
     document = docs.get(kind)
     if (not isinstance(row, tuple) or len(row) != 6
-            or row[0] != identifier or row[3] != "NO_VERIFICABLE"
+            or row[0] != identifier or not credible_offline_coverage_row(row)
             or not isinstance(document, str) or not document
             or "/" + DOCS[kind] + "#L" + str(anchor) not in row[1]
             or TOKENS[identifier] not in document
@@ -273,7 +275,10 @@ class BrechasControlbot30Tests(unittest.TestCase):
                 self.assertEqual(local_evidence(identifier, self.rows, self.docs, None)["code"], UNKNOWN)
                 changed = dict(self.rows)
                 cells = list(changed[identifier])
-                cells[3] = "CUBIERTO"
+                if cells[3] == "CUBIERTO":
+                    cells[4] = cells[4].replace("MERGED", "PENDING", 1)
+                else:
+                    cells[3] = "CUBIERTO"
                 changed[identifier] = tuple(cells)
                 self.assertEqual(local_evidence(identifier, changed, self.docs, observed)["code"], UNKNOWN)
                 changed = dict(self.docs)
@@ -313,7 +318,7 @@ class BrechasControlbot30Tests(unittest.TestCase):
         observed = synthetic()
         for identifier in IDS:
             with self.subTest(row=identifier):
-                self.assertEqual(self.rows[identifier][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_offline_coverage_row(self.rows[identifier]))
                 self.assertEqual(local_evidence(identifier, self.rows, self.docs, observed),
                                  {"code": LOCAL, "ci": UNKNOWN, "live": UNKNOWN})
                 for fake in (None, {}, {"ci": "success"},

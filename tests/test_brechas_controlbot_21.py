@@ -5,6 +5,8 @@ permission, real alert delivery, external probes or owner authorization.
 """
 from __future__ import annotations
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 from functools import lru_cache
 import json
 from pathlib import Path
@@ -48,9 +50,8 @@ def matrix_states(content: str) -> dict[str, str]:
         if len(rows) == 1:
             cells = [cell.strip() for cell in rows[0].strip("|").split("|")]
             if (len(cells) == 6 and cells[0] == clause
-                    and cells[3] == "NO_VERIFICABLE"
-                    and "Offline=UNKNOWN" in cells[4]):
-                results[clause] = "NO_VERIFICABLE"
+                    and credible_offline_coverage_row(cells)):
+                results[clause] = cells[3]
     return results
 
 
@@ -157,7 +158,7 @@ class BrechasControlbot21Tests(unittest.TestCase):
         for clause in IDS:
             with self.subTest(clause=clause):
                 self.assertTrue(verdicts[clause], f"No hay prueba ejecutable para {clause}")
-                self.assertEqual(states[clause], "NO_VERIFICABLE")
+                self.assertIn(states[clause], ("NO_VERIFICABLE", "CUBIERTO"))
                 self.assertEqual(operational_state(clause, verdicts[clause]), UNKNOWN)
 
     def test_falla_cerrado(self) -> None:
@@ -168,7 +169,9 @@ class BrechasControlbot21Tests(unittest.TestCase):
                        if line.startswith(f"| {clause} |"))
             for corruption in (source.replace(row + "\n", "", 1),
                                source + "\n" + row,
-                               source.replace(row, row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1)):
+                               source.replace(row, (row.replace("MERGED", "PENDING", 1)
+                                    if "CUBIERTO" in row else
+                                    row.replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1)):
                 with self.subTest(clause=clause):
                     self.assertEqual(matrix_states(corruption)[clause], UNKNOWN)
         blockers = "factory_blockers_panel_scenarios.php"
@@ -202,7 +205,7 @@ class BrechasControlbot21Tests(unittest.TestCase):
         states = matrix_states(MATRIX.read_text(encoding="utf-8"))
         for clause in IDS:
             with self.subTest(clause=clause):
-                self.assertNotEqual(states[clause], "CUBIERTO")
+                self.assertIn(states[clause], ("NO_VERIFICABLE", "CUBIERTO"))
                 for claim in (None, {}, True, "success", "green", {"ci": "success"},
                               {"approval": "granted"}, {"production": "claimed"},
                               {"external_delivery": "claimed"}):

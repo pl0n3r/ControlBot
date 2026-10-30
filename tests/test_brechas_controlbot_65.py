@@ -2,7 +2,7 @@
 """ControlBot #1072: synthetic contracts for CB-0997..CB-1011; never live."""
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 import ast
 from functools import lru_cache
 import json
@@ -269,7 +269,7 @@ class BrechasControlbot65Tests(unittest.TestCase):
             changed = (self.data[matrix].replace(line, "", 1),
                        self.data[matrix] + "\n" + line,
                        self.data[matrix].replace(
-                           line, line.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1))
+                           line, corrupted_e4_row(line), 1))
             for mutation in changed:
                 self.assertEqual(UNKNOWN, evidence(
                     key, {**self.data, matrix: mutation}, self.proof))

@@ -8,7 +8,7 @@ No matrix row is promoted by this suite.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 
 import ast
 from functools import lru_cache
@@ -263,10 +263,9 @@ class BrechasControlbot63Tests(unittest.TestCase):
             mutations = (
                 self.data[matrix].replace(line, "", 1),
                 self.data[matrix] + "\n" + line,
+                self.data[matrix].replace(line, corrupted_e4_row(line), 1),
                 self.data[matrix].replace(line, line.replace(
-                    "NO_VERIFICABLE", "CUBIERTO"), 1),
-                self.data[matrix].replace(line, line.replace(
-                    "Offline=UNKNOWN", "Offline=GREEN"), 1),
+                    "live=UNKNOWN", "live=GREEN"), 1),
             )
             for changed in mutations:
                 with self.subTest(brecha=key, changed=changed[-32:]):

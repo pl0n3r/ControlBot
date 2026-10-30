@@ -5,7 +5,7 @@ Missing matrix rows remain explicit UNKNOWN; this PR does not edit matrices.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 
 from functools import lru_cache
 import json
@@ -216,7 +216,7 @@ class BrechasControlbot59Tests(unittest.TestCase):
         for index, mutated in enumerate((self.documents[0].replace(row, "", 1),
                         self.documents[0] + "\n" + row,
                         self.documents[0].replace(row,
-                                                  row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1))):
+                                                  corrupted_e4_row(row), 1))):
             docs = (mutated, *self.documents[1:])
             if index == 0:
                 self.assertEqual(matrix_verdict("CB-0907", matrix_rows(docs)), UNKNOWN)

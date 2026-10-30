@@ -5,7 +5,7 @@ No cambia la matriz, autoriza B2/V3, verifica backups ni permite despliegues.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 
 import ast
 from functools import lru_cache
@@ -245,7 +245,7 @@ class BrechasControlbot64Tests(unittest.TestCase):
                 for modified in (data[path].replace(row, "", 1),
                                  data[path] + "\n" + row,
                                  data[path].replace(
-                                     row, row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1)):
+                                     row, corrupted_e4_row(row), 1)):
                     self.assertEqual(UNKNOWN, verdict(
                         ident, {**data, path: modified}))
                 group, clause, _ = CLAUSE[ident]

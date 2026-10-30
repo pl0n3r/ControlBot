@@ -7,7 +7,7 @@ Hostinger attestation; unknown operational evidence always stays UNKNOWN.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 
 import ast
 from functools import lru_cache
@@ -329,7 +329,7 @@ class BrechasControlbot62Tests(unittest.TestCase):
             for altered in (
                 data[path].replace(row, "", 1),
                 data[path] + "\n" + row,
-                data[path].replace(row, row.replace("NO_VERIFICABLE", "CUBIERTO"), 1),
+                data[path].replace(row, corrupted_e4_row(row), 1),
             ):
                 with self.subTest(clause=key):
                     bad = {**data, path: altered}

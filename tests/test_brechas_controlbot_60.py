@@ -6,7 +6,7 @@ human approval, live telemetry or matrix promotion is inferred by this file.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 
 from functools import lru_cache
 import json
@@ -290,7 +290,7 @@ class BrechasControlbot60Tests(unittest.TestCase):
                 self.assertEqual(UNKNOWN, local_verdict(ident, missing))
                 for altered in (self.sources[path] + "\n" + line,
                                 self.sources[path].replace(
-                                    line, line.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1)):
+                                    line, corrupted_e4_row(line), 1)):
                     with self.assertRaisesRegex(ValueError, "UNKNOWN"):
                         matrix_rows({**self.sources, path: altered})
                 damaged = {**self.sources,

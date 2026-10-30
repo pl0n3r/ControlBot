@@ -6,7 +6,7 @@ No cambia ni promueve las filas NO_VERIFICABLE de la matriz.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 
 import ast
 from functools import lru_cache
@@ -299,7 +299,7 @@ class BrechasControlbot61Tests(unittest.TestCase):
             for bad in (source[path].replace(row, "", 1),
                         source[path] + "\n" + row,
                         source[path] + "\n   " + row,
-                        source[path].replace(row, row.replace("NO_VERIFICABLE", "CUBIERTO"), 1)):
+                        source[path].replace(row, corrupted_e4_row(row), 1)):
                 with self.subTest(id=key, source=path):
                     self.assertEqual(UNKNOWN, local_verdict(
                         key, {**source, path: bad}, probes))

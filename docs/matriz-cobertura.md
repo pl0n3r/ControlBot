@@ -388,6 +388,8 @@ Las 20 hojas #1008–#1027 quedaron cerradas como `completed` y sus PRs de prueb
 
 **Porcentaje CUBIERTO:** 14.42%. **Hojas nuevas creadas por esta auditoría: 0**. El porcentaje corresponde SOLO a este corte parcial, no al resultado completo. No se inventan hojas para estados UNKNOWN.
 
+**Corte histórico previo a #1254 (NO es el total vigente):** CUBIERTO=31, EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, NO_VERIFICABLE=1163. Esta referencia histórica mantiene la trazabilidad de contrastes previos; el consolidado actual se calcula abajo.
+
 ### Resultado consolidado de las cinco matrices
 
 **Consolidado de 1.194 obligaciones:** CUBIERTO=51, EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, NO_VERIFICABLE=1143; porcentaje CUBIERTO=4.27%. **Hojas nuevas creadas: 0.** El recuento local de 215 filas en la tabla precedente describe únicamente este índice; la función `full_matrix` valida el agregado de 1.194 filas reales. No autoriza go-live ni concluye que los requisitos NO_VERIFICABLE estén ausentes.

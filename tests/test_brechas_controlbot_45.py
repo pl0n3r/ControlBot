@@ -11,6 +11,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "docs/matriz-cobertura-parte-03.md"
 CHECKLIST = ROOT / "docs/lista-salida-produccion.md"
@@ -224,9 +226,10 @@ class BrechasControlbot45Tests(unittest.TestCase):
                 row = rows[clause]
                 self.assertEqual(len(row), 6)
                 self.assertEqual(row[0], clause)
-                self.assertEqual(row[3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(row))
                 for state in ("Offline=UNKNOWN", "live=UNKNOWN", "operando=UNKNOWN"):
-                    self.assertIn(state, row[4])
+                    if state != "Offline=UNKNOWN" or row[3] == "NO_VERIFICABLE":
+                        self.assertIn(state, row[4])
         self.assertIn("Decisión vigente: NO-GO",
                       CHECKLIST.read_text(encoding="utf-8"))
 

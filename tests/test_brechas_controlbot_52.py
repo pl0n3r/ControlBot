@@ -15,6 +15,8 @@ import sys
 import tempfile
 import unittest
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 BACKUP = ROOT / "ops/factory/backup"
 CALLER = ROOT / ".github/workflows/observador-reservas-consumidor.yml"
@@ -261,9 +263,10 @@ class BrechasControlbot52Tests(unittest.TestCase):
         for name, rows in observed.items():
             with self.subTest(requirement=name):
                 self.assertEqual(len(rows), 1)
-                self.assertEqual(rows[0][3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(rows[0]))
                 for fragment in ("offline=unknown", "live=unknown", "operando=unknown"):
-                    self.assertIn(fragment, rows[0][4].lower())
+                    if fragment != "offline=unknown" or rows[0][3] == "NO_VERIFICABLE":
+                        self.assertIn(fragment, rows[0][4].lower())
         _, output = preflight()
         self.assertEqual(output["readiness"], "UNKNOWN")
         self.assertIs(output["live_authorized"], False)

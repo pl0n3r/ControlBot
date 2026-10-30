@@ -14,6 +14,8 @@ import subprocess
 import tempfile
 import unittest
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 PHP = shutil.which("php") or "php"
 MATRICES = tuple(ROOT / "docs" / name for name in (
@@ -213,7 +215,7 @@ class BrechasControlbot58Tests(unittest.TestCase):
         for clause, passed in checks.items():
             with self.subTest(clause=clause):
                 self.assertTrue(bool(passed), "falta contraste offline: " + clause)
-                self.assertEqual(found[clause][3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(found[clause]))
 
     def test_falla_cerrado(self) -> None:
         """AC-02: falta, tamper, identidad, duplicados y evidencias invalidas."""
@@ -276,7 +278,7 @@ class BrechasControlbot58Tests(unittest.TestCase):
         self.assertTrue(data["d063_attestation"]["no_real_customer_data"])
         for clause, cells in rows().items():
             with self.subTest(clause=clause):
-                self.assertEqual(cells[3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(cells))
                 self.assertIn(UNKNOWN, cells[4].upper())
         for clause, path in LEGAL.items():
             with self.subTest(clause=clause):

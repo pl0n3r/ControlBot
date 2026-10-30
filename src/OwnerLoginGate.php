@@ -51,7 +51,53 @@ final class OwnerLoginGate {
             if ($regenerate !== null && $regenerate() !== true) return self::response(503, 'Service unavailable.');
             return self::redirect('/login');
         }
-        if ($action !== 'login') return self::response(400, 'Solicitud inválida.');
+
+        if ($action !== 'login') {
+            if (!self::isAuthenticated($session, $now)
+                || !$store->validVersion($session['_cb_owner_revision'] ?? null)) {
+                return self::response(403, 'Forbidden.');
+            }
+            $code = $post['totp'] ?? '';
+            if (!is_string($code) || strlen($code) > 128) {
+                return self::response(400, 'Solicitud inválida.');
+            }
+            try {
+                switch ($action) {
+                    case 'revoke_all':
+                        $store->revokeAll($now);
+                        unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
+                        $session['_cb_login_csrf'] = self::randomToken();
+                        if ($regenerate !== null && $regenerate() !== true) {
+                            return self::response(503, 'Service unavailable.');
+                        }
+                        return self::redirect('/login');
+                    case 'totp_begin':
+                        $secret = $store->beginEnrollment($now);
+                        return self::loginPage($session, true,
+                            'Configura el secreto TOTP, luego confirma un código: ' . $secret,
+                            200, $store->status());
+                    case 'totp_confirm':
+                        $codes = $store->confirmEnrollment($code, $now);
+                        $session['_cb_owner_revision'] = $store->status()['version'];
+                        return self::loginPage($session, true,
+                            'Guarda estos códigos de recuperación de un solo uso fuera del sistema: '
+                            . implode(' ', $codes), 200, $store->status());
+                    case 'totp_disable':
+                        $store->disable($code, $now);
+                        $session['_cb_owner_revision'] = $store->status()['version'];
+                        return self::redirect('/login');
+                    case 'totp_required':
+                    case 'totp_optional':
+                        $store->setRequired($action === 'totp_required', $code, $now);
+                        $session['_cb_owner_revision'] = $store->status()['version'];
+                        return self::redirect('/login');
+                    default:
+                        return self::response(400, 'Solicitud inválida.');
+                }
+            } catch (Throwable) {
+                return self::response(403, 'Operación denegada.');
+            }
+        }
         $login = $post['username'] ?? null;
         $password = $post['password'] ?? null;
         if (!is_string($login) || !is_string($password)
@@ -61,7 +107,10 @@ final class OwnerLoginGate {
         $ip = $server['REMOTE_ADDR'] ?? null;
         if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP) === false) return self::response(503, 'Service unavailable.');
         try {
-            $result = self::checkAndRecord($config, $ip, $login, $password, $now);
+            $code = $post['totp'] ?? '';
+            if (!is_string($code) || strlen($code) > 128) return self::failurePage($session);
+            $result = self::checkAndRecord($config, $ip, $login, $password, $now,
+                static fn (): bool => $store->verify($code, $now));
         } catch (Throwable) {
             return self::response(503, 'Service unavailable.');
         }
@@ -71,6 +120,12 @@ final class OwnerLoginGate {
         }
         if ($result !== 'authenticated') return self::failurePage($session);
         if ($regenerate !== null && $regenerate() !== true) return self::response(503, 'Service unavailable.');
+        try {
+            $session['_cb_owner_revision'] = $store->login($now);
+        } catch (Throwable) {
+            unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
+            return self::response(503, 'Service unavailable.');
+        }
         $session['_cb_owner_web'] = true;
         $session['_cb_owner_last_seen'] = $now;
         $session['_cb_login_csrf'] = self::randomToken();
@@ -107,6 +162,14 @@ final class OwnerLoginGate {
         if ($path === '/login' || $path === '/login.php') return null;
         self::expire($session, $now);
         if (!self::isAuthenticated($session, $now)) return self::redirect('/login', 302);
+        try {
+            if (!self::store($config)->validVersion($session['_cb_owner_revision'] ?? null)) {
+                unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
+                return self::redirect('/login', 302);
+            }
+        } catch (Throwable) {
+            return self::response(503, 'Service unavailable.');
+        }
         $session['_cb_owner_last_seen'] = $now;
         return null;
     }
@@ -127,7 +190,7 @@ final class OwnerLoginGate {
     }
     private static function expire(array &$session, int $now): void {
         if (!self::isAuthenticated($session, $now)) {
-            unset($session['_cb_owner_web'], $session['_cb_owner_last_seen']);
+            unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
         }
     }
     /**
@@ -142,6 +205,7 @@ final class OwnerLoginGate {
         string $login,
         string $password,
         int $now,
+        ?callable $secondary = null,
     ): string|array {
         $hash = $config['password_hash'];
         $dir = realpath($config['rate_limit_dir']);
@@ -184,7 +248,7 @@ final class OwnerLoginGate {
             // Both comparisons are performed, regardless of account existence.
             $passwordOk = password_verify($password, $hash);
             $ownerOk = hash_equals($config['owner_login'], $login);
-            if ($passwordOk && $ownerOk) {
+            if ($passwordOk && $ownerOk && ($secondary === null || $secondary())) {
                 self::saveThrottle($handle, ['start' => $now, 'count' => 0, 'blocked_until' => 0]);
                 return 'authenticated';
             }

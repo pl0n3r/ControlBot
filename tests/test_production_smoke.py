@@ -5,6 +5,7 @@ import base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
+import secrets
 from pathlib import Path
 import shutil
 import ssl
@@ -18,9 +19,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "production-smoke.sh"
 SHA = "a" * 40
 VERSION = "0.1.24"
-CSRF = "synthetic-csrf-1234567890"
+CSRF = secrets.token_urlsafe(24)
 USER = "smoke-fixture-owner"
-PASSWORD = "synthetic-test-only-password"
+PASSWORD = secrets.token_urlsafe(32)
 
 
 class LocalFixture(BaseHTTPRequestHandler):
@@ -121,10 +122,10 @@ class ProductionSmokeTests(unittest.TestCase):
         cls.addClassCleanup(cls.server.shutdown)
         cls.owner_file = private / "owner.name"
         cls.password_file = private / "owner.password"
-        cls.owner_file.write_text(USER, encoding="utf-8")
-        cls.password_file.write_text(PASSWORD, encoding="utf-8")
-        cls.owner_file.chmod(0o600)
-        cls.password_file.chmod(0o600)
+        for path, value in ((cls.owner_file, USER), (cls.password_file, PASSWORD)):
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(value)
 
     def setUp(self):
         self.server.mode = "good"

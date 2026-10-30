@@ -102,6 +102,11 @@ def _php(arguments: list[str]) -> str:
     base = [binary, "-d", "allow_url_fopen=0", "-d", "enable_dl=0",
             "-d", "disable_functions=curl_exec,curl_multi_exec,fsockopen,pfsockopen,stream_socket_client,shell_exec,system,exec,passthru,proc_open,popen"]
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "C"}
+    # The CI coverage wrapper requires these synthetic, non-secret control paths.
+    for key in ("CONTROLBOT_REAL_PHP", "CONTROLBOT_PHP_COVERAGE_BOOTSTRAP",
+                "CONTROLBOT_PHP_COVERAGE_DIR", "CONTROLBOT_REPO_ROOT", "XDEBUG_MODE"):
+        if key in os.environ:
+            env[key] = os.environ[key]
     with tempfile.TemporaryDirectory(prefix="cb1251-offline-") as home:
         env["HOME"] = home
         result = subprocess.run(base + arguments, cwd=ROOT, env=env,

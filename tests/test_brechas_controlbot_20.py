@@ -222,6 +222,103 @@ def credible_e3_coverage_row(row):
 
 
 
+# Proveniencia E4: hojas de prueba #1238..#1253 y PRs fusionados auténticos.
+# Solo se puede promover la porción A ejecutada contra PHP real; las B/C/D
+# y las afirmaciones de operación, autoridad o despliegue permanecen UNKNOWN.
+_E4_PROVENANCE = (
+    (916, 934, 1311, 55, 1238), (935, 946, 1331, 56, 1239),
+    (947, 961, 1313, 57, 1240), (962, 978, 1332, 58, 1241),
+    (979, 996, 1312, 59, 1242), (997, 1012, 1314, 60, 1243),
+    (1014, 1017, 1315, 61, 1244), (1018, 1034, 1316, 62, 1245),
+    (1035, 1053, 1317, 63, 1246), (1054, 1072, 1318, 64, 1247),
+    (1073, 1089, 1323, 65, 1248), (1090, 1107, 1319, 66, 1249),
+    (1108, 1123, 1321, 67, 1250), (1124, 1163, 1320, 68, 1251),
+    (1164, 1181, 1322, 69, 1252), (1182, 1192, 1324, 70, 1253),
+)
+_E4_ALLOWED = frozenset().union(
+    set(range(916, 935)) - {919, 932}, set(range(935, 962)),
+    {963, 965, 966, 967, 971, 973},
+    set(range(979, 984)) | set(range(987, 997)),
+    set(range(997, 1013)), set(range(1014, 1018)),
+    set(range(1018, 1029)) | {1030, 1031, 1032},
+    set(range(1035, 1054)) - {1042, 1053},
+    set(range(1054, 1066)) | set(range(1067, 1072)),
+    {1073, 1074, 1075, 1084, 1085, 1086, 1088, 1089},
+    set(range(1090, 1108)) - {1102}, set(range(1108, 1124)),
+    set(range(1124, 1130)), {1165, 1167, 1171, 1172, 1173, 1174, 1176},
+    {1189, 1190, 1191},
+)
+_E4_SOURCE_REF = re.compile(
+    r"\[(?P<path>(?:docs/[A-Za-z0-9._/-]+\.md|README\.md|AGENTES\.md)):L"
+    r"(?P<line>[1-9]\d*)\]"
+    r"\(https://github\.com/pl0n3r/ControlBot/blob/[0-9a-f]{40}/"
+    r"(?P=path)#L(?P=line)\)"
+)
+
+
+def credible_e4_coverage_row(row):
+    """Valida estado UNKNOWN o promoción E4 offline con evidencia exacta."""
+    if not isinstance(row, (tuple, list)) or len(row) != 6:
+        return False
+    key, source, requirement, status, evidence, issue = row
+    if (not isinstance(key, str) or re.fullmatch(r"CB-\d{4}", key) is None
+            or not isinstance(source, str) or not isinstance(requirement, str)
+            or len(requirement.strip()) < 12 or not isinstance(evidence, str)
+            or not isinstance(issue, str)
+            or _E4_SOURCE_REF.fullmatch(source) is None
+            or _E3_ISSUE_REF.fullmatch(issue) is None):
+        return False
+    source_path = _E4_SOURCE_REF.fullmatch(source).group("path")
+    if ".." in Path(source_path).parts:
+        return False
+    if status == "NO_VERIFICABLE":
+        tokens = re.findall(
+            r"(?i)(?<![A-Za-z0-9_])(offline|live|operando)\s*=\s*([A-Za-z_]+)\b",
+            evidence,
+        )
+        planes = {name: [] for name in ("offline", "live", "operando")}
+        for name, state in tokens:
+            planes[name.lower()].append(state.upper())
+        # Algunas filas originales conservan un segundo offline=UNKNOWN
+        # en el contraste histórico: nunca convertirlo en permiso operativo.
+        if any(not states or set(states) != {"UNKNOWN"}
+               for states in planes.values()):
+            return False
+        before = re.split(
+            r"(?i)(?<![A-Za-z0-9_])offline\s*=\s*unknown\b",
+            evidence, maxsplit=1,
+        )[0]
+        return len(before.strip()) >= 12
+    if status != "CUBIERTO" or int(key[3:]) not in _E4_ALLOWED:
+        return False
+    proof = _E3_EVIDENCE.fullmatch(evidence)
+    if proof is None or proof["key"] != key:
+        return False
+    number = int(key[3:])
+    group = next((g for g in _E4_PROVENANCE if g[0] <= number <= g[1]), None)
+    if group is None or (int(proof["pr"]), int(proof["testno"]),
+                         int(proof["issue"])) != tuple(group[2:]):
+        return False
+    root = ROOT.resolve()
+    for field in ("code", "test"):
+        path = Path(proof[field])
+        if path.is_absolute() or ".." in path.parts:
+            return False
+        resolved = (root / path).resolve()
+        if not resolved.is_relative_to(root) or not resolved.is_file():
+            return False
+    return True
+
+
+def corrupted_e4_row(line):
+    """Test-only mutant: a covered row loses its PR proof, others forge status."""
+    if not isinstance(line, str):
+        raise TypeError("UNKNOWN: invalid synthetic coverage row")
+    if "| CUBIERTO |" in line:
+        return line.replace("MERGED", "PENDING", 1)
+    return line.replace("NO_VERIFICABLE", "CUBIERTO", 1)
+
+
 def matrix_rows(documents: dict[str, str]) -> dict[str, tuple[str, ...]]:
     """Require one documented, unpromoted clause in the partitioned matrix."""
     found: dict[str, tuple[str, ...]] = {}
@@ -285,6 +382,37 @@ def opaque(value: object, prefix: str) -> bool:
 
 
 class BrechasControlbot20Tests(unittest.TestCase):
+    def test_e4_proveniencia_y_guardas_de_mundo_real(self) -> None:
+        """Aceptar solo prueba conductual + PR auténtico, nunca live."""
+        path = ROOT / "docs/matriz-cobertura-parte-04.md"
+        line = next(s for s in path.read_text(encoding="utf-8").splitlines()
+                    if s.startswith("| CB-0917 |"))
+        row = list(x.strip() for x in line.strip().strip("|").split("|"))
+        self.assertTrue(credible_e4_coverage_row(row))
+        row[3] = "CUBIERTO"
+        row[4] = (
+            "Código src/ProductDiscoveryWorkOrigin.php; "
+            "prueba tests/test_cobertura_controlbot_55.py; "
+            "PR #1311 MERGED; requisito CB-0917 ejercido contra código real "
+            "con fixtures offline (#1238); sin validación productiva; "
+            "live=UNKNOWN; operando=UNKNOWN."
+        )
+        self.assertTrue(credible_e4_coverage_row(row))
+        for replacement in (
+            row[4].replace("PR #1311", "PR #1312"),
+            row[4].replace("(#1238)", "(#1240)"),
+            row[4].replace("src/ProductDiscoveryWorkOrigin.php",
+                           "src/../../etc/passwd"),
+            row[4].replace("live=UNKNOWN", "live=GREEN"),
+        ):
+            self.assertFalse(credible_e4_coverage_row(
+                (*row[:4], replacement, row[5])))
+        self.assertFalse(credible_e4_coverage_row(
+            ("CB-0919", row[1], row[2], "CUBIERTO", row[4]
+             .replace("CB-0917", "CB-0919"), row[5])))
+        self.assertFalse(credible_e4_coverage_row(
+            (*row[:3], "CUBIERTO", row[4], "[#1](https://example.com/x)")))
+
     def test_e3_no_verificable_rechaza_estados_incompatibles(self) -> None:
         """UNKNOWN: no se acepta un plano contradictorio ni duplicado."""
         origin = (

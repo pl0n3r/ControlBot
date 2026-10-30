@@ -7,6 +7,8 @@ The coverage matrices remain NO_VERIFICABLE until independently reconciled.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
+
 import ast
 from functools import lru_cache
 import json
@@ -85,10 +87,7 @@ def matrix_rows(files: object) -> dict[str, tuple[str, ...]]:
                     or cells[0] != key or f"[{doc}:L" not in cells[1]
                     or clause.casefold() not in cells[2].casefold()
                     or clause.casefold() not in files[doc].casefold()
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "falta contraste" not in gap
-                    or any(f"{name}=unknown" not in gap
-                           for name in ("offline", "live", "operando"))
+                    or not credible_e4_coverage_row(cells)
                     or "/issues/1" not in cells[5]):
                 raise ValueError("UNKNOWN: incomplete or falsely promoted " + key)
             rows[key] = cells
@@ -251,7 +250,7 @@ class BrechasControlbot72Tests(unittest.TestCase):
             corruptions = (
                 files[path].replace(line, "", 1),
                 files[path] + "\n" + line,
-                files[path].replace(line, line.replace("NO_VERIFICABLE", "CUBIERTO"), 1),
+                files[path].replace(line, corrupted_e4_row(line), 1),
             )
             for modified in corruptions:
                 with self.subTest(row=ident, corruption=modified[-20:]):
@@ -280,7 +279,8 @@ class BrechasControlbot72Tests(unittest.TestCase):
                 imports.add(node.module.split(".")[0])
         self.assertLessEqual(
             imports, {"__future__", "ast", "functools", "json", "pathlib",
-                      "re", "shutil", "subprocess", "unittest"})
+                      "re", "shutil", "subprocess", "unittest",
+                                  "test_brechas_controlbot_20"})
         self.assertTrue(all(path.startswith("tests/") and path.endswith("_scenarios.php")
                             for path, _ in FIXTURES.values()))
         data = json.loads((ROOT / "datos.yml").read_text(encoding="utf-8"))

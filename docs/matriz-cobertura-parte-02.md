@@ -17,6 +17,8 @@
 
 **Mapa de brechas del corte:** B=requiere evidencia de entorno externo; C=regla de autoridad o alcance; D=función no implementada; U=sin aserción directa de la cláusula. B (24): CB-0304, CB-0309, CB-0322, CB-0327, CB-0416, CB-0493, CB-0494, CB-0515, CB-0516, CB-0520, CB-0523, CB-0527, CB-0528, CB-0530, CB-0552, CB-0555, CB-0563, CB-0564, CB-0566, CB-0567, CB-0568, CB-0569, CB-0570, CB-0571; C (28): CB-0314, CB-0317, CB-0328, CB-0349, CB-0355, CB-0381, CB-0391, CB-0402, CB-0410, CB-0414, CB-0417, CB-0426, CB-0431, CB-0435, CB-0436, CB-0442, CB-0466, CB-0467, CB-0481, CB-0497, CB-0498, CB-0505, CB-0517, CB-0561, CB-0562, CB-0565, CB-0572, CB-0586; D (1): CB-0321; U (22): CB-0332, CB-0339, CB-0343, CB-0510, CB-0511, CB-0512, CB-0513, CB-0535, CB-0536, CB-0537, CB-0538, CB-0543, CB-0544, CB-0548, CB-0550, CB-0551, CB-0553, CB-0554, CB-0556, CB-0557, CB-0558, CB-0559. Todas estas filas mantienen su condición NO_VERIFICABLE, sin presumir conexión ni operación real.
 
+**Reconciliación #1256 — etapa 3/4:** 2 filas del tramo E3 acreditan código, pruebas conductuales offline y PRs fusionados. 1 permanecen NO_VERIFICABLE por política, integración, operación real o prueba integral ausente. Ninguna promoción acredita producción, privilegios, gasto, derecho aplicable, backup real o go-live.
+
 ## Matriz
 
 | ID | Fuente | Requisito verificable | Estado | Evidencia y planos | Issue |
@@ -263,19 +265,19 @@
 | CB-0592 | [docs/infrastructure-actions.md:L15](https://github.com/pl0n3r/ControlBot/blob/cd7eec1485262880ea1907639512fe88b2ca290d/docs/infrastructure-actions.md#L15) | that evaluates authority, capability policy, blast radius, evidence and budget. | CUBIERTO | Código src/InfrastructureActionProjection.php; prueba tests/test_cobertura_controlbot_36.py; PR #1263 MERGED; requisito CB-0592 ejercido contra código real con fixtures offline (#1219); sin validación productiva; live=UNKNOWN; operando=UNKNOWN. | [#1](https://github.com/pl0n3r/ControlBot/issues/1) |
 | CB-0593 | [docs/infrastructure-actions.md:L20](https://github.com/pl0n3r/ControlBot/blob/cd7eec1485262880ea1907639512fe88b2ca290d/docs/infrastructure-actions.md#L20) | fabricated arrays/objects and cross-capability replay fail closed. | CUBIERTO | Código src/InfrastructureActionProjection.php; prueba tests/test_cobertura_controlbot_36.py; PR #1263 MERGED; requisito CB-0593 ejercido contra código real con fixtures offline (#1219); sin validación productiva; live=UNKNOWN; operando=UNKNOWN. | [#1](https://github.com/pl0n3r/ControlBot/issues/1) |
 | CB-0594 | [docs/infrastructure-actions.md:L26](https://github.com/pl0n3r/ControlBot/blob/cd7eec1485262880ea1907639512fe88b2ca290d/docs/infrastructure-actions.md#L26) | unwrap or reconstruct authority and creates no provider session, queue, policy, | CUBIERTO | Código src/InfrastructureActionProjection.php; prueba tests/test_cobertura_controlbot_36.py; PR #1263 MERGED; requisito CB-0594 ejercido contra código real con fixtures offline (#1219); sin validación productiva; live=UNKNOWN; operando=UNKNOWN. | [#1](https://github.com/pl0n3r/ControlBot/issues/1) |
-| CB-0596 | [docs/infrastructure-contract.md:L9](https://github.com/pl0n3r/ControlBot/blob/cd7eec1485262880ea1907639512fe88b2ca290d/docs/infrastructure-contract.md#L9) | `InfrastructureResource` usa tipos cerrados: `environment`, `service`, `database`, `storage`, `dns`, `certificate`, `backup`, `network`. | NO_VERIFICABLE | Falta contraste de comportamiento con prueba y PR concretos. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN. | [#1](https://github.com/pl0n3r/ControlBot/issues/1) |
-| CB-0597 | [docs/infrastructure-contract.md:L12](https://github.com/pl0n3r/ControlBot/blob/cd7eec1485262880ea1907639512fe88b2ca290d/docs/infrastructure-contract.md#L12) | Cost y backup se representan únicamente por refs; sus contratos autoritativos permanecen fuera de este módulo. | NO_VERIFICABLE | Falta contraste de comportamiento con prueba y PR concretos. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN. | [#1](https://github.com/pl0n3r/ControlBot/issues/1) |
-| CB-0598 | [docs/infrastructure-contract.md:L16](https://github.com/pl0n3r/ControlBot/blob/cd7eec1485262880ea1907639512fe88b2ca290d/docs/infrastructure-contract.md#L16) | Los adapters se descubren por **capability + scope**, no por condicionales vendor-specific. Capabilities v1: | NO_VERIFICABLE | Falta contraste de comportamiento con prueba y PR concretos. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN. | [#1](https://github.com/pl0n3r/ControlBot/issues/1) |
+| CB-0596 | [docs/infrastructure-contract.md:L9](https://github.com/pl0n3r/ControlBot/blob/cd7eec1485262880ea1907639512fe88b2ca290d/docs/infrastructure-contract.md#L9) | `InfrastructureResource` usa tipos cerrados: `environment`, `service`, `database`, `storage`, `dns`, `certificate`, `backup`, `network`. | CUBIERTO | Código src/InfrastructureProvider.php; prueba tests/test_cobertura_controlbot_37.py; PR #1265 MERGED; requisito CB-0596 ejercido contra código real con fixtures offline (#1220); sin validación productiva; live=UNKNOWN; operando=UNKNOWN. | [#1](https://github.com/pl0n3r/ControlBot/issues/1) |
+| CB-0597 | [docs/infrastructure-contract.md:L12](https://github.com/pl0n3r/ControlBot/blob/cd7eec1485262880ea1907639512fe88b2ca290d/docs/infrastructure-contract.md#L12) | Cost y backup se representan únicamente por refs; sus contratos autoritativos permanecen fuera de este módulo. | CUBIERTO | Código src/InfrastructureProvider.php; prueba tests/test_cobertura_controlbot_37.py; PR #1265 MERGED; requisito CB-0597 ejercido contra código real con fixtures offline (#1220); sin validación productiva; live=UNKNOWN; operando=UNKNOWN. | [#1](https://github.com/pl0n3r/ControlBot/issues/1) |
+| CB-0598 | [docs/infrastructure-contract.md:L16](https://github.com/pl0n3r/ControlBot/blob/cd7eec1485262880ea1907639512fe88b2ca290d/docs/infrastructure-contract.md#L16) | Los adapters se descubren por **capability + scope**, no por condicionales vendor-specific. Capabilities v1: | NO_VERIFICABLE | D: El selector runtime de adapters por capability+scope no existe en InfrastructureProvider; requiere implementación y test del despachador (hoja #1220, PR #1265 MERGED; la prueba offline no acredita este requisito completo). Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN. | [#1](https://github.com/pl0n3r/ControlBot/issues/1) |
 
 ## Resumen
 
 | Estado | Filas |
 | --- | ---: |
-| CUBIERTO | 167 |
+| CUBIERTO | 169 |
 | EN_CURSO | 0 |
 | SIN_COBERTURA | 0 |
 | DESCARTADO | 0 |
-| NO_VERIFICABLE | 78 |
+| NO_VERIFICABLE | 76 |
 | TOTAL | 245 |
 
-**IDs únicos: 245 · suma ordinal: 110403. Porcentaje CUBIERTO: 68.16%.** Esta partición no crea hojas ni confirma GREEN, D-043 o D-059; las evidencias live permanecen pendientes.
+**IDs únicos: 245 · suma ordinal: 110403. Porcentaje CUBIERTO: 68.98%.** Esta partición no crea hojas ni confirma GREEN, D-043 o D-059; las evidencias live permanecen pendientes.

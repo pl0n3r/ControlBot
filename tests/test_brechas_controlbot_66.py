@@ -335,6 +335,7 @@ class BrechasControlbot66Tests(unittest.TestCase):
                 path = MAIN if ident in {"CB-1013", "CB-1018"} else PART
                 line = next(x for x in data[path].splitlines()
                             if x.startswith(f"| {ident} |"))
+                self.assertIn("live=UNKNOWN", line)
                 for altered in (
                     data[path].replace(line, "", 1),
                     data[path] + "\n" + line,
@@ -342,7 +343,7 @@ class BrechasControlbot66Tests(unittest.TestCase):
                         line, corrupted_e4_row(line), 1),
                     data[path].replace(
                         line, line.replace(
-                            "Falta contraste de comportamiento", "Demostrado", 1), 1),
+                            "live=UNKNOWN", "live=VERIFIED", 1), 1),
                 ):
                     self.assertEqual(UNKNOWN, verdict(
                         ident, {**data, path: altered}, obs))

@@ -88,7 +88,7 @@ def matrix_rows(data: object) -> dict[str, str]:
             if key in found:
                 raise ValueError("UNKNOWN: duplicated coverage row " + key)
             if (not line.startswith(f"| {key} | [{DOCS[key]}:")
-                    or not credible_e4_coverage_row(tuple(x.strip() for x in line.strip().strip("|").split("|"))):
+                    or not credible_e4_coverage_row(tuple(x.strip() for x in line.strip().strip("|").split("|")))):
                 raise ValueError("UNKNOWN: promoted or ambiguous coverage row " + key)
             found[key] = line
     if set(found) != set(IDS):

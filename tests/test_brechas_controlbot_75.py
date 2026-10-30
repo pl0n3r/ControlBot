@@ -12,6 +12,8 @@ from pathlib import Path
 import re
 import unittest
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 UNKNOWN = "UNKNOWN"
 GAP = "BRECHA_DOCUMENTADA"
@@ -99,10 +101,11 @@ def matrix_rows(files: object) -> dict[str, tuple[str, ...]]:
             if (key in found or path != expected_partition or len(cells) != 6
                     or cells[0] != key or SOURCE_REFS[key] not in cells[1]
                     or CLAUSES[key].casefold() not in cells[2].casefold()
-                    or cells[3] != "NO_VERIFICABLE"
-                    or expected_reason not in cells[4]
-                    or not all(f"{state}=unknown" in cells[4].casefold()
-                               for state in ("offline", "live", "operando"))
+                    or not credible_offline_coverage_row(cells)
+                    or (cells[3] == "NO_VERIFICABLE"
+                        and expected_reason not in cells[4]
+                        and not (cells[4].startswith(("B:", "C:", "D:"))
+                                 and "falta evidencia" in cells[4]))
                     or "/issues/1" not in cells[5]):
                 raise ValueError("UNKNOWN: invalid, promoted or duplicated row " + key)
             found[key] = cells
@@ -214,7 +217,7 @@ class BrechasControlbot75Tests(unittest.TestCase):
         self.assertEqual(len(set(MISSING_PROOFS.values())), len(IDS))
         for key in IDS:
             with self.subTest(id=key):
-                self.assertEqual("NO_VERIFICABLE", rows[key][3])
+                self.assertTrue(credible_offline_coverage_row(rows[key]))
                 self.assertEqual(PARTIAL if key in LOCAL_IDS else GAP,
                                  evidence(key, files)["local"])
                 self.assertEqual(

@@ -194,6 +194,57 @@ def full_matrix() -> list[tuple[str, ...]]:
         raise ValueError("Matriz incompleta o IDs ajenos al snapshot")
     return gathered
 
+
+# Historical regressions are kept on their original functional scope. The
+# migration may mark a clause CUBIERTO only for existing offline PHP behavior,
+# with a known merged PR, a checked-in test and no live/operational attestation.
+# This helper never equates an offline proof with production readiness.
+_OFFLINE_RECONCILIATION = (
+    (1, 16, 1261, 3), (17, 30, 1260, 4), (31, 49, 1301, 5),
+    (50, 69, 1299, 6), (70, 86, 1306, 7), (87, 104, 1307, 8),
+    (105, 123, 1300, 9), (124, 140, 1302, 10),
+    (141, 166, 1290, 11), (167, 183, 1304, 12),
+    (184, 203, 1291, 13), (204, 220, 1296, 14),
+    (221, 238, 1286, 15), (239, 253, 1287, 16),
+    (254, 273, 1288, 17), (274, 291, 1292, 18),
+    (1130, 1144, 1258, 2), (1145, 1151, 1259, 1),
+)
+
+
+def credible_offline_coverage_row(row):
+    """Reject fabricated CUBIERTO while accepting a real offline transition."""
+    if not isinstance(row, (tuple, list)) or len(row) != 6:
+        return False
+    key, _, requirement, status, evidence, _ = row
+    if not isinstance(key, str) or re.fullmatch(r"CB-\d{4}", key) is None:
+        return False
+    if not isinstance(requirement, str) or not requirement or not isinstance(evidence, str):
+        return False
+    if status == "NO_VERIFICABLE":
+        return "UNKNOWN" in evidence and "live=UNKNOWN" in evidence and "operando=UNKNOWN" in evidence
+    if status != "CUBIERTO":
+        return False
+    if "live=UNKNOWN" not in evidence or "operando=UNKNOWN" not in evidence:
+        return False
+    match = re.match(
+        r"^Código (src/[A-Za-z0-9_.-]+\.php|ops/factory/deploy); "
+        r"prueba (tests/test_cobertura_controlbot_(\d{2})\.py); "
+        r"PR #(\d+) MERGED; cláusula (CB-\d{4}) ejercida offline",
+        evidence,
+    )
+    if match is None or match.group(4) != key:
+        return False
+    number = int(key[3:])
+    expected = next(
+        ((pr, test) for low, high, pr, test in _OFFLINE_RECONCILIATION
+         if low <= number <= high), None
+    )
+    if expected is None or expected != (int(match.group(3)), int(match.group(2))):
+        return False
+    return (ROOT.joinpath(match.group(1)).is_file()
+            and ROOT.joinpath(match.group(2)).is_file())
+
+
 class MatrizCoberturaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

@@ -14,9 +14,12 @@ def read_secret(env: dict, repo_root: str = "/nonexistent") -> str:
         "$v = ControlBot\\Security\\SecretSource::read('CONTROLBOT_TEST_SECRET', $argv[1]);"
         "echo $v === null ? 'NULL' : $v;"
     )
-    merged = {"PATH": os.environ.get("PATH", ""), **env}
+    merged = {k: v for k, v in os.environ.items() if not k.startswith("CONTROLBOT_TEST_SECRET")}
+    merged.update(env)
     out = subprocess.run(["php", "-r", code, repo_root], cwd=ROOT, env=merged,
                          capture_output=True, text=True, timeout=20)
+    if not out.stdout.strip():
+        raise AssertionError(f"php sin salida (código {out.returncode}): {out.stderr.strip()[:300]}")
     return out.stdout.strip()
 
 

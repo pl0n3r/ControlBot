@@ -85,7 +85,7 @@ def scenario(group: str, case: str = "") -> dict:
         group == "projection"
         and stderr.startswith(known_prefix)
         and stderr.endswith(known_suffix)
-        and "\\n" not in stderr
+        and chr(10) not in stderr
     ):
         stderr = ""
     if run.returncode or stderr:

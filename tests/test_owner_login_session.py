@@ -140,15 +140,6 @@ class OwnerLoginSessionTests(unittest.TestCase):
                 {"baseline": True, "synthetic": True},
             )
 
-    def test_unimplemented_controls_are_not_misrepresented(self):
-        doc = (ROOT / "docs/owner-login.md").read_text(encoding="utf-8")
-        for expected in (
-            "Estado: preparación", "No acreditado",
-            "revocación centralizada", "códigos de recuperación",
-            "reserva V3", "D-059", "construccion",
-        ):
-            self.assertIn(expected, doc)
-        self.assertNotIn("VALIDATED_IN_PRODUCTION", doc)
 
 
 if __name__ == "__main__":

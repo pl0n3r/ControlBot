@@ -1,6 +1,5 @@
 """Contract tests for the dashboard's health banner (offline, CSS only)."""
 
-import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -43,6 +42,8 @@ class DashboardHealthBannerTests(unittest.TestCase):
         css = banner_styles(render("empty"))
         self.assertNotRegex(css, r"#[\da-fA-F]{3,8}\b|rgba?\(|hsla?\(")
         self.assertIn("background: var(--panel)", css)
+        self.assertIn("border-left: 3px solid var(--cyan)", render("empty"))
+        self.assertIn("font-size: 1.13rem", render("empty"))
         self.assertIn("border: 1px solid var(--line)", css)
         self.assertIn("border-color: var(--health-accent)", css)
         self.assertIn("color: var(--health-accent)", css)

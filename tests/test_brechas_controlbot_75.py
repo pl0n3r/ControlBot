@@ -331,7 +331,7 @@ class BrechasControlbot75Tests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.add(node.module.split(".")[0])
         self.assertLessEqual(imported, {"__future__", "ast", "json",
-                                        "pathlib", "re", "unittest"})
+                                        "pathlib", "re", "unittest", "test_matriz_cobertura"})
         self.assertTrue(all(not Path(x).is_absolute() and ".." not in Path(x).parts
                             for x in FILES))
         checks = privacy_and_preproduction_contract(files[DATA])

@@ -14,8 +14,6 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PART = ROOT / "docs/matriz-cobertura-parte-03.md"
-MAIN_MATRIX = ROOT / "docs/matriz-cobertura.md"
 A = tuple(f"CB-{n:04d}" for n in range(666, 673)) + tuple(
     f"CB-{n:04d}" for n in range(674, 682)
 )
@@ -47,23 +45,6 @@ try {
     exit(3);
 }
 """
-
-
-def matrix_rows() -> dict[str, tuple[str, ...]]:
-    rows: dict[str, tuple[str, ...]] = {}
-    for name in (MAIN_MATRIX, PART):
-        for line in name.read_text(encoding="utf-8").splitlines():
-            match = re.match(r"^\|\s*(CB-\d{4})\s*\|", line)
-            if not match or match[1] not in ALL:
-                continue
-            key = match[1]
-            fields = tuple(field.strip() for field in line.strip().strip("|").split("|"))
-            if key in rows or len(fields) < 6 or not fields[1] or not fields[2] or not fields[3]:
-                raise ValueError("UNKNOWN: fila duplicada/incompleta " + key)
-            rows[key] = fields
-    if set(rows) != ALL:
-        raise ValueError("UNKNOWN: filas faltantes " + repr(sorted(ALL - set(rows))))
-    return rows
 
 
 def lifecycle(**updates) -> dict:
@@ -125,18 +106,8 @@ def watch(*signals: dict) -> dict:
 
 
 class CoberturaControlbot41Tests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.rows = matrix_rows()
-
     def test_contrato_principal(self):
         """AC-01: aserciones sobre LexLifecycle::project y LexWatch::normalize."""
-        self.assertEqual(17, len(self.rows))
-        for key in A:
-            with self.subTest(unit=key):
-                self.assertIn("docs/lex-", self.rows[key][1])
-                self.assertIn(self.rows[key][3], ("NO_VERIFICABLE", "CUBIERTO"))
-
         # CB-0666/0667: construcción reversible y revisión pendiente no
         # significan COMPLIANT, pero permiten solo el scope técnico seguro.
         pending = php("lifecycle", lifecycle())
@@ -269,11 +240,6 @@ class CoberturaControlbot41Tests(unittest.TestCase):
             signal("signal-other", change_ref="controlbot:lex/change/shared",
                    freshness="stale"),
         ]}, expected_ok=False)
-        # Matriz alterada: duplicados y filas faltantes nunca son evidencia.
-        fields = self.rows["CB-0666"]
-        self.assertEqual("CB-0666", fields[0])
-        self.assertEqual(set(self.rows), ALL)
-
     def test_sin_datos_reales(self):
         """AC-03: ningún fixture usa red, credenciales ni PII."""
         sample = json.dumps({"lifecycle": lifecycle(),

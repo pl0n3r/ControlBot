@@ -271,6 +271,6 @@ Originalmente todos los estados eran **NO_VERIFICABLE**; #1255 promueve únicame
 | NO_VERIFICABLE | 233 |
 | TOTAL | 239 |
 
-**IDs únicos:** 239 · **suma ordinal:** 242219 · **Hojas nuevas:** 0 · **Cobertura certificada:** 0.00%.
+**IDs únicos:** 239 · **suma ordinal:** 242219 · **Hojas nuevas:** 0 · **Cobertura certificada (solo comportamiento offline):** 2.51%.
 
 Esta parte por sí sola no cierra #940: la integración global aún debe eliminar solapamientos entre otras partes, verificar los 1.194 IDs y resolver las puertas operativas y humanas pertinentes.

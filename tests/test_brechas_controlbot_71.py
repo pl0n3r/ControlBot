@@ -6,6 +6,8 @@ The coverage matrix is read-only and remains NO_VERIFICABLE until reconciled.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row
+
 from functools import lru_cache
 import ast
 import json
@@ -70,9 +72,7 @@ def matrix_rows(documents: object) -> dict[str, tuple[str, ...]]:
             if ident in found:
                 raise ValueError("UNKNOWN: duplicated " + ident)
             if (len(cells) != 6 or not all(cells[:5])
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Offline=UNKNOWN" not in cells[4]
-                    or "live=UNKNOWN" not in cells[4]):
+                    or not credible_e4_coverage_row(cells)):
                 raise ValueError("UNKNOWN: invalid/proclaimed " + ident)
             group, opening = CLAUSES[ident]
             if (opening.casefold() not in cells[2].casefold()
@@ -235,7 +235,7 @@ def verdict(ident: object, rows: object, proofs: object,
         return UNKNOWN
     row = rows.get(ident)
     if (not isinstance(row, tuple) or len(row) != 6
-            or row[3] != "NO_VERIFICABLE" or "Offline=UNKNOWN" not in row[4]):
+            or not credible_e4_coverage_row(row)):
         return UNKNOWN
     group, phrase = CLAUSES[ident]
     original = docs.get(group)
@@ -320,7 +320,7 @@ class BrechasControlbot71Tests(unittest.TestCase):
         self.assertEqual(set(self.rows), set(IDS))
         for ident in IDS:
             with self.subTest(ident=ident):
-                self.assertEqual(self.rows[ident][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_e4_coverage_row(self.rows[ident]))
                 self.assertIn("live=UNKNOWN", self.rows[ident][4])
                 self.assertIn(verdict(ident, self.rows, {ident: False},
                                     self.docs), (UNKNOWN,))

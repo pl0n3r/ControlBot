@@ -6,6 +6,8 @@ perímetro, autorización del dueño, CI, despliegue ni producción.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row
+
 import ast
 from functools import lru_cache
 import json
@@ -81,10 +83,7 @@ def matrix_rows(files: object) -> dict[str, tuple[str, ...]]:
             if (key in found or path != expected or len(cells) != 6
                     or cells[0] != key or f"{src}#L{number}" not in cells[1]
                     or CLAUSE[key] not in cells[2]
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos." not in cells[4]
-                    or not all(f"{x}=unknown" in cells[4].lower()
-                               for x in ("offline", "live", "operando"))
+                    or not credible_e4_coverage_row(cells)
                     or "/issues/1" not in cells[5]):
                 raise ValueError("UNKNOWN: fila inválida o duplicada " + key)
             found[key] = cells
@@ -210,7 +209,7 @@ class BrechasControlbot70Tests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.add(node.module.split(".")[0])
         self.assertLessEqual(imported, {"__future__", "ast", "functools", "json", "pathlib", "re",
-                                        "shutil", "subprocess", "unittest", "tests"})
+                                        "shutil", "subprocess", "unittest", "tests", "test_brechas_controlbot_20"})
         self.assertNotIn("requests", imported)
         self.assertNotIn("httpx", imported)
         data = json.loads((ROOT / "datos.yml").read_text(encoding="utf-8"))

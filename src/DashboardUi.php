@@ -173,13 +173,13 @@ h1 { font-size: clamp(1.9rem, 9vw, 3.2rem); letter-spacing: -.035em; }
   50% { opacity: .8; transform: scale(1.04); }
 }
 .dashboard-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
-.panel { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 20px; }
+.panel { position: relative; overflow: hidden; border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: 10px; background: var(--panel); padding: 20px; }
 .panel-line { position: absolute; inset: 0 auto auto 0; width: 38%; height: 1px; background: var(--cyan); opacity: .55; }
 .domain-card h2 { margin-top: 8px; font-size: 1.25rem; }
 .metric-list { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; }
 .metric-list li { display: flex; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
 .metric-list span { min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
-.metric-list strong { min-width: 0; text-align: right; font-family: "JetBrains Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
+.metric-list strong { min-width: 0; text-align: right; font-size: 1.13rem; font-family: "JetBrains Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
 .empty { color: var(--muted); margin: 18px 0 0; }
 a, button, summary, [tabindex]:not([tabindex="-1"]) { outline-offset: 3px; }
 a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--amber); }

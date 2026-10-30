@@ -269,17 +269,23 @@ final class OwnerLoginGate {
             fwrite($handle, json_encode($state, JSON_THROW_ON_ERROR)) === false ||
             !fflush($handle)) throw new \RuntimeException('Throttle write failed.');
     }
-    private static function loginPage(array $session, bool $authenticated, string $notice = '', int $status = 200): array {
+    private static function loginPage(
+        array $session, bool $authenticated, string $notice = '', int $status = 200,
+        array $mfa = [],
+    ): array {
         $csrf = htmlspecialchars($session['_cb_login_csrf'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $noticeHtml = $notice !== '' ? '<p role="alert" class="error">' . htmlspecialchars($notice, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '';
         $content = $authenticated
             ? '<p>Sesión de acceso local iniciada.</p><p><a href="/overview">Ir al panel</a></p>'
                 . '<form method="post" action="/login"><input type="hidden" name="action" value="logout">'
                 . '<input type="hidden" name="csrf" value="' . $csrf . '"><button type="submit">Salir</button></form>'
+                . self::managementForms($csrf, $mfa)
             : '<form method="post" action="/login"><input type="hidden" name="action" value="login">'
                 . '<input type="hidden" name="csrf" value="' . $csrf . '">'
                 . '<label for="username">Usuario</label><input id="username" name="username" type="text" autocomplete="username" required maxlength="128">'
                 . '<label for="password">Contraseña</label><input id="password" name="password" type="password" autocomplete="current-password" required>'
+                . '<label for="totp">Código TOTP o de recuperación (si aplica)</label>'
+                . '<input id="totp" name="totp" type="text" autocomplete="one-time-code" maxlength="128">'
                 . '<button type="submit">Entrar</button></form>';
         $html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>Acceso del propietario | ControlBot</title><style>'
@@ -298,6 +304,31 @@ final class OwnerLoginGate {
             . '</style></head>'
             . '<body><main><h1>ControlBot</h1><p>Acceso del propietario</p>' . $noticeHtml . $content . '</main></body></html>';
         return self::response($status, $html, ['Content-Type' => 'text/html; charset=utf-8']);
+    }
+    private static function managementForms(string $csrf, array $mfa): string {
+        $form = static fn (string $action, string $label, bool $withCode = false): string =>
+            '<form method="post" action="/login"><input type="hidden" name="csrf" value="' . $csrf . '">'
+            . '<input type="hidden" name="action" value="' . $action . '">'
+            . ($withCode ? '<label>Código TOTP</label><input name="totp" type="text" autocomplete="one-time-code" required>' : '')
+            . '<button type="submit">' . $label . '</button></form>';
+        $html = $form('revoke_all', 'Revocar todas las sesiones');
+        if (($mfa['enabled'] ?? false) !== true) {
+            return $html . $form('totp_begin', 'Configurar autenticación en dos pasos')
+                . $form('totp_confirm', 'Confirmar TOTP y generar códigos', true);
+        }
+        if (($mfa['required'] ?? false) !== true) {
+            return $html . $form('totp_disable', 'Desactivar TOTP', true)
+                . $form('totp_required', 'Hacer TOTP obligatorio', true);
+        }
+        return $html . $form('totp_optional', 'Hacer TOTP opcional', true);
+    }
+    private static function store(array $config): OwnerLocalAuthStore {
+        $key = $config['totp_key'] ?? getenv('CONTROLBOT_OWNER_TOTP_KEY');
+        return new OwnerLocalAuthStore(
+            $config['rate_limit_dir'],
+            $config['owner_login'],
+            is_string($key) ? $key : null,
+        );
     }
     private static function failurePage(array $session): array { return self::loginPage($session, false, 'Usuario o contraseña incorrectos.', 401); }
     private static function redirect(string $to, int $status = 303): array { return self::response($status, '', ['Location' => $to]); }

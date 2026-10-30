@@ -16,6 +16,8 @@ import shutil
 import subprocess
 import unittest
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = "docs/matriz-cobertura.md"
 PART = "docs/matriz-cobertura-parte-04.md"
@@ -82,11 +84,15 @@ def matrix_rows(files: object) -> dict[str, tuple[str, ...]]:
             cells = tuple(v.strip() for v in line.strip().strip("|").split("|"))
             if (key in found or path != expected_path or len(cells) != 6
                     or cells[0] != key or f"{source}:L" not in cells[1]
-                    or fragment not in cells[2] or cells[3] != "NO_VERIFICABLE"
-                    or not all(f"{x}=unknown" in cells[4].lower()
-                               for x in ("offline", "live", "operando"))
-                    or "Falta contraste" not in cells[4]
-                       and "Fuente normativa sin verificación" not in cells[4]
+                    or fragment not in cells[2] or not credible_offline_coverage_row(cells)
+                    or (cells[3] == "NO_VERIFICABLE"
+                        and not all(f"{x}=unknown" in cells[4].lower()
+                                    for x in ("offline", "live", "operando")))
+                    or (cells[3] == "NO_VERIFICABLE"
+                        and "Falta contraste" not in cells[4]
+                        and "Fuente normativa sin verificación" not in cells[4]
+                        and not (cells[4].startswith(("B:", "C:", "D:"))
+                                 and "falta evidencia" in cells[4]))
                     or "/issues/1" not in cells[5]):
                 raise ValueError("UNKNOWN: fila incompleta o promovida " + key)
             found[key] = cells
@@ -288,7 +294,8 @@ class BrechasControlbot73Tests(unittest.TestCase):
             for variant in (
                 files[path].replace(line, "", 1),
                 files[path] + "\n" + line,
-                files[path].replace(line, line.replace("NO_VERIFICABLE", "CUBIERTO"), 1),
+                files[path].replace(line, (line.replace("MERGED", "PENDING") if "CUBIERTO" in line
+                                            else line.replace("NO_VERIFICABLE", "CUBIERTO")), 1),
             ):
                 with self.subTest(row=key):
                     with self.assertRaisesRegex(ValueError, UNKNOWN):

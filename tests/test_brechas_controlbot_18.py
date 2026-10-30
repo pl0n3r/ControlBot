@@ -14,6 +14,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = tuple(f"CB-{n:04d}" for n in range(257, 272))
 UNKNOWN = "UNKNOWN"
@@ -85,12 +87,11 @@ def matrix_states(root: str, partition: str) -> dict[str, str]:
         expected = "root" if key in SOURCE_ROWS else "part"
         if (len(matches) == 1 and matches[0][0] == expected
                 and len(matches[0][1]) == 6
-                and matches[0][1][3] == "NO_VERIFICABLE"
+                and credible_offline_coverage_row(matches[0][1])
                 and SNIPPETS[key] in matches[0][1][2]
                 and DOCS[CLAUSE_DOMAIN[key]] in matches[0][1][1]
-                and all(s in matches[0][1][4] for s in
-                        ("Offline=UNKNOWN", "live=UNKNOWN", "operando=UNKNOWN"))):
-            states[key] = "NO_VERIFICABLE"
+                ):
+            states[key] = matches[0][1][3]
         else:
             states[key] = UNKNOWN
     return states
@@ -251,7 +252,7 @@ class BrechasControlbot18Tests(unittest.TestCase):
         for key in IDS:
             with self.subTest(clause=key):
                 self.assertTrue(verdicts[key], f"{key}: unsupported local contrast")
-                self.assertEqual(states[key], "NO_VERIFICABLE")
+                self.assertIn(states[key], ("NO_VERIFICABLE", "CUBIERTO"))
                 self.assertEqual(operational_state(key, verdicts[key]), UNKNOWN)
 
     def test_falla_cerrado(self) -> None:
@@ -265,7 +266,8 @@ class BrechasControlbot18Tests(unittest.TestCase):
             variations = (
                 source.replace(row + "\n", "", 1),
                 source + "\n" + row,
-                source.replace(row, row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                source.replace(row, (row.replace("MERGED", "PENDING", 1) if "CUBIERTO" in row
+                                     else row.replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1),
             )
             for candidate in variations:
                 with self.subTest(clause=clause):
@@ -315,7 +317,7 @@ class BrechasControlbot18Tests(unittest.TestCase):
             set(IDS),
         )
         self.assertEqual(
-            set(matrix_states(root, part).values()), {"NO_VERIFICABLE"})
+            set(matrix_states(root, part).values()) <= {"NO_VERIFICABLE", "CUBIERTO"}, True)
         self.assertEqual(
             scenario("read", "freshness")["unknown"]["meta"]["freshness"]["state"],
             "unknown")

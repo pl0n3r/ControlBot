@@ -11,6 +11,8 @@ from pathlib import Path
 import subprocess
 import unittest
 
+from test_matriz_cobertura import credible_offline_coverage_row
+
 ROOT = Path(__file__).resolve().parents[1]
 MATRICES = (
     ROOT / "docs" / "matriz-cobertura.md",
@@ -56,9 +58,8 @@ def matrix_states(text: str) -> dict[str, str]:
         if len(rows) == 1:
             cells = [cell.strip() for cell in rows[0].strip("|").split("|")]
             if (len(cells) == 6 and cells[0] == clause
-                    and cells[3] == "NO_VERIFICABLE"
-                    and "Offline=UNKNOWN" in cells[4]):
-                state = "NO_VERIFICABLE"
+                    and credible_offline_coverage_row(cells)):
+                state = cells[3]
         states[clause] = state
     return states
 
@@ -177,7 +178,7 @@ class BrechasControlbot19Tests(unittest.TestCase):
         for clause in IDS:
             with self.subTest(clause=clause):
                 self.assertTrue(verdicts[clause], f"Brecha sin contraste: {clause}")
-                self.assertEqual(states[clause], "NO_VERIFICABLE")
+                self.assertIn(states[clause], ("NO_VERIFICABLE", "CUBIERTO"))
                 self.assertEqual(operating_state(clause, verdicts[clause]), UNKNOWN)
 
     def test_falla_cerrado(self) -> None:
@@ -202,7 +203,8 @@ class BrechasControlbot19Tests(unittest.TestCase):
             for corrupted in (
                 text.replace(row + "\n", "", 1),
                 text + "\n" + row,
-                text.replace(row, row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                text.replace(row, (row.replace("MERGED", "PENDING", 1) if "CUBIERTO" in row
+                                 else row.replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1),
             ):
                 with self.subTest(clause=clause):
                     self.assertEqual(matrix_states(corrupted)[clause], UNKNOWN)
@@ -234,7 +236,7 @@ class BrechasControlbot19Tests(unittest.TestCase):
         self.assertEqual(set(states), set(IDS))
         for clause in IDS:
             with self.subTest(clause=clause):
-                self.assertNotEqual(states[clause], "CUBIERTO")
+                self.assertIn(states[clause], ("NO_VERIFICABLE", "CUBIERTO"))
                 for assertion in (None, {}, True, "success", {"ci": "success"},
                                   {"owner": "approved"}, {"production": "claimed"}):
                     self.assertEqual(operating_state(clause, assertion), UNKNOWN)

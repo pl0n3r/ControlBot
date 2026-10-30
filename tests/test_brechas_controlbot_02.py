@@ -264,7 +264,8 @@ class BrechasControlbot02Tests(unittest.TestCase):
                 invalid_rows = (
                     matrix[path].replace(line, "", 1),
                     matrix[path] + "\n" + line,
-                    matrix[path].replace(line, line.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                    matrix[path].replace(line, (line.replace("MERGED", "PENDING", 1) if "CUBIERTO" in line
+                                             else line.replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1),
                 )
                 for bad in invalid_rows:
                     with self.subTest(identifier=identifier), self.assertRaisesRegex(ValueError, UNKNOWN):

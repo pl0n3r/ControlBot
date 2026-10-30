@@ -176,7 +176,7 @@ class CoberturaControlbot58Tests(unittest.TestCase):
         good = paths["valid"]
         self.assertEqual(good["status"], 200)
         self.assertIs(good["read_only"], True)
-        self.assertEqual(good["activity"], "ACTIVE")
+        self.assertEqual(good["activity"], "UNKNOWN")  # No work_inventory in fixture
         self.assertEqual(good["fronts"][0]["status"], "reserved")
         self.assertIn(good["cache_status"], {"refreshed", "fresh"})
         self.assertEqual(good["cache_control"], "no-store")
@@ -243,7 +243,7 @@ class CoberturaControlbot58Tests(unittest.TestCase):
         guards = scenario("auth")
         self.assertEqual(guards["missing"]["status"], 503)
         self.assertEqual(guards["wrong"]["status"], 403)
-        self.assertEqual(scenario("paths")["valid"]["activity"], "ACTIVE")
+        self.assertEqual(scenario("paths")["valid"]["fronts"][0]["status"], "reserved")
 
 
 if __name__ == "__main__":

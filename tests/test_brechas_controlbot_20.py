@@ -58,7 +58,7 @@ def credible_offline_coverage_row(row):
             or not isinstance(evidence, str)):
         return False
     match = re.fullmatch(
-        r"Código (src/[A-Za-z0-9_.-]+\.php); "
+        r"Código (src/[A-Za-z0-9_.-]+\.php|scripts/hostinger_go_live_plan\.py); "
         r"prueba (tests/test_cobertura_controlbot_(\d{2})\.py); "
         r"PR #(\d+) MERGED; requisito (CB-\d{4}) "
         r"ejercido contra código real con fixtures offline \(#(\d+)\); "
@@ -221,6 +221,22 @@ class BrechasControlbot20Tests(unittest.TestCase):
             candidate[4] = candidate[4].replace(before, after)
             with self.subTest(change=after):
                 self.assertFalse(credible_offline_coverage_row(candidate))
+        python_line = next(line for line in text.splitlines()
+                           if line.startswith("| CB-0518 |"))
+        python_row = [cell.strip() for cell in python_line.strip("|").split("|")]
+        python_row[3] = "CUBIERTO"
+        python_row[4] = (
+            "Código scripts/hostinger_go_live_plan.py; "
+            "prueba tests/test_cobertura_controlbot_32.py; "
+            "PR #1289 MERGED; requisito CB-0518 ejercido contra código real "
+            "con fixtures offline (#1215); sin validación productiva; "
+            "live=UNKNOWN; operando=UNKNOWN."
+        )
+        self.assertTrue(credible_offline_coverage_row(python_row))
+        python_row[4] = python_row[4].replace(
+            "scripts/hostinger_go_live_plan.py", "scripts/unsafe.py"
+        )
+        self.assertFalse(credible_offline_coverage_row(python_row))
         without_reason = list(baseline)
         without_reason[4] = "Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN."
         self.assertFalse(credible_offline_coverage_row(without_reason))

@@ -91,19 +91,21 @@ final class OwnerLoginGate {
                             'Configura el secreto TOTP, luego confirma un código: ' . $secret,
                             200, $store->status());
                     case 'totp_confirm':
-                        $codes = $store->confirmEnrollment($code, $now);
-                        $session['_cb_owner_revision'] = $store->status()['version'];
+                        $enrollment = $store->confirmEnrollment($code, $now);
+                        // Nunca adoptar una revisión global posterior a esta operación:
+                        // una revocación concurrente debe invalidar esta sesión.
+                        $session['_cb_owner_revision'] = $enrollment['version'];
                         return self::loginPage($session, true,
                             'Guarda estos códigos de recuperación de un solo uso fuera del sistema: '
-                            . implode(' ', $codes), 200, $store->status());
+                            . implode(' ', $enrollment['codes']), 200, $store->status());
                     case 'totp_disable':
-                        $store->disable($code, $now);
-                        $session['_cb_owner_revision'] = $store->status()['version'];
+                        $session['_cb_owner_revision'] = $store->disable($code, $now);
                         return self::redirect('/login');
                     case 'totp_required':
                     case 'totp_optional':
-                        $store->setRequired($action === 'totp_required', $code, $now);
-                        $session['_cb_owner_revision'] = $store->status()['version'];
+                        $session['_cb_owner_revision'] = $store->setRequired(
+                            $action === 'totp_required', $code, $now
+                        );
                         return self::redirect('/login');
                     default:
                         return self::response(400, 'Solicitud inválida.');

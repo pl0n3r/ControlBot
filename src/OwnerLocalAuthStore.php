@@ -97,7 +97,7 @@ final class OwnerLocalAuthStore
         return $secret;
     }
 
-    /** Returns recovery codes exactly once; store contains only their hashes. */
+    /** Returns recovery codes once with the exact version created under the same lock. */
     public function confirmEnrollment(string $code, int $now): array
     {
         return $this->transaction(function (array &$s) use ($code, $now): array {
@@ -122,7 +122,7 @@ final class OwnerLocalAuthStore
             $s['last_counter'] = $confirmedCounter;
             $s['version']++;
             self::auditEvent($s, 'totp_enabled', $now);
-            return $codes;
+            return ['codes' => $codes, 'version' => $s['version']];
         });
     }
 
@@ -155,9 +155,9 @@ final class OwnerLocalAuthStore
         });
     }
 
-    public function disable(string $code, int $now): void
+    public function disable(string $code, int $now): int
     {
-        $this->transaction(function (array &$s) use ($code, $now): void {
+        return $this->transaction(function (array &$s) use ($code, $now): int {
             if ($s['required'] || $s['secret'] === ''
                 || !$this->matches($this->unseal($s['secret']), $code, $now, $s['last_counter'])) {
                 throw new RuntimeException('TOTP disable forbidden.');
@@ -169,12 +169,13 @@ final class OwnerLocalAuthStore
             $s['last_counter'] = -1;
             $s['version']++;
             self::auditEvent($s, 'totp_disabled', $now);
+            return $s['version'];
         });
     }
 
-    public function setRequired(bool $required, string $code, int $now): void
+    public function setRequired(bool $required, string $code, int $now): int
     {
-        $this->transaction(function (array &$s) use ($required, $code, $now): void {
+        return $this->transaction(function (array &$s) use ($required, $code, $now): int {
             if ($s['secret'] === '' || !$this->matches(
                 $this->unseal($s['secret']), $code, $now, $s['last_counter']
             )) {
@@ -184,6 +185,7 @@ final class OwnerLocalAuthStore
             $s['last_counter'] = $this->matchedCounter($this->unseal($s['secret']), $code, $now);
             $s['version']++;
             self::auditEvent($s, 'totp_policy', $now);
+            return $s['version'];
         });
     }
 

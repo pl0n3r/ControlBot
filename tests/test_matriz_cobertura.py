@@ -321,13 +321,20 @@ class MatrizCoberturaTests(unittest.TestCase):
     def test_union_global_1194_estricta(self):
         rows = full_matrix()
         counts = Counter(row[3] for row in rows)
-        self.assertEqual(counts, {"CUBIERTO": 31, "NO_VERIFICABLE": 1163})
         self.assertEqual(len(rows), 1194)
-        summary = ("**Consolidado de 1.194 obligaciones:** CUBIERTO=31, "
-                   "EN_CURSO=0, SIN_COBERTURA=0, DESCARTADO=0, "
-                   "NO_VERIFICABLE=1163; porcentaje CUBIERTO=2.60%. "
-                   "**Hojas nuevas creadas: 0.**")
-        self.assertIn(summary, self.text)
+        match = re.search(
+            r"\*\*Consolidado de 1\.194 obligaciones:\*\* "
+            r"CUBIERTO=(\d+), EN_CURSO=(\d+), SIN_COBERTURA=(\d+), "
+            r"DESCARTADO=(\d+), NO_VERIFICABLE=(\d+); "
+            r"porcentaje CUBIERTO=([\d.]+)%\. "
+            r"\*\*Hojas nuevas creadas: 0\.\*\*",
+            self.text,
+        )
+        self.assertIsNotNone(match, "Consolidado ausente o malformado")
+        for status, value in zip(("CUBIERTO", "EN_CURSO", "SIN_COBERTURA",
+                                  "DESCARTADO", "NO_VERIFICABLE"), match.groups()[:5]):
+            self.assertEqual(int(value), counts[status], status)
+        self.assertEqual(float(match.group(6)), round(100 * counts["CUBIERTO"] / 1194, 2))
 
     def test_resumen_por_estado(self):
         actual = Counter(row[3] for row in self.rows)

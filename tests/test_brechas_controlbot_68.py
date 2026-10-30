@@ -2,7 +2,7 @@
 """ControlBot #1075: fifteen Scheduler/security-alert gaps, synthetic only."""
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 import ast
 from functools import lru_cache
 import json
@@ -294,7 +294,7 @@ class BrechasControlbot68Tests(unittest.TestCase):
             line = next(x for x in data[path].splitlines() if x.startswith("| " + key + " |"))
             for bad in (data[path].replace(line, "", 1), data[path] + "\n" + line,
                         data[path] + "\n   " + line,
-                        data[path].replace(line, line.replace("NO_VERIFICABLE", "CUBIERTO"), 1)):
+                        data[path].replace(line, corrupted_e4_row(line), 1)):
                 with self.subTest(id=key):
                     self.assertEqual(UNKNOWN, verdict(key, {**data, path: bad}, proof))
             group, clue = CLAUSES[key]

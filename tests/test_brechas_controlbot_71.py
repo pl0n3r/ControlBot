@@ -6,7 +6,7 @@ The coverage matrix is read-only and remains NO_VERIFICABLE until reconciled.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 
 from functools import lru_cache
 import ast
@@ -287,8 +287,7 @@ class BrechasControlbot71Tests(unittest.TestCase):
                                          {ident: True}, self.docs), UNKNOWN)
                 for changed in (self.documents[source] + "\n" + row,
                                 self.documents[source].replace(
-                                    row, row.replace("NO_VERIFICABLE",
-                                                     "CUBIERTO", 1), 1)):
+                                    row, corrupted_e4_row(row), 1)):
                     copies = list(self.documents)
                     copies[source] = changed
                     with self.assertRaisesRegex(ValueError, UNKNOWN):

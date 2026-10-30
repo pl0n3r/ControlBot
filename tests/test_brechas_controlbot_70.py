@@ -6,7 +6,7 @@ perímetro, autorización del dueño, CI, despliegue ni producción.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 
 import ast
 from functools import lru_cache
@@ -187,7 +187,7 @@ class BrechasControlbot70Tests(unittest.TestCase):
             path = MAIN if key in ("CB-1073", "CB-1084") else PART4
             line = next(s for s in files[path].splitlines() if s.startswith("| " + key + " |"))
             for changed in (files[path].replace(line, "", 1), files[path] + "\n" + line,
-                            files[path].replace(line, line.replace("NO_VERIFICABLE", "VERIFICADO"), 1)):
+                            files[path].replace(line, corrupted_e4_row(line), 1)):
                 altered = {**files, path: changed}
                 with self.subTest(row=key):
                     with self.assertRaisesRegex(ValueError, UNKNOWN):

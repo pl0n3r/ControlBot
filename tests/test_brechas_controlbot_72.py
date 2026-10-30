@@ -7,7 +7,7 @@ The coverage matrices remain NO_VERIFICABLE until independently reconciled.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 
 import ast
 from functools import lru_cache
@@ -250,7 +250,7 @@ class BrechasControlbot72Tests(unittest.TestCase):
             corruptions = (
                 files[path].replace(line, "", 1),
                 files[path] + "\n" + line,
-                files[path].replace(line, line.replace("NO_VERIFICABLE", "CUBIERTO"), 1),
+                files[path].replace(line, corrupted_e4_row(line), 1),
             )
             for modified in corruptions:
                 with self.subTest(row=ident, corruption=modified[-20:]):

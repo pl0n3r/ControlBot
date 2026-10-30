@@ -5,7 +5,7 @@ assert both local behavior and gaps explicitly; no matrix row is promoted.
 """
 from __future__ import annotations
 
-from test_brechas_controlbot_20 import credible_e4_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 import ast
 from functools import lru_cache
 import json
@@ -339,7 +339,7 @@ class BrechasControlbot66Tests(unittest.TestCase):
                     data[path].replace(line, "", 1),
                     data[path] + "\n" + line,
                     data[path].replace(
-                        line, line.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                        line, corrupted_e4_row(line), 1),
                     data[path].replace(
                         line, line.replace(
                             "Falta contraste de comportamiento", "Demostrado", 1), 1),

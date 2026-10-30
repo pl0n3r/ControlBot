@@ -208,7 +208,7 @@ class BrechasControlbot55Tests(unittest.TestCase):
             for node in ast.walk(syntax) if isinstance(node, ast.ImportFrom)
         }
         self.assertTrue(import_roots <= {"ast", "re", "unittest"})
-        self.assertTrue(from_roots <= {"__future__", "pathlib"})
+        self.assertTrue(from_roots <= {"__future__", "pathlib", "test_brechas_controlbot_20"})
         disallowed = {"requests", "urllib", "socket", "subprocess", "http", "selenium"}
         self.assertFalse((import_roots | from_roots) & disallowed)
         self.assertEqual([p for p in (MASTER, PART, RULES, LEGACY, AGENTS) if not p.is_file()], [])

@@ -56,9 +56,13 @@ final class OwnerLocalAuthStore
             && $this->transaction(static fn (array &$s): bool => $s['version'] === $version);
     }
 
-    public function login(int $now): int
+    public function login(int $now, int $expectedVersion): int
     {
-        return $this->transaction(function (array &$s) use ($now): int {
+        return $this->transaction(function (array &$s) use ($now, $expectedVersion): int {
+            // No emitir sesión si la revocación ganó la carrera al segundo factor.
+            if ($expectedVersion < 0 || $s['version'] !== $expectedVersion) {
+                throw new RuntimeException('Owner session revision changed.');
+            }
             self::auditEvent($s, 'login', $now);
             return $s['version'];
         });

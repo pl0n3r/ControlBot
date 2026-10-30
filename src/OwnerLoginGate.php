@@ -123,6 +123,9 @@ final class OwnerLoginGate {
         try {
             $code = $post['totp'] ?? '';
             if (!is_string($code) || strlen($code) > 128) return self::failurePage($session);
+            // Capturar versión antes de validar credenciales; el store compara
+            // de nuevo dentro de su lock al establecer la sesión.
+            $attemptVersion = $store->status()['version'];
             $result = self::checkAndRecord($config, $ip, $login, $password, $now,
                 static fn (): bool => $store->verify($code, $now));
         } catch (Throwable) {
@@ -135,7 +138,7 @@ final class OwnerLoginGate {
         if ($result !== 'authenticated') return self::failurePage($session);
         if ($regenerate !== null && $regenerate() !== true) return self::response(503, 'Service unavailable.');
         try {
-            $session['_cb_owner_revision'] = $store->login($now);
+            $session['_cb_owner_revision'] = $store->login($now, $attemptVersion);
         } catch (Throwable) {
             unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
             return self::response(503, 'Service unavailable.');

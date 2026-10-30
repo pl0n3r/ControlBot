@@ -234,6 +234,11 @@ $dir=getenv('CONTROLBOT_TEST_LIMIT_DIR');
 $key=base64_encode(str_repeat('X',SODIUM_CRYPTO_SECRETBOX_KEYBYTES));
 $now=1800000000;
 $s=new OwnerLocalAuthStore($dir,'pl0n3r',$key);
+$staleVersion=$s->status()['version'];
+$s->revokeAll($now);
+try { $s->login($now+1,$staleVersion); throw new RuntimeException('stale login allowed'); }
+catch (RuntimeException $e) { chk2($e->getMessage()==='Owner session revision changed.'); }
+chk2($s->login($now+2,$s->status()['version']) === $s->status()['version']);
 $secret=$s->beginEnrollment($now);
 chk2(!$s->verify('123456',$now));
 try { $s->confirmEnrollment(Totp::code($secret,$now+400),$now+400); throw new RuntimeException('expired allowed'); }

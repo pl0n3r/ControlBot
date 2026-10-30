@@ -195,10 +195,6 @@ def full_matrix() -> list[tuple[str, ...]]:
     return gathered
 
 
-# Historical regressions are kept on their original functional scope. The
-# migration may mark a clause CUBIERTO only for existing offline PHP behavior,
-# with a known merged PR, a checked-in test and no live/operational attestation.
-# This helper never equates an offline proof with production readiness.
 _OFFLINE_RECONCILIATION = (
     (1, 16, 1261, 3), (17, 30, 1260, 4), (31, 49, 1301, 5),
     (50, 69, 1299, 6), (70, 86, 1306, 7), (87, 104, 1307, 8),
@@ -221,7 +217,7 @@ def credible_offline_coverage_row(row):
     if not isinstance(requirement, str) or not requirement or not isinstance(evidence, str):
         return False
     if status == "NO_VERIFICABLE":
-        return "UNKNOWN" in evidence and "live=UNKNOWN" in evidence and "operando=UNKNOWN" in evidence
+        return "Offline=UNKNOWN" in evidence and "live=UNKNOWN" in evidence and "operando=UNKNOWN" in evidence
     if status != "CUBIERTO":
         return False
     if "live=UNKNOWN" not in evidence or "operando=UNKNOWN" not in evidence:
@@ -232,14 +228,14 @@ def credible_offline_coverage_row(row):
         r"PR #(\d+) MERGED; cláusula (CB-\d{4}) ejercida offline",
         evidence,
     )
-    if match is None or match.group(4) != key:
+    if match is None or match.group(5) != key:
         return False
     number = int(key[3:])
     expected = next(
         ((pr, test) for low, high, pr, test in _OFFLINE_RECONCILIATION
          if low <= number <= high), None
     )
-    if expected is None or expected != (int(match.group(3)), int(match.group(2))):
+    if expected is None or expected != (int(match.group(4)), int(match.group(3))):
         return False
     return (ROOT.joinpath(match.group(1)).is_file()
             and ROOT.joinpath(match.group(2)).is_file())

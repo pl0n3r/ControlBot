@@ -66,6 +66,15 @@ final class OwnerLoginGate {
             if (!is_string($code) || strlen($code) > 128) {
                 return self::response(400, 'Solicitud inválida.');
             }
+            // La posesión de una sesión y su CSRF no basta para operaciones
+            // sensibles: revocar sesiones o enrolar MFA exige la clave actual.
+            if (in_array($action, ['revoke_all', 'totp_begin'], true)) {
+                $password = $post['password'] ?? null;
+                if (!is_string($password) || strlen($password) > 4096
+                    || !password_verify($password, $config['password_hash'])) {
+                    return self::response(403, 'Operación denegada.');
+                }
+            }
             try {
                 switch ($action) {
                     case 'revoke_all':
@@ -316,9 +325,14 @@ final class OwnerLoginGate {
             . '<input type="hidden" name="action" value="' . $action . '">'
             . ($withCode ? '<label>Código TOTP</label><input name="totp" type="text" autocomplete="one-time-code" required>' : '')
             . '<button type="submit">' . $label . '</button></form>';
-        $html = $form('revoke_all', 'Revocar todas las sesiones');
+        $sensitiveForm = static fn (string $action, string $label): string =>
+            '<form method="post" action="/login"><input type="hidden" name="csrf" value="' . $csrf . '">'
+            . '<input type="hidden" name="action" value="' . $action . '">'
+            . '<label>Contraseña actual</label><input name="password" type="password" autocomplete="current-password" required>'
+            . '<button type="submit">' . $label . '</button></form>';
+        $html = $sensitiveForm('revoke_all', 'Revocar todas las sesiones');
         if (($mfa['enabled'] ?? false) !== true) {
-            return $html . $form('totp_begin', 'Configurar autenticación en dos pasos')
+            return $html . $sensitiveForm('totp_begin', 'Configurar autenticación en dos pasos')
                 . $form('totp_confirm', 'Confirmar TOTP y generar códigos', true);
         }
         if (($mfa['required'] ?? false) !== true) {

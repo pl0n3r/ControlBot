@@ -154,13 +154,22 @@ $secondSession=$s;
 chk(OwnerLoginGate::requireOwner($private,$secondSession,$cfg,$now+1)===null, 'second session');
 $bad=OwnerLoginGate::handle($post,['action'=>'revoke_all','csrf'=>'bad'],$s,$cfg,$now+2,$regen);
 chk($bad['status']===403,'CSRF revoke');
-$revoked=OwnerLoginGate::handle($post,['action'=>'revoke_all','csrf'=>$s['_cb_login_csrf']],$s,$cfg,$now+3,$regen);
+$missingPassword=OwnerLoginGate::handle($post,['action'=>'revoke_all','csrf'=>$s['_cb_login_csrf']],$s,$cfg,$now+2,$regen);
+chk($missingPassword['status']===403,'revoke requires owner password');
+$revoked=OwnerLoginGate::handle($post,[
+    'action'=>'revoke_all','csrf'=>$s['_cb_login_csrf'],
+    'password'=>'synthetic-secret'],$s,$cfg,$now+3,$regen);
 chk($revoked['status']===303,'revoke response');
 chk(OwnerLoginGate::requireOwner($private,$secondSession,$cfg,$now+4)['status']===302,'revoke must affect other sessions');
 OwnerLoginGate::handle($get,[],$s,$cfg,$now+5);
 $pass['csrf']=$s['_cb_login_csrf'];
 chk(OwnerLoginGate::handle($post,$pass,$s,$cfg,$now+5,$regen)['status']===303,'login after revoke');
-$begin=OwnerLoginGate::handle($post,['action'=>'totp_begin','csrf'=>$s['_cb_login_csrf']],$s,$cfg,$now+6,$regen);
+$beginDenied=OwnerLoginGate::handle($post,[
+    'action'=>'totp_begin','csrf'=>$s['_cb_login_csrf']],$s,$cfg,$now+6,$regen);
+chk($beginDenied['status']===403,'MFA enrolment requires current password');
+$begin=OwnerLoginGate::handle($post,[
+    'action'=>'totp_begin','csrf'=>$s['_cb_login_csrf'],
+    'password'=>'synthetic-secret'],$s,$cfg,$now+6,$regen);
 chk($begin['status']===200 && preg_match('/[A-Z2-7]{32}/',$begin['body'],$m)===1,'TOTP enrollment secret');
 $secret=$m[0];
 $wrong=OwnerLoginGate::handle($post,['action'=>'totp_confirm','csrf'=>$s['_cb_login_csrf'],'totp'=>'0000'],$s,$cfg,$now+7,$regen);

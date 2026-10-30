@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace ControlBot\Security;
 require_once __DIR__ . '/UiTheme.php';
+require_once __DIR__ . '/OwnerLocalAuthStore.php';
 use Throwable;
 final class OwnerLoginGate {
     private const IDLE_SECONDS = 900;
@@ -19,17 +20,33 @@ final class OwnerLoginGate {
         $method = $server['REQUEST_METHOD'] ?? null;
         if ($method !== 'GET' && $method !== 'POST') return self::response(405, 'Method not allowed.', ['Allow' => 'GET, POST']);
         if (!self::validRequestPath($server, ['/login', '/login.php'])) return self::response(404, 'Not found.');
-        self::expire($session, $now);
+        try {
+            $store = self::store($config);
+            self::expire($session, $now);
+            if (($session['_cb_owner_web'] ?? null) === true
+                && !$store->validVersion($session['_cb_owner_revision'] ?? null)) {
+                unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
+            }
+        } catch (Throwable) {
+            return self::response(503, 'Service unavailable.');
+        }
         if (!self::validToken($session['_cb_login_csrf'] ?? null)) {
             $session['_cb_login_csrf'] = self::randomToken();
         }
-        if ($method === 'GET') return self::loginPage($session, self::isAuthenticated($session, $now));
+        if ($method === 'GET') {
+            return self::loginPage($session, self::isAuthenticated($session, $now),
+                '', 200, $store->status());
+        }
         $action = $post['action'] ?? 'login';
         $token = $post['csrf'] ?? null;
         if (!is_string($token) || !hash_equals($session['_cb_login_csrf'], $token)) return self::response(403, 'Solicitud inválida.');
         if ($action === 'logout') {
-            // Invalidar el contexto local sin alterar sesiones OAuth ajenas.
-            unset($session['_cb_owner_web'], $session['_cb_owner_last_seen']);
+            try {
+                if (self::isAuthenticated($session, $now)) $store->logout($now);
+            } catch (Throwable) {
+                return self::response(503, 'Service unavailable.');
+            }
+            unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
             $session['_cb_login_csrf'] = self::randomToken();
             if ($regenerate !== null && $regenerate() !== true) return self::response(503, 'Service unavailable.');
             return self::redirect('/login');

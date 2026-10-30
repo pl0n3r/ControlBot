@@ -120,7 +120,149 @@ echo json_encode(['baseline' => true, 'synthetic' => true],
 """
 
 
+MFA_CASE = r"""
+require_once 'src/Approvals.php';
+require_once 'src/OwnerSession.php';
+require_once 'src/OwnerLoginGate.php';
+use ControlBot\Security\OwnerLoginGate;
+use ControlBot\Security\OwnerLocalAuthStore;
+use ControlBot\Security\Totp;
+
+function chk(bool $ok, string $msg): void {
+    if (!$ok) throw new RuntimeException($msg);
+}
+$now = 1800000000;
+$hash = password_hash('synthetic-secret', PASSWORD_ARGON2ID,
+    ['memory_cost' => 4096, 'time_cost' => 1, 'threads' => 1]);
+$key = base64_encode(str_repeat('Z', SODIUM_CRYPTO_SECRETBOX_KEYBYTES));
+$cfg = [
+    'owner_login'=>'pl0n3r','password_hash'=>$hash,
+    'rate_limit_dir'=>getenv('CONTROLBOT_TEST_LIMIT_DIR'), 'totp_key'=>$key,
+];
+$get=['REQUEST_METHOD'=>'GET','REQUEST_URI'=>'/login','REMOTE_ADDR'=>'198.51.100.18'];
+$post=['REQUEST_METHOD'=>'POST','REQUEST_URI'=>'/login','REMOTE_ADDR'=>'198.51.100.18'];
+$private=['REQUEST_METHOD'=>'GET','REQUEST_URI'=>'/overview','REMOTE_USER'=>'pl0n3r'];
+$s=[]; $rotations=0;
+$regen=static function () use (&$rotations): bool { $rotations++; return true; };
+$state = new OwnerLocalAuthStore($cfg['rate_limit_dir'], 'pl0n3r', $key);
+$stateBefore=$state->status();
+chk(!$stateBefore['enabled'] && !$stateBefore['required'], 'MFA default must be off');
+OwnerLoginGate::handle($get, [], $s, $cfg, $now);
+$pass=['csrf'=>$s['_cb_login_csrf'], 'username'=>'pl0n3r', 'password'=>'synthetic-secret'];
+chk(OwnerLoginGate::handle($post,$pass,$s,$cfg,$now,$regen)['status']===303, 'initial login');
+$secondSession=$s;
+chk(OwnerLoginGate::requireOwner($private,$secondSession,$cfg,$now+1)===null, 'second session');
+$bad=OwnerLoginGate::handle($post,['action'=>'revoke_all','csrf'=>'bad'],$s,$cfg,$now+2,$regen);
+chk($bad['status']===403,'CSRF revoke');
+$revoked=OwnerLoginGate::handle($post,['action'=>'revoke_all','csrf'=>$s['_cb_login_csrf']],$s,$cfg,$now+3,$regen);
+chk($revoked['status']===303,'revoke response');
+chk(OwnerLoginGate::requireOwner($private,$secondSession,$cfg,$now+4)['status']===302,'revoke must affect other sessions');
+OwnerLoginGate::handle($get,[],$s,$cfg,$now+5);
+$pass['csrf']=$s['_cb_login_csrf'];
+chk(OwnerLoginGate::handle($post,$pass,$s,$cfg,$now+5,$regen)['status']===303,'login after revoke');
+$begin=OwnerLoginGate::handle($post,['action'=>'totp_begin','csrf'=>$s['_cb_login_csrf']],$s,$cfg,$now+6,$regen);
+chk($begin['status']===200 && preg_match('/[A-Z2-7]{32}/',$begin['body'],$m)===1,'TOTP enrollment secret');
+$secret=$m[0];
+$wrong=OwnerLoginGate::handle($post,['action'=>'totp_confirm','csrf'=>$s['_cb_login_csrf'],'totp'=>'0000'],$s,$cfg,$now+7,$regen);
+chk($wrong['status']===403,'invalid enrollment must be rejected');
+$first=Totp::code($secret,$now+8);
+$confirmed=OwnerLoginGate::handle($post,['action'=>'totp_confirm','csrf'=>$s['_cb_login_csrf'],'totp'=>$first],$s,$cfg,$now+8,$regen);
+chk($confirmed['status']===200,'enrollment confirmation');
+preg_match_all('/\b[A-F0-9]{24}\b/',$confirmed['body'],$codes);
+chk(count($codes[0])===8,'recovery codes shown once');
+$recovery=$codes[0][0];
+chk($state->status()['enabled'], 'TOTP is enabled');
+$logout=OwnerLoginGate::handle($post,['action'=>'logout','csrf'=>$s['_cb_login_csrf']],$s,$cfg,$now+9,$regen);
+chk($logout['status']===303,'logout after MFA');
+OwnerLoginGate::handle($get,[],$s,$cfg,$now+10);
+$pass['csrf']=$s['_cb_login_csrf'];
+chk(OwnerLoginGate::handle($post,$pass,$s,$cfg,$now+10,$regen)['status']===401,'password alone after TOTP');
+$pass['totp']=Totp::code($secret,$now+40);
+chk(OwnerLoginGate::handle($post,$pass,$s,$cfg,$now+40,$regen)['status']===303,'correct TOTP login');
+$policy=OwnerLoginGate::handle($post,[
+    'action'=>'totp_required','csrf'=>$s['_cb_login_csrf'],
+    'totp'=>Totp::code($secret,$now+70)],$s,$cfg,$now+70,$regen);
+chk($policy['status']===303 && $state->status()['required'],'require policy');
+$denyDisable=OwnerLoginGate::handle($post,[
+    'action'=>'totp_disable','csrf'=>$s['_cb_login_csrf'],
+    'totp'=>Totp::code($secret,$now+100)],$s,$cfg,$now+100,$regen);
+chk($denyDisable['status']===403 && $state->status()['enabled'],'required policy blocks disable');
+$optional=OwnerLoginGate::handle($post,[
+    'action'=>'totp_optional','csrf'=>$s['_cb_login_csrf'],
+    'totp'=>Totp::code($secret,$now+130)],$s,$cfg,$now+130,$regen);
+chk($optional['status']===303 && !$state->status()['required'],'optional policy');
+$off=OwnerLoginGate::handle($post,[
+    'action'=>'totp_disable','csrf'=>$s['_cb_login_csrf'],
+    'totp'=>Totp::code($secret,$now+160)],$s,$cfg,$now+160,$regen);
+chk($off['status']===303 && !$state->status()['enabled'],'disable TOTP');
+$names=array_column($state->auditTrail(),'event');
+foreach (['login','logout','revoke','totp_setup_started','totp_enabled',
+          'totp_policy','totp_disabled','totp_used'] as $event) {
+    chk(in_array($event,$names,true),'missing audit: '.$event);
+}
+$raw=file_get_contents(glob($cfg['rate_limit_dir'].'/cb-auth-*.json')[0]);
+chk(!str_contains($raw,$secret) && !str_contains($raw,$recovery)
+    && !str_contains($raw,'synthetic-secret'), 'secrets stored in cleartext');
+echo json_encode(['revocation'=>true,'totp'=>true,'audit'=>true],JSON_THROW_ON_ERROR);
+"""
+
+MFA_NEGATIVE_CASE = r"""
+require_once 'src/Approvals.php';
+require_once 'src/OwnerSession.php';
+require_once 'src/OwnerLocalAuthStore.php';
+use ControlBot\Security\OwnerLocalAuthStore;
+use ControlBot\Security\Totp;
+function chk2(bool $ok): void { if (!$ok) throw new RuntimeException('Negative contract failed'); }
+$dir=getenv('CONTROLBOT_TEST_LIMIT_DIR');
+$key=base64_encode(str_repeat('X',SODIUM_CRYPTO_SECRETBOX_KEYBYTES));
+$now=1800000000;
+$s=new OwnerLocalAuthStore($dir,'pl0n3r',$key);
+$secret=$s->beginEnrollment($now);
+chk2(!$s->verify('123456',$now));
+try { $s->confirmEnrollment(Totp::code($secret,$now+400),$now+400); throw new RuntimeException('expired allowed'); }
+catch (RuntimeException $e) { chk2($e->getMessage()==='TOTP setup invalid.'); }
+$secret=$s->beginEnrollment($now+401);
+$s->confirmEnrollment(Totp::code($secret,$now+401),$now+401);
+$good=Totp::code($secret,$now+460);
+chk2($s->verify($good,$now+460));
+chk2(!$s->verify($good,$now+460));
+chk2(!$s->verify($good,$now+550));
+$badKey=new OwnerLocalAuthStore($dir,'pl0n3r',null);
+try { $badKey->verify($good,$now+600); throw new RuntimeException('missing key allowed'); }
+catch (RuntimeException $e) { chk2($e->getMessage()==='TOTP key unavailable.'); }
+$events=$s->auditTrail();
+chk2(!str_contains(json_encode($events),$good));
+$raw=glob($dir.'/cb-auth-*.json')[0];
+file_put_contents($raw,'{"version":false}');
+try { $s->status(); throw new RuntimeException('corrupt state allowed'); }
+catch (RuntimeException $e) { chk2($e->getMessage()==='Owner state corrupt.'); }
+echo json_encode(['fail_closed'=>true,'one_time'=>true],JSON_THROW_ON_ERROR);
+"""
+
+
 class OwnerLoginSessionTests(unittest.TestCase):
+    def _run_php_case(self, program):
+        with tempfile.TemporaryDirectory(prefix="controlbot-owner1366-mfa-") as private:
+            env = {**os.environ, "CONTROLBOT_TEST_LIMIT_DIR": private}
+            result = subprocess.run(
+                ["php", "-r", program], cwd=ROOT, env=env,
+                text=True, capture_output=True, timeout=30,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            return json.loads(result.stdout)
+
+    def test_revocation_and_totp_workflow(self):
+        self.assertEqual(
+            self._run_php_case(MFA_CASE),
+            {"revocation": True, "totp": True, "audit": True},
+        )
+
+    def test_totp_fail_closed_and_audit(self):
+        self.assertEqual(
+            self._run_php_case(MFA_NEGATIVE_CASE),
+            {"fail_closed": True, "one_time": True},
+        )
+
     def test_owner_login_session_contract(self):
         """Caducidad, logout, CSRF, acceso limitado y OTP con tiempo sintético."""
         with tempfile.TemporaryDirectory(prefix="controlbot-owner1366-") as private:

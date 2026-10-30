@@ -15,6 +15,8 @@ import sys
 from tempfile import TemporaryDirectory
 import unittest
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 MATRICES = (ROOT / "docs/matriz-cobertura.md",
             ROOT / "docs/matriz-cobertura-parte-03.md")
@@ -89,9 +91,7 @@ def matrix_rows() -> dict[str, tuple[str, ...]]:
     if set(rows) != set(IDS):
         raise ValueError("UNKNOWN: faltan filas CB-0805..CB-0819")
     for name, fields in rows.items():
-        if (fields[3] != "NO_VERIFICABLE"
-                or not all(f"{plane}=unknown" in fields[4].lower()
-                           for plane in ("offline", "live", "operando"))):
+        if (not e3_coverage(fields)):
             raise ValueError("UNKNOWN: evidencia no autorizada " + name)
     return rows
 
@@ -190,7 +190,7 @@ class BrechasControlbot53Tests(unittest.TestCase):
         for name, passed in checks.items():
             with self.subTest(clause=name):
                 self.assertTrue(passed, "sin evidencia offline suficiente: " + name)
-                self.assertEqual(rows[name][3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(rows[name]))
 
     def test_falla_cerrado(self) -> None:
         """AC-02: mode, tamaño, extras, SHA, flags y duplicados no pasan."""
@@ -266,7 +266,7 @@ class BrechasControlbot53Tests(unittest.TestCase):
         self.assertEqual(set(rows), set(IDS))
         for name in IDS:
             with self.subTest(clause=name):
-                self.assertEqual(rows[name][3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(rows[name]))
                 self.assertEqual(operational_status(rows[name]), UNKNOWN)
         outputs = ((BACKUP, backup_fixture(), "backup_verified", "live_authorized"),
                    (DEPLOY, deploy_fixture(), "deploy_executed", "production_ready"),

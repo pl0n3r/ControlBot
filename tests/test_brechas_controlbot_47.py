@@ -13,6 +13,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = frozenset({
     "CB-0708", "CB-0710", "CB-0711", "CB-0712", "CB-0713",
@@ -288,7 +290,7 @@ class BrechasControlbot47Tests(unittest.TestCase):
         self.assertEqual(set(rows), IDS)
         for name, cells in rows.items():
             with self.subTest(clause=name):
-                self.assertEqual(cells[3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(cells))
                 self.assertIn("UNKNOWN", cells[4].upper())
 
 

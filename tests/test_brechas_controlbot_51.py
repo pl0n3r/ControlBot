@@ -12,6 +12,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 SCENARIOS = ROOT / "tests"
 MATRICES = (
@@ -238,7 +240,7 @@ class BrechasControlbot51Tests(unittest.TestCase):
         for clause, cells in rows.items():
             with self.subTest(clause=clause):
                 self.assertEqual(cells[0], clause)
-                self.assertEqual(cells[3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(cells))
                 self.assertIn("UNKNOWN", cells[4])
                 self.assertIn("live=UNKNOWN", cells[4])
                 self.assertIn("operando=UNKNOWN", cells[4])

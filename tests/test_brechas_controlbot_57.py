@@ -15,6 +15,8 @@ import shutil
 import subprocess
 import unittest
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX = "docs/matriz-cobertura-parte-03.md"
 PAUSE_DOC = "docs/pause-control-v1.md"
@@ -117,9 +119,7 @@ def matrix_rows(data: dict[str, str]) -> dict[str, tuple[str, ...]]:
         parts = tuple(c.strip() for c in line.strip().strip("|").split("|"))
         key = match.group(1)
         if (key in found or len(parts) != 6 or not all(parts)
-                or parts[3] != "NO_VERIFICABLE"
-                or any(f"{plane}=unknown" not in parts[4].lower()
-                       for plane in ("offline", "live", "operando"))):
+                or not e3_coverage(parts)):
             raise ValueError("UNKNOWN: duplicated, incomplete, or promoted " + key)
         found[key] = parts
     if set(found) != set(IDS):
@@ -278,7 +278,7 @@ class BrechasControlbot57Tests(unittest.TestCase):
                             if v.startswith(f"| {key} |"))
                 for mutated in (data[MATRIX].replace(line, ""),
                                 data[MATRIX] + "\n" + line,
-                                data[MATRIX].replace(line, line.replace("NO_VERIFICABLE", "CUBIERTO"))):
+                                data[MATRIX].replace(line, (line.replace("MERGED", "PENDING") if " | CUBIERTO | " in line else line.replace("NO_VERIFICABLE", "CUBIERTO")))):
                     self.assertEqual(local_verdict(key, {**data, MATRIX: mutated}, observed), UNKNOWN)
                 doc, marker = DOC_MARKERS[key]
                 self.assertEqual(local_verdict(key, {**data, doc: data[doc].replace(marker, "")},

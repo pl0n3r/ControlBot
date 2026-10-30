@@ -11,6 +11,8 @@ from pathlib import Path
 import re
 import unittest
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 MASTER = ROOT / "docs/matriz-cobertura.md"
 PART = ROOT / "docs/matriz-cobertura-parte-03.md"
@@ -40,9 +42,7 @@ def matrix_rows(texts: tuple[str, str] | None = None) -> dict[str, tuple[str, ..
         raise ValueError("UNKNOWN: conjunto de requisitos incompleto")
     for identifier, cells in rows.items():
         evidence = cells[4].lower()
-        if cells[3] != "NO_VERIFICABLE" or not all(
-            f"{plane}=unknown" in evidence for plane in ("offline", "live", "operando")
-        ):
+        if not e3_coverage(cells):
             raise ValueError("UNKNOWN: estado/evidencia no acreditados " + identifier)
     return rows
 
@@ -163,7 +163,7 @@ class BrechasControlbot55Tests(unittest.TestCase):
         for identifier in IDS:
             with self.subTest(requirement=identifier):
                 self.assertTrue(checks[identifier], "brecha sin aserción: " + identifier)
-                self.assertEqual(rows[identifier][3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(rows[identifier]))
 
     def test_falla_cerrado(self) -> None:
         """AC-02: ausente, duplicado, promoción y pruebas no frescas son UNKNOWN."""
@@ -220,11 +220,9 @@ class BrechasControlbot55Tests(unittest.TestCase):
         self.assertEqual(len(rows), 15)
         for identifier, cells in rows.items():
             with self.subTest(requirement=identifier):
-                self.assertEqual(cells[3], "NO_VERIFICABLE")
-                self.assertTrue(all(
-                    f"{plane}=unknown" in cells[4].lower()
-                    for plane in ("offline", "live", "operando")
-                ))
+                self.assertTrue(e3_coverage(cells))
+                self.assertTrue(all(f"{plane}=unknown" in cells[4].lower()
+                    for plane in (("offline", "live", "operando") if cells[3] == "NO_VERIFICABLE" else ("live", "operando"))))
                 self.assertEqual(external_authority(cells), UNKNOWN)
         for snapshot in (
             {"offline": "PASS", "live": UNKNOWN, "operando": UNKNOWN},

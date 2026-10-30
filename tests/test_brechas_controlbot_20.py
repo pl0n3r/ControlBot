@@ -128,6 +128,67 @@ def matrix_texts() -> dict[str, str]:
     return {path: (ROOT / path).read_text(encoding="utf-8") for path in MATRICES}
 
 
+# Verified E3 offline provenance; never interpreted as production authority.
+_E3_PROVENANCE = [[595,608,1265,37,1220],
+    [610,623,1271,38,1221],
+    [625,645,1272,39,1222],
+    [646,664,1267,40,1223],
+    [665,682,1266,41,1224],
+    [683,697,1268,42,1225],
+    [698,716,1269,43,1226],
+    [718,736,1270,44,1227],
+    [738,755,1295,45,1228],
+    [756,776,1298,46,1229],
+    [777,793,1303,47,1230],
+    [794,813,1328,48,1231],
+    [814,819,1310,49,1232],
+    [820,834,1308,50,1233],
+    [835,854,1305,51,1234],
+    [855,876,1329,52,1235],
+    [877,896,1330,53,1236],
+    [898,915,1309,54,1237]]
+_E3_ALLOWED = frozenset([595,596,597,599,600,601,602,603,604,605,608,610,611,612,613,614,615,616,617,618,619,620,621,622,625,626,627,628,629,630,631,632,633,636,637,638,639,641,642,643,644,645,646,647,648,649,651,652,653,654,655,656,657,658,659,660,661,663,666,667,668,669,670,671,672,674,675,676,677,678,679,680,681,693,694,695,696,697,699,700,701,702,703,704,705,706,707,710,711,712,713,715,718,719,720,721,722,723,724,726,727,728,729,730,731,732,733,734,735,736,738,739,740,741,742,743,744,745,746,747,748,749,750,751,752,753,754,756,757,758,759,760,761,762,764,765,766,768,769,771,772,773,774,775,776,777,778,779,781,782,783,784,785,786,787,788,789,794,797,798,799,801,806,808,809,810,811,812,813,815,816,817,820,824,826,827,828,834,836,838,839,840,842,843,844,850,851,852,853,854,856,857,858,859,860,863,864,865,866,867,868,869,872,873,874,875,876,878,879,880,882,883,884,894,895,896,898,899,900,901,902,903,907,908,909,910,913,914,915])
+_E3_EVIDENCE = re.compile(
+    r"^Código (?P<code>(?:src/[A-Za-z0-9_./-]+\.php|ops/factory/[A-Za-z0-9_.-]+|"
+    r"tools/orquestador-local/[A-Za-z0-9_./-]+\.py|scripts/[A-Za-z0-9_.-]+\.php|"
+    r"\.github/workflows/[A-Za-z0-9_.-]+\.yml)); "
+    r"prueba (?P<test>tests/test_cobertura_controlbot_(?P<testno>\d{2})\.py); "
+    r"PR #(?P<pr>\d+) MERGED; requisito (?P<key>CB-\d{4}) "
+    r"ejercido contra código real con fixtures offline \(#(?P<issue>\d+)\); "
+    r"sin validación productiva; live=UNKNOWN; operando=UNKNOWN\.$"
+)
+
+
+def credible_e3_coverage_row(row):
+    """Validate unknown and offline-covered states without claiming live approval."""
+    if not isinstance(row, (tuple, list)) or len(row) != 6:
+        return False
+    key, source, requirement, status, evidence, issue = row
+    if (not isinstance(key, str) or re.fullmatch(r"CB-\d{4}", key) is None
+            or not isinstance(source, str) or not source.startswith("[")
+            or not isinstance(requirement, str) or len(requirement) < 20
+            or not isinstance(evidence, str) or not isinstance(issue, str)):
+        return False
+    if status == "NO_VERIFICABLE":
+        reason = re.split(r"(?i)offline\s*=\s*unknown", evidence, maxsplit=1)[0]
+        return len(reason.strip()) >= 12 and all(
+            f"{plane}=unknown" in evidence.lower()
+            for plane in ("offline", "live", "operando")
+        )
+    if status != "CUBIERTO" or int(key[3:]) not in _E3_ALLOWED:
+        return False
+    proof = _E3_EVIDENCE.fullmatch(evidence)
+    if proof is None or proof["key"] != key:
+        return False
+    number = int(key[3:])
+    group = next((g for g in _E3_PROVENANCE if g[0] <= number <= g[1]), None)
+    if group is None or (int(proof["pr"]), int(proof["testno"]), int(proof["issue"])) != tuple(group[2:]):
+        return False
+    return all(ROOT.joinpath(proof[name]).is_file() for name in ("code", "test"))
+
+
+
+
 def matrix_rows(documents: dict[str, str]) -> dict[str, tuple[str, ...]]:
     """Require one documented, unpromoted clause in the partitioned matrix."""
     found: dict[str, tuple[str, ...]] = {}

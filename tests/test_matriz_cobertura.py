@@ -309,8 +309,10 @@ class MatrizCoberturaTests(unittest.TestCase):
 
         for original, falsified in (
             (path, "docs/cuota-falsa.md"),
-            ("issues/1360", "issues/1406"),
-            ("pull/1403", "pull/9999"),
+            ("[#1360](https://github.com/pl0n3r/ControlBot/issues/1360)",
+             "[#1406](https://github.com/pl0n3r/ControlBot/issues/1406)"),
+            ("[#1403](https://github.com/pl0n3r/ControlBot/pull/1403)",
+             "[#9999](https://github.com/pl0n3r/ControlBot/pull/9999)"),
             ("tests/test_quota_panel_nonblocking.py", "tests/test_cuota_falsa.py"),
         ):
             with self.subTest(falsified=falsified):

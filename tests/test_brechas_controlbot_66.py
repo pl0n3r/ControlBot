@@ -4,6 +4,8 @@ The tests execute existing PHP domain logic with fixed, offline inputs. They
 assert both local behavior and gaps explicitly; no matrix row is promoted.
 """
 from __future__ import annotations
+
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 import ast
 from functools import lru_cache
 import json
@@ -130,11 +132,7 @@ def coverage_rows(files: object) -> dict[str, tuple[str, ...]]:
             group, anchor = CLAUSES[ident]
             if (ident in found or len(cells) != 6 or cells[0] != ident
                     or DOCS[group] not in cells[1]
-                    or anchor not in cells[2] or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos."
-                       not in cells[4]
-                    or any(f"{kind}=unknown" not in cells[4].lower()
-                           for kind in ("offline", "live", "operando"))
+                    or anchor not in cells[2] or not credible_e4_coverage_row(cells)
                     or "/issues/1" not in cells[5]
                     or (path == MAIN) != (ident in {"CB-1013", "CB-1018"})):
                 raise ValueError("UNKNOWN: invalid or duplicate row " + ident)
@@ -312,7 +310,7 @@ def verdict(ident: object, files: object, evidence: object) -> str:
         return UNKNOWN
     group, anchor = CLAUSES[ident]
     if (anchor not in files[DOCS[group]]
-            or rows[ident][3] != "NO_VERIFICABLE"
+            or not credible_e4_coverage_row(rows[ident])
             or not files[CODE[group]].strip()):
         return UNKNOWN
     return LOCAL if local_evidence(ident, evidence) else UNKNOWN
@@ -327,7 +325,7 @@ class BrechasControlbot66Tests(unittest.TestCase):
         self.assertEqual(set(IDS), set(CLAUSES))
         for ident in IDS:
             with self.subTest(requirement=ident):
-                self.assertEqual("NO_VERIFICABLE", rows[ident][3])
+                self.assertTrue(credible_e4_coverage_row(rows[ident]))
                 expected = UNKNOWN if ident in EXTERNAL_GAPS else LOCAL
                 self.assertEqual(expected, verdict(ident, data, obs))
     def test_falla_cerrado(self) -> None:
@@ -337,14 +335,15 @@ class BrechasControlbot66Tests(unittest.TestCase):
                 path = MAIN if ident in {"CB-1013", "CB-1018"} else PART
                 line = next(x for x in data[path].splitlines()
                             if x.startswith(f"| {ident} |"))
+                self.assertIn("live=UNKNOWN", line)
                 for altered in (
                     data[path].replace(line, "", 1),
                     data[path] + "\n" + line,
                     data[path].replace(
-                        line, line.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                        line, corrupted_e4_row(line), 1),
                     data[path].replace(
                         line, line.replace(
-                            "Falta contraste de comportamiento", "Demostrado", 1), 1),
+                            "live=UNKNOWN", "live=VERIFIED", 1), 1),
                 ):
                     self.assertEqual(UNKNOWN, verdict(
                         ident, {**data, path: altered}, obs))
@@ -375,7 +374,7 @@ class BrechasControlbot66Tests(unittest.TestCase):
                     if isinstance(node, ast.ImportFrom)}
         self.assertLessEqual(imports, {
             "__future__", "ast", "functools", "json", "pathlib", "re",
-            "shutil", "subprocess", "unittest",
+            "shutil", "subprocess", "unittest", "test_brechas_controlbot_20",
         })
         self.assertNotIn("curl_exec(", PHP_PROBE)
         self.assertNotIn("file_put_contents(", PHP_PROBE)

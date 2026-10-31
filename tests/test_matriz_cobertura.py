@@ -41,6 +41,9 @@ POST_SNAPSHOT = {
     "docs/emergency-shutdown-plan.md": (962, 966, "tests/test_apagado_emergencia_doc.py"),
     "docs/evidence-receipts.md": (963, 967, "tests/test_recibos_evidencia_doc.py"),
     "docs/signal-budget-load-script.md": (964, 970, "tests/test_carga_senales_doc.py"),
+    "docs/hostinger-deploy-backup-gate.md": (1359, 1367, "tests/test_deploy_backup_gate.py"),
+    "docs/health-monitor.md": (1370, 1376, "tests/test_health_monitor_alerts.py"),
+    "docs/profiles-chats-inventory.md": (1362, 1386, "tests/test_profiles_chats_inventory.py"),
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
 POST_CELL = re.compile(

@@ -433,3 +433,4 @@ Este registro **separa** las hojas documentales posteriores al snapshot normativ
 | `docs/auth-negative-tests.md` | [#1364](https://github.com/pl0n3r/ControlBot/issues/1364) | [#1400](https://github.com/pl0n3r/ControlBot/pull/1400) | `tests/test_auth_negative.py` | NO_VERIFICABLE / NO ENSAYADO |
 | `docs/quota-panel.md` | [#1360](https://github.com/pl0n3r/ControlBot/issues/1360) | [#1403](https://github.com/pl0n3r/ControlBot/pull/1403) | `tests/test_quota_panel_nonblocking.py` | NO_VERIFICABLE / NO ENSAYADO |
 | `docs/support-channels.md` | [#1358](https://github.com/pl0n3r/ControlBot/issues/1358) | [#1404](https://github.com/pl0n3r/ControlBot/pull/1404) | `tests/test_support_channels.py` | NO_VERIFICABLE / NO ENSAYADO |
+| `docs/dr-drill-report.md` | [#1371](https://github.com/pl0n3r/ControlBot/issues/1371) | [#1414](https://github.com/pl0n3r/ControlBot/pull/1414) | `tests/test_dr_drill_rpo_rto.py` | NO_VERIFICABLE / NO ENSAYADO |

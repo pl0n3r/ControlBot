@@ -63,6 +63,12 @@ class OwnerLoginRedirectTests(unittest.TestCase):
                 self.assertEqual(status, 403)
                 self.assertIsNone(headers["Location"])
                 self.assertIsNone(headers["WWW-Authenticate"])
+                # Ni health ni API pueden usar el 302 de un navegador, aunque anuncien HTML.
+                for path in ("/health", "/api/private"):
+                    status, headers = _get(port, path, "text/html")
+                    self.assertEqual(status, 403, path)
+                    self.assertIsNone(headers["Location"])
+                    self.assertIsNone(headers["WWW-Authenticate"])
             finally:
                 proc.kill(); proc.wait()
 

@@ -37,9 +37,21 @@ if (is_string($passwordHash) && $passwordHash !== '') {
             $localSession = $_SESSION;
         }
     }
-    $isBrowser = ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET'
+    $requestPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+    $isApi = is_string($requestPath) && ($requestPath === '/api' || str_starts_with($requestPath, '/api/'));
+    $isBrowser = ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && !$isApi
         && str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'text/html');
     $gate = OwnerLoginGate::requireOwner($_SERVER, $localSession, $loginConfig, time());
+    // Health/asset exceptions may bypass the gate for direct static or dedicated health
+    // handlers, but must never grant access to owner views through this front controller.
+    if ($gate === null && is_string($requestPath)
+        && ($requestPath === '/health' || $requestPath === '/health.php'
+            || str_starts_with($requestPath, '/assets/'))) {
+        $gate = ['status' => 403, 'headers' => [
+            'Content-Type' => 'text/plain; charset=utf-8',
+            'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff',
+        ], 'body' => "Forbidden.\n"];
+    }
     if ($sessionOpen) {
         $_SESSION = $localSession; // conserva la marca de actividad
         session_write_close();

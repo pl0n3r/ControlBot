@@ -49,7 +49,7 @@ class SecretSourceTests(unittest.TestCase):
         # Omitting the root argument must still protect files shipped with this repository.
         code = (
             "require 'src/SecretSource.php';"
-            "$v = ControlBot\\\\Security\\\\SecretSource::read('CONTROLBOT_TEST_SECRET');"
+            "$v = ControlBot\\Security\\SecretSource::read('CONTROLBOT_TEST_SECRET');"
             "echo $v === null ? 'NULL' : $v;"
         )
         env = {k: v for k, v in os.environ.items() if not k.startswith("CONTROLBOT_TEST_SECRET")}

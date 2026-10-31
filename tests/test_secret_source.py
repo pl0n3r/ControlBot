@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HTACCESS = (ROOT / ".htaccess").read_text(encoding="utf-8")
 
 
-def read_secret(env: dict, repo_root: str = "/nonexistent") -> str:
+def read_secret(env: dict, repo_root: str = str(ROOT)) -> str:
     code = (
         "require 'src/SecretSource.php';"
         "$v = ControlBot\\Security\\SecretSource::read('CONTROLBOT_TEST_SECRET', $argv[1]);"
@@ -38,6 +38,26 @@ class SecretSourceTests(unittest.TestCase):
             f = Path(d) / "s.key"
             f.write_text("leak", encoding="utf-8")
             self.assertEqual("NULL", read_secret({"CONTROLBOT_TEST_SECRET_FILE": str(f)}, repo_root=d))
+
+    def test_missing_root_and_implicit_root_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            outside = Path(d) / "safe.key"
+            outside.write_text("synthetic", encoding="utf-8")
+            self.assertEqual("NULL", read_secret(
+                {"CONTROLBOT_TEST_SECRET_FILE": str(outside)}, repo_root=str(Path(d) / "missing")))
+
+        # Omitting the root argument must still protect files shipped with this repository.
+        code = (
+            "require 'src/SecretSource.php';"
+            "$v = ControlBot\\\\Security\\\\SecretSource::read('CONTROLBOT_TEST_SECRET');"
+            "echo $v === null ? 'NULL' : $v;"
+        )
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CONTROLBOT_TEST_SECRET")}
+        env["CONTROLBOT_TEST_SECRET_FILE"] = str(ROOT / "src/SecretSource.php")
+        result = subprocess.run(["php", "-r", code], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(0, result.returncode, result.stderr[:300])
+        self.assertEqual("NULL", result.stdout.strip())
 
     def test_missing_relative_empty_or_oversized_files_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as d:

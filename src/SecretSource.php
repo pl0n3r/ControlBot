@@ -26,8 +26,11 @@ final class SecretSource
         if ($real === false || !is_file($real) || !is_readable($real)) {
             return null;
         }
-        $root = $repositoryRoot !== null ? realpath($repositoryRoot) : false;
-        if ($root !== false && ($real === $root || str_starts_with($real, $root . DIRECTORY_SEPARATOR))) {
+        $root = realpath($repositoryRoot ?? dirname(__DIR__));
+        if ($root === false) {
+            return null; // unknown repository root: never skip the containment check
+        }
+        if ($real === $root || str_starts_with($real, $root . DIRECTORY_SEPARATOR)) {
             return null; // a secret inside the deployed tree could be served or committed
         }
         $size = filesize($real);

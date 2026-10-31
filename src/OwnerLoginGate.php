@@ -33,6 +33,8 @@ final class OwnerLoginGate {
         if (!self::validToken($session['_cb_login_csrf'] ?? null)) {
             $session['_cb_login_csrf'] = self::randomToken();
         }
+        parse_str((string) ($server['QUERY_STRING'] ?? ''), $query);
+        $next = self::safeNext($method === 'GET' ? ($query['next'] ?? null) : ($post['next'] ?? null));
         if ($method === 'GET') {
             try {
                 $status = $store->status();
@@ -40,7 +42,7 @@ final class OwnerLoginGate {
                 return self::response(503, 'Service unavailable.');
             }
             return self::loginPage($session, self::isAuthenticated($session, $now),
-                '', 200, $status);
+                '', 200, $status, $next);
         }
         $action = $post['action'] ?? 'login';
         $token = $post['csrf'] ?? null;
@@ -135,13 +137,13 @@ final class OwnerLoginGate {
         $password = $post['password'] ?? null;
         if (!is_string($login) || !is_string($password)
             || strlen($login) > 128 || strlen($password) > 4096) {
-            return self::failurePage($session);
+            return self::failurePage($session, $next);
         }
         $ip = $server['REMOTE_ADDR'] ?? null;
         if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP) === false) return self::response(503, 'Service unavailable.');
         try {
             $code = $post['totp'] ?? '';
-            if (!is_string($code) || strlen($code) > 128) return self::failurePage($session);
+            if (!is_string($code) || strlen($code) > 128) return self::failurePage($session, $next);
             // Capturar versión antes de validar credenciales; el store compara
             // de nuevo dentro de su lock al establecer la sesión.
             $attemptVersion = $store->status()['version'];
@@ -154,7 +156,7 @@ final class OwnerLoginGate {
             return self::response(429, 'Demasiados intentos. Inténtalo más tarde.',
                 ['Retry-After' => (string) $result['retry_after']]);
         }
-        if ($result !== 'authenticated') return self::failurePage($session);
+        if ($result !== 'authenticated') return self::failurePage($session, $next);
         if ($regenerate !== null && $regenerate() !== true) return self::response(503, 'Service unavailable.');
         try {
             $session['_cb_owner_revision'] = $store->login($now, $attemptVersion);
@@ -165,7 +167,7 @@ final class OwnerLoginGate {
         $session['_cb_owner_web'] = true;
         $session['_cb_owner_last_seen'] = $now;
         $session['_cb_login_csrf'] = self::randomToken();
-        return self::redirect('/overview');
+        return self::redirect($next !== '' ? $next : '/overview');
     }
     /** Comprueba la sesión *local*, sin conceder por ello tokens OAuth/TOTP. */
     public static function isAuthenticated(array $session, int $now): bool {
@@ -197,11 +199,11 @@ final class OwnerLoginGate {
         if (!self::configured($config) || $now <= 0) return self::response(503, 'Service unavailable.');
         if ($path === '/login' || $path === '/login.php') return null;
         self::expire($session, $now);
-        if (!self::isAuthenticated($session, $now)) return self::redirect('/login', 302);
+        if (!self::isAuthenticated($session, $now)) return self::redirect(self::loginUrl($method, $path), 302);
         try {
             if (!self::store($config)->validVersion($session['_cb_owner_revision'] ?? null)) {
                 unset($session['_cb_owner_web'], $session['_cb_owner_last_seen'], $session['_cb_owner_revision']);
-                return self::redirect('/login', 302);
+                return self::redirect(self::loginUrl($method, $path), 302);
             }
         } catch (Throwable) {
             return self::response(503, 'Service unavailable.');
@@ -307,7 +309,7 @@ final class OwnerLoginGate {
     }
     private static function loginPage(
         array $session, bool $authenticated, string $notice = '', int $status = 200,
-        array $mfa = [],
+        array $mfa = [], string $next = '',
     ): array {
         $csrf = htmlspecialchars($session['_cb_login_csrf'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $noticeHtml = $notice !== '' ? '<p role="alert" class="error">' . htmlspecialchars($notice, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '';
@@ -318,6 +320,7 @@ final class OwnerLoginGate {
                 . self::managementForms($csrf, $mfa)
             : '<form method="post" action="/login"><input type="hidden" name="action" value="login">'
                 . '<input type="hidden" name="csrf" value="' . $csrf . '">'
+                . ($next !== '' ? '<input type="hidden" name="next" value="' . htmlspecialchars($next, ENT_QUOTES, 'UTF-8') . '">' : '')
                 . '<label for="username">Usuario</label><input id="username" name="username" type="text" autocomplete="username" required maxlength="128">'
                 . '<label for="password">Contraseña</label><input id="password" name="password" type="password" autocomplete="current-password" required>'
                 . '<label for="totp">Código TOTP o de recuperación (si aplica)</label>'
@@ -371,7 +374,22 @@ final class OwnerLoginGate {
             is_string($key) ? $key : null,
         );
     }
-    private static function failurePage(array $session): array { return self::loginPage($session, false, 'Usuario o contraseña incorrectos.', 401); }
+    private static function failurePage(array $session, string $next = ''): array {
+        return self::loginPage($session, false, 'Usuario o contraseña incorrectos.', 401, [], $next);
+    }
+    /** Ruta interna a la que volver tras entrar; vacío si no es segura (nada de redirecciones abiertas). */
+    public static function safeNext(mixed $value): string {
+        if (!is_string($value) || strlen($value) > 256
+            || preg_match('#^/(?:[A-Za-z0-9_-]+(?:[./][A-Za-z0-9_-]+)*)?$#D', $value) !== 1
+            || str_contains($value, '..') || preg_match('#^/login(?:\.php)?(?:/|$)#D', $value) === 1) {
+            return '';
+        }
+        return $value;
+    }
+    private static function loginUrl(mixed $method, string $path): string {
+        $next = $method === 'GET' ? self::safeNext($path) : '';
+        return $next !== '' && $next !== '/' ? '/login?next=' . rawurlencode($next) : '/login';
+    }
     private static function redirect(string $to, int $status = 303): array { return self::response($status, '', ['Location' => $to]); }
     private static function response(int $status, string $body, array $extras = []): array {
         return ['status' => $status, 'headers' => array_merge([

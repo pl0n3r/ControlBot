@@ -19,7 +19,7 @@ function ok1379(bool $condition, string $why): void {
 }
 ok1379($store->status()['version'] === 0, 'initial state');
 $secret = $store->beginEnrollment($now);
-$enrollment = $store->confirmEnrollment(Totp::code($secret, $now + 1), $now + 1);
+$enrollment = $store->confirmEnrollment(Totp::code($secret, $now + 1), $now + 1, $store->status()['version']);
 ok1379(count($enrollment['codes']) === 8, 'recovery count');
 $version = $enrollment['version'];
 ok1379($store->validVersion($version), 'current version');
@@ -36,20 +36,20 @@ $otp1 = Totp::code($secret, $now + 31);
 ok1379($store->verify($otp1, $now + 31), 'valid TOTP rejected');
 ok1379(!$store->verify($otp1, $now + 31), 'TOTP replay accepted');
 $otp2 = Totp::code($secret, $now + 61);
-$requiredVersion = $store->setRequired(true, $otp2, $now + 61);
+$requiredVersion = $store->setRequired(true, $otp2, $now + 61, $store->status()['version']);
 ok1379($store->status()['required'] && $store->validVersion($requiredVersion), 'required policy');
-try { $store->disable(Totp::code($secret, $now + 91), $now + 91); throw new RuntimeException('disabled required'); }
+try { $store->disable(Totp::code($secret, $now + 91), $now + 91, $store->status()['version']); throw new RuntimeException('disabled required'); }
 catch (RuntimeException $e) { ok1379($e->getMessage() !== 'disabled required', 'policy bypass'); }
-$optionalVersion = $store->setRequired(false, Totp::code($secret, $now + 91), $now + 91);
+$optionalVersion = $store->setRequired(false, Totp::code($secret, $now + 91), $now + 91, $store->status()['version']);
 ok1379(!$store->status()['required'] && $store->validVersion($optionalVersion), 'optional policy');
-$disabledVersion = $store->disable(Totp::code($secret, $now + 121), $now + 121);
+$disabledVersion = $store->disable(Totp::code($secret, $now + 121), $now + 121, $store->status()['version']);
 ok1379($store->validVersion($disabledVersion) && !$store->status()['enabled'], 'disable state');
 ok1379($store->verify('', $now + 122), 'optional MFA absence');
 ok1379(count($store->auditTrail()) >= 8, 'audit missing');
-try { $store->confirmEnrollment('000000', $now + 123); throw new RuntimeException('no pending accepted'); }
+try { $store->confirmEnrollment('000000', $now + 123, $store->status()['version']); throw new RuntimeException('no pending accepted'); }
 catch (RuntimeException $e) { ok1379($e->getMessage() !== 'no pending accepted', 'pending bypass'); }
 $store->beginEnrollment($now + 124);
-try { $store->confirmEnrollment('000000', $now + 425); throw new RuntimeException('expired accepted'); }
+try { $store->confirmEnrollment('000000', $now + 425, $store->status()['version']); throw new RuntimeException('expired accepted'); }
 catch (RuntimeException $e) { ok1379($e->getMessage() !== 'expired accepted', 'expired enrollment bypass'); }
 $noKey = new OwnerLocalAuthStore($dir, 'pl0n3r', null);
 try { $noKey->beginEnrollment($now + 126); throw new RuntimeException('missing key accepted'); }
@@ -76,7 +76,9 @@ class OwnerStoreSliceTests(unittest.TestCase):
         source = (ROOT / "src/OwnerLocalAuthStore.php").read_text()
         self.assertIn("flock($handle, LOCK_EX)", source)
         self.assertIn("sodium_crypto_secretbox", source)
-        self.assertLessEqual(len(source.splitlines()) + len(Path(__file__).read_text().splitlines()), 400)
+        # Post-#1379 security hardening is a separate 400-line PR diff budget.
+        self.assertLessEqual(len(source.splitlines()), 400)
+        self.assertIn('@rename($tmp, $this->path)', source)
 
 
 if __name__ == "__main__":

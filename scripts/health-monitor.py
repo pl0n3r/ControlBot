@@ -76,7 +76,8 @@ def read_state(path: str) -> str:
     except (ValueError, UnicodeError) as error:
         raise MonitorError("state_invalid") from error
     if (not isinstance(result, dict) or set(result) != {"version", "state"}
-            or result["version"] != 1 or result["state"] not in ("HEALTHY", "ALERT")):
+            or type(result["version"]) is not int or result["version"] != 1
+            or result["state"] not in ("HEALTHY", "ALERT")):
         raise MonitorError("state_invalid")
     return result["state"]
 

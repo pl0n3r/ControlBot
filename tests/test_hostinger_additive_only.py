@@ -141,7 +141,15 @@ class Fixture(unittest.TestCase):
         self.assertNotIn("synthetic-once-123456", json.dumps(self.records))
 
     def test_php_backup_gate_fixture_precedes_deploy_contract(self):
-        from tests.test_deploy_backup_gate import fixture, probe
+        # tests/ is not a package: import the existing PHP gate fixture by exact file path.
+        import importlib.util
+        source = ROOT / "tests" / "test_deploy_backup_gate.py"
+        spec = importlib.util.spec_from_file_location("backup_gate_fixture_offline", source)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        fixture, probe = module.fixture, module.probe
         ok = probe(fixture())
         self.assertEqual("SATISFIED", ok["synthetic_precondition"])
         self.assertFalse(ok["runtime_authorized"])

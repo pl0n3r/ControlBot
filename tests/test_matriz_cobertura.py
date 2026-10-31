@@ -45,6 +45,7 @@ POST_SNAPSHOT = {
     "docs/health-monitor.md": (1370, 1376, "tests/test_health_monitor_alerts.py"),
     "docs/profiles-chats-inventory.md": (1362, 1386, "tests/test_profiles_chats_inventory.py"),
     "docs/hostinger-transport.md": (1368, 1392, "tests/test_hostinger_transport.py"),
+    "docs/secretos-en-archivo-hostinger.md": (1349, 1350, "tests/test_secret_source.py"),
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
 POST_CELL = re.compile(
@@ -267,6 +268,12 @@ class MatrizCoberturaTests(unittest.TestCase):
         self.assertTrue({"README.md", "AGENTES.md"} <= sources)
         self.assertTrue({f"issues/{i}" for i in CONTAINERS} <= sources)
         self.assertGreaterEqual(sum(r[1].startswith("[issues/1:") for r in self.rows), 11)
+
+    def test_registro_guia_secretos_privados_exacta(self):
+        """La guía privada se vincula al Issue, PR y prueba reales sin promocionar live."""
+        expected = (1349, 1350, "tests/test_secret_source.py")
+        self.assertEqual(expected, POST_SNAPSHOT["docs/secretos-en-archivo-hostinger.md"])
+        self.assertEqual(expected, parse_post_snapshot(self.text)["docs/secretos-en-archivo-hostinger.md"])
 
     def test_particiones_son_salidas_no_fuentes(self):
         self.assertFalse(is_normative_document(DOC))

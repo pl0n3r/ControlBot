@@ -41,7 +41,7 @@ $csrf = $s['_cb_login_csrf'];
 $bad = OwnerLoginGate::handle($post,['csrf'=>$csrf,'username'=>'intruder','password'=>'fixture-only'],$s,$cfg,$now,$regenerate);
 check($bad['status']===401 && str_contains($bad['body'],'Usuario o contraseña incorrectos'));
 $good = OwnerLoginGate::handle($post,['csrf'=>$csrf,'username'=>'pl0n3r','password'=>'fixture-only'],$s,$cfg,$now,$regenerate);
-check($good['status']===303 && $good['headers']['Location']==='/overview');
+check($good['status']===303 && $good['headers']['Location']==='/');
 check($regen===1 && OwnerLoginGate::isAuthenticated($s,$now));
 check(!array_key_exists('_github_token_sealed',$s));
 check(str_contains(OwnerLoginGate::handle($get,[],$s,$cfg,$now)['body'],'Salir'));
@@ -49,7 +49,7 @@ check(str_contains(OwnerLoginGate::handle($get,[],$s,$cfg,$now)['body'],'Salir')
     def test_route_policy_and_missing_configuration(self):
         php_run(r"""
 $private = OwnerLoginGate::requireOwner(['REQUEST_METHOD'=>'GET','REQUEST_URI'=>'/overview','REMOTE_USER'=>'pl0n3r'],$s,$cfg,$now);
-check($private['status']===302 && $private['headers']['Location']==='/login');
+check($private['status']===302 && $private['headers']['Location']==='/login?next=%2Foverview');
 check($private['headers']['Cache-Control']==='no-store');
 foreach (['/health','/health.php','/assets/main.css'] as $path)
     check(OwnerLoginGate::requireOwner(['REQUEST_METHOD'=>'GET','REQUEST_URI'=>$path],$s,$cfg,$now)===null);
@@ -152,7 +152,7 @@ for ($i=0;$i<5;$i++) {
 }
 $good=['csrf'=>$csrf,'username'=>'pl0n3r','password'=>'fixture-only'];
 $r=OwnerLoginGate::handle($post,$good,$s,$cfg,$now,$regenerate);
-check($r['status']===303 && $r['headers']['Location']==='/overview');
+check($r['status']===303 && $r['headers']['Location']==='/');
 check($regen===1);
 check(count(glob($cfg['rate_limit_dir'].'/cb-owner-*.json'))===2);
 """)

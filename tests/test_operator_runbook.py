@@ -18,17 +18,17 @@ SENSITIVE = (
     r"github_pat_[A-Za-z0-9_]{12,}",
     r"sk-[A-Za-z0-9]{12,}",
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
-    r"(?i)\\b(?:password|passwd|api_key|auth_key)\\s*[:=]\\s*[^\\s<>]{8,}",
-    r"(?i)\\bauthorization\\s*:\\s*(?:bearer|basic)\\s+\\S+",
-    r"(?i)\\b(?:cookie|set-cookie)\\s*:\\s*\\S+",
-    r"\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b",
-    r"/home/u\\d{6,}/",
+    r"(?i)\b(?:password|passwd|api_key|auth_key)\s*[:=]\s*[^\s<>]{8,}",
+    r"(?i)\bauthorization\s*:\s*(?:bearer|basic)\s+\S+",
+    r"(?i)\b(?:cookie|set-cookie)\s*:\s*\S+",
+    r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+    r"/home/u\d{6,}/",
 )
-CODE_BLOCKS = re.compile(r"~~~sh\\s*\\n(.*?)\\n~~~", re.S)
+CODE_BLOCKS = re.compile(r"~~~sh\s*\n(.*?)\n~~~", re.S)
 FILE_PATHS = re.compile(
-    r"(?<![A-Za-z0-9_./-])((?:scripts|tests)/[a-zA-Z0-9_.-]+\\.py)"
+    r"(?<![A-Za-z0-9_./-])((?:scripts|tests)/[a-zA-Z0-9_.-]+\.py)"
 )
-WORKFLOWS = re.compile(r"--workflow\\s+([a-zA-Z0-9_.-]+\\.yml)")
+WORKFLOWS = re.compile(r"--workflow\s+([a-zA-Z0-9_.-]+\.yml)")
 
 
 def inspect_document(text: str) -> list[str]:
@@ -61,7 +61,7 @@ def inspect_document(text: str) -> list[str]:
             if not (line.startswith("python3 ") or line.startswith("printf ")
                     or line.startswith("gh run list ")):
                 failures.append(f"comando no permitido: {line[:45]}")
-            if re.search(r"(?i)\\b(?:rm|sudo|ssh|mysql|curl|wget|deploy)\\s+-", line):
+            if re.search(r"(?i)\b(?:rm|sudo|ssh|mysql|curl|wget|deploy)\s+-", line):
                 failures.append("comando potencialmente destructivo")
         for path in FILE_PATHS.findall(block):
             paths_found.add(path)
@@ -76,7 +76,7 @@ def inspect_document(text: str) -> list[str]:
     for pattern in SENSITIVE:
         if re.search(pattern, text):
             failures.append("contenido sensible detectado")
-    if re.search(r"(?im)^\\s*(?:estado|resultado productivo)\\s*:\\s*(?:ENSAYADO|GO|GREEN|VALIDATED_IN_PRODUCTION)\\s*$", text):
+    if re.search(r"(?im)^\s*(?:estado|resultado productivo)\s*:\s*(?:ENSAYADO|GO|GREEN|VALIDATED_IN_PRODUCTION)\s*$", text):
         failures.append("declara estado live sin evidencia")
     return failures
 
@@ -107,11 +107,11 @@ def test_criterio_principal(self: unittest.TestCase) -> None:
 def test_rechaza_cambios_inseguros(self: unittest.TestCase) -> None:
     text = DOC.read_text(encoding="utf-8")
     for injection in (
-        "\\n~~~sh\\npython3 scripts/inexistente.py\\n~~~\\n",
-        "\\n~~~sh\\nsudo rm -rf /\\n~~~\\n",
-        "\\nghp_0123456789abcdef0123456789\\n",
-        "\\nalice@example.com\\n",
-        "\\nEstado: VALIDATED_IN_PRODUCTION\\n",
+        "\n~~~sh\npython3 scripts/inexistente.py\n~~~\n",
+        "\n~~~sh\nsudo rm -rf /\n~~~\n",
+        "\nghp_0123456789abcdef0123456789\n",
+        "\nalice@example.com\n",
+        "\nEstado: VALIDATED_IN_PRODUCTION\n",
     ):
         with self.subTest(injection=injection[:45]):
             self.assertNotEqual(inspect_document(text + injection), [])

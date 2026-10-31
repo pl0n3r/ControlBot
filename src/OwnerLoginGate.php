@@ -314,7 +314,7 @@ final class OwnerLoginGate {
         $csrf = htmlspecialchars($session['_cb_login_csrf'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $noticeHtml = $notice !== '' ? '<p role="alert" class="error">' . htmlspecialchars($notice, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '';
         $content = $authenticated
-            ? '<p>Sesión de acceso local iniciada.</p><p><a href="/overview">Ir al panel</a></p>'
+            ? '<p>Sesión de acceso local iniciada.</p><p><a href="/">Ir al panel</a></p>'
                 . '<form method="post" action="/login"><input type="hidden" name="action" value="logout">'
                 . '<input type="hidden" name="csrf" value="' . $csrf . '"><button type="submit">Salir</button></form>'
                 . self::managementForms($csrf, $mfa)
@@ -323,25 +323,48 @@ final class OwnerLoginGate {
                 . ($next !== '' ? '<input type="hidden" name="next" value="' . htmlspecialchars($next, ENT_QUOTES, 'UTF-8') . '">' : '')
                 . '<label for="username">Usuario</label><input id="username" name="username" type="text" autocomplete="username" required maxlength="128">'
                 . '<label for="password">Contraseña</label><input id="password" name="password" type="password" autocomplete="current-password" required>'
-                . '<label for="totp">Código TOTP o de recuperación (si aplica)</label>'
+                . '<label for="totp">Código de verificación<span class="hint">Solo si activaste la verificación en dos pasos.</span></label>'
                 . '<input id="totp" name="totp" type="text" autocomplete="one-time-code" maxlength="128">'
                 . '<button type="submit">Entrar</button></form>';
+        $mark = '<svg viewBox="0 0 36 36" aria-hidden="true" focusable="false"><rect width="36" height="36" rx="9" fill="var(--cyan)"/>'
+            . '<path d="M11 18.5l5 5 9-11" fill="none" stroke="var(--on-accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         $html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>Acceso del propietario | ControlBot</title><style>'
             . \ControlBot\Ui\UiTheme::tokensCss()
-            . 'body{margin:0;min-height:100vh;display:grid;place-items:center;'
-            . 'font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}'
-            . 'main{box-sizing:border-box;width:min(92vw,390px);padding:2rem;'
-            . 'border:1px solid var(--line);border-radius:16px;background:var(--panel)}'
-            . 'label,input,button{display:block;width:100%;box-sizing:border-box;margin-top:.65rem}'
-            . 'input,button{min-height:44px;padding:.75rem;border-radius:8px;border:1px solid var(--line-strong)}'
-            . 'input{background:var(--field-bg);color:var(--text);font:inherit}'
-            . 'button{background:var(--cyan);color:var(--on-accent);font-weight:700;cursor:pointer;margin-top:1.25rem}'
-            . 'button:hover{filter:brightness(.94)}a{color:var(--cyan)}.error{color:var(--red)}'
+            . ':root{color-scheme:light dark}'
+            . 'body{margin:0;min-height:100vh;display:grid;place-items:center;padding:1.5rem 1rem;box-sizing:border-box;'
+            . 'font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;background:var(--bg);color:var(--text)}'
+            . '::selection{background:var(--cyan);color:var(--on-accent)}'
+            . 'main{box-sizing:border-box;width:min(100%,400px);padding:2rem 1.75rem 1.75rem;'
+            . 'border:1px solid var(--line);border-radius:16px;background:var(--panel);'
+            . 'box-shadow:0 12px 32px -12px rgba(12,20,25,.28);animation:rise .5s cubic-bezier(.16,1,.3,1) both}'
+            . '@keyframes rise{from{opacity:0;transform:translateY(10px)}}'
+            . '.brand{display:flex;align-items:center;gap:.7rem;margin:0 0 1.5rem}'
+            . '.brand svg{flex:none;width:36px;height:36px}'
+            . '.brand span{font-size:1.125rem;font-weight:700;letter-spacing:-.01em}'
+            . 'h1{margin:0 0 .25rem;font-size:1.5rem;line-height:1.2;letter-spacing:-.02em;text-wrap:balance}'
+            . '.lede{margin:0 0 1.25rem;color:var(--muted);font-size:.9375rem}'
+            . 'label{display:block;margin-top:1rem;font-size:.875rem;font-weight:600}'
+            . '.hint{display:block;margin-top:.25rem;color:var(--muted);font-size:.8125rem;font-weight:400}'
+            . 'input,button{display:block;width:100%;box-sizing:border-box;min-height:44px;font:inherit;border-radius:8px}'
+            . 'input{margin-top:.4rem;padding:.65rem .8rem;border:1px solid var(--line-strong);background:var(--field-bg);'
+            . 'color:var(--text);caret-color:var(--cyan);transition:border-color .15s,box-shadow .15s}'
+            . 'input:hover{border-color:var(--cyan)}'
+            . 'input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-soft)}'
+            . 'button{margin-top:1.5rem;padding:.65rem 1rem;border:0;background:var(--cyan);color:var(--on-accent);'
+            . 'font-weight:700;cursor:pointer;transition:background-color .15s,transform .15s}'
+            . 'button:hover{filter:brightness(.94)}button:active{transform:scale(.98)}'
+            . 'a{color:var(--cyan);text-underline-offset:.2em}'
+            . '.error{margin:0 0 1rem;padding:.7rem .85rem;border:1px solid var(--red);border-radius:8px;'
+            . 'background:var(--warning-bg);color:var(--warning-text);font-size:.9375rem}'
+            . '.foot{margin:1.5rem 0 0;color:var(--muted);font-size:.8125rem;text-align:center}'
             . ':focus-visible{outline:3px solid var(--amber);outline-offset:3px}'
             . '@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}'
             . '</style></head>'
-            . '<body><main><h1>ControlBot</h1><p>Acceso del propietario</p>' . $noticeHtml . $content . '</main></body></html>';
+            . '<body><main><div class="brand">' . $mark . '<span>ControlBot</span></div>'
+            . '<h1>' . ($authenticated ? 'Sesión iniciada' : 'Acceso del propietario') . '</h1>'
+            . '<p class="lede">' . ($authenticated ? 'Ya puedes entrar al panel.' : 'Entra con tu usuario y contraseña para abrir el panel.') . '</p>'
+            . $noticeHtml . $content . '<p class="foot">Zona privada. Los accesos quedan registrados.</p></main></body></html>';
         return self::response($status, $html, ['Content-Type' => 'text/html; charset=utf-8']);
     }
     private static function managementForms(string $csrf, array $mfa): string {

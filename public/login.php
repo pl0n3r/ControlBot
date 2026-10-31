@@ -2,8 +2,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../src/OwnerLoginGate.php';
+require_once __DIR__ . '/../src/SecretSource.php';
 
 use ControlBot\Security\OwnerLoginGate;
+use ControlBot\Security\SecretSource;
 
 // Hoja offline #916: no habilita el rewrite /login ni desactiva Basic Auth.
 // La activación del endpoint requiere revisión D-059 y cableado posterior.
@@ -33,7 +35,7 @@ if (!session_start()) {
 
 $config = [
     'owner_login' => getenv('CONTROLBOT_OWNER_LOGIN') ?: null,
-    'password_hash' => getenv('CONTROLBOT_OWNER_PASSWORD_HASH') ?: null,
+    'password_hash' => SecretSource::read('CONTROLBOT_OWNER_PASSWORD_HASH', dirname(__DIR__)),
     'rate_limit_dir' => getenv('CONTROLBOT_OWNER_RATE_LIMIT_DIR') ?: null,
 ];
 $response = OwnerLoginGate::handle(

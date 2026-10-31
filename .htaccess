@@ -6,10 +6,14 @@ DirectoryIndex index.php
 <IfModule mod_auth_basic.c>
 <IfModule mod_authn_file.c>
 <IfModule mod_authz_core.c>
+# La ventana de usuario y contraseña solo se retira cuando el dueño crea el archivo marcador
+# (junto con CONTROLBOT_OWNER_PASSWORD_HASH en el servidor). Sin él, sigue cerrado como antes.
+<If "! -f '/home/u151692719/.htpasswds/owner-login-enabled'">
 AuthType Basic
 AuthName "ControlBot"
 AuthUserFile /home/u151692719/.htpasswds/controlbot
 Require valid-user
+</If>
 </IfModule>
 </IfModule>
 </IfModule>
@@ -35,10 +39,14 @@ RewriteRule \.(?:md|ya?ml|json|lock|sql|log|ini|dist|xml|toml)$ - [F,L,NC]
 # Reject direct client access to the internal health entrypoint. Internal rewrites keep the original THE_REQUEST.
 RewriteCond %{THE_REQUEST} \s/+public/health\.php(?:\s|\?|$) [NC]
 RewriteRule ^public/health\.php$ - [R=404,L,NC]
-RewriteRule ^(?!(?:index\.php|public/index\.php|health\.php|public/health\.php)$).+\.php$ - [F,L,NC]
+# La página de login se sirve solo como /login; el archivo no es accesible directamente.
+RewriteCond %{THE_REQUEST} \s/+public/login\.php(?:\s|\?|$) [NC]
+RewriteRule ^public/login\.php$ - [R=404,L,NC]
+RewriteRule ^(?!(?:index\.php|public/index\.php|health\.php|public/health\.php|public/login\.php)$).+\.php$ - [F,L,NC]
 
 # Owner-gated health route stays closed without real server auth and private artifact.
 RewriteRule ^health\.php$ public/health.php [L,NC]
+RewriteRule ^login$ public/login.php [L,NC]
 # Only the intended public surface bypasses the front controller.
 RewriteRule ^(?:index\.php$|public(?:/|$)) - [L,NC]
 RewriteRule ^ index.php [L]

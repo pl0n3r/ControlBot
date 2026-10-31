@@ -24,7 +24,7 @@ SENSITIVE = (
     r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
     r"/home/u\d{6,}/",
 )
-CODE_BLOCKS = re.compile(r"~~~sh\s*\n(.*?)\n~~~", re.S)
+CODE_BLOCKS = re.compile(r"(?m)^[ \t]*~~~sh[ \t]*\r?\n(.*?)^[ \t]*~~~[ \t]*(?:\r?\n|\Z)", re.S)
 FILE_PATHS = re.compile(
     r"(?<![A-Za-z0-9_./-])((?:scripts|tests)/[a-zA-Z0-9_.-]+\.py)"
 )

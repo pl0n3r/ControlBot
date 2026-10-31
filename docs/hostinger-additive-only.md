@@ -5,8 +5,8 @@
 ## Política de operación segura
 
 - **Predeterminado:** solo crear archivos inexistentes con ruta canónica validada; escribir un nombre existente equivale a **sobrescritura destructiva** y nunca es aditivo.
-- Operaciones tipadas destructivas: \`remove\`, \`overwrite\`, \`drop_table\` y \`truncate_table\`. Deben tener aprobación explícita del **dueño** por **operación exacta**, de un solo uso, asociada a run, destino y contenido. Una aprobación no cubre otra ruta, otro SQL, otro run ni una modificación posterior.
-- Rechazar incondicionalmente \`rm\`, \`rmdir\`, \`DROP\`, \`TRUNCATE\`, \`DELETE\`, \`mv\`, shell, SQL o comandos arbitrarios sin parseo tipado. **No ejecutar strings de shell/SQL aunque exista un supuesto permiso**. Toda eliminación autorizada solo se representa como acción tipada de la capa superior.
+- Operaciones tipadas destructivas: `remove`, `overwrite`, `drop_table` y `truncate_table`. Deben tener aprobación explícita del **dueño** por **operación exacta**, de un solo uso, asociada a run, destino y contenido. Una aprobación no cubre otra ruta, otro SQL, otro run ni una modificación posterior.
+- Rechazar incondicionalmente `rm`, `rmdir`, `DROP`, `TRUNCATE`, `DELETE`, `mv`, shell, SQL o comandos arbitrarios sin parseo tipado. **No ejecutar strings de shell/SQL aunque exista un supuesto permiso**. Toda eliminación autorizada solo se representa como acción tipada de la capa superior.
 - Cualquier operación (también create) requiere primero **recibo de copia reciente y verificada** para el run/alcance de la operación y restore probado, conforme a la puerta D-059 de #1359. Si falta la evidencia auténtica, es antigua, pertenece a otro destino o es UNKNOWN, negar sin mutar.
 - El simulador usa un callback de backup inyectado únicamente por el test. En producción el proceso confiable debe verificar por sí mismo evidencia SHA-256, restauración, firma/autoridad, caducidad y scope; nunca aceptar un objeto creado por el caller como prueba de un respaldo real.
 - Toda acción denegada registra un recibo mínimo sin payload, secretos, grants ni credenciales. Fallo de auditoría -> fallo cerrado. Si una autorización destructiva se consume, no se reutiliza aunque se produzca un error posterior.
@@ -14,9 +14,9 @@
 
 ## Contrato ejecutable de simulación sin red
 
-El bloque de Python siguiente se carga solo por \`tests/test_hostinger_additive_only.py\`. Altera exclusivamente diccionarios en memoria; nunca llama sockets, SSH, API, shell, subprocess ni base de datos.
+El bloque de Python siguiente se carga solo por `tests/test_hostinger_additive_only.py`. Altera exclusivamente diccionarios en memoria; nunca llama sockets, SSH, API, shell, subprocess ni base de datos.
 
-\`\`\`python
+```python
 # BEGIN HOSTINGER_ADDITIVE_ONLY_CONTRACT
 import hashlib
 import json
@@ -119,16 +119,16 @@ class AdditiveOnlySimulator:
                 and type(grant["expires_at"]) is int and self.now() < grant["expires_at"] <= self.now() + 300
                 and grant["decision"] == "GRANTED")
 # END HOSTINGER_ADDITIVE_ONLY_CONTRACT
-\`\`\`
+```
 
 ## Relación con el gate de respaldo #1359
 
-\`tests/test_hostinger_additive_only.py\` ejercita el \`BackupGate\` PHP real con el fixture B2 sintético de \`tests/test_deploy_backup_gate.py\`. Su veredicto de backup se inyecta en el simulador en memoria; el test valida que un recibo alterado, una restauración corrupta o una copia no verificada bloquean también las creaciones aditivas.
+`tests/test_hostinger_additive_only.py` ejercita el `BackupGate` PHP real con el fixture B2 sintético de `tests/test_deploy_backup_gate.py`. Su veredicto de backup se inyecta en el simulador en memoria; el test valida que un recibo alterado, una restauración corrupta o una copia no verificada bloquean también las creaciones aditivas.
 
-**La marca de test \`SATISFIED\` es solo una precondición sintética.** \`runtime_authorized=false\`, \`deploy_enabled=false\`, \`production_verified=false\` siempre. Hostinger real y Backblaze B2 siguen UNKNOWN y no están autorizados.
+**La marca de test `SATISFIED` es solo una precondición sintética.** `runtime_authorized=false`, `deploy_enabled=false`, `production_verified=false` siempre. Hostinger real y Backblaze B2 siguen UNKNOWN y no están autorizados.
 
 ## Aceptación y reversión
 
-\`docs/hostinger-additive-only.md::Hostinger-additive-onlyTests::test_criterio_principal\` es el nombre canónico exigido por #1369; la clase dinámica y método reales se definen en \`tests/test_hostinger_additive_only.py\`.
+`docs/hostinger-additive-only.md::Hostinger-additive-onlyTests::test_criterio_principal` es el nombre canónico exigido por #1369; la clase dinámica y método reales se definen en `tests/test_hostinger_additive_only.py`.
 
-Ejecutar \`python3 -m unittest tests.test_hostinger_additive_only -v\` y luego \`CI Factory v1 / Validar\` sobre HEAD exacto. Reversión: revertir los dos archivos de documentación/prueba; no modifica código runtime ni credenciales. El resultado offline **no** concede permisos del dueño para un deploy real.
+Ejecutar `python3 -m unittest tests.test_hostinger_additive_only -v` y luego `CI Factory v1 / Validar` sobre HEAD exacto. Reversión: revertir los dos archivos de documentación/prueba; no modifica código runtime ni credenciales. El resultado offline **no** concede permisos del dueño para un deploy real.

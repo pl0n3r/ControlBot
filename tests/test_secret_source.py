@@ -58,5 +58,15 @@ class SecretSourceTests(unittest.TestCase):
         self.assertIn("SecretSource::read('CONTROLBOT_OWNER_PASSWORD_HASH'", (ROOT / "public/login.php").read_text(encoding="utf-8"))
 
 
+    def test_runbook_is_in_claimed_path_and_not_legacy_hostinger_document(self) -> None:
+        guide_path = ROOT / "docs/secretos-en-archivo-hostinger.md"
+        guide = guide_path.read_text(encoding="utf-8")
+        for required in ("CONTROLBOT_VAULT_KEY_FILE", "CONTROLBOT_OWNER_PASSWORD_HASH_FILE",
+                         "4096", "D-059", "0600", "public_html"):
+            self.assertIn(required, guide)
+        legacy = (ROOT / "docs/hostinger-root-publication.md").read_text(encoding="utf-8")
+        self.assertNotIn("## Secretos en archivo privado", legacy)
+
+
 if __name__ == "__main__":
     unittest.main()

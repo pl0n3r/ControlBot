@@ -84,6 +84,30 @@ class OwnerLoginRedirectTests(unittest.TestCase):
             finally:
                 proc.kill(); proc.wait()
 
+    def test_private_owner_hash_file_enables_the_same_login_gate(self):
+        """El hash privado fuera del repositorio usa el mismo contrato que login.php."""
+        with tempfile.TemporaryDirectory(prefix="cb1346-secret-") as secrets:
+            hashed = subprocess.run(
+                ["php", "-r", "echo password_hash('fixture-only', PASSWORD_ARGON2ID, "
+                 "['memory_cost'=>4096,'time_cost'=>1,'threads'=>1]);"],
+                text=True, capture_output=True, check=True).stdout
+            secret_file = Path(secrets) / "owner-password.hash"
+            secret_file.write_text(hashed + "\n", encoding="utf-8")
+            secret_file.chmod(0o600)
+            with tempfile.TemporaryDirectory(prefix="cb1346-throttle-") as limits:
+                proc, port = _serve({
+                    "CONTROLBOT_OWNER_PASSWORD_HASH": "",
+                    "CONTROLBOT_OWNER_PASSWORD_HASH_FILE": str(secret_file),
+                    "CONTROLBOT_OWNER_RATE_LIMIT_DIR": limits,
+                })
+                try:
+                    status, headers = _get(port, "/overview", "text/html")
+                    self.assertEqual(status, 302)
+                    self.assertEqual(headers["Location"], "/login?next=%2Foverview")
+                    self.assertIsNone(headers["WWW-Authenticate"])
+                finally:
+                    proc.kill(); proc.wait()
+
     def test_post_logout_csrf_and_safe_internal_return(self):
         php_run(r"""
 foreach (['/overview', '/github', '/projects/condor/github'] as $ok)

@@ -7,8 +7,8 @@ require_once __DIR__ . '/../src/SecretSource.php';
 use ControlBot\Security\OwnerLoginGate;
 use ControlBot\Security\SecretSource;
 
-// Hoja offline #916: no habilita el rewrite /login ni desactiva Basic Auth.
-// La activación del endpoint requiere revisión D-059 y cableado posterior.
+// Ruta /login habilitada por #1346: la retirada de Basic Auth exige activación
+// explícita del dueño; no se modifica hosting ni se provisionan secretos aquí.
 if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === 'off') {
     http_response_code(503);
     header('Cache-Control: no-store');

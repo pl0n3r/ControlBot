@@ -15,7 +15,7 @@ use ControlBot\Web\ControlBotWebEntrypoint;
 
 // Acceso con página de login (#1346): solo se activa cuando el servidor tiene el hash de la
 // contraseña del dueño. Sin él, todo sigue cerrado por la ruta OAuth/TOTP de más abajo.
-$passwordHash = getenv('CONTROLBOT_OWNER_PASSWORD_HASH');
+$passwordHash = SecretSource::read('CONTROLBOT_OWNER_PASSWORD_HASH', dirname(__DIR__));
 if (is_string($passwordHash) && $passwordHash !== '') {
     $loginConfig = [
         'owner_login' => getenv('CONTROLBOT_OWNER_LOGIN') ?: null,

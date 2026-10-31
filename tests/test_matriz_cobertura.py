@@ -44,6 +44,7 @@ POST_SNAPSHOT = {
     "docs/hostinger-deploy-backup-gate.md": (1359, 1367, "tests/test_deploy_backup_gate.py"),
     "docs/health-monitor.md": (1370, 1376, "tests/test_health_monitor_alerts.py"),
     "docs/profiles-chats-inventory.md": (1362, 1386, "tests/test_profiles_chats_inventory.py"),
+    "docs/hostinger-transport.md": (1368, 1392, "tests/test_hostinger_transport.py"),
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
 POST_CELL = re.compile(

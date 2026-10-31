@@ -241,11 +241,11 @@ catch (RuntimeException $e) { chk2($e->getMessage()==='Owner session revision ch
 chk2($s->login($now+2,$s->status()['version']) === $s->status()['version']);
 $secret=$s->beginEnrollment($now);
 chk2(!$s->verify('123456',$now));
-try { $s->confirmEnrollment(Totp::code($secret,$now+400),$now+400); throw new RuntimeException('expired allowed'); }
+try { $s->confirmEnrollment(Totp::code($secret,$now+400),$now+400,$s->status()['version']); throw new RuntimeException('expired allowed'); }
 catch (RuntimeException $e) { chk2($e->getMessage()==='TOTP setup invalid.'); }
 $secret=$s->beginEnrollment($now+401);
 $setupCode=Totp::code($secret,$now+401);
-$enrollment=$s->confirmEnrollment($setupCode,$now+401);
+$enrollment=$s->confirmEnrollment($setupCode,$now+401,$s->status()['version']);
 chk2(count($enrollment['codes'])===8,'eight one-time recovery codes');
 chk2($s->validVersion($enrollment['version']),'enrollment version must be current');
 $s->revokeAll($now+402);

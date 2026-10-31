@@ -46,6 +46,7 @@ POST_SNAPSHOT = {
     "docs/profiles-chats-inventory.md": (1362, 1386, "tests/test_profiles_chats_inventory.py"),
     "docs/hostinger-transport.md": (1368, 1392, "tests/test_hostinger_transport.py"),
     "docs/secretos-en-archivo-hostinger.md": (1349, 1350, "tests/test_secret_source.py"),
+    "docs/hostinger-additive-only.md": (1369, 1398, "tests/test_hostinger_additive_only.py"),
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
 POST_CELL = re.compile(
@@ -274,6 +275,12 @@ class MatrizCoberturaTests(unittest.TestCase):
         expected = (1349, 1350, "tests/test_secret_source.py")
         self.assertEqual(expected, POST_SNAPSHOT["docs/secretos-en-archivo-hostinger.md"])
         self.assertEqual(expected, parse_post_snapshot(self.text)["docs/secretos-en-archivo-hostinger.md"])
+
+    def test_registro_hostinger_additive_only_exacto(self):
+        """La política offline #1369 referencia el PR #1398 sin acreditar producción."""
+        expected = (1369, 1398, "tests/test_hostinger_additive_only.py")
+        self.assertEqual(expected, POST_SNAPSHOT["docs/hostinger-additive-only.md"])
+        self.assertEqual(expected, parse_post_snapshot(self.text)["docs/hostinger-additive-only.md"])
 
     def test_particiones_son_salidas_no_fuentes(self):
         self.assertFalse(is_normative_document(DOC))

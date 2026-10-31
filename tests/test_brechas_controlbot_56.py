@@ -15,6 +15,8 @@ import shutil
 import subprocess
 import unittest
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 MASTER = ROOT / "docs/matriz-cobertura.md"
 PART = ROOT / "docs/matriz-cobertura-parte-03.md"
@@ -46,10 +48,7 @@ def matrix_rows(texts: tuple[str, str] | None = None) -> dict[str, tuple[str, ..
             identifier = match.group(1)
             if identifier in rows or len(cells) != 6 or not all(cells):
                 raise ValueError("UNKNOWN: duplicate/incomplete row " + identifier)
-            if cells[3] != "NO_VERIFICABLE" or any(
-                f"{plane}=unknown" not in cells[4].lower()
-                for plane in ("offline", "live", "operando")
-            ):
+            if not e3_coverage(cells):
                 raise ValueError("UNKNOWN: unproven coverage " + identifier)
             rows[identifier] = cells
     if set(rows) != set(IDS):
@@ -191,7 +190,7 @@ class BrechasControlbot56Tests(unittest.TestCase):
         for identifier in IDS:
             with self.subTest(clause=identifier):
                 self.assertTrue(checks[identifier], "brecha sin aserción " + identifier)
-                self.assertEqual(rows[identifier][3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(rows[identifier]))
 
     def test_falla_cerrado(self) -> None:
         """AC-02: filas ausentes/duplicadas y cobertura inventada son UNKNOWN."""
@@ -246,9 +245,9 @@ class BrechasControlbot56Tests(unittest.TestCase):
         self.assertEqual(len(rows), 15)
         for identifier, cells in rows.items():
             with self.subTest(clause=identifier):
-                self.assertEqual(cells[3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(cells))
                 self.assertTrue(all(f"{p}=unknown" in cells[4].lower()
-                                    for p in ("offline", "live", "operando")))
+                                    for p in (("offline", "live", "operando") if cells[3] == "NO_VERIFICABLE" else ("live", "operando"))))
                 self.assertEqual(external_attestation(cells), UNKNOWN)
         briefing = php_scenario("owner_briefing_delivery_scenarios.php")
         self.assertEqual(briefing["first"]["delivery_status"], "pending")

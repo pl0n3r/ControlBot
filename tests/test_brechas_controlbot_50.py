@@ -12,6 +12,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / 'docs/matriz-cobertura.md'
 PART = ROOT / 'docs/matriz-cobertura-parte-03.md'
@@ -228,9 +230,10 @@ class BrechasControlbot50Tests(unittest.TestCase):
             with self.subTest(clause=identifier):
                 row = rows[identifier]
                 self.assertIn(SOURCES[identifier], row)
-                self.assertIn('| NO_VERIFICABLE |', row)
+                self.assertTrue(e3_coverage([p.strip() for p in row.strip('|').split('|')]))
                 for state in ('Offline=UNKNOWN', 'live=UNKNOWN', 'operando=UNKNOWN'):
-                    self.assertIn(state.lower(), row.lower())
+                    if state != "Offline=UNKNOWN" or "| NO_VERIFICABLE |" in row:
+                        self.assertIn(state.lower(), row.lower())
                 self.assertTrue((ROOT / 'docs' / SOURCES[identifier]).is_file())
         self.assertEqual(set(UNVERIFIED), {'CB-0761', 'CB-0763', 'CB-0768', 'CB-0771'})
         for reason in UNVERIFIED.values():

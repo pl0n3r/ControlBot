@@ -5,6 +5,8 @@ No cambia la matriz, autoriza B2/V3, verifica backups ni permite despliegues.
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
+
 import ast
 from functools import lru_cache
 import json
@@ -67,10 +69,7 @@ def rows(data: object) -> dict[str, tuple[str, ...]]:
             group, _, anchor = CLAUSE[ident]
             if (ident in found or len(fields) != 6 or fields[0] != ident
                     or DOC[group] not in fields[1] or anchor not in fields[2]
-                    or fields[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos." not in fields[4]
-                    or any(f"{k}=unknown" not in fields[4].lower()
-                           for k in ("offline", "live", "operando"))
+                    or not credible_e4_coverage_row(fields)
                     or (path == MAIN) != (ident == "CB-0994")):
                 raise ValueError("UNKNOWN: invalid row " + ident)
             found[ident] = fields
@@ -233,7 +232,7 @@ class BrechasControlbot64Tests(unittest.TestCase):
         for ident in IDS:
             with self.subTest(id=ident):
                 self.assertEqual(verdict(ident, data), UNKNOWN if ident in GAPS else LOCAL)
-                self.assertEqual(indexed[ident][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_e4_coverage_row(indexed[ident]))
 
     def test_falla_cerrado(self) -> None:
         """AC-02: falta, duplicación, promoción o alteración nunca es GREEN."""
@@ -246,7 +245,7 @@ class BrechasControlbot64Tests(unittest.TestCase):
                 for modified in (data[path].replace(row, "", 1),
                                  data[path] + "\n" + row,
                                  data[path].replace(
-                                     row, row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1)):
+                                     row, corrupted_e4_row(row), 1)):
                     self.assertEqual(UNKNOWN, verdict(
                         ident, {**data, path: modified}))
                 group, clause, _ = CLAUSE[ident]
@@ -278,7 +277,7 @@ class BrechasControlbot64Tests(unittest.TestCase):
         imports |= {(n.module or "").split(".")[0] for n in ast.walk(tree)
                     if isinstance(n, ast.ImportFrom)}
         self.assertLessEqual(imports, {"__future__", "ast", "functools", "json",
-                                      "pathlib", "re", "shutil", "subprocess", "unittest"})
+                                      "pathlib", "re", "shutil", "subprocess", "unittest", "test_brechas_controlbot_20"})
         self.assertNotIn("do-not-echo", json.dumps(scenario("p", "baseline")))
         escaped = scenario("u", "escape")
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", escaped)
@@ -292,7 +291,7 @@ class BrechasControlbot64Tests(unittest.TestCase):
         indexed = rows(data)
         for ident in IDS:
             with self.subTest(id=ident):
-                self.assertEqual("NO_VERIFICABLE", indexed[ident][3])
+                self.assertTrue(credible_e4_coverage_row(indexed[ident]))
                 for claim in (None, {}, {"ci": "success", "sha": "a" * 40},
                               {"factory_recovery_health": "GREEN"},
                               {"backup_receipt": "VALIDATED_IN_PRODUCTION"},

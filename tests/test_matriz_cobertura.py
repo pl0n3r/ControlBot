@@ -47,6 +47,7 @@ POST_SNAPSHOT = {
     "docs/hostinger-transport.md": (1368, 1392, "tests/test_hostinger_transport.py"),
     "docs/secretos-en-archivo-hostinger.md": (1349, 1350, "tests/test_secret_source.py"),
     "docs/hostinger-additive-only.md": (1369, 1398, "tests/test_hostinger_additive_only.py"),
+    "docs/auth-negative-tests.md": (1364, 1400, "tests/test_auth_negative.py"),
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
 POST_CELL = re.compile(
@@ -281,6 +282,14 @@ class MatrizCoberturaTests(unittest.TestCase):
         expected = (1369, 1398, "tests/test_hostinger_additive_only.py")
         self.assertEqual(expected, POST_SNAPSHOT["docs/hostinger-additive-only.md"])
         self.assertEqual(expected, parse_post_snapshot(self.text)["docs/hostinger-additive-only.md"])
+
+    def test_registro_auth_negative_exacto(self):
+        """#1364/#1400: documento de pruebas sintéticas, sin atestación live."""
+        expected = (1364, 1400, "tests/test_auth_negative.py")
+        self.assertEqual(expected, POST_SNAPSHOT["docs/auth-negative-tests.md"])
+        self.assertEqual(expected, parse_post_snapshot(self.text)["docs/auth-negative-tests.md"])
+        # Los archivos de #1364 pertenecen al PR bloqueado #1400:
+        # registrar la identidad no presupone que ya estén en esta rama.
 
     def test_particiones_son_salidas_no_fuentes(self):
         self.assertFalse(is_normative_document(DOC))

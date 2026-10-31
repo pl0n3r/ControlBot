@@ -243,7 +243,7 @@ Originalmente todos los estados eran **NO_VERIFICABLE**; #1255 promueve únicame
 | CB-1167 | [issues/55:L4](https://github.com/pl0n3r/ControlBot/issues/55) | Si GitHub falla o responde ambiguo, ControlBot falla cerrado y no inventa estado. | NO_VERIFICABLE | Aceptación integral o evidencia terminal no comprobada; NO cuenta como hoja ejecutable. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN. | [#55](https://github.com/pl0n3r/ControlBot/issues/55) |
 | CB-1168 | [issues/55:L5](https://github.com/pl0n3r/ControlBot/issues/55) | Permisos GitHub son mínimos y revocables. | NO_VERIFICABLE | Aceptación integral o evidencia terminal no comprobada; NO cuenta como hoja ejecutable. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN. | [#55](https://github.com/pl0n3r/ControlBot/issues/55) |
 | CB-1169 | [issues/55:L6](https://github.com/pl0n3r/ControlBot/issues/55) | La UI funciona en iPhone y desktop. | NO_VERIFICABLE | Aceptación integral o evidencia terminal no comprobada; NO cuenta como hoja ejecutable. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN. | [#55](https://github.com/pl0n3r/ControlBot/issues/55) |
-| CB-1172 | [issues/561:L2](https://github.com/pl0n3r/ControlBot/issues/561) | Las decisiones del dueño pendientes de todos los repos aparecen arriba, con enlace al Issue. | CUBIERTO | Código src/FactoryLiveSnapshot.php; prueba tests/test_cobertura_controlbot_69.py; PR #1322 MERGED; requisito CB-1172 ejercido contra código real con fixtures offline (#1252); sin validación productiva; live=UNKNOWN; operando=UNKNOWN. | [#561](https://github.com/pl0n3r/ControlBot/issues/561) |
+| CB-1172 | [issues/561:L2](https://github.com/pl0n3r/ControlBot/issues/561) | Las decisiones del dueño pendientes de todos los repos aparecen arriba, con enlace al Issue. | NO_VERIFICABLE | Aceptación integral o evidencia terminal no comprobada: test_brechas_controlbot_76.py exige evidencia multi-repos de todas las decisiones pendientes con orden y enlaces reales; tests/test_cobertura_controlbot_69.py / PR #1322 MERGED solo ejercita snapshot y UI PHP sintéticos, sin prueba integral de la ordenación real; requiere prueba de aceptación independiente por QA y autoridad del dueño. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN. | [#561](https://github.com/pl0n3r/ControlBot/issues/561) |
 | CB-1173 | [issues/561:L3](https://github.com/pl0n3r/ControlBot/issues/561) | Un dato no disponible se muestra como UNKNOWN o STALE, nunca como éxito. | CUBIERTO | Código src/FactoryLiveSnapshot.php; prueba tests/test_cobertura_controlbot_69.py; PR #1322 MERGED; requisito CB-1173 ejercido contra código real con fixtures offline (#1252); sin validación productiva; live=UNKNOWN; operando=UNKNOWN. | [#561](https://github.com/pl0n3r/ControlBot/issues/561) |
 | CB-1174 | [issues/561:L4](https://github.com/pl0n3r/ControlBot/issues/561) | Es solo lectura y no expone secretos. | CUBIERTO | Código src/FactoryLiveSnapshot.php; prueba tests/test_cobertura_controlbot_69.py; PR #1322 MERGED; requisito CB-1174 ejercido contra código real con fixtures offline (#1252); sin validación productiva; live=UNKNOWN; operando=UNKNOWN. | [#561](https://github.com/pl0n3r/ControlBot/issues/561) |
 | CB-1175 | [issues/561:L5](https://github.com/pl0n3r/ControlBot/issues/561) | Funciona en móvil y cumple el contraste AA ya verificado para el centro de control. | NO_VERIFICABLE | Aceptación integral o evidencia terminal no comprobada; NO cuenta como hoja ejecutable. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN. | [#561](https://github.com/pl0n3r/ControlBot/issues/561) |
@@ -264,14 +264,14 @@ Originalmente todos los estados eran **NO_VERIFICABLE**; #1255 promueve únicame
 
 | Estado | Filas |
 | --- | ---: |
-| CUBIERTO | 126 |
+| CUBIERTO | 125 |
 | EN_CURSO | 0 |
 | SIN_COBERTURA | 0 |
 | DESCARTADO | 0 |
-| NO_VERIFICABLE | 113 |
+| NO_VERIFICABLE | 114 |
 | TOTAL | 239 |
 
-**IDs únicos:** 239 · **suma ordinal:** 242219 · **Hojas nuevas:** 0 · **Cobertura certificada (solo comportamiento offline):** 52.72%.
+**IDs únicos:** 239 · **suma ordinal:** 242219 · **Hojas nuevas:** 0 · **Cobertura certificada (solo comportamiento offline):** 52.30%.
 
 Esta parte por sí sola no cierra #940: la integración global aún debe eliminar solapamientos entre otras partes, verificar los 1.194 IDs y resolver las puertas operativas y humanas pertinentes.
 
@@ -279,6 +279,8 @@ Esta parte por sí sola no cierra #940: la integración global aún debe elimina
 ### Brechas concretas E4 que permanecen NO_VERIFICABLE
 
 Las siguientes razones individualizan la brecha de cada ID aún no promovido. Los estados de la tabla siguen fail-closed; las afirmaciones de operación y autoridad de terceros permanecen UNKNOWN.
+- **CB-1172**: Prueba sintética de #1252/PR #1322 cubre el snapshot de decisiones, pero tests/test_brechas_controlbot_76.py mantiene el contrato de aceptación integral multi-repo (orden real, enlaces a Issues y origen autenticado) como UNKNOWN; falta prueba de aceptación independiente de QA y autorización del dueño. Offline=UNKNOWN; live=UNKNOWN; operando=UNKNOWN.
+
 
 - **CB-0290**: No hay aserción conductual fusionada de #1238–#1253 para «step_up_required permanece así sin evidencia verificada y solo pasa a allow con step-up vigente del mi»; necesita test PHP de esta cláusula con negativos y PR autónomo por QA/ingeniería.
 - **CB-0291**: No hay aserción conductual fusionada de #1238–#1253 para «El output conserva refs opacas de device/session y, cuando el camino autorizado consume evidencia step»; necesita test PHP de esta cláusula con negativos y PR autónomo por QA/ingeniería.

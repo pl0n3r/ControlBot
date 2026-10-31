@@ -97,7 +97,7 @@ $form = OwnerLoginGate::handle($get, [], $s, $cfg, $now);
 check(str_contains($form['body'], 'name="next" value="/github"'));
 $csrf = $s['_cb_login_csrf'];
 $evil = OwnerLoginGate::handle($post, ['csrf'=>$csrf,'username'=>'pl0n3r','password'=>'fixture-only','next'=>'//evil.com'], $s, $cfg, $now, $regenerate);
-check($evil['status']===303 && $evil['headers']['Location']==='/');
+check($evil['status']===303 && $evil['headers']['Location']==='/overview');
 $s = [];
 OwnerLoginGate::handle($get, [], $s, $cfg, $now);
 $csrf = $s['_cb_login_csrf'];

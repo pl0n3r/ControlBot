@@ -167,7 +167,7 @@ final class OwnerLoginGate {
         $session['_cb_owner_web'] = true;
         $session['_cb_owner_last_seen'] = $now;
         $session['_cb_login_csrf'] = self::randomToken();
-        return self::redirect($next !== '' ? $next : '/');
+        return self::redirect($next !== '' ? $next : '/overview');
     }
     /** Comprueba la sesión *local*, sin conceder por ello tokens OAuth/TOTP. */
     public static function isAuthenticated(array $session, int $now): bool {
@@ -314,7 +314,7 @@ final class OwnerLoginGate {
         $csrf = htmlspecialchars($session['_cb_login_csrf'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $noticeHtml = $notice !== '' ? '<p role="alert" class="error">' . htmlspecialchars($notice, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '';
         $content = $authenticated
-            ? '<p>Sesión de acceso local iniciada.</p><p><a href="/">Ir al panel</a></p>'
+            ? '<p>Sesión de acceso local iniciada.</p><p><a href="/overview">Ir al panel</a></p>'
                 . '<form method="post" action="/login"><input type="hidden" name="action" value="logout">'
                 . '<input type="hidden" name="csrf" value="' . $csrf . '"><button type="submit">Salir</button></form>'
                 . self::managementForms($csrf, $mfa)

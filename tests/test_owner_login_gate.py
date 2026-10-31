@@ -41,7 +41,7 @@ $csrf = $s['_cb_login_csrf'];
 $bad = OwnerLoginGate::handle($post,['csrf'=>$csrf,'username'=>'intruder','password'=>'fixture-only'],$s,$cfg,$now,$regenerate);
 check($bad['status']===401 && str_contains($bad['body'],'Usuario o contraseña incorrectos'));
 $good = OwnerLoginGate::handle($post,['csrf'=>$csrf,'username'=>'pl0n3r','password'=>'fixture-only'],$s,$cfg,$now,$regenerate);
-check($good['status']===303 && $good['headers']['Location']==='/');
+check($good['status']===303 && $good['headers']['Location']==='/overview');
 check($regen===1 && OwnerLoginGate::isAuthenticated($s,$now));
 check(!array_key_exists('_github_token_sealed',$s));
 check(str_contains(OwnerLoginGate::handle($get,[],$s,$cfg,$now)['body'],'Salir'));

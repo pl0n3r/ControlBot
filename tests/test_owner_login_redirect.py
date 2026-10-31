@@ -114,6 +114,31 @@ class OwnerLoginRedirectTests(unittest.TestCase):
                 finally:
                     proc.kill(); proc.wait()
 
+    def test_local_owner_bridge_binds_identity_to_server_config(self):
+        """Ejercita las dos ramas del adaptador real, sin sesión ni datos de terceros."""
+        php_run(r"""
+require_once 'src/ControlBotWebEntrypoint.php';
+$request = [
+    'REQUEST_METHOD' => 'GET',
+    'REQUEST_URI' => '/github',
+    'REMOTE_USER' => 'forged-external-user',
+];
+$env = ['CONTROLBOT_OWNER_LOGIN' => 'pl0n3r'];
+$untrusted = \ControlBot\Web\ControlBotWebEntrypoint::handle($request, $env, $now);
+check($untrusted['status'] === 403);
+$missing = \ControlBot\Web\ControlBotWebEntrypoint::handleLocalOwner(
+    $request, ['CONTROLBOT_OWNER_LOGIN' => null], $now);
+check($missing['status'] === 503);
+check(!isset($missing['headers']['WWW-Authenticate']));
+$actual = \ControlBot\Web\ControlBotWebEntrypoint::handleLocalOwner($request, $env, $now);
+$trusted = $request;
+$trusted['REMOTE_USER'] = 'pl0n3r';
+$expected = \ControlBot\Web\ControlBotWebEntrypoint::handle($trusted, $env, $now);
+check($actual === $expected);
+check($actual['status'] === 200);
+check(!isset($actual['headers']['WWW-Authenticate']));
+""")
+
     def test_post_logout_csrf_and_safe_internal_return(self):
         php_run(r"""
 foreach (['/overview', '/github', '/projects/condor/github'] as $ok)

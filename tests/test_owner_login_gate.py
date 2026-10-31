@@ -152,7 +152,7 @@ for ($i=0;$i<5;$i++) {
 }
 $good=['csrf'=>$csrf,'username'=>'pl0n3r','password'=>'fixture-only'];
 $r=OwnerLoginGate::handle($post,$good,$s,$cfg,$now,$regenerate);
-check($r['status']===303 && $r['headers']['Location']==='/');
+check($r['status']===303 && $r['headers']['Location']==='/overview');
 check($regen===1);
 check(count(glob($cfg['rate_limit_dir'].'/cb-owner-*.json'))===2);
 """)

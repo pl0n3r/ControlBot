@@ -87,8 +87,9 @@ class Fixture(unittest.TestCase):
             with self.subTest(op=op["kind"]):
                 self.assertEqual("one_time_owner_approval_required", self.dispatch(op)["reason"])
                 self.assertEqual("one_time_owner_approval_required", self.dispatch(op, permission(op, fingerprint="f" * 64))["reason"])
-                self.assertTrue(self.dispatch(op, permission(op))["ok"])
-                self.assertEqual("one_time_owner_approval_required", self.dispatch(op, permission(op))["reason"])
+                grant = permission(op, approval_id="synthetic-once-" + op["kind"] + "-123456")
+                self.assertTrue(self.dispatch(op, grant)["ok"])
+                self.assertEqual("one_time_owner_approval_required", self.dispatch(op, grant)["reason"])
         self.assertEqual("changed", self.gate.files["public/index.php"])
         self.assertEqual([], self.gate.tables["items"])
 

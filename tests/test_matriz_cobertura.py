@@ -49,6 +49,7 @@ POST_SNAPSHOT = {
     "docs/hostinger-additive-only.md": (1369, 1398, "tests/test_hostinger_additive_only.py"),
     "docs/auth-negative-tests.md": (1364, 1400, "tests/test_auth_negative.py"),
     "docs/quota-panel.md": (1360, 1403, "tests/test_quota_panel_nonblocking.py"),
+    "docs/support-channels.md": (1358, 1404, "tests/test_support_channels.py"),
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
 POST_CELL = re.compile(
@@ -291,6 +292,39 @@ class MatrizCoberturaTests(unittest.TestCase):
         self.assertEqual(expected, parse_post_snapshot(self.text)["docs/auth-negative-tests.md"])
         # Los archivos de #1364 pertenecen al PR bloqueado #1400:
         # registrar la identidad no presupone que ya estén en esta rama.
+
+    def test_registro_support_channels_exacto(self):
+        """#1358 / PR #1404: identidad y estado post-snapshot de canales de soporte."""
+        path = "docs/support-channels.md"
+        expected = (1358, 1404, "tests/test_support_channels.py")
+        self.assertEqual(expected, POST_SNAPSHOT[path])
+        self.assertEqual(expected, parse_post_snapshot(self.text)[path])
+        self.assertEqual(missing_normative_sources(self.text, {path}), set())
+        self.assertNotIn(path, {SOURCE.fullmatch(row[1])["path"] for row in self.rows})
+        rows = [row for row in self.text.splitlines()
+                if row.startswith("| `" + path + "` |")]
+        self.assertEqual(1, len(rows), "La fuente post-snapshot es única")
+        row = rows[0]
+        self.assertTrue(row.endswith("| NO_VERIFICABLE / NO ENSAYADO |"))
+        for original, replacement in (
+            (path, "docs/soporte-inventado.md"),
+            ("[#1358](https://github.com/pl0n3r/ControlBot/issues/1358)",
+             "[#9999](https://github.com/pl0n3r/ControlBot/issues/9999)"),
+            ("[#1404](https://github.com/pl0n3r/ControlBot/pull/1404)",
+             "[#9999](https://github.com/pl0n3r/ControlBot/pull/9999)"),
+            ("tests/test_support_channels.py", "tests/test_falso.py"),
+        ):
+            with self.subTest(replacement=replacement):
+                altered = self.text.replace(row, row.replace(original, replacement, 1), 1)
+                self.assertNotEqual(altered, self.text)
+                with self.assertRaisesRegex(ValueError, "no coinciden"):
+                    parse_post_snapshot(altered)
+        with self.assertRaisesRegex(ValueError, "no acredita"):
+            parse_post_snapshot(self.text.replace(
+                row, row.replace("NO_VERIFICABLE / NO ENSAYADO", "CUBIERTO", 1),
+            ))
+        with self.assertRaisesRegex(ValueError, "duplicado"):
+            parse_post_snapshot(self.text.replace(row, row + "\n" + row, 1))
 
     def test_registro_quota_panel_nonblocking_exacto(self):
         """#1360 / PR #1403: registra fuente sin acreditar medición ni desplegar."""

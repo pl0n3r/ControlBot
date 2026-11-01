@@ -44,6 +44,7 @@
 | Smoke de producción | Atestación D-043 VALIDATED_IN_PRODUCTION sin pendientes | DEL_DUEÑO | OWNER y operador: no hay recibo de deploy observado exact-SHA con pending=[] | [#625](https://github.com/pl0n3r/ControlBot/issues/625) |
 | Autenticación del propietario | Login owner-only con prueba real de sesión y revocación | DEL_DUEÑO | OWNER y operador: Basic Auth y la seguridad offline del panel no acreditan el login instalado | [#625](https://github.com/pl0n3r/ControlBot/issues/625) |
 | Autenticación del propietario | 2FA y permisos de perfil efectivos en hosting | DEL_DUEÑO | OWNER: falta prueba independiente de TOTP, rutas prohibidas y caducidad de sesiones reales | [#625](https://github.com/pl0n3r/ControlBot/issues/625) |
+| Autenticación del propietario | Crear la clave del propietario, guardar su hash en el servidor y activar la página de login (retirar la ventana de Basic Auth) | DEL_DUEÑO | OWNER: la pantalla de login existe pero no está conectada; faltan `CONTROLBOT_VAULT_KEY` y el hash del dueño como archivos privados en Hostinger (ver `docs/secretos-en-archivo-hostinger.md`), copia previa según D-059 y el despliegue; el código lo preparan [#1346](https://github.com/pl0n3r/ControlBot/issues/1346) y [#1349](https://github.com/pl0n3r/ControlBot/issues/1349) | [#625](https://github.com/pl0n3r/ControlBot/issues/625) |
 | Transporte GitHub | Acceso GitHub real read-only limitado y autenticado | DEL_DUEÑO | OWNER: productor GitHubReadOnlyProjectionWriter #934 está OFF por defecto; faltan llaves autorizadas | [#55](https://github.com/pl0n3r/ControlBot/issues/55) |
 | Transporte GitHub | Proveniencia temporal de datos reales y revocación de token | DEL_DUEÑO | OWNER y operador: no hay snapshot GitHub productivo, validación de TTL o evidencia de rotación | [#55](https://github.com/pl0n3r/ControlBot/issues/55) |
 | Transporte Hostinger | Canal real host/SSH o API con identidad de operador | DEL_DUEÑO | OWNER y operador: docs/hostinger-public-api-runtime.md exige SecretsBroker, transporte y permisos; no hay sesión productiva | [#625](https://github.com/pl0n3r/ControlBot/issues/625) |
@@ -62,9 +63,9 @@
 | LISTO | 0 |
 | EN_CURSO | 2 |
 | SIN_COBERTURA | 0 |
-| DEL_DUEÑO | 36 |
+| DEL_DUEÑO | 37 |
 | NO_APLICA | 0 |
-| TOTAL | 38 |
+| TOTAL | 39 |
 
 **Hojas nuevas creadas por esta auditoría:** 0. No hay filas `SIN_COBERTURA` en este corte: las faltas productivas enumeradas están bloqueadas por operación/autoridad del OWNER y el operador, no se convierten en hojas sin scope autorizado. Cualquier brecha puramente técnica nueva debe identificarse con `SIN_COBERTURA` y materializar su hoja ejecutable antes de aceptar el checklist.
 

@@ -49,6 +49,7 @@ POST_SNAPSHOT = {
     "docs/hostinger-additive-only.md": (1369, 1398, "tests/test_hostinger_additive_only.py"),
     "docs/auth-negative-tests.md": (1364, 1400, "tests/test_auth_negative.py"),
     "docs/quota-panel.md": (1360, 1403, "tests/test_quota_panel_nonblocking.py"),
+    "docs/panel-kill-switch.md": (1363, 1409, "tests/test_panel_kill_switch.py"),
     "docs/support-channels.md": (1358, 1404, "tests/test_support_channels.py"),
     "docs/dr-drill-report.md": (1371, 1414, "tests/test_dr_drill_rpo_rto.py"),
 }
@@ -388,6 +389,33 @@ class MatrizCoberturaTests(unittest.TestCase):
             parse_post_snapshot(self.text.replace(
                 row, row.replace("NO_VERIFICABLE / NO ENSAYADO", "CUBIERTO"), 1,
             ))
+        with self.assertRaisesRegex(ValueError, "duplicado"):
+            parse_post_snapshot(self.text.replace(row, row + "\n" + row, 1))
+
+    def test_registro_panel_kill_switch_exacto(self):
+        """Contrato post-snapshot #1363 / PR #1409, sin evidencia de live."""
+        path = "docs/panel-kill-switch.md"
+        expected = (1363, 1409, "tests/test_panel_kill_switch.py")
+        self.assertEqual(expected, POST_SNAPSHOT[path])
+        self.assertEqual(expected, parse_post_snapshot(self.text)[path])
+        self.assertFalse(missing_normative_sources(self.text, {path}))
+        self.assertNotIn(path, {SOURCE.fullmatch(r[1])["path"] for r in self.rows})
+        rows = [r for r in self.text.splitlines() if r.startswith("| `" + path + "` |")]
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertTrue(row.endswith("| NO_VERIFICABLE / NO ENSAYADO |"))
+        for a, b in ((path, "docs/panel-switch-otro.md"),
+                     ("issues/1363", "issues/9999"),
+                     ("pull/1409", "pull/9999"),
+                     ("tests/test_panel_kill_switch.py", "tests/test_falso.py")):
+            with self.subTest(replacement=b):
+                altered = self.text.replace(row, row.replace(a, b, 1), 1)
+                self.assertNotEqual(self.text, altered)
+                with self.assertRaisesRegex(ValueError, "no coinciden|inválido"):
+                    parse_post_snapshot(altered)
+        with self.assertRaisesRegex(ValueError, "no acredita"):
+            parse_post_snapshot(self.text.replace(
+                row, row.replace("NO_VERIFICABLE / NO ENSAYADO", "CUBIERTO"), 1))
         with self.assertRaisesRegex(ValueError, "duplicado"):
             parse_post_snapshot(self.text.replace(row, row + "\n" + row, 1))
 

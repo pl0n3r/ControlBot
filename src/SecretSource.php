@@ -37,8 +37,12 @@ final class SecretSource
         if ($size === false || $size < 1 || $size > self::MAX_BYTES) {
             return null;
         }
-        $content = file_get_contents($real);
-        $value = is_string($content) ? trim($content) : '';
+        // Bound the actual read too: the file can grow after filesize() is checked.
+        $content = file_get_contents($real, false, null, 0, self::MAX_BYTES + 1);
+        if (!is_string($content) || strlen($content) > self::MAX_BYTES) {
+            return null;
+        }
+        $value = trim($content);
         return $value === '' ? null : $value;
     }
 }

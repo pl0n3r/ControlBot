@@ -82,6 +82,35 @@ class SecretSourceTests(unittest.TestCase):
         self.assertIn("file_get_contents($real, false, null, 0, self::MAX_BYTES + 1)", source)
         self.assertIn("strlen($content) > self::MAX_BYTES", source)
 
+    def test_file_changed_after_size_check_still_fails_closed(self) -> None:
+        # Simulate a concurrent grow after a successful filesize() precheck.
+        # The namespaced PHP functions replace only the calls from SecretSource.
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "changed.key"
+            f.write_text("x", encoding="utf-8")
+            code = (
+                "namespace ControlBot\\Security {"
+                "function filesize($path) { return 1; }"
+                "function file_get_contents($path, $use_include_path = false, "
+                "$context = null, $offset = 0, $length = null) {"
+                "if ($length !== 4097) { throw new \\RuntimeException('unbounded read'); }"
+                "return str_repeat('x', 4097);"
+                "}"
+                "}"
+                "namespace {"
+                "require 'src/SecretSource.php';"
+                "$v = ControlBot\\Security\\SecretSource::read('CONTROLBOT_TEST_SECRET', $argv[1]);"
+                "echo $v === null ? 'NULL' : $v;"
+                "}"
+            )
+            env = {k: v for k, v in os.environ.items() if not k.startswith("CONTROLBOT_TEST_SECRET")}
+            env["CONTROLBOT_TEST_SECRET_FILE"] = str(f)
+            result = subprocess.run(["php", "-r", code, str(ROOT)], cwd=ROOT, env=env,
+                                    capture_output=True, text=True, timeout=20)
+            self.assertEqual(0, result.returncode, result.stderr[:300])
+            self.assertEqual("NULL", result.stdout)
+
+
     def test_htaccess_names_only_private_paths_never_secret_values(self) -> None:
         for name in ("CONTROLBOT_VAULT_KEY_FILE", "CONTROLBOT_OWNER_PASSWORD_HASH_FILE"):
             line = next(x for x in HTACCESS.splitlines() if x.startswith("SetEnv " + name))

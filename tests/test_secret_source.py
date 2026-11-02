@@ -18,14 +18,20 @@ def read_secret(env: dict, repo_root: str = str(ROOT)) -> str:
     merged.update(env)
     out = subprocess.run(["php", "-r", code, repo_root], cwd=ROOT, env=merged,
                          capture_output=True, text=True, timeout=20)
-    if not out.stdout.strip():
-        raise AssertionError(f"php sin salida (código {out.returncode}): {out.stderr.strip()[:300]}")
-    return out.stdout.strip()
+    if out.returncode != 0 or not out.stdout:
+        raise AssertionError(f"php falló o no devolvió salida (código {out.returncode}): {out.stderr.strip()[:300]}")
+    return out.stdout
 
 
 class SecretSourceTests(unittest.TestCase):
     def test_environment_variable_wins(self) -> None:
-        self.assertEqual("from-env", read_secret({"CONTROLBOT_TEST_SECRET": "from-env"}))
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "also-configured.key"
+            f.write_text("from-file", encoding="utf-8")
+            self.assertEqual("from-env", read_secret({
+                "CONTROLBOT_TEST_SECRET": "from-env",
+                "CONTROLBOT_TEST_SECRET_FILE": str(f),
+            }))
 
     def test_private_file_outside_the_repo_is_read_and_trimmed(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -62,9 +68,48 @@ class SecretSourceTests(unittest.TestCase):
     def test_missing_relative_empty_or_oversized_files_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             empty = Path(d) / "e"; empty.write_text("", encoding="utf-8")
+            exactly_max = Path(d) / "at-limit"
+            exactly_max.write_bytes(b"x" * 4096)
+            just_over = Path(d) / "over-limit"
+            just_over.write_bytes(b"x" * 4097)
             big = Path(d) / "b"; big.write_text("x" * 5000, encoding="utf-8")
-            for value in (str(Path(d) / "nope"), "relative/path", str(empty), str(big), ""):
+            self.assertEqual("x" * 4096, read_secret({"CONTROLBOT_TEST_SECRET_FILE": str(exactly_max)}))
+            for value in (str(Path(d) / "nope"), "relative/path", str(empty), str(just_over), str(big), ""):
                 self.assertEqual("NULL", read_secret({"CONTROLBOT_TEST_SECRET_FILE": value}), value)
+
+        # Filesize is only a precheck: the read must also be bounded and length-checked.
+        source = (ROOT / "src/SecretSource.php").read_text(encoding="utf-8")
+        self.assertIn("file_get_contents($real, false, null, 0, self::MAX_BYTES + 1)", source)
+        self.assertIn("strlen($content) > self::MAX_BYTES", source)
+
+    def test_file_changed_after_size_check_still_fails_closed(self) -> None:
+        # Simulate a concurrent grow after a successful filesize() precheck.
+        # The namespaced PHP functions replace only the calls from SecretSource.
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "changed.key"
+            f.write_text("x", encoding="utf-8")
+            code = (
+                "namespace ControlBot\\Security {"
+                "function filesize($path) { return 1; }"
+                "function file_get_contents($path, $use_include_path = false, "
+                "$context = null, $offset = 0, $length = null) {"
+                "if ($length !== 4097) { throw new \\RuntimeException('unbounded read'); }"
+                "return str_repeat('x', 4097);"
+                "}"
+                "}"
+                "namespace {"
+                "require 'src/SecretSource.php';"
+                "$v = ControlBot\\Security\\SecretSource::read('CONTROLBOT_TEST_SECRET', $argv[1]);"
+                "echo $v === null ? 'NULL' : $v;"
+                "}"
+            )
+            env = {k: v for k, v in os.environ.items() if not k.startswith("CONTROLBOT_TEST_SECRET")}
+            env["CONTROLBOT_TEST_SECRET_FILE"] = str(f)
+            result = subprocess.run(["php", "-r", code, str(ROOT)], cwd=ROOT, env=env,
+                                    capture_output=True, text=True, timeout=20)
+            self.assertEqual(0, result.returncode, result.stderr[:300])
+            self.assertEqual("NULL", result.stdout)
+
 
     def test_htaccess_names_only_private_paths_never_secret_values(self) -> None:
         for name in ("CONTROLBOT_VAULT_KEY_FILE", "CONTROLBOT_OWNER_PASSWORD_HASH_FILE"):

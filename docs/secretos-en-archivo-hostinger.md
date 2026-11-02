@@ -5,7 +5,7 @@ Esta guía corresponde a ControlBot #1349. El cambio permite **leer** secretos d
 ## Ubicación y configuración (solo el dueño)
 
 1. Preparar en Hostinger un directorio privado **fuera del repositorio y de `public_html`**, por ejemplo `/home/USUARIO/domains/DOMINIO/private/`. Aplicar permisos restrictivos al directorio (0700) y a cada archivo (0600), conforme a las capacidades del servidor y su propietario.
-2. En ese directorio, guardar **por separado** `vault.key` (clave de cifrado del vault, con entropía criptográfica adecuada) y `owner-password.hash` (hash obtenido mediante `password_hash` de una contraseña que solo conozca el dueño). No copiar secretos en el repositorio, chats, logs, PR ni issues. No generar el hash con la contraseña literal en una orden que quede en el historial.
+2. En ese directorio, guardar **por separado** `vault.key` (clave de cifrado del vault, con entropía criptográfica adecuada) y `owner-password.hash` (hash obtenido mediante `password_hash($password, PASSWORD_ARGON2ID)` de una contraseña que solo conozca el dueño; `OwnerLoginGate` exige Argon2id). No copiar secretos en el repositorio, chats, logs, PR ni issues. No generar el hash con la contraseña literal en una orden que quede en el historial.
 3. Configurar en `.htaccess` **solamente las rutas absolutas**, usando las variables `CONTROLBOT_VAULT_KEY_FILE` y `CONTROLBOT_OWNER_PASSWORD_HASH_FILE`. Ejemplo ilustrativo, **no literal para producción**:
 
 ```apache

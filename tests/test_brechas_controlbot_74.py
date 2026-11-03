@@ -13,7 +13,7 @@ import re
 import unittest
 
 
-from test_matriz_cobertura import credible_offline_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row
 
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = "docs/matriz-cobertura.md"
@@ -90,7 +90,7 @@ def matrix_rows(files: object) -> dict[str, tuple[str, ...]]:
             if (key in rows or path != expected_path or len(columns) != 6
                     or columns[0] != key or ref not in columns[1]
                     or phrase.casefold() not in columns[2].casefold()
-                    or not credible_offline_coverage_row(columns)
+                    or not credible_e4_coverage_row(columns)
                     or "/issues/1" not in columns[5]
                     or phrase.casefold() not in files[source].casefold()):
                 raise ValueError("UNKNOWN: invalid or promoted " + key)
@@ -139,7 +139,7 @@ class BrechasControlbot74Tests(unittest.TestCase):
         self.assertEqual(set(rows), set(IDS))
         for key in IDS:
             with self.subTest(id=key):
-                self.assertTrue(credible_offline_coverage_row(rows[key]))
+                self.assertTrue(credible_e4_coverage_row(rows[key]))
                 self.assertEqual({"status": GAP, "missing": MISSING[key]}, gap(key, files))
                 self.assertEqual(UNKNOWN, runtime_attestation(key))
 
@@ -188,7 +188,7 @@ class BrechasControlbot74Tests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.add(node.module.split(".")[0])
         self.assertLessEqual(imported, {"__future__", "ast", "pathlib",
-                                        "re", "unittest", "test_matriz_cobertura"})
+                                        "re", "unittest", "test_brechas_controlbot_20"})
         self.assertTrue(all(not Path(p).is_absolute() and ".." not in Path(p).parts
                             for p in SOURCES))
         self.assertEqual(set(documents()), SOURCES)

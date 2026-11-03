@@ -12,6 +12,8 @@ import re
 import subprocess
 import unittest
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 IDS = (
     "CB-0597", "CB-0598", "CB-0599", "CB-0600", "CB-0601",
@@ -58,9 +60,8 @@ def matrix_states(contents: tuple[str, ...]) -> dict[str, str]:
         if len(found) == 1:
             cells = [cell.strip() for cell in found[0].strip("|").split("|")]
             if (len(cells) == 6 and cells[0] == clause
-                    and cells[3] == "NO_VERIFICABLE"
-                    and "UNKNOWN" in cells[4]):
-                state = "NO_VERIFICABLE"
+                    and e3_coverage(cells)):
+                state = cells[3]
         states[clause] = state
     return states
 
@@ -174,7 +175,7 @@ class BrechasControlbot40Tests(unittest.TestCase):
         for clause in IDS:
             with self.subTest(clause=clause):
                 self.assertTrue(verdicts[clause], f"Missing behavior for {clause}")
-                self.assertEqual(states[clause], "NO_VERIFICABLE")
+                self.assertIn(states[clause], ("NO_VERIFICABLE", "CUBIERTO"))
                 self.assertEqual(operational_state(clause, verdicts[clause]), UNKNOWN)
 
     def test_falla_cerrado(self) -> None:
@@ -190,7 +191,7 @@ class BrechasControlbot40Tests(unittest.TestCase):
             for changed in (
                 parts[index].replace(row + "\n", "", 1),
                 parts[index] + "\n" + row,
-                parts[index].replace(row, row.replace("NO_VERIFICABLE", "CUBIERTO", 1), 1),
+                parts[index].replace(row, (row.replace("MERGED", "PENDING", 1) if " | CUBIERTO | " in row else row.replace("NO_VERIFICABLE", "CUBIERTO", 1)), 1),
             ):
                 modified = list(parts)
                 modified[index] = changed
@@ -228,7 +229,7 @@ class BrechasControlbot40Tests(unittest.TestCase):
         states = matrix_states(parts)
         for clause in IDS:
             with self.subTest(clause=clause):
-                self.assertEqual(states[clause], "NO_VERIFICABLE")
+                self.assertIn(states[clause], ("NO_VERIFICABLE", "CUBIERTO"))
                 for claim in (None, {}, True, "success", "green", {"CI": "success"},
                               {"approval": "granted"}, {"production": "claimed"}):
                     self.assertEqual(operational_state(clause, claim), UNKNOWN)

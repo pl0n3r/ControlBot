@@ -13,6 +13,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "docs/matriz-cobertura-parte-03.md"
 IDS = (
@@ -76,8 +78,7 @@ def compliance(rows: dict[str, list[str]], assertions: dict[str, bool],
     for key in IDS:
         row = rows.get(key)
         if (not source_ready or row is None or len(row) < 6
-                or row[3] != "NO_VERIFICABLE"
-                or "offline=unknown" not in row[4].lower()
+                or not e3_coverage(row)
                 or assertions.get(key) is not True):
             result[key] = UNKNOWN
         else:
@@ -256,7 +257,7 @@ class BrechasControlbot41Tests(unittest.TestCase):
         self.assertEqual(set(checks), set(IDS))
         for key in IDS:
             with self.subTest(clause=key):
-                self.assertEqual(rows[key][3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(rows[key]))
                 self.assertTrue(checks[key], "Contrato local no demostrado: " + key)
                 self.assertEqual(compliance(rows, checks)[key], "LOCAL_CONTRACT")
 
@@ -273,7 +274,9 @@ class BrechasControlbot41Tests(unittest.TestCase):
                 self.assertEqual(compliance(rows, failed)[key], UNKNOWN)
                 changed = dict(rows)
                 changed[key] = [*rows[key]]
-                changed[key][3] = "CUBIERTO"
+                changed[key][4] = "proof_invalid" if rows[key][3] == "CUBIERTO" else rows[key][4]
+                if rows[key][3] != "CUBIERTO":
+                    changed[key][3] = "CUBIERTO"
                 self.assertEqual(compliance(changed, checks)[key], UNKNOWN)
         self.assertTrue(all(v == UNKNOWN for v in
                             compliance(rows, checks, source_ready=False).values()))
@@ -311,8 +314,10 @@ class BrechasControlbot41Tests(unittest.TestCase):
         rows, checks = self.evidence()
         for key in IDS:
             with self.subTest(clause=key):
-                self.assertEqual(rows[key][3], "NO_VERIFICABLE")
+                self.assertTrue(e3_coverage(rows[key]))
                 for label in ("Offline=UNKNOWN", "live=UNKNOWN", "operando=UNKNOWN"):
+                    if label == "Offline=UNKNOWN" and rows[key][3] == "CUBIERTO":
+                        continue
                     self.assertIn(label, rows[key][4])
                 self.assertNotEqual(compliance(rows, checks)[key], "LIVE_PASS")
         self.assertEqual(

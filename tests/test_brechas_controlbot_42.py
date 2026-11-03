@@ -12,6 +12,8 @@ import re
 import subprocess
 import unittest
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 INFRA_MATRIX = ROOT / "docs/matriz-cobertura-parte-03.md"
@@ -240,8 +242,9 @@ class BrechasControlbot42Tests(unittest.TestCase):
             with self.subTest(requirement=name):
                 self.assertEqual(len(matches[name]), 1)
                 row = matches[name][0]
-                self.assertEqual(row[3], "NO_VERIFICABLE")
-                self.assertIn("offline=unknown", row[4].lower())
+                self.assertTrue(e3_coverage(row))
+                if row[3] == "NO_VERIFICABLE":
+                    self.assertIn("offline=unknown", row[4].lower())
                 self.assertIn("live=unknown", row[4].lower())
                 self.assertIn("operando=unknown", row[4].lower())
         self.assertEqual(infra("freshness")["absent_effective"], "unknown")

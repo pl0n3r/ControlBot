@@ -49,7 +49,7 @@ check(str_contains(OwnerLoginGate::handle($get,[],$s,$cfg,$now)['body'],'Salir')
     def test_route_policy_and_missing_configuration(self):
         php_run(r"""
 $private = OwnerLoginGate::requireOwner(['REQUEST_METHOD'=>'GET','REQUEST_URI'=>'/overview','REMOTE_USER'=>'pl0n3r'],$s,$cfg,$now);
-check($private['status']===302 && $private['headers']['Location']==='/login');
+check($private['status']===302 && $private['headers']['Location']==='/login?next=%2Foverview');
 check($private['headers']['Cache-Control']==='no-store');
 foreach (['/health','/health.php','/assets/main.css'] as $path)
     check(OwnerLoginGate::requireOwner(['REQUEST_METHOD'=>'GET','REQUEST_URI'=>$path],$s,$cfg,$now)===null);

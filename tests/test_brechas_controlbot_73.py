@@ -16,7 +16,7 @@ import shutil
 import subprocess
 import unittest
 
-from test_matriz_cobertura import credible_offline_coverage_row
+from test_brechas_controlbot_20 import credible_e4_coverage_row
 
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = "docs/matriz-cobertura.md"
@@ -84,7 +84,7 @@ def matrix_rows(files: object) -> dict[str, tuple[str, ...]]:
             cells = tuple(v.strip() for v in line.strip().strip("|").split("|"))
             if (key in found or path != expected_path or len(cells) != 6
                     or cells[0] != key or f"{source}:L" not in cells[1]
-                    or fragment not in cells[2] or not credible_offline_coverage_row(cells)
+                    or fragment not in cells[2] or not credible_e4_coverage_row(cells)
                     or (cells[3] == "NO_VERIFICABLE"
                         and not all(f"{x}=unknown" in cells[4].lower()
                                     for x in ("offline", "live", "operando")))

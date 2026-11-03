@@ -125,6 +125,21 @@ final class ControlBotWebEntrypoint
         );
     }
 
+    /**
+     * Vistas del dueño tras la página de login (#1346). La sesión local ya fue verificada
+     * por OwnerLoginGate::requireOwner en el servidor; el login se toma de la configuración
+     * del servidor, nunca de REMOTE_USER ni de cabeceras del cliente.
+     */
+    public static function handleLocalOwner(array $server, array $environment, int $now): array
+    {
+        $owner = self::text($environment['CONTROLBOT_OWNER_LOGIN'] ?? null);
+        if ($owner === null) {
+            return self::error();
+        }
+        $server['REMOTE_USER'] = $owner;
+        return self::handle($server, $environment, $now);
+    }
+
     private static function withShell(array $response, string $title): array
     {
         if (($response['status'] ?? null) !== 200

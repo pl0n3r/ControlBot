@@ -12,6 +12,8 @@ import unittest
 from functools import lru_cache
 from pathlib import Path
 
+from test_brechas_controlbot_20 import credible_e3_coverage_row as e3_coverage
+
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = (
     "CB-0726", "CB-0727", "CB-0728", "CB-0729", "CB-0730",
@@ -275,8 +277,9 @@ class BrechasControlbot48Tests(unittest.TestCase):
             with self.subTest(brecha=identifier):
                 self.assertEqual(len(rows[identifier]), 1)
                 line = rows[identifier][0]
-                self.assertIn("| NO_VERIFICABLE |", line)
-                self.assertIn("offline=unknown", line.lower())
+                self.assertTrue(e3_coverage([p.strip() for p in line.strip("|").split("|")]))
+                if "| NO_VERIFICABLE |" in line:
+                    self.assertIn("offline=unknown", line.lower())
                 self.assertIn("live=unknown", line.lower())
                 self.assertIn("operando=unknown", line.lower())
         email = scenario("email", "audit")

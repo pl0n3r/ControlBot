@@ -6,6 +6,8 @@ deployment, delivery, legal authorization, or a promotion of the coverage matrix
 """
 from __future__ import annotations
 
+from test_brechas_controlbot_20 import credible_e4_coverage_row
+
 from copy import deepcopy
 from functools import lru_cache
 import json
@@ -84,10 +86,7 @@ def matrix_rows(src: dict[str, str]) -> dict[str, tuple[str, ...]]:
             group, clause = CLAUSES[ident]
             if (ident in found or len(cells) != 6 or cells[0] != ident
                     or DOCS[group] not in cells[1] or clause not in cells[2]
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos." not in cells[4]
-                    or not all(f"{state}=unknown" in cells[4].lower()
-                               for state in ("offline", "live", "operando"))
+                    or not credible_e4_coverage_row(cells)
                     or "/issues/1" not in cells[5]
                     or (path == MAIN) != (ident in {"CB-1059", "CB-1064", "CB-1067"})):
                 raise ValueError("UNKNOWN: invalid/duplicate row " + ident)
@@ -253,7 +252,7 @@ def verdict(ident: object, src: object, evidence: object) -> str:
             return UNKNOWN
         if not behavior(ident, evidence, src):
             return UNKNOWN
-        if rows[ident][3] != "NO_VERIFICABLE":
+        if not credible_e4_coverage_row(rows[ident]):
             return UNKNOWN
     except (KeyError, TypeError, ValueError, IndexError, AttributeError):
         return UNKNOWN

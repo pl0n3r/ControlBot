@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """ControlBot #1075: fifteen Scheduler/security-alert gaps, synthetic only."""
 from __future__ import annotations
+
+from test_brechas_controlbot_20 import credible_e4_coverage_row, corrupted_e4_row
 import ast
 from functools import lru_cache
 import json
@@ -96,10 +98,7 @@ def matrix_rows(data: object) -> dict[str, tuple[str, ...]]:
             group, clue = CLAUSES[key]
             if (key in found or len(cells) != 6 or cells[0] != key
                     or DOCS[group] not in cells[1] or clue not in cells[2]
-                    or cells[3] != "NO_VERIFICABLE"
-                    or "Falta contraste de comportamiento con prueba y PR concretos." not in cells[4]
-                    or any(f"{x}=unknown" not in cells[4].lower()
-                           for x in ("offline", "live", "operando"))
+                    or not credible_e4_coverage_row(cells)
                     or "/issues/1" not in cells[5]
                     or (path == MAIN) != (key in MAIN_IDS)):
                 raise ValueError("UNKNOWN: invalid row " + key)
@@ -284,7 +283,7 @@ class BrechasControlbot68Tests(unittest.TestCase):
             with self.subTest(id=key):
                 self.assertEqual(UNKNOWN if key in DOCUMENTED_UNKNOWN else LOCAL,
                                  verdict(key, data, proof))
-                self.assertEqual(rows[key][3], "NO_VERIFICABLE")
+                self.assertTrue(credible_e4_coverage_row(rows[key]))
         self.assertTrue(behavior("CB-1042", proof))
 
     def test_falla_cerrado(self) -> None:
@@ -295,7 +294,7 @@ class BrechasControlbot68Tests(unittest.TestCase):
             line = next(x for x in data[path].splitlines() if x.startswith("| " + key + " |"))
             for bad in (data[path].replace(line, "", 1), data[path] + "\n" + line,
                         data[path] + "\n   " + line,
-                        data[path].replace(line, line.replace("NO_VERIFICABLE", "CUBIERTO"), 1)):
+                        data[path].replace(line, corrupted_e4_row(line), 1)):
                 with self.subTest(id=key):
                     self.assertEqual(UNKNOWN, verdict(key, {**data, path: bad}, proof))
             group, clue = CLAUSES[key]
@@ -318,7 +317,7 @@ class BrechasControlbot68Tests(unittest.TestCase):
         imports |= {(node.module or "").split(".")[0] for node in ast.walk(tree)
                     if isinstance(node, ast.ImportFrom)}
         self.assertLessEqual(imports, {"__future__", "ast", "functools", "json",
-                                      "pathlib", "re", "shutil", "subprocess", "unittest"})
+                                      "pathlib", "re", "shutil", "subprocess", "unittest", "test_brechas_controlbot_20"})
         self.assertTrue(all(not Path(p).is_absolute() and ".." not in Path(p).parts
                             for p in FILES))
         self.assertEqual(UNKNOWN, operational_state("CB-1056", {"delivered": True}))

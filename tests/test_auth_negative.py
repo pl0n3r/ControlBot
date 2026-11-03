@@ -105,13 +105,24 @@ $badPost['REMOTE_ADDR'] = '198.51.100.9';
 $missing = OwnerLoginGate::handle($badPost,$base,$s,$cfg,$now+60,$regenerate);
 $incorrect = OwnerLoginGate::handle($badPost,
     ['totp'=>'not-a-code'] + $base,$s,$cfg,$now+60,$regenerate);
+$acceptedCodes = [];
+foreach ([-30, 0, 30] as $offset) {
+    $acceptedCodes[] = Totp::code($secret, $now + 60 + $offset);
+}
+$expiredCode = Totp::code($secret, $now - 120);
+// A stale six-digit OTP can collide with a live one; ensure deterministic rejection.
+while (in_array($expiredCode, $acceptedCodes, true)) {
+    $expiredCode = sprintf('%06d', (((int) $expiredCode + 1) % 1000000));
+}
 $expired = OwnerLoginGate::handle($badPost,
-    ['totp'=>Totp::code($secret,$now-120)] + $base,
+    ['totp'=>$expiredCode] + $base,
     $s,$cfg,$now+60,$regenerate);
 $before = OwnerLoginGate::isAuthenticated($s,$now+60);
 $valid = OwnerLoginGate::handle($post,
     ['totp'=>Totp::code($secret,$now+60)] + $base,
     $s,$cfg,$now+60,$regenerate);
+$validAuthenticated = OwnerLoginGate::isAuthenticated($s,$now+60);
+$validOwnerRoute = OwnerLoginGate::requireOwner($protected,$s,$cfg,$now+61);
 $replaySession = [];
 OwnerLoginGate::handle($get, [], $replaySession,$cfg,$now+60);
 $replay = OwnerLoginGate::handle($post,
@@ -121,7 +132,10 @@ $replay = OwnerLoginGate::handle($post,
     $replaySession,$cfg,$now+60,$regenerate);
 echo json_encode([
  'missing'=>$missing,'incorrect'=>$incorrect,'expired'=>$expired,
- 'authenticated_before'=>$before,'valid'=>$valid,'replay'=>$replay,
+ 'expired_distinct'=>!in_array($expiredCode,$acceptedCodes,true),
+ 'authenticated_before'=>$before,'valid'=>$valid,
+ 'valid_authenticated'=>$validAuthenticated,'valid_owner_route'=>$validOwnerRoute,
+ 'replay'=>$replay,
  'replay_authenticated'=>OwnerLoginGate::isAuthenticated($replaySession,$now+60),
  'audit_events'=>array_column($store->auditTrail(),'event'),
 ], JSON_THROW_ON_ERROR);
@@ -149,6 +163,7 @@ class AuthNegativeTests(unittest.TestCase):
     """Fail-closed assertions; no green result is inferred from static source text."""
 
     def test_criterio_principal(self):
+        """Reject invalid logins and prove TOTP authorizes an owner session."""
         login = php_case(LOGIN_SCENARIO)
         for name, status in (
             ("anonymous", 302), ("missing", 403), ("forged", 403),
@@ -178,7 +193,10 @@ class AuthNegativeTests(unittest.TestCase):
                 self.assertEqual(totp[case]["status"], 401)
                 self.assertEqual(totp[case]["headers"]["Cache-Control"], "no-store")
         self.assertFalse(totp["authenticated_before"])
+        self.assertTrue(totp["expired_distinct"])
         self.assertEqual(totp["valid"]["status"], 303)
+        self.assertTrue(totp["valid_authenticated"])
+        self.assertIsNone(totp["valid_owner_route"])
         self.assertFalse(totp["replay_authenticated"])
         self.assertIn("totp_enabled", totp["audit_events"])
         self.assertIn("totp_used", totp["audit_events"])
@@ -193,6 +211,7 @@ class AuthNegativeTests(unittest.TestCase):
         self.assertNotIn("totp_key", json.dumps(second).lower())
 
     def test_documentacion_y_sin_credenciales_reales(self):
+        """Preserve offline documentation and synthetic-only fixture contracts."""
         doc = (ROOT / "docs/auth-negative-tests.md").read_text(encoding="utf-8")
         for term in ("Auth-negative-testsTests::test_criterio_principal",
                      "SPEC", "CSRF", "TOTP", "revocación", "CI Factory v1",

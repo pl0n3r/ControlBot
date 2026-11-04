@@ -12,7 +12,7 @@ final class SecretSource
 {
     private const MAX_BYTES = 4096;
 
-    /** Conventional private files (sibling `private/` of the deployed root) for the two server secrets. */
+    /** Whitelisted private filenames for lookup outside the deployed web tree. */
     private const CONVENTIONAL_FILES = [
         'CONTROLBOT_VAULT_KEY' => 'vault.key',
         'CONTROLBOT_OWNER_PASSWORD_HASH' => 'owner-password.hash',
@@ -31,26 +31,67 @@ final class SecretSource
         return self::readFromFile($name, $repositoryRoot);
     }
 
-    /** Reads only the configured private file, without accepting a direct env value. */
+    /**
+     * Reads only private files, without accepting a direct env value. Candidates, first hit wins:
+     * the configured NAME_FILE, then private/<file> in ancestors of the deployed root (symlinks resolved),
+     * then private/<file> in up to four ancestors of it that are not inside a public_html tree.
+     */
     private static function readFromFile(string $name, ?string $repositoryRoot): ?string
     {
-        $path = getenv($name . '_FILE');
-        if (!is_string($path) || $path === '') {
-            $path = self::conventionalPath($name, $repositoryRoot);
+        $root = realpath($repositoryRoot ?? dirname(__DIR__));
+        if ($root === false) {
+            return null; // unknown repository root: never skip the containment check
         }
-        if ($path === null || $path[0] !== '/' || str_contains($path, "\0")) {
+        $candidates = [];
+        $explicit = getenv($name . '_FILE');
+        if (is_string($explicit) && $explicit !== '') {
+            $candidates[] = $explicit;
+        }
+        $file = self::CONVENTIONAL_FILES[$name] ?? null;
+        if ($file !== null) {
+            // private/<file> in an ancestor of the deployed root, never inside a public_html tree
+            // (a subdomain can live in public_html/<sub>, so its siblings would be web-reachable).
+            $dir = $root;
+            for ($i = 0; $i < 4; $i++) {
+                $dir = dirname($dir);
+                if ($dir === '/' || $dir === '.' || $dir === DIRECTORY_SEPARATOR) {
+                    break;
+                }
+                if (preg_match('#(^|/)public_html(/|$)#', $dir) === 1) {
+                    continue;
+                }
+                $candidates[] = $dir . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . $file;
+            }
+        }
+        foreach (array_unique($candidates) as $path) {
+            $value = self::loadFile($path, $root);
+            if ($value !== null) {
+                return $value;
+            }
+        }
+        // PHP web workers log the secret's name, never its path or its value.
+        // CLI tests and optional public owner identifiers must stay silent.
+        if (PHP_SAPI !== 'cli' && $file !== null && $name !== 'CONTROLBOT_OWNER_LOGIN') {
+            error_log('ControlBot: archivo privado no disponible para ' . $name);
+        }
+        return null;
+    }
+
+    private static function loadFile(string $path, string $root): ?string
+    {
+        if ($path[0] !== '/' || str_contains($path, "\0")) {
             return null;
         }
         $real = realpath($path);
         if ($real === false || !is_file($real) || !is_readable($real)) {
             return null;
         }
-        $root = realpath($repositoryRoot ?? dirname(__DIR__));
-        if ($root === false) {
-            return null; // unknown repository root: never skip the containment check
-        }
         if ($real === $root || str_starts_with($real, $root . DIRECTORY_SEPARATOR)) {
             return null; // a secret inside the deployed tree could be served or committed
+        }
+        // Resolve symlinks before deciding: the file must never be web-served.
+        if (preg_match('#(^|/)public_html(/|$)#', $real) === 1) {
+            return null;
         }
         $size = filesize($real);
         if ($size === false || $size < 1 || $size > self::MAX_BYTES) {
@@ -63,16 +104,6 @@ final class SecretSource
         }
         $value = trim($content);
         return $value === '' ? null : $value;
-    }
-
-    private static function conventionalPath(string $name, ?string $repositoryRoot): ?string
-    {
-        $file = self::CONVENTIONAL_FILES[$name] ?? null;
-        $root = realpath($repositoryRoot ?? dirname(__DIR__));
-        if ($file === null || $root === false) {
-            return null;
-        }
-        return dirname($root) . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . $file;
     }
 
     /**

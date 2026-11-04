@@ -17,17 +17,21 @@ SetEnv CONTROLBOT_OWNER_PASSWORD_HASH_FILE /home/USUARIO/domains/DOMINIO/private
 
 ## Respaldo por convención (sin `SetEnv`)
 
-Si no hay variable directa ni `NOMBRE_FILE`, `CONTROLBOT_VAULT_KEY` y `CONTROLBOT_OWNER_PASSWORD_HASH` se buscan en `private/vault.key` y `private/owner-password.hash`, hermana de la raíz desplegada (`public_html`). Aplican las mismas garantías de abajo; otros secretos no usan este respaldo. El identificador del dueño (`SecretSource::ownerLogin`) usa la variable `CONTROLBOT_OWNER_LOGIN`, luego `private/owner-login` y, por último, el identificador público documentado `USUARIO`; si la variable está vacía o no es un identificador válido (1–64 caracteres ASCII: letras, dígitos, punto, guion, guion bajo o @), se intenta igualmente el archivo privado validado y después `USUARIO`. Un valor inválido del archivo tampoco se usa. El identificador no es secreto; **la contraseña y la clave del vault siguen siendo obligatorias**.
+Si no hay variable directa ni `NOMBRE_FILE`, `CONTROLBOT_VAULT_KEY` y `CONTROLBOT_OWNER_PASSWORD_HASH` se buscan en `private/vault.key` y `private/owner-password.hash`, en una carpeta superior de la raíz desplegada (hasta cuatro niveles, nunca dentro de `public_html`; p. ej. `domains/<sitio>/private` cuando ControlBot vive en `public_html/control`). Aplican las mismas garantías de abajo; otros secretos no usan este respaldo. El identificador del dueño (`SecretSource::ownerLogin`) usa la variable `CONTROLBOT_OWNER_LOGIN`, luego `private/owner-login` y, por último, el identificador público documentado `USUARIO`; si la variable está vacía o no es un identificador válido (1–64 caracteres ASCII: letras, dígitos, punto, guion, guion bajo o @), se intenta igualmente el archivo privado validado y después `USUARIO`. Un valor inválido del archivo tampoco se usa. El identificador no es secreto; **la contraseña y la clave del vault siguen siendo obligatorias**.
 
 ## Garantías de lectura y fallo cerrado
 
 - `SecretSource::read` utiliza primero la variable de entorno directa, cuando es una cadena no vacía; en su defecto consulta la ruta de `NOMBRE_FILE`.
 - La ruta debe ser **absoluta** y resolver a un archivo regular y legible **fuera del árbol desplegado**. No se aceptan rutas relativas, inexistentes, directorios ni enlaces simbólicos que resuelvan dentro de ese árbol.
+- Ningún candidato puede resolver a un archivo dentro de `public_html`, incluso si proviene de un enlace simbólico o de `NOMBRE_FILE`; se prueba el siguiente candidato seguro.
+- La búsqueda automática no cruza a un **dominio hermano**: desde `domains/condorapp.com.co/public_html/control` no encuentra `domains/control.condorapp.com.co/private`. En ese caso la recuperación productiva requiere una configuración explícita aprobada y segura conforme a D-059; este PR no acredita por sí solo una recuperación del servicio.
 - El archivo debe tener entre **1 y 4096 bytes** (máximo 4 KB). Se recortan espacios y saltos de línea alrededor del contenido; un valor que quede vacío se trata como ausente.
 - Si el archivo o la configuración son inválidos, **no** se usan credenciales sustitutas, datos de prueba ni secretos embebidos. Los entrypoints permanecen cerrados (respuesta de servicio no disponible o denegación según su lógica).
 - Evitar publicar la ruta en mensajes públicos si revela datos de la instalación. **Jamás** mostrar el contenido del archivo ni su hash en diagnósticos.
 
 ## Validación y reversión
+
+Solo los procesos PHP web escriben en `error_log` el **nombre** de un secreto obligatorio ausente, nunca rutas ni valores; las ejecuciones CLI de pruebas no emiten ese diagnóstico en `stderr`.
 
 Las pruebas offline en `tests/test_secret_source.py` usan directorios temporales y valores sintéticos para cubrir precedencia, recorte, archivos inválidos, árbol desplegado y rutas presentes en `.htaccess`. No prueban ni alteran Hostinger.
 

@@ -117,7 +117,9 @@ class SecretSourceTests(unittest.TestCase):
             "$v = ControlBot\\Security\\SecretSource::read($argv[1], $argv[2]);"
             "echo $v === null ? 'NULL' : $v;"
         )
-        merged = {k: v for k, v in os.environ.items() if not k.startswith("CONTROLBOT_")}
+        secret_prefixes = ("CONTROLBOT_VAULT_KEY", "CONTROLBOT_OWNER_PASSWORD_HASH",
+                           "CONTROLBOT_OWNER_LOGIN", "CONTROLBOT_OTHER_SECRET")
+        merged = {k: v for k, v in os.environ.items() if not k.startswith(secret_prefixes)}
         merged.update(env or {})
         out = subprocess.run(["php", "-r", code, name, root], cwd=ROOT, env=merged,
                              capture_output=True, text=True, timeout=20)

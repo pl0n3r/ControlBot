@@ -71,7 +71,7 @@ class PanelDesignTest(unittest.TestCase):
         self.assertIn('data-source-age-seconds="0"', health)
         self.assertIn('Alcanzable', health)
         for markup in (agent, health):
-            visible = re.sub(r'\\s(?:title|data-[\\w-]+)="[^"]*"', '', markup)
+            visible = re.sub(r'\s(?:title|data-[\w-]+)="[^"]*"', '', markup)
             self.assertNotIn('freshness=', visible)
             self.assertNotIn('timestamp=', visible)
             self.assertNotIn(' · antigüedad=', visible)

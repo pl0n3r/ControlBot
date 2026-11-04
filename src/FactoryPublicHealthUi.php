@@ -104,22 +104,41 @@ final class FactoryPublicHealthUi
             $latency = $row['latency_ms'] === null ? 'UNKNOWN' : $row['latency_ms'] . ' ms';
             $when = $row['observed_at'] === null ? 'UNKNOWN'
                 : gmdate('Y-m-d H:i:s', $row['observed_at']) . ' UTC';
-            $age = $row['source_age_seconds'] === null ? 'UNKNOWN'
-                : $row['source_age_seconds'] . ' s';
+            $exactAge = $row['source_age_seconds'] === null ? 'UNKNOWN' : (string) $row['source_age_seconds'];
+            $stateLabel = match ($row['status']) {
+                'reachable' => 'Alcanzable', 'unreachable' => 'No alcanzable',
+                'stale' => 'Desactualizado', default => 'Sin evidencia',
+            };
+            $symbol = match ($row['status']) {
+                'reachable' => '●', 'unreachable' => '■', 'stale' => '◐', default => '?',
+            };
+            $details = 'Observado: ' . $when . ' · Antigüedad: ' . $exactAge . ' s'
+                . ' · Motivo: ' . $row['reason'] . ' · Endpoint: ' . $row['endpoint'];
             $html .= '<article class="front public-health" data-read-only="true"'
-                . ' data-health="' . self::e($row['status']) . '">'
+                . ' data-health="' . self::e($row['status']) . '" data-source-age-seconds="'
+                . self::e($exactAge) . '" data-observed-at="'
+                . self::e($row['observed_at'] === null ? 'UNKNOWN' : (string) $row['observed_at']) . '">'
                 . '<h3>' . self::e($row['repository_ref']) . '</h3>'
-                . '<p>Disponibilidad HTTP: <strong>' . self::e($row['status']) . '</strong></p>'
+                . '<p>Disponibilidad HTTP: <strong><span aria-hidden="true">' . $symbol
+                . '</span> ' . self::e($stateLabel) . '</strong></p>'
                 . '<p>Código: ' . self::e($code) . ' · Latencia: ' . self::e($latency) . '</p>'
-                . '<p>Observado: ' . self::e($when) . ' · Antigüedad: ' . self::e($age) . '</p>'
-                . '<small>Motivo: ' . self::e($row['reason'])
-                . ' · Endpoint: ' . self::e($row['endpoint']) . '</small></article>';
+                . '<p>Observado: ' . self::e(self::ageLabel($row['source_age_seconds'])) . '</p>'
+                . '<small title="' . self::e($details) . '">Señal pública · Solo lectura</small></article>';
         }
         return '<section class="panel" data-section="public_health" aria-label="Salud pública observada">'
             . '<p class="eyebrow">OBSERVACIÓN PÚBLICA</p><h2>Salud de producción</h2>'
             . '<p>Solo lectura: HTTP alcanzable NO significa producción VERDE. '
             . 'SHA, esquema y smoke permanecen UNKNOWN sin evidencia independiente.</p>'
             . '<div class="front-grid">' . $html . '</div></section>';
+    }
+
+    private static function ageLabel(?int $seconds): string
+    {
+        if ($seconds === null) return 'sin evidencia de antigüedad';
+        if ($seconds < 60) return 'hace ' . $seconds . ' s';
+        if ($seconds < 3600) return 'hace ' . intdiv($seconds, 60) . ' min';
+        if ($seconds < 86400) return 'hace ' . intdiv($seconds, 3600) . ' h';
+        return 'hace ' . intdiv($seconds, 86400) . ' d';
     }
 
     private static function e(string $s): string

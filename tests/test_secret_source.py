@@ -189,6 +189,19 @@ class SecretSourceTests(unittest.TestCase):
             self.assertIn("SecretSource::ownerLogin(", source, path)
             self.assertNotIn("getenv('CONTROLBOT_OWNER_LOGIN')", source, path)
 
+    def test_subdomain_in_public_html_finds_private_in_account_folder_only(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            site = Path(d) / "domains" / "main.example"
+            root = site / "public_html" / "control"; root.mkdir(parents=True)
+            (site / "private").mkdir()
+            (site / "private" / "vault.key").write_text("from-ancestor", encoding="utf-8")
+            exposed = site / "public_html" / "private"; exposed.mkdir()
+            (exposed / "owner-password.hash").write_text("web-reachable", encoding="utf-8")
+            env = {"CONTROLBOT_VAULT_KEY_FILE": str(Path(d) / "missing.key")}
+            self.assertEqual("from-ancestor", self._read_named("CONTROLBOT_VAULT_KEY", str(root), env))
+            # A private/ inside public_html would be served by the web server: never used.
+            self.assertEqual("NULL", self._read_named("CONTROLBOT_OWNER_PASSWORD_HASH", str(root)))
+
     def test_htaccess_names_only_private_paths_never_secret_values(self) -> None:
         for name in ("CONTROLBOT_VAULT_KEY_FILE", "CONTROLBOT_OWNER_PASSWORD_HASH_FILE"):
             line = next(x for x in HTACCESS.splitlines() if x.startswith("SetEnv " + name))

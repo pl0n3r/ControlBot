@@ -31,23 +31,59 @@ final class SecretSource
         return self::readFromFile($name, $repositoryRoot);
     }
 
-    /** Reads only the configured private file, without accepting a direct env value. */
+    /**
+     * Reads only private files, without accepting a direct env value. Candidates, first hit wins:
+     * the configured NAME_FILE, then private/<file> in ancestors of the deployed root (symlinks resolved),
+     * then private/<file> in up to four ancestors of it that are not inside a public_html tree.
+     */
     private static function readFromFile(string $name, ?string $repositoryRoot): ?string
     {
-        $path = getenv($name . '_FILE');
-        if (!is_string($path) || $path === '') {
-            $path = self::conventionalPath($name, $repositoryRoot);
+        $root = realpath($repositoryRoot ?? dirname(__DIR__));
+        if ($root === false) {
+            return null; // unknown repository root: never skip the containment check
         }
-        if ($path === null || $path[0] !== '/' || str_contains($path, "\0")) {
+        $candidates = [];
+        $explicit = getenv($name . '_FILE');
+        if (is_string($explicit) && $explicit !== '') {
+            $candidates[] = $explicit;
+        }
+        $file = self::CONVENTIONAL_FILES[$name] ?? null;
+        if ($file !== null) {
+            // private/<file> in an ancestor of the deployed root, never inside a public_html tree
+            // (a subdomain can live in public_html/<sub>, so its siblings would be web-reachable).
+            $dir = $root;
+            for ($i = 0; $i < 4; $i++) {
+                $dir = dirname($dir);
+                if ($dir === '/' || $dir === '.' || $dir === DIRECTORY_SEPARATOR) {
+                    break;
+                }
+                if (preg_match('#(^|/)public_html(/|$)#', $dir) === 1) {
+                    continue;
+                }
+                $candidates[] = $dir . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . $file;
+            }
+        }
+        foreach (array_unique($candidates) as $path) {
+            $value = self::loadFile($path, $root);
+            if ($value !== null) {
+                return $value;
+            }
+        }
+        if ($file !== null && $name !== 'CONTROLBOT_OWNER_LOGIN') {
+            // Diagnostic for the host's PHP error log: names only, never paths or values.
+            error_log('ControlBot: secreto ' . $name . ' no disponible en ningun archivo privado valido.');
+        }
+        return null;
+    }
+
+    private static function loadFile(string $path, string $root): ?string
+    {
+        if ($path[0] !== '/' || str_contains($path, "\0")) {
             return null;
         }
         $real = realpath($path);
         if ($real === false || !is_file($real) || !is_readable($real)) {
             return null;
-        }
-        $root = realpath($repositoryRoot ?? dirname(__DIR__));
-        if ($root === false) {
-            return null; // unknown repository root: never skip the containment check
         }
         if ($real === $root || str_starts_with($real, $root . DIRECTORY_SEPARATOR)) {
             return null; // a secret inside the deployed tree could be served or committed
@@ -63,16 +99,6 @@ final class SecretSource
         }
         $value = trim($content);
         return $value === '' ? null : $value;
-    }
-
-    private static function conventionalPath(string $name, ?string $repositoryRoot): ?string
-    {
-        $file = self::CONVENTIONAL_FILES[$name] ?? null;
-        $root = realpath($repositoryRoot ?? dirname(__DIR__));
-        if ($file === null || $root === false) {
-            return null;
-        }
-        return dirname($root) . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . $file;
     }
 
     /**

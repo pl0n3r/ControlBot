@@ -69,10 +69,6 @@ final class SecretSource
                 return $value;
             }
         }
-        if ($file !== null && $name !== 'CONTROLBOT_OWNER_LOGIN') {
-            // Diagnostic for the host's PHP error log: names only, never paths or values.
-            error_log('ControlBot: secreto ' . $name . ' no disponible en ningun archivo privado valido.');
-        }
         return null;
     }
 

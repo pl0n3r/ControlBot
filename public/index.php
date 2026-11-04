@@ -18,7 +18,7 @@ use ControlBot\Web\ControlBotWebEntrypoint;
 $passwordHash = SecretSource::read('CONTROLBOT_OWNER_PASSWORD_HASH', dirname(__DIR__));
 if (is_string($passwordHash) && $passwordHash !== '') {
     $loginConfig = [
-        'owner_login' => getenv('CONTROLBOT_OWNER_LOGIN') ?: SecretSource::ownerLogin(dirname(__DIR__)),
+        'owner_login' => SecretSource::ownerLogin(dirname(__DIR__)),
         'password_hash' => $passwordHash,
         'rate_limit_dir' => getenv('CONTROLBOT_OWNER_RATE_LIMIT_DIR') ?: null,
     ];
@@ -80,12 +80,12 @@ if (is_string($passwordHash) && $passwordHash !== '') {
 // Compatibility contract: non-GitHub routes still reach FactoryOrchestratorWebEntrypoint::handle
 // through the authenticated owner entrypoint; REMOTE_USER is never an authority.
 $environment = [
-    'CONTROLBOT_OWNER_LOGIN' => getenv('CONTROLBOT_OWNER_LOGIN') ?: SecretSource::ownerLogin(dirname(__DIR__)),
+    'CONTROLBOT_OWNER_LOGIN' => SecretSource::ownerLogin(dirname(__DIR__)),
     'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH' => getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH') ?: null,
 ];
 
 try {
-    $owner = getenv('CONTROLBOT_OWNER_LOGIN') ?: SecretSource::ownerLogin(dirname(__DIR__));
+    $owner = SecretSource::ownerLogin(dirname(__DIR__));
     $vaultKey = SecretSource::read('CONTROLBOT_VAULT_KEY', dirname(__DIR__));
     if (!is_string($owner) || $owner === '' || !is_string($vaultKey) || $vaultKey === '') {
         throw new RuntimeException('Owner session configuration unavailable.');

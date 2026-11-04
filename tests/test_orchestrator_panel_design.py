@@ -1,4 +1,5 @@
 """Contrato de diseño del panel «Orquestador en vivo» (issue #1443)."""
+import json
 import re
 import subprocess
 import unittest
@@ -53,6 +54,29 @@ class PanelDesignTest(unittest.TestCase):
         self.assertIn('box-shadow:var(--surface-shadow)', css)
         for token in ('--repo-pink', '--repo-orange', '--seg-bg', '--sky', '--violet'):
             self.assertIn(token, css)
+
+    def test_paneles_compartidos_sin_debug_visible(self):
+        def scenario(path, name):
+            return json.loads(subprocess.run(
+                ['php', str(ROOT / path), name],
+                check=True, capture_output=True, text=True,
+            ).stdout)
+
+        agent = scenario('tests/factory_agent_activity_scenarios.php', 'full')['html']
+        health = scenario('tests/factory_public_health_scenarios.php', 'ui_escape')['raw_html']
+        self.assertIn('data-freshness="current"', agent)
+        self.assertIn('data-source-age-seconds="10"', agent)
+        self.assertIn('hace 12 s', agent)
+        self.assertIn('data-health="reachable"', health)
+        self.assertIn('data-source-age-seconds="0"', health)
+        self.assertIn('Alcanzable', health)
+        for markup in (agent, health):
+            visible = re.sub(r'\\s(?:title|data-[\\w-]+)="[^"]*"', '', markup)
+            self.assertNotIn('freshness=', visible)
+            self.assertNotIn('timestamp=', visible)
+            self.assertNotIn(' · antigüedad=', visible)
+            self.assertNotIn('Endpoint:', visible)
+        self.assertIn('&lt;script&gt;', health)
 
     def test_numeros_tabulares_y_objetivos_tactiles(self):
         self.assertIn('tabular-nums', self.css)

@@ -16,7 +16,11 @@ final class SecretSource
     private const CONVENTIONAL_FILES = [
         'CONTROLBOT_VAULT_KEY' => 'vault.key',
         'CONTROLBOT_OWNER_PASSWORD_HASH' => 'owner-password.hash',
+        'CONTROLBOT_OWNER_LOGIN' => 'owner-login',
     ];
+
+    /** Public owner identifier documented in docs/hostinger-root-publication.md (not a secret). */
+    private const DEFAULT_OWNER_LOGIN = 'USUARIO';
 
     public static function read(string $name, ?string $repositoryRoot = null): ?string
     {
@@ -63,5 +67,18 @@ final class SecretSource
             return null;
         }
         return dirname($root) . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . $file;
+    }
+
+    /**
+     * Owner login identifier: environment variable, then private/owner-login, then the public default.
+     * Only identifies the owner; the password hash and the vault key remain mandatory elsewhere.
+     */
+    public static function ownerLogin(?string $repositoryRoot = null): string
+    {
+        $value = self::read('CONTROLBOT_OWNER_LOGIN', $repositoryRoot);
+        if (is_string($value) && preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $value) === 1) {
+            return $value;
+        }
+        return self::DEFAULT_OWNER_LOGIN;
     }
 }

@@ -17,7 +17,7 @@ SetEnv CONTROLBOT_OWNER_PASSWORD_HASH_FILE /home/USUARIO/domains/DOMINIO/private
 
 ## Respaldo por convención (sin `SetEnv`)
 
-Si no hay variable directa ni `NOMBRE_FILE`, `CONTROLBOT_VAULT_KEY` y `CONTROLBOT_OWNER_PASSWORD_HASH` se buscan en `private/vault.key` y `private/owner-password.hash`, hermana de la raíz desplegada (`public_html`). Aplican las mismas garantías de abajo; otros secretos no usan este respaldo.
+Si no hay variable directa ni `NOMBRE_FILE`, `CONTROLBOT_VAULT_KEY` y `CONTROLBOT_OWNER_PASSWORD_HASH` se buscan en `private/vault.key` y `private/owner-password.hash`, hermana de la raíz desplegada (`public_html`). Aplican las mismas garantías de abajo; otros secretos no usan este respaldo. El identificador del dueño (`SecretSource::ownerLogin`) usa la variable `CONTROLBOT_OWNER_LOGIN`, luego `private/owner-login` y, por último, el identificador público documentado `USUARIO`; la contraseña y la clave del vault siguen siendo obligatorias.
 
 ## Garantías de lectura y fallo cerrado
 

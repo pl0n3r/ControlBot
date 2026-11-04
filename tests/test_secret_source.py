@@ -136,7 +136,6 @@ class SecretSourceTests(unittest.TestCase):
             self.assertEqual("key-from-private", self._read_named("CONTROLBOT_VAULT_KEY", str(site)))
             self.assertEqual("hash-from-private", self._read_named("CONTROLBOT_OWNER_PASSWORD_HASH", str(site)))
             self.assertEqual("NULL", self._read_named("CONTROLBOT_OTHER_SECRET", str(site)))
-            self.assertEqual("NULL", self._read_named("CONTROLBOT_OWNER_LOGIN", str(site)))
 
     def test_fallback_keeps_priority_and_containment(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -158,6 +157,32 @@ class SecretSourceTests(unittest.TestCase):
             (root / "private").mkdir()
             (root / "private" / "vault.key").write_text("inside-tree", encoding="utf-8")
             self.assertEqual("NULL", self._read_named("CONTROLBOT_VAULT_KEY", str(root)))
+
+    def test_owner_login_precedence_and_default(self) -> None:
+        code = ("require 'src/SecretSource.php';"
+                "echo ControlBot\\Security\\SecretSource::ownerLogin($argv[1]);")
+        def login(root, env=None):
+            merged = {k: v for k, v in os.environ.items() if not k.startswith("CONTROLBOT_OWNER_LOGIN")}
+            merged.update(env or {})
+            out = subprocess.run(["php", "-r", code, root], cwd=ROOT, env=merged,
+                                 capture_output=True, text=True, timeout=20)
+            self.assertEqual(0, out.returncode, out.stderr[:300])
+            return out.stdout
+        with tempfile.TemporaryDirectory() as d:
+            site = Path(d) / "public_html"; site.mkdir()
+            private = Path(d) / "private"; private.mkdir()
+            self.assertEqual("USUARIO", login(str(site)))
+            (private / "owner-login").write_text(" dueno.real\n", encoding="utf-8")
+            self.assertEqual("dueno.real", login(str(site)))
+            self.assertEqual("desde-env", login(str(site), {"CONTROLBOT_OWNER_LOGIN": "desde-env"}))
+            (private / "owner-login").write_text("bad value;<x>", encoding="utf-8")
+            self.assertEqual("USUARIO", login(str(site)))
+            self.assertEqual("USUARIO", login(str(site), {"CONTROLBOT_OWNER_LOGIN": "no valido!"}))
+
+    def test_entrypoints_use_owner_login_helper(self) -> None:
+        for path in ("public/index.php", "public/login.php", "public/health.php"):
+            source = (ROOT / path).read_text(encoding="utf-8")
+            self.assertIn("SecretSource::ownerLogin(", source, path)
 
     def test_htaccess_names_only_private_paths_never_secret_values(self) -> None:
         for name in ("CONTROLBOT_VAULT_KEY_FILE", "CONTROLBOT_OWNER_PASSWORD_HASH_FILE"):

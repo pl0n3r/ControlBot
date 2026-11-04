@@ -34,7 +34,7 @@ if (!session_start()) {
 }
 
 $config = [
-    'owner_login' => getenv('CONTROLBOT_OWNER_LOGIN') ?: SecretSource::ownerLogin(dirname(__DIR__)),
+    'owner_login' => SecretSource::ownerLogin(dirname(__DIR__)),
     'password_hash' => SecretSource::read('CONTROLBOT_OWNER_PASSWORD_HASH', dirname(__DIR__)),
     'rate_limit_dir' => getenv('CONTROLBOT_OWNER_RATE_LIMIT_DIR') ?: null,
 ];

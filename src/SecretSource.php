@@ -28,6 +28,12 @@ final class SecretSource
         if (is_string($direct) && $direct !== '') {
             return $direct;
         }
+        return self::readFromFile($name, $repositoryRoot);
+    }
+
+    /** Reads only the configured private file, without accepting a direct env value. */
+    private static function readFromFile(string $name, ?string $repositoryRoot): ?string
+    {
         $path = getenv($name . '_FILE');
         if (!is_string($path) || $path === '') {
             $path = self::conventionalPath($name, $repositoryRoot);
@@ -75,9 +81,14 @@ final class SecretSource
      */
     public static function ownerLogin(?string $repositoryRoot = null): string
     {
-        $value = self::read('CONTROLBOT_OWNER_LOGIN', $repositoryRoot);
-        if (is_string($value) && preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $value) === 1) {
-            return $value;
+        // A malformed env value must not shadow a valid protected file.
+        $direct = getenv('CONTROLBOT_OWNER_LOGIN');
+        if (is_string($direct) && preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $direct) === 1) {
+            return $direct;
+        }
+        $file = self::readFromFile('CONTROLBOT_OWNER_LOGIN', $repositoryRoot);
+        if (is_string($file) && preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $file) === 1) {
+            return $file;
         }
         return self::DEFAULT_OWNER_LOGIN;
     }

@@ -175,6 +175,10 @@ class SecretSourceTests(unittest.TestCase):
             (private / "owner-login").write_text(" dueno.real\n", encoding="utf-8")
             self.assertEqual("dueno.real", login(str(site)))
             self.assertEqual("desde-env", login(str(site), {"CONTROLBOT_OWNER_LOGIN": "desde-env"}))
+            # Invalid or empty environment values must fall back to the valid protected file.
+            self.assertEqual("dueno.real", login(str(site), {"CONTROLBOT_OWNER_LOGIN": "no valido!"}))
+            self.assertEqual("dueno.real", login(str(site), {"CONTROLBOT_OWNER_LOGIN": ""}))
+            self.assertEqual("dueno.real", login(str(site), {"CONTROLBOT_OWNER_LOGIN": "   "}))
             (private / "owner-login").write_text("bad value;<x>", encoding="utf-8")
             self.assertEqual("USUARIO", login(str(site)))
             self.assertEqual("USUARIO", login(str(site), {"CONTROLBOT_OWNER_LOGIN": "no valido!"}))
@@ -183,6 +187,7 @@ class SecretSourceTests(unittest.TestCase):
         for path in ("public/index.php", "public/login.php", "public/health.php"):
             source = (ROOT / path).read_text(encoding="utf-8")
             self.assertIn("SecretSource::ownerLogin(", source, path)
+            self.assertNotIn("getenv('CONTROLBOT_OWNER_LOGIN')", source, path)
 
     def test_htaccess_names_only_private_paths_never_secret_values(self) -> None:
         for name in ("CONTROLBOT_VAULT_KEY_FILE", "CONTROLBOT_OWNER_PASSWORD_HASH_FILE"):

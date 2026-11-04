@@ -15,6 +15,10 @@ SetEnv CONTROLBOT_OWNER_PASSWORD_HASH_FILE /home/USUARIO/domains/DOMINIO/private
 
 4. Antes de modificar una instalación real, realizar y verificar el respaldo exigido por D-059. La configuración y despliegue siguen siendo operaciones independientes de este PR.
 
+## Respaldo por convención (sin `SetEnv`)
+
+Si no hay variable directa ni `NOMBRE_FILE`, `CONTROLBOT_VAULT_KEY` y `CONTROLBOT_OWNER_PASSWORD_HASH` se buscan en `private/vault.key` y `private/owner-password.hash`, hermana de la raíz desplegada (`public_html`). Aplican las mismas garantías de abajo; otros secretos no usan este respaldo.
+
 ## Garantías de lectura y fallo cerrado
 
 - `SecretSource::read` utiliza primero la variable de entorno directa, cuando es una cadena no vacía; en su defecto consulta la ruta de `NOMBRE_FILE`.

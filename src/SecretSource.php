@@ -12,6 +12,12 @@ final class SecretSource
 {
     private const MAX_BYTES = 4096;
 
+    /** Conventional private files (sibling `private/` of the deployed root) for the two server secrets. */
+    private const CONVENTIONAL_FILES = [
+        'CONTROLBOT_VAULT_KEY' => 'vault.key',
+        'CONTROLBOT_OWNER_PASSWORD_HASH' => 'owner-password.hash',
+    ];
+
     public static function read(string $name, ?string $repositoryRoot = null): ?string
     {
         $direct = getenv($name);
@@ -19,7 +25,10 @@ final class SecretSource
             return $direct;
         }
         $path = getenv($name . '_FILE');
-        if (!is_string($path) || $path === '' || $path[0] !== '/' || str_contains($path, "\0")) {
+        if (!is_string($path) || $path === '') {
+            $path = self::conventionalPath($name, $repositoryRoot);
+        }
+        if ($path === null || $path[0] !== '/' || str_contains($path, "\0")) {
             return null;
         }
         $real = realpath($path);
@@ -44,5 +53,15 @@ final class SecretSource
         }
         $value = trim($content);
         return $value === '' ? null : $value;
+    }
+
+    private static function conventionalPath(string $name, ?string $repositoryRoot): ?string
+    {
+        $file = self::CONVENTIONAL_FILES[$name] ?? null;
+        $root = realpath($repositoryRoot ?? dirname(__DIR__));
+        if ($file === null || $root === false) {
+            return null;
+        }
+        return dirname($root) . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . $file;
     }
 }

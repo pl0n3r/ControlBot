@@ -16,7 +16,11 @@ final class SecretSource
     private const CONVENTIONAL_FILES = [
         'CONTROLBOT_VAULT_KEY' => 'vault.key',
         'CONTROLBOT_OWNER_PASSWORD_HASH' => 'owner-password.hash',
+        'CONTROLBOT_OWNER_LOGIN' => 'owner-login',
     ];
+
+    /** Public owner identifier documented in docs/hostinger-root-publication.md (not a secret). */
+    private const DEFAULT_OWNER_LOGIN = 'USUARIO';
 
     public static function read(string $name, ?string $repositoryRoot = null): ?string
     {
@@ -24,6 +28,12 @@ final class SecretSource
         if (is_string($direct) && $direct !== '') {
             return $direct;
         }
+        return self::readFromFile($name, $repositoryRoot);
+    }
+
+    /** Reads only the configured private file, without accepting a direct env value. */
+    private static function readFromFile(string $name, ?string $repositoryRoot): ?string
+    {
         $path = getenv($name . '_FILE');
         if (!is_string($path) || $path === '') {
             $path = self::conventionalPath($name, $repositoryRoot);
@@ -63,5 +73,23 @@ final class SecretSource
             return null;
         }
         return dirname($root) . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . $file;
+    }
+
+    /**
+     * Owner login identifier: environment variable, then private/owner-login, then the public default.
+     * Only identifies the owner; the password hash and the vault key remain mandatory elsewhere.
+     */
+    public static function ownerLogin(?string $repositoryRoot = null): string
+    {
+        // A malformed env value must not shadow a valid protected file.
+        $direct = getenv('CONTROLBOT_OWNER_LOGIN');
+        if (is_string($direct) && preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $direct) === 1) {
+            return $direct;
+        }
+        $file = self::readFromFile('CONTROLBOT_OWNER_LOGIN', $repositoryRoot);
+        if (is_string($file) && preg_match('/^[A-Za-z0-9._@-]{1,64}$/D', $file) === 1) {
+            return $file;
+        }
+        return self::DEFAULT_OWNER_LOGIN;
     }
 }

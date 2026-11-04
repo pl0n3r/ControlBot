@@ -145,7 +145,7 @@ class HealthHttpIdentityEndpointTests(unittest.TestCase):
         self.assertIn("public/health\\.php", php_deny)
         self.assertIn("[F,L,NC]", php_deny)
         self.assertNotIn("SetEnv CONTROLBOT_RELEASE_MANIFEST_PATH", rules)
-        self.assertIn("getenv('CONTROLBOT_OWNER_LOGIN')", ENTRY.read_text())
+        self.assertIn("SecretSource::ownerLogin(", ENTRY.read_text())
         self.assertIn("getenv('CONTROLBOT_RELEASE_MANIFEST_PATH')", ENTRY.read_text())
         self.assertIn("getenv('CONTROLBOT_RELEASE_ATTESTATION_KEY')", ENTRY.read_text())
 

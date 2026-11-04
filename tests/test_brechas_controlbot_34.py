@@ -168,7 +168,7 @@ class BrechasControlbot34Tests(unittest.TestCase):
                     self.assertIn("Require valid-user", htaccess)
                     self.assertIn("RewriteRule ^(?:src|config|docs|scripts|tests|vendor", htaccess)
                     self.assertIn(r"RewriteRule ^health\.php$ public/health.php [L,NC]", htaccess)
-                    self.assertIn("getenv('CONTROLBOT_OWNER_LOGIN')",
+                    self.assertIn("SecretSource::ownerLogin(",
                                   self.code["public/health.php"])
                 elif row == "CB-0511":
                     ci = self.code[".github/workflows/ci.yml"]

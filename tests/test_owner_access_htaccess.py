@@ -79,7 +79,7 @@ echo $response['status'];
             self.htaccess,
             r"(?m)^SetEnv\s+CONTROLBOT_OWNER_LOGIN\s+USUARIO\s*$",
         )
-        self.assertIn("getenv('CONTROLBOT_OWNER_LOGIN')", self.public_index)
+        self.assertIn("SecretSource::ownerLogin(", self.public_index)
         self.assertIn("$server['REMOTE_USER']", self.entrypoint)
         self.assertIn("REMOTE_USER", self.runbook)
         self.assertIn("CONTROLBOT_OWNER_LOGIN", self.runbook)

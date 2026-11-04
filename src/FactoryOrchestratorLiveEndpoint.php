@@ -26,7 +26,7 @@ final class FactoryOrchestratorLiveEndpoint
         }
         if (!hash_equals($config['owner_login'], $user)) return self::response(403, "Forbidden.\n");
         if ($method !== 'GET') return self::response(405, "Method not allowed.\n", ['Allow' => 'GET']);
-        if (!in_array($path, ['/', '/api/orchestrator-live'], true)) return self::response(404, "Not found.\n");
+        if (!in_array($path, ['/', '/overview', '/api/orchestrator-live'], true)) return self::response(404, "Not found.\n");
         try {
             $cached = FactoryOrchestratorLiveCache::remember(
                 $config['cache_path'], $now, $config['ttl_seconds'],

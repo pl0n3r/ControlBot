@@ -260,6 +260,28 @@ class SecretSourceTests(unittest.TestCase):
         legacy = (ROOT / "docs/hostinger-root-publication.md").read_text(encoding="utf-8")
         self.assertNotIn("## Secretos en archivo privado", legacy)
 
+    def test_hostinger_production_runbook_contract(self) -> None:
+        """Documentación de rutas, permisos y operaciones DEL_DUEÑO, sin Hostinger real."""
+        secret_doc = (ROOT / "docs/secretos-en-archivo-hostinger.md").read_text(encoding="utf-8")
+        hosting_doc = (ROOT / "docs/hostinger-root-publication.md").read_text(encoding="utf-8")
+        for doc in (secret_doc, hosting_doc):
+            for expected in (
+                "/home/u151692719/domains/condorapp.com.co/public_html/control",
+                "/home/u151692719/domains/condorapp.com.co/private",
+                "vault.key", "owner-password.hash", "owner-login", "owner-rate-limit",
+                "0600", "0700", "SetEnv", "public_html", "NOMBRE_FILE",
+            ):
+                self.assertIn(expected, doc)
+        for expected in (
+            "DEL_DUEÑO", "domains/control.condorapp.com.co/private",
+            "public_html/control/public/diag-tmp.php",
+            "/home/u151692719/.htpasswds/owner-login-enabled",
+            "rotarla", "Rollback", "Basic Auth",
+        ):
+            self.assertIn(expected, secret_doc)
+        self.assertIn("DEL_DUEÑO", hosting_doc)
+        self.assertIn("Rollback", hosting_doc)
+
 
 if __name__ == "__main__":
     unittest.main()

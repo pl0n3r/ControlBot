@@ -6,13 +6,7 @@ Esta guía corresponde a ControlBot #1349. El cambio permite **leer** secretos d
 
 1. Preparar en Hostinger un directorio privado **fuera del repositorio y de `public_html`**, por ejemplo `/home/USUARIO/domains/DOMINIO/private/`. Aplicar permisos restrictivos al directorio (0700) y a cada archivo (0600), conforme a las capacidades del servidor y su propietario.
 2. En ese directorio, guardar **por separado** `vault.key` (clave de cifrado del vault, con entropía criptográfica adecuada) y `owner-password.hash` (hash obtenido mediante `password_hash($password, PASSWORD_ARGON2ID)` de una contraseña que solo conozca el dueño; `OwnerLoginGate` exige Argon2id). No copiar secretos en el repositorio, chats, logs, PR ni issues. No generar el hash con la contraseña literal en una orden que quede en el historial.
-3. Configurar en `.htaccess` **solamente las rutas absolutas**, usando las variables `CONTROLBOT_VAULT_KEY_FILE` y `CONTROLBOT_OWNER_PASSWORD_HASH_FILE`. Ejemplo ilustrativo, **no literal para producción**:
-
-```apache
-SetEnv CONTROLBOT_VAULT_KEY_FILE /home/USUARIO/domains/DOMINIO/private/vault.key
-SetEnv CONTROLBOT_OWNER_PASSWORD_HASH_FILE /home/USUARIO/domains/DOMINIO/private/owner-password.hash
-```
-
+3. En esta instalación, `SetEnv` de `.htaccess` no llega a PHP: usar la convención privada documentada a continuación en lugar de confiar en las variables de Apache.
 4. Antes de modificar una instalación real, realizar y verificar el respaldo exigido por D-059. La configuración y despliegue siguen siendo operaciones independientes de este PR.
 
 ## Respaldo por convención (sin `SetEnv`)
@@ -40,3 +34,31 @@ Solo los procesos PHP web escriben en `error_log` el **nombre** de un secreto ob
 Las pruebas offline en `tests/test_secret_source.py` usan directorios temporales y valores sintéticos para cubrir precedencia, recorte, archivos inválidos, árbol desplegado y rutas presentes en `.htaccess`. No prueban ni alteran Hostinger.
 
 La validación de un entorno real requiere una autorización y ventana operativa separadas (D-059); comprobar las respuestas sin imprimir secretos y conservar una vía de reversión hacia el estado anterior. Si falta una condición de seguridad o el servidor no entrega `SetEnv` a PHP, **no** abrir el acceso como solución alternativa.
+
+## Despliegue real de ControlBot (Hostinger)
+
+La URL pública `https://control.condorapp.com.co/` sirve el código desde
+`/home/u151692719/domains/condorapp.com.co/public_html/control`.
+El árbol `/home/u151692719/domains/control.condorapp.com.co/public_html` no es la raíz de este despliegue (se observó vacío salvo `var`). No duplicar allí el código ni la configuración.
+
+Los secretos de esta instalación se guardan **fuera de `public_html`**, en
+`/home/u151692719/domains/condorapp.com.co/private`. Archivos esperados:
+
+- `vault.key` y `owner-password.hash`: obligatorios; archivos `0600`.
+- `owner-login`: opcional; identificador público validado, archivo `0600`.
+- `owner-rate-limit/`: directorio de intentos de login, permisos `0700`.
+- `private/`: directorio con permisos `0700`.
+
+Para los secretos obligatorios la prioridad de lectura es: variable de entorno directa no vacía (`CONTROLBOT_VAULT_KEY` / `CONTROLBOT_OWNER_PASSWORD_HASH`), ruta explícita vía `CONTROLBOT_VAULT_KEY_FILE` / `CONTROLBOT_OWNER_PASSWORD_HASH_FILE` (`NOMBRE_FILE`), y por último convención `private/vault.key` / `private/owner-password.hash`. Para el login: `CONTROLBOT_OWNER_LOGIN`, `private/owner-login` y finalmente el identificador público `USUARIO`. Sin `CONTROLBOT_OWNER_RATE_LIMIT_DIR`, los intentos se guardan en `private/owner-rate-limit/`. La directiva `SetEnv` de `.htaccess` **no llega a PHP en esta instalación**; el fallback privado permite operar sin convertir `public_html` en almacén de secretos. Nunca escribir claves, contraseñas ni sus hashes en documentación, diagnósticos o repositorio.
+
+## DEL_DUEÑO — saneamiento de producción (no ejecutar desde este PR)
+
+Estas tareas son **manuales, del dueño, sujetas a D-059**, con respaldo previo verificado y sin copiar valores a chats, logs o tickets:
+
+1. Confirmar primero que la aplicación lee correctamente los archivos canónicos bajo `/home/u151692719/domains/condorapp.com.co/private`; solo entonces borrar las **copias duplicadas** de secretos en `/home/u151692719/domains/control.condorapp.com.co/private`.
+2. Comprobar que **no existe** `/home/u151692719/domains/condorapp.com.co/public_html/control/public/diag-tmp.php`; si subsiste el diagnóstico temporal, retirarlo sin publicar su contenido.
+3. Verificar el marcador `/home/u151692719/.htpasswds/owner-login-enabled`, cuyo estado controla el acceso sin la ventana adicional de credenciales del servidor.
+4. Si la contraseña se escribió alguna vez en un chat, **rotarla** por un canal seguro, sin mostrar el nuevo secreto ni su hash.
+5. Revisar permisos `0600` en los archivos y `0700` en los directorios, conservando la ubicación fuera de `public_html`.
+
+**Rollback del acceso:** retirar el marcador `/home/u151692719/.htpasswds/owner-login-enabled` devuelve la ventana de usuario y contraseña de Basic Auth del servidor. La reversión y cualquier comprobación en Hostinger son acciones exclusivas del dueño; este cambio solo fija el runbook y su contrato offline.

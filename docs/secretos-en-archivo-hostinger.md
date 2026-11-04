@@ -23,11 +23,15 @@ Si no hay variable directa ni `NOMBRE_FILE`, `CONTROLBOT_VAULT_KEY` y `CONTROLBO
 
 - `SecretSource::read` utiliza primero la variable de entorno directa, cuando es una cadena no vacía; en su defecto consulta la ruta de `NOMBRE_FILE`.
 - La ruta debe ser **absoluta** y resolver a un archivo regular y legible **fuera del árbol desplegado**. No se aceptan rutas relativas, inexistentes, directorios ni enlaces simbólicos que resuelvan dentro de ese árbol.
+- Ningún candidato puede resolver a un archivo dentro de `public_html`, incluso si proviene de un enlace simbólico o de `NOMBRE_FILE`; se prueba el siguiente candidato seguro.
+- La búsqueda automática no cruza a un **dominio hermano**: desde `domains/condorapp.com.co/public_html/control` no encuentra `domains/control.condorapp.com.co/private`. En ese caso la recuperación productiva requiere una configuración explícita aprobada y segura conforme a D-059; este PR no acredita por sí solo una recuperación del servicio.
 - El archivo debe tener entre **1 y 4096 bytes** (máximo 4 KB). Se recortan espacios y saltos de línea alrededor del contenido; un valor que quede vacío se trata como ausente.
 - Si el archivo o la configuración son inválidos, **no** se usan credenciales sustitutas, datos de prueba ni secretos embebidos. Los entrypoints permanecen cerrados (respuesta de servicio no disponible o denegación según su lógica).
 - Evitar publicar la ruta en mensajes públicos si revela datos de la instalación. **Jamás** mostrar el contenido del archivo ni su hash en diagnósticos.
 
 ## Validación y reversión
+
+Solo los procesos PHP web escriben en `error_log` el **nombre** de un secreto obligatorio ausente, nunca rutas ni valores; las ejecuciones CLI de pruebas no emiten ese diagnóstico en `stderr`.
 
 Las pruebas offline en `tests/test_secret_source.py` usan directorios temporales y valores sintéticos para cubrir precedencia, recorte, archivos inválidos, árbol desplegado y rutas presentes en `.htaccess`. No prueban ni alteran Hostinger.
 

@@ -12,7 +12,7 @@ final class SecretSource
 {
     private const MAX_BYTES = 4096;
 
-    /** Conventional private files (sibling `private/` of the deployed root) for the two server secrets. */
+    /** Whitelisted private filenames for lookup outside the deployed web tree. */
     private const CONVENTIONAL_FILES = [
         'CONTROLBOT_VAULT_KEY' => 'vault.key',
         'CONTROLBOT_OWNER_PASSWORD_HASH' => 'owner-password.hash',
@@ -69,6 +69,11 @@ final class SecretSource
                 return $value;
             }
         }
+        // PHP web workers log the secret's name, never its path or its value.
+        // CLI tests and optional public owner identifiers must stay silent.
+        if (PHP_SAPI !== 'cli' && $file !== null && $name !== 'CONTROLBOT_OWNER_LOGIN') {
+            error_log('ControlBot: archivo privado no disponible para ' . $name);
+        }
         return null;
     }
 
@@ -83,6 +88,10 @@ final class SecretSource
         }
         if ($real === $root || str_starts_with($real, $root . DIRECTORY_SEPARATOR)) {
             return null; // a secret inside the deployed tree could be served or committed
+        }
+        // Resolve symlinks before deciding: the file must never be web-served.
+        if (preg_match('#(^|/)public_html(/|$)#', $real) === 1) {
+            return null;
         }
         $size = filesize($real);
         if ($size === false || $size < 1 || $size > self::MAX_BYTES) {

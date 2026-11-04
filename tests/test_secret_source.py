@@ -201,6 +201,15 @@ class SecretSourceTests(unittest.TestCase):
             self.assertEqual("from-ancestor", self._read_named("CONTROLBOT_VAULT_KEY", str(root), env))
             # A private/ inside public_html would be served by the web server: never used.
             self.assertEqual("NULL", self._read_named("CONTROLBOT_OWNER_PASSWORD_HASH", str(root)))
+            # A symlink resolving back into public_html is still web-reachable.
+            link = site / "private" / "owner-password.hash"
+            link.symlink_to(exposed / "owner-password.hash")
+            self.assertEqual("NULL", self._read_named("CONTROLBOT_OWNER_PASSWORD_HASH", str(root)))
+            # An explicit NAME_FILE in public_html is rejected; safe ancestor fallback works.
+            (exposed / "vault.key").write_text("web-key", encoding="utf-8")
+            self.assertEqual("from-ancestor", self._read_named(
+                "CONTROLBOT_VAULT_KEY", str(root),
+                {"CONTROLBOT_VAULT_KEY_FILE": str(exposed / "vault.key")}))
 
     def test_htaccess_names_only_private_paths_never_secret_values(self) -> None:
         for name in ("CONTROLBOT_VAULT_KEY_FILE", "CONTROLBOT_OWNER_PASSWORD_HASH_FILE"):

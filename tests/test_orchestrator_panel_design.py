@@ -44,6 +44,16 @@ class PanelDesignTest(unittest.TestCase):
         for ms in re.findall(r'(\d+)ms', self.css):
             self.assertLessEqual(int(ms), 250)
 
+    def test_claro_y_oscuro_conservan_tokens_de_contraste(self):
+        css = self.css.replace(' ', '')
+        self.assertIn('@media(prefers-color-scheme:dark)', css)
+        self.assertNotIn('\\n:root{color-scheme:dark;', self.css)
+        self.assertIn('color-scheme: light;', self.css)
+        self.assertIn('background:var(--surface-gradient)', css)
+        self.assertIn('box-shadow:var(--surface-shadow)', css)
+        for token in ('--repo-pink', '--repo-orange', '--seg-bg', '--sky', '--violet'):
+            self.assertIn(token, css)
+
     def test_numeros_tabulares_y_objetivos_tactiles(self):
         self.assertIn('tabular-nums', self.css)
         self.assertIn('min-height:44px', self.css)

@@ -49,18 +49,8 @@ final class SecretSource
         }
         $file = self::CONVENTIONAL_FILES[$name] ?? null;
         if ($file !== null) {
-            // private/<file> in an ancestor of the deployed root, never inside a public_html tree
-            // (a subdomain can live in public_html/<sub>, so its siblings would be web-reachable).
-            $dir = $root;
-            for ($i = 0; $i < 4; $i++) {
-                $dir = dirname($dir);
-                if ($dir === '/' || $dir === '.' || $dir === DIRECTORY_SEPARATOR) {
-                    break;
-                }
-                if (preg_match('#(^|/)public_html(/|$)#', $dir) === 1) {
-                    continue;
-                }
-                $candidates[] = $dir . DIRECTORY_SEPARATOR . 'private' . DIRECTORY_SEPARATOR . $file;
+            foreach (self::privateDirectories($root) as $dir) {
+                $candidates[] = $dir . DIRECTORY_SEPARATOR . $file;
             }
         }
         foreach (array_unique($candidates) as $path) {
@@ -73,6 +63,62 @@ final class SecretSource
         // CLI tests and optional public owner identifiers must stay silent.
         if (PHP_SAPI !== 'cli' && $file !== null && $name !== 'CONTROLBOT_OWNER_LOGIN') {
             error_log('ControlBot: archivo privado no disponible para ' . $name);
+        }
+        return null;
+    }
+
+    /**
+     * `private/` directories in up to four ancestors of the deployed root, never inside a public_html
+     * tree (a subdomain can live in public_html/<sub>, so its siblings would be web-reachable).
+     *
+     * @return list<string>
+     */
+    private static function privateDirectories(string $root): array
+    {
+        $dirs = [];
+        $dir = $root;
+        for ($i = 0; $i < 4; $i++) {
+            $dir = dirname($dir);
+            if ($dir === '/' || $dir === '.' || $dir === DIRECTORY_SEPARATOR) {
+                break;
+            }
+            if (preg_match('#(^|/)public_html(/|$)#', $dir) === 1) {
+                continue;
+            }
+            $dirs[] = $dir . DIRECTORY_SEPARATOR . 'private';
+        }
+        return $dirs;
+    }
+
+    /**
+     * Directory for the owner-login attempt throttle: CONTROLBOT_OWNER_RATE_LIMIT_DIR, else
+     * `owner-rate-limit/` inside the first writable private/ directory outside public_html (created 0700).
+     */
+    public static function rateLimitDirectory(?string $repositoryRoot = null): ?string
+    {
+        $direct = getenv('CONTROLBOT_OWNER_RATE_LIMIT_DIR');
+        if (is_string($direct) && $direct !== '') {
+            return $direct;
+        }
+        $root = realpath($repositoryRoot ?? dirname(__DIR__));
+        if ($root === false) {
+            return null;
+        }
+        foreach (self::privateDirectories($root) as $private) {
+            if (!is_dir($private) || is_link($private) || !is_writable($private)) {
+                continue;
+            }
+            $real = realpath($private);
+            if ($real === false || $real === $root || str_starts_with($real, $root . DIRECTORY_SEPARATOR)) {
+                continue;
+            }
+            $dir = $real . DIRECTORY_SEPARATOR . 'owner-rate-limit';
+            if (!is_dir($dir) && !@mkdir($dir, 0700)) {
+                continue;
+            }
+            if (is_dir($dir) && !is_link($dir) && is_writable($dir)) {
+                return $dir;
+            }
         }
         return null;
     }

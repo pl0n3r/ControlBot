@@ -211,6 +211,34 @@ class SecretSourceTests(unittest.TestCase):
                 "CONTROLBOT_VAULT_KEY", str(root),
                 {"CONTROLBOT_VAULT_KEY_FILE": str(exposed / "vault.key")}))
 
+    def test_rate_limit_directory_uses_env_or_private_outside_public_html(self) -> None:
+        code = ("require 'src/SecretSource.php';"
+                "$v = ControlBot\\Security\\SecretSource::rateLimitDirectory($argv[1]);"
+                "echo $v === null ? 'NULL' : $v;")
+        def run(root, env=None):
+            merged = {k: v for k, v in os.environ.items() if not k.startswith("CONTROLBOT_OWNER_RATE")}
+            merged.update(env or {})
+            out = subprocess.run(["php", "-r", code, root], cwd=ROOT, env=merged,
+                                 capture_output=True, text=True, timeout=20)
+            self.assertEqual(0, out.returncode, out.stderr[:300])
+            return out.stdout
+        with tempfile.TemporaryDirectory() as d:
+            site = Path(d).resolve() / "domains" / "main.example"
+            root = site / "public_html" / "control"; root.mkdir(parents=True)
+            (site / "public_html" / "private").mkdir()  # web-reachable: never used
+            self.assertEqual("NULL", run(str(root)))
+            (site / "private").mkdir()
+            got = run(str(root))
+            self.assertEqual(str(site / "private" / "owner-rate-limit"), got)
+            self.assertEqual(0o700, (site / "private" / "owner-rate-limit").stat().st_mode & 0o777)
+            self.assertEqual("/explicit", run(str(root), {"CONTROLBOT_OWNER_RATE_LIMIT_DIR": "/explicit"}))
+            self.assertFalse((site / "public_html" / "private" / "owner-rate-limit").exists())
+
+    def test_entrypoints_use_rate_limit_helper(self) -> None:
+        for path in ("public/index.php", "public/login.php"):
+            self.assertIn("SecretSource::rateLimitDirectory(",
+                          (ROOT / path).read_text(encoding="utf-8"), path)
+
     def test_htaccess_names_only_private_paths_never_secret_values(self) -> None:
         for name in ("CONTROLBOT_VAULT_KEY_FILE", "CONTROLBOT_OWNER_PASSWORD_HASH_FILE"):
             line = next(x for x in HTACCESS.splitlines() if x.startswith("SetEnv " + name))

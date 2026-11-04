@@ -20,7 +20,7 @@ if (is_string($passwordHash) && $passwordHash !== '') {
     $loginConfig = [
         'owner_login' => SecretSource::ownerLogin(dirname(__DIR__)),
         'password_hash' => $passwordHash,
-        'rate_limit_dir' => getenv('CONTROLBOT_OWNER_RATE_LIMIT_DIR') ?: null,
+        'rate_limit_dir' => SecretSource::rateLimitDirectory(dirname(__DIR__)),
     ];
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');

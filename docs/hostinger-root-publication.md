@@ -30,7 +30,7 @@ La aplicación sigue verificando identidad por dos señales server-side: `$_SERV
 
 ### Compatibilidad LiteSpeed
 
-La instalación real ya comprobó que `SetEnv` de `.htaccess` no llega a PHP. La identidad de dueño y los secretos usan la lógica de fallback privado descrita en el runbook. Nunca relajar la comparación de propietario ni admitir headers arbitrarios.
+En una instalación nueva se debe comprobar que LiteSpeed entrega `REMOTE_USER` a PHP. En esta instalación real se comprobó que `SetEnv` de `.htaccess` no llega a PHP: la identidad pública de dueño y los secretos usan la lógica de fallback privado descrita en el runbook. Nunca relajar la comparación de propietario ni admitir headers arbitrarios.
 
 La alternativa mínima debe seguir usando únicamente identidad generada por el servidor. Por ejemplo, si LiteSpeed expone `REDIRECT_REMOTE_USER`, se implementa un cambio separado y probado que lo lea desde `$_SERVER` solo después de confirmar que lo genera el servidor. Si `SetEnv` no llega a PHP, puede evaluarse una regla de entorno equivalente del servidor. No se deben leer headers arbitrarios ni incrustar secretos en `.htaccess`, PHP o documentación.
 

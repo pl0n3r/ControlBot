@@ -40,7 +40,10 @@ final class SupportNotificationRecipients
         string $directory, int $now
     ): array {
         $uri = $server['REQUEST_URI'] ?? null;
-        if ($uri !== self::ROUTE) {
+        $path = is_string($uri) && strlen($uri) <= 2048
+            && !str_contains($uri, "\0") ? parse_url($uri, PHP_URL_PATH) : null;
+        if ($path !== self::ROUTE || !is_string($uri)
+            || preg_match('~^/support-notifications(?:\?[^#\x00]*)?$~D', $uri) !== 1) {
             return self::reply(404, ['error'=>'not_found']);
         }
         $method = $server['REQUEST_METHOD'] ?? null;

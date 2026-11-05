@@ -118,7 +118,10 @@ if ($scenario === 'roundtrip') {
         'unauthorized mutation audited');
 } elseif ($scenario === 'routing') {
     $active = (string) strtotime('2026-11-03T15:00:00+00:00');
-    $preview = Module::handle($get, [
+    $simulateGet = $get;
+    $simulateGet['REQUEST_URI'] =
+        '/support-notifications?action=simulate&type=incident&at_utc=' . $active;
+    $preview = Module::handle($simulateGet, [
         'action'=>'simulate','type'=>'incident','at_utc'=>$active,
     ], $session, $config, $dir, $now+3);
     check1428($preview['status'] === 200, 'simulation rejected');

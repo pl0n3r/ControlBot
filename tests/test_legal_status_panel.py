@@ -109,61 +109,64 @@ class LegalStatusPanelTests(unittest.TestCase):
 
     def test_owner_only_and_read_only(self):
         source = (ROOT / "src/LegalStatusPanel.php").read_text(encoding="utf-8")
-        entry = (ROOT / "src/ControlBotWebEntrypoint.php").read_text(encoding="utf-8")
+        bootstrap = (ROOT / "public/index.php").read_text(encoding="utf-8")
         shell = (ROOT / "src/ControlCenterShell.php").read_text(encoding="utf-8")
-        self.assertIn("OwnerAuthenticatedRouter::verifiedOwner", entry)
-        self.assertIn("self::legalResponse($server)", entry)
+        self.assertIn("OwnerAuthenticatedRouter::verifiedOwner", bootstrap)
+        self.assertIn("$legalPath === '/legal'", bootstrap)
+        self.assertIn("OwnerLoginGate::requireOwner", bootstrap)
         self.assertIn("'legal' => 'Legal'", shell)
         self.assertNotIn("curl_exec", source)
-        for method in ("file_put_contents", "unlink(", "fwrite(", "shell_exec",
-                       "git push", "update_issue", "merge_pull_request"):
-            self.assertNotIn(method, source)
+        for mutation in ("file_put_contents", "unlink(", "fwrite(", "shell_exec",
+                         "git push", "update_issue", "merge_pull_request"):
+            self.assertNotIn(mutation, source)
 
-        code = r"""
+        php = r"""
 require 'src/Approvals.php';
 require 'src/OwnerSession.php';
-require 'src/ControlBotWebEntrypoint.php';
 use ControlBot\Security\OwnerSessionService;
 use ControlBot\Security\TokenVault;
 use ControlBot\Security\Totp;
-use ControlBot\Web\ControlBotWebEntrypoint;
-$now=1800000000;
-$owner='pl0n3r';
+$scenario=$argv[1]; $now=time();
+putenv('CONTROLBOT_OWNER_LOGIN=pl0n3r');
+putenv('CONTROLBOT_OWNER_PASSWORD_HASH=');
+putenv('CONTROLBOT_LEGAL_SNAPSHOT_PATH=');
 $key=base64_encode(str_repeat('K',SODIUM_CRYPTO_SECRETBOX_KEYBYTES));
-$auth=new OwnerSessionService($owner,new TokenVault($key));
-$session=[];
-$auth->establishTrustedOAuthSession($session,$owner,'gho_synthetic_fixture');
-$env=['CONTROLBOT_OWNER_LOGIN'=>$owner];
-$server=['REQUEST_METHOD'=>'GET','REQUEST_URI'=>'/legal','REMOTE_USER'=>$owner];
-$public=ControlBotWebEntrypoint::handle($server,$env,$now);
-$denied=ControlBotWebEntrypoint::handleAuthenticated($server,$env,$now,[],$auth);
-$beforeTotp=ControlBotWebEntrypoint::handleAuthenticated($server,$env,$now,$session,$auth);
-$secret='JBSWY3DPEHPK3PXP';
-$auth->reauthenticateTotp($session,Totp::code($secret,$now),$secret,$now);
-$allowed=ControlBotWebEntrypoint::handleAuthenticated($server,$env,$now,$session,$auth);
-$post=$server; $post['REQUEST_METHOD']='POST';
-$mutation=ControlBotWebEntrypoint::handleAuthenticated($post,$env,$now,$session,$auth);
-$expired=ControlBotWebEntrypoint::handleAuthenticated($server,$env,$now+301,$session,$auth);
-echo json_encode([
- 'public'=>$public['status'],'denied'=>$denied['status'],
- 'before_totp'=>$beforeTotp['status'],'allowed'=>$allowed['status'],
- 'method'=>$mutation['status'],'expired'=>$expired['status'],
- 'no_store'=>$allowed['headers']['Cache-Control']??null,
- 'owner_only_body'=>str_contains($allowed['body'],'Legal y privacidad'),
- 'has_unknown'=>str_contains($allowed['body'],'UNKNOWN'),
- 'no_secret'=>!str_contains($allowed['body'],'gho_synthetic_fixture')
-],JSON_THROW_ON_ERROR);
+putenv('CONTROLBOT_VAULT_KEY='.$key);
+$_SERVER['REQUEST_METHOD']=($scenario==='post'?'POST':'GET');
+$_SERVER['REQUEST_URI']='/legal';
+$_SERVER['REMOTE_USER']='pl0n3r';
+register_shutdown_function(static function () {
+    file_put_contents('php://stderr', json_encode(['status'=>http_response_code()]));
+});
+if($scenario!=='anonymous'){
+    ini_set('session.use_strict_mode','1');
+    session_start();
+    $id=session_id();
+    $auth=new OwnerSessionService('pl0n3r',new TokenVault($key));
+    $auth->establishTrustedOAuthSession($_SESSION,'pl0n3r','gho_synthetic_fixture');
+    if($scenario!=='before'){
+        $secret='JBSWY3DPEHPK3PXP';
+        $auth->reauthenticateTotp($_SESSION,Totp::code($secret,$now),$secret,$now);
+    }
+    if($scenario==='expired')$_SESSION['_reauthenticated_at']=$now-600;
+    session_write_close();
+    $_COOKIE[session_name()]=$id;
+}
+require 'public/index.php';
 """
-        result = subprocess.run(["php", "-r", code], cwd=ROOT, text=True,
-                                capture_output=True, timeout=25)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        output = json.loads(result.stdout)
-        self.assertEqual((output["public"], output["denied"], output["before_totp"]),
-                         (403, 403, 403))
-        self.assertEqual((output["allowed"], output["method"], output["expired"]),
-                         (200, 405, 403))
-        self.assertEqual(output["no_store"], "no-store")
-        self.assertTrue(all(output[k] for k in ("owner_only_body", "has_unknown", "no_secret")))
+        results = {}
+        for scenario in ("anonymous", "before", "allowed", "post", "expired"):
+            response = subprocess.run(["php", "-r", php, scenario], cwd=ROOT,
+                                      text=True, capture_output=True, timeout=25)
+            self.assertEqual(response.returncode, 0, response.stdout + response.stderr)
+            results[scenario] = (json.loads(response.stderr)["status"], response.stdout)
+        self.assertEqual([results[k][0] for k in results],
+                         [403, 403, 200, 405, 403])
+        self.assertTrue(all("Forbidden." in results[k][1] for k in ("anonymous", "before", "expired")))
+        self.assertIn("Legal y privacidad", results["allowed"][1])
+        self.assertIn("UNKNOWN", results["allowed"][1])
+        self.assertNotIn("gho_synthetic_fixture", results["allowed"][1])
+        self.assertNotIn("Legal y privacidad", results["post"][1])
 
     def test_invalid_and_untrusted_documents_fail_closed(self):
         sample = json.loads(json.dumps(FIXTURE))

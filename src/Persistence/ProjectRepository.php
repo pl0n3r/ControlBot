@@ -1,19 +1,12 @@
 <?php
 declare(strict_types=1);
-
 namespace ControlBot\Persistence;
-
 use ControlBot\Production\BackupGate;
 use InvalidArgumentException;
 use JsonException;
 use PDO;
 use RuntimeException;
 use Throwable;
-
-/**
- * Additive domain migration wrapper. Keep the historical SchemaMigrator and
- * 001_decisions.sql untouched. Never call apply() from a web request.
- */
 final class DomainSchemaMigrator
 {
     private const TABLES = [
@@ -23,8 +16,6 @@ final class DomainSchemaMigrator
         'controlbot_intake',
         'controlbot_pause_state',
     ];
-
-    /** @return array{version:int,tables:list<string>,sha256:string} */
     public static function dryRun(PDO $db): array
     {
         self::requireExceptions($db);
@@ -33,7 +24,6 @@ final class DomainSchemaMigrator
         if (!is_string($sql) || trim($sql) === '') {
             throw new RuntimeException('Domain migration missing.');
         }
-        // The tracked SQL must contain exactly the five additive DDL statements.
         $withoutComments = preg_replace('/^\s*--[^\n]*(?:\n|$)/m', '', $sql);
         if (!is_string($withoutComments)) {
             throw new RuntimeException('Domain migration unreadable.');
@@ -52,14 +42,6 @@ final class DomainSchemaMigrator
         }
         return ['version' => 2, 'tables' => self::TABLES, 'sha256' => hash('sha256', $sql)];
     }
-
-    /**
-     * Require an in-scope, fresh, protected-write BackupGate receipt BEFORE
-     * applying 001 or 002. A structurally valid receipt never proves external
-     * authenticity: the production caller must separately establish D-059.
-     *
-     * @param array{project:string,environment:string,resource:string,run_id:string,issue:string} $scope
-     */
     public static function apply(
         PDO $db,
         ?array $backupReceipt,
@@ -74,8 +56,6 @@ final class DomainSchemaMigrator
             || $gate['reason'] !== 'backup_verified') {
             throw new RuntimeException('Domain migration requires a verified scoped backup.');
         }
-        // SQLite DDL is transactional. MariaDB DDL auto-commits: external
-        // operator/go-live authority and backup/restore gates remain mandatory.
         $sqlite = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
         if ($sqlite && $db->inTransaction()) {
             throw new RuntimeException('Nested migration transaction prohibited.');
@@ -107,7 +87,6 @@ final class DomainSchemaMigrator
             throw $error;
         }
     }
-
     private static function requireExceptions(PDO $db): void
     {
         if ($db->getAttribute(PDO::ATTR_ERRMODE) !== PDO::ERRMODE_EXCEPTION) {
@@ -115,12 +94,9 @@ final class DomainSchemaMigrator
         }
     }
 }
-
-/** Fixed-table, scope-isolated SQL persistence. No automatic schema writes. */
 abstract class PdoDomainRepository
 {
     protected const TABLE = '';
-
     public function __construct(protected readonly PDO $db)
     {
         if ($db->getAttribute(PDO::ATTR_ERRMODE) !== PDO::ERRMODE_EXCEPTION
@@ -132,8 +108,6 @@ abstract class PdoDomainRepository
             throw new InvalidArgumentException('Invalid domain repository.');
         }
     }
-
-    /** Persist a bounded, associative payload under a mandatory tenant scope. */
     public function save(string $scopeId, string $recordId, array $payload, int $recordedAt): void
     {
         self::identity($scopeId, 64);
@@ -152,7 +126,6 @@ abstract class PdoDomainRepository
         if ($this->db->inTransaction()) {
             throw new RuntimeException('Nested domain write prohibited.');
         }
-
         $this->db->beginTransaction();
         try {
             $delete = $this->db->prepare(
@@ -176,7 +149,6 @@ abstract class PdoDomainRepository
             throw $error;
         }
     }
-
     public function find(string $scopeId, string $recordId): ?array
     {
         self::identity($scopeId, 64);
@@ -202,7 +174,6 @@ abstract class PdoDomainRepository
         }
         return $value;
     }
-
     private static function identity(string $value, int $max): void
     {
         if (strlen($value) > $max
@@ -211,24 +182,8 @@ abstract class PdoDomainRepository
         }
     }
 }
-
-final class PdoProjectRepository extends PdoDomainRepository
-{
-    protected const TABLE = 'controlbot_projects';
-}
-final class PdoAgentRepository extends PdoDomainRepository
-{
-    protected const TABLE = 'controlbot_agents';
-}
-final class PdoAgentSessionRepository extends PdoDomainRepository
-{
-    protected const TABLE = 'controlbot_agent_sessions';
-}
-final class PdoIntakeRepository extends PdoDomainRepository
-{
-    protected const TABLE = 'controlbot_intake';
-}
-final class PdoPauseRepository extends PdoDomainRepository
-{
-    protected const TABLE = 'controlbot_pause_state';
-}
+final class PdoProjectRepository extends PdoDomainRepository { protected const TABLE = 'controlbot_projects'; }
+final class PdoAgentRepository extends PdoDomainRepository { protected const TABLE = 'controlbot_agents'; }
+final class PdoAgentSessionRepository extends PdoDomainRepository { protected const TABLE = 'controlbot_agent_sessions'; }
+final class PdoIntakeRepository extends PdoDomainRepository { protected const TABLE = 'controlbot_intake'; }
+final class PdoPauseRepository extends PdoDomainRepository { protected const TABLE = 'controlbot_pause_state'; }

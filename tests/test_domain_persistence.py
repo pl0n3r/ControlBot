@@ -1,39 +1,28 @@
 """#1453: disposable SQLite migration + real PHP repositories, without live IO."""
 from __future__ import annotations
-
 import json
 import sqlite3
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[1]
 M1 = ROOT / "migrations/001_decisions.sql"
 M2 = ROOT / "migrations/002_projects_agents_intake.sql"
 REPO = ROOT / "src/Persistence/ProjectRepository.php"
-
 SCENARIO = r'''<?php
 declare(strict_types=1);
 foreach (array_slice($argv, 2) as $source) { require_once $source; }
-use ControlBot\Persistence\DomainSchemaMigrator;
-use ControlBot\Persistence\PdoProjectRepository;
-use ControlBot\Persistence\PdoAgentRepository;
-use ControlBot\Persistence\PdoAgentSessionRepository;
-use ControlBot\Persistence\PdoIntakeRepository;
-use ControlBot\Persistence\PdoPauseRepository;
-
+use ControlBot\Persistence\{DomainSchemaMigrator,PdoProjectRepository,PdoAgentRepository,
+ PdoAgentSessionRepository,PdoIntakeRepository,PdoPauseRepository};
 $db = new PDO('sqlite:' . $argv[1], null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 $names = fn() => $db->query("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'controlbot_%' ORDER BY name")->fetchAll(PDO::FETCH_COLUMN);
 $before = $names();
 $plan = DomainSchemaMigrator::dryRun($db);
 $afterDry = $names();
 $run = '123e4567-e89b-42d3-a456-426614174000';
-$scope = [
-  'project'=>'controlbot', 'environment'=>'local-test',
-  'resource'=>'database:local-test', 'run_id'=>$run,
-  'issue'=>'pl0n3r/ControlBot#1453'
-];
+$scope = ['project'=>'controlbot','environment'=>'local-test',
+ 'resource'=>'database:local-test','run_id'=>$run,'issue'=>'pl0n3r/ControlBot#1453'];
 $now = time();
 $format = fn(int $t): string => gmdate('Y-m-d\\TH:i:s\\Z', $t);
 $receipt = [
@@ -53,20 +42,15 @@ $missingBackup = rejects(fn()=> DomainSchemaMigrator::apply($db, null, $scope, $
 $notModifiedWithoutBackup = $names() === $before;
 $badScope = [...$scope, 'resource'=>'database:another'];
 $scopeMismatch = rejects(fn()=> DomainSchemaMigrator::apply($db, $receipt, $badScope, $now));
-$stale = [...$receipt,
- 'created_at'=>$format($now-100000), 'verified_at'=>$format($now-90000)];
+$stale = [...$receipt, 'created_at'=>$format($now-100000), 'verified_at'=>$format($now-90000)];
 $staleBackup = rejects(fn()=> DomainSchemaMigrator::apply($db, $stale, $scope, $now));
 DomainSchemaMigrator::apply($db, $receipt, $scope, $now);
 $afterApply = $names();
 DomainSchemaMigrator::apply($db, $receipt, $scope, $now);
 $idempotent = $names() === $afterApply;
-$classes = [
- 'projects'=>PdoProjectRepository::class,
- 'agents'=>PdoAgentRepository::class,
- 'sessions'=>PdoAgentSessionRepository::class,
- 'intake'=>PdoIntakeRepository::class,
- 'pause'=>PdoPauseRepository::class
-];
+$classes = ['projects'=>PdoProjectRepository::class,'agents'=>PdoAgentRepository::class,
+ 'sessions'=>PdoAgentSessionRepository::class,'intake'=>PdoIntakeRepository::class,
+ 'pause'=>PdoPauseRepository::class];
 $records = [];
 foreach ($classes as $type=>$class) {
     $repo = new $class($db);
@@ -78,10 +62,8 @@ foreach ($classes as $type=>$class) {
     $untouched = $repo->find('tenant-a','entity:01') === $value;
     $repo->save('tenant-a','entity:01',['type'=>$type,'updated'=>true], $now+1);
     $second = $repo->find('tenant-a','entity:01');
-    $records[$type] = [
-      'first'=>$first, 'second'=>$second, 'isolated'=>$isolated,
-      'untouched'=>$untouched, 'other'=>$repo->find('tenant-b','entity:01')
-    ];
+    $records[$type] = ['first'=>$first,'second'=>$second,'isolated'=>$isolated,
+      'untouched'=>$untouched,'other'=>$repo->find('tenant-b','entity:01')];
 }
 $project = new PdoProjectRepository($db);
 $badId = rejects(fn()=> $project->save('tenant-a','bad id', ['a'=>1],$now));
@@ -113,16 +95,8 @@ echo json_encode([
  'bad_mode'=>$badMode,'bad_migrator_mode'=>$badMigratorMode
 ], JSON_THROW_ON_ERROR);
 '''
-
-SOURCES = [
-    ROOT / "src/CapabilityPolicy.php",
-    ROOT / "src/BackupReceipt.php",
-    ROOT / "src/BackupGate.php",
-    ROOT / "src/Persistence/SchemaMigrator.php",
-    REPO,
-]
-
-
+SOURCES = [ROOT / ("src/" + name + ".php") for name in ("CapabilityPolicy", "BackupReceipt", "BackupGate")]
+SOURCES += [ROOT / "src/Persistence/SchemaMigrator.php", REPO]
 class PersistenceTests(unittest.TestCase):
     @staticmethod
     def _run(preexisting: bool) -> dict:
@@ -140,7 +114,6 @@ class PersistenceTests(unittest.TestCase):
             if result.returncode != 0:
                 raise AssertionError("PHP scenario failed: " + result.stderr[-1800:])
             return json.loads(result.stdout)
-
     def test_criterio_principal(self):
         for file in (*SOURCES,):
             syntax = subprocess.run(
@@ -174,7 +147,6 @@ class PersistenceTests(unittest.TestCase):
                     self.assertTrue(record["isolated"])
                     self.assertTrue(record["untouched"])
                     self.assertEqual(record["other"], {"type": name, "tenant": "b"})
-
     def test_criterio_seguridad_y_bordes(self):
         result = self._run(preexisting=False)
         for key in (
@@ -194,7 +166,5 @@ class PersistenceTests(unittest.TestCase):
             sorted(p.name for p in SOURCES if not p.is_file()), [],
             "All tested dependencies must be checked in."
         )
-
-
 if __name__ == "__main__":
     unittest.main()

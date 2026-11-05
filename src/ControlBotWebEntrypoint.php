@@ -7,11 +7,13 @@ use ControlBot\Business\FactoryOrchestratorWebEntrypoint;
 use ControlBot\GitHub\GitHubProjectEntrypoint;
 use ControlBot\GitHub\GitHubPublicEntrypoint;
 use ControlBot\Ui\ControlCenterShell;
+use ControlBot\Legal\LegalStatusPanel;
 
 require_once __DIR__ . '/FactoryOrchestratorWebEntrypoint.php';
 require_once __DIR__ . '/GitHubPublicEntrypoint.php';
 require_once __DIR__ . '/GitHubProjectEntrypoint.php';
 require_once __DIR__ . '/ControlCenterShell.php';
+require_once __DIR__ . '/LegalStatusPanel.php';
 
 final class ControlBotWebEntrypoint
 {
@@ -37,6 +39,9 @@ final class ControlBotWebEntrypoint
                 $orchestratorCachePath,
             );
         }
+
+        // Nunca permitir el módulo legal desde el controlador público basado en REMOTE_USER.
+        if ($path === '/legal') return self::privateForbidden();
 
         if ($path !== '/github'
             && preg_match('#^/projects/[a-z][a-z0-9-]{1,63}/github$#D', $path) !== 1) {
@@ -110,6 +115,9 @@ final class ControlBotWebEntrypoint
                 'body' => "Forbidden.\n",
             ];
         }
+        // Solo después de verificar la sesión OAuth+TOTP y la identidad del dueño.
+        if ($apiPath === '/legal') return self::legalResponse($server);
+
         // API owner-v1: el servidor NO confiere autoridad por cabeceras.
         // OAuth+TOTP ya se validaron arriba, pero el registro vuelve a
         // verificarlos antes de seleccionar handlers/mutaciones.
@@ -160,8 +168,54 @@ final class ControlBotWebEntrypoint
             require_once __DIR__ . '/Routing/OwnerAuthenticatedRouter.php';
             return \ControlBot\Routing\OwnerAuthenticatedRouter::forbidden($server);
         }
+        // handleLocalOwner se invoca solo desde public/index.php después de
+        // OwnerLoginGate::requireOwner y nunca sirve como autenticación propia.
+        if ($path === '/legal') return self::legalResponse($server);
         $server['REMOTE_USER'] = $owner;
         return self::handle($server, $environment, $now);
+    }
+
+    /** Ruta privada únicamente invocable tras el gate autenticado del dueño. */
+    private static function legalResponse(array $server): array
+    {
+        $headers = [
+            'Content-Type' => 'text/html; charset=utf-8',
+            'Cache-Control' => 'no-store',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-Frame-Options' => 'DENY',
+            'Referrer-Policy' => 'no-referrer',
+        ];
+        if (($server['REQUEST_METHOD'] ?? null) !== 'GET') {
+            $headers['Content-Type'] = 'text/plain; charset=utf-8';
+            $headers['Allow'] = 'GET';
+            return ['status' => 405, 'headers' => $headers, 'body' => "Method not allowed.\n"];
+        }
+        try {
+            $html = ControlCenterShell::render(
+                'Legal y privacidad',
+                'legal',
+                ['overview' => '/overview', 'github' => '/github', 'legal' => '/legal'],
+                LegalStatusPanel::render(LegalStatusPanel::readConfigured()),
+            );
+            return ['status' => 200, 'headers' => $headers, 'body' => $html];
+        } catch (\Throwable) {
+            return self::error();
+        }
+    }
+
+    private static function privateForbidden(): array
+    {
+        return [
+            'status' => 403,
+            'headers' => [
+                'Content-Type' => 'text/plain; charset=utf-8',
+                'Cache-Control' => 'no-store',
+                'X-Content-Type-Options' => 'nosniff',
+                'X-Frame-Options' => 'DENY',
+                'Referrer-Policy' => 'no-referrer',
+            ],
+            'body' => "Forbidden.\n",
+        ];
     }
 
     private static function withShell(array $response, string $title): array
@@ -180,7 +234,7 @@ final class ControlBotWebEntrypoint
             ? $styleMatch[1]
             : '';
 
-        $routes = ['overview' => '/overview', 'github' => '/github'];
+        $routes = ['overview' => '/overview', 'github' => '/github', 'legal' => '/legal'];
         $response['body'] = ControlCenterShell::render(
             $title,
             'github',

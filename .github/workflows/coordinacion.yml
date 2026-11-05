@@ -36,6 +36,7 @@ jobs:
         startsWith(github.event.comment.body, '/renovar-contrato ') ||
         (
           github.event.comment.author_association == 'OWNER' &&
+          github.repository == 'pl0n3r/ControlBot' &&
           startsWith(github.event.comment.body, '/recuperar-lock-v3-activa ')
         )
       )

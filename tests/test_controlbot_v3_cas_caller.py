@@ -33,6 +33,7 @@ EXPECTED = " ".join((
     "startsWith(github.event.comment.body, '/renovar-contrato ') ||",
     "(",
     "github.event.comment.author_association == 'OWNER' &&",
+    "github.repository == 'pl0n3r/ControlBot' &&",
     "startsWith(github.event.comment.body, '/recuperar-lock-v3-activa ')",
     ")", ")",
 ))
@@ -40,12 +41,14 @@ EXPECTED = " ".join((
 
 def routed(body: str, *, event: str = "issue_comment", is_issue: bool = True,
            sender: str = "pl0n3r", author: str = "pl0n3r",
-           association: str = "OWNER") -> bool:
+           association: str = "OWNER",
+           repository: str = "pl0n3r/ControlBot") -> bool:
     """Modelo puro de la guarda EXACTA comprobada en test_guard."""
     return (event == "issue_comment" and is_issue and sender == author and (
         body in EXACT_COMMANDS
         or any(body.startswith(p) for p in PREFIX_COMMANDS)
-        or (association == "OWNER" and body.startswith(PREFIX))
+        or (association == "OWNER" and repository == "pl0n3r/ControlBot"
+            and body.startswith(PREFIX))
     ))
 
 
@@ -96,6 +99,7 @@ class OwnerCasCallerTests(unittest.TestCase):
             {"sender": "attacker"}, {"author": "attacker"},
             {"association": "NONE"}, {"association": "CONTRIBUTOR"},
             {"association": "COLLABORATOR"}, {"association": "MEMBER"},
+            {"repository": "someone/ControlBot"},
         )
         for ctx in scenarios:
             with self.subTest(ctx=ctx):

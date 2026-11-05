@@ -52,6 +52,8 @@ POST_SNAPSHOT = {
     "docs/panel-kill-switch.md": (1363, 1409, "tests/test_panel_kill_switch.py"),
     "docs/support-channels.md": (1358, 1404, "tests/test_support_channels.py"),
     "docs/dr-drill-report.md": (1371, 1414, "tests/test_dr_drill_rpo_rto.py"),
+    "docs/persistencia-dominio.md": (1453, 1463, "tests/test_domain_persistence.py"),
+    "docs/soporte-destinatarios.md": (1428, 1468, "tests/test_support_notification_recipients.py"),
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
 POST_CELL = re.compile(
@@ -257,6 +259,14 @@ class MatrizCoberturaTests(unittest.TestCase):
     def setUpClass(cls):
         cls.text = DOC.read_text(encoding="utf-8")
         cls.rows = parse_rows(cls.text)
+
+    def test_registro_persistencia_dominio_exacto(self):
+        registro = parse_post_snapshot(self.text)
+        self.assertEqual(registro["docs/persistencia-dominio.md"],
+                         (1453, 1463, "tests/test_domain_persistence.py"))
+        self.assertEqual(registro["docs/soporte-destinatarios.md"],
+                         (1428, 1468, "tests/test_support_notification_recipients.py"))
+        self.assertFalse(set(registro) & {source[1] for source in self.rows})
 
     def test_cubre_todas_las_fuentes(self):
         files = {f"docs/{p.relative_to(ROOT / 'docs').as_posix()}"

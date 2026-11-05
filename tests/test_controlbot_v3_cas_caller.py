@@ -71,7 +71,7 @@ class OwnerCasCallerTests(unittest.TestCase):
 
     def test_serializacion_y_reusable_sin_escalar_permiso(self):
         self.assertIn(
-            "group: coordinacion-${ github.event.issue.number || "
+            "group: coordinacion-${{ github.event.issue.number || "
             "github.event.pull_request.head.ref || github.run_id }}",
             self.workflow,
         )
@@ -81,9 +81,9 @@ class OwnerCasCallerTests(unittest.TestCase):
             "      contents: write", "      issues: write",
             "      pull-requests: write", "      checks: write",
             "operation: comment",
-            "actor: ${ github.event.comment.user.login }}",
-            "association: ${ github.event.comment.author_association }}",
-            "body: ${ github.event.comment.body }}",
+            "actor: ${{ github.event.comment.user.login }}",
+            "association: ${{ github.event.comment.author_association }}",
+            "body: ${{ github.event.comment.body }}",
         ):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, self.job)

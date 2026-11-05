@@ -33,7 +33,7 @@ foreach(['cockpit','owner-inbox','owner-decisions/decision-alpha'] as $route) { 
 ['HTTP_X_CSRF_TOKEN'=>'wrong','CONTENT_TYPE'=>'application/json'],$session,$json); $badJson=$dispatch('POST','/api/v1/owner-decisions/decision-alpha/decision',$post,$session,'{"version":'); $badPayload=$dispatch('POST','/api/v1/owner-decisions/decision-alpha/decision',$post,$session,'{"foo":1}'); $badPath=$dispatch('GET','/api/v1/%2e%2e/cockpit'); $unknown=$dispatch('GET','/api/v1/undefined'); $wrongMethod=$dispatch('PUT','/api/v1/cockpit'); $missingSource=$router::dispatch($auth,$session,$make('GET','/api/v1/cockpit'),$now);
 $tmp=sys_get_temp_dir().'/cb-route-'.bin2hex(random_bytes(6)); mkdir($tmp,0700); file_put_contents($tmp.'/OtherRoutes.php', '<?php return [[\'method\'=>\'GET\',\'path\'=>\'/api/v1/custom\',\'handler\'=>static fn($f,$p,$b,$n):array=>[\'ok\'=>true]]];'); $custom=$dispatch('GET','/api/v1/custom',[],$session,null,null,$tmp); file_put_contents($tmp.'/DuplicateRoutes.php', '<?php return [[\'method\'=>\'GET\',\'path\'=>\'/api/v1/custom/\',\'handler\'=>static fn($f,$p,$b,$n):array=>[\'ok\'=>true]]];');
 $duplicate=$dispatch('GET','/api/v1/custom',[],$session,null,null,$tmp); unlink($tmp.'/OtherRoutes.php');unlink($tmp.'/DuplicateRoutes.php');rmdir($tmp); $failure=\ControlBot\Web\ControlBotWebEntrypoint::handleAuthenticated($make('GET','/api/v1/cockpit'),['CONTROLBOT_OWNER_LOGIN'=>'pl0n3r'],$now,[],$auth); $local=\ControlBot\Web\ControlBotWebEntrypoint::handleLocalOwner($make('GET','/api/v1/cockpit'),['CONTROLBOT_OWNER_LOGIN'=>'pl0n3r'],$now); $malformed=$dispatch('GET','/api/v1/cockpit',[],$session,null,static fn()=>['meta'=>$meta,'ventures'=>[['broken'=>true]]]); $responses=[ 'anonymous'=>$missing,'anonymous_post'=>$anonymousPost,'stale'=>$stale, 'csrf'=>$csrf,'bad_csrf'=>$badCsrf,'bad_json'=>$badJson, 'bad_payload'=>$badPayload,'path'=>$badPath,'unknown'=>$unknown,'method'=>$wrongMethod,'no_source'=>$missingSource,'duplicate'=>$duplicate,'failed_entrypoint'=>$failure,'local_owner'=>$local,'malformed_source'=>$malformed ]; $bodies=array_map(static fn(array $r):string=>$r['body'],array_merge(array_values($responses),[$custom])); $out=[ 'denials'=>array_map(static fn($r):int=>$r['status'],$responses), 'errors'=>array_map(static fn($r):array=>json_decode($r['body'],true,16,JSON_THROW_ON_ERROR),$responses), 'additional_file'=>$custom['status'], 'not_leaked'=>!str_contains(implode('',$bodies),'fixture-server-token'), 'backend_calls'=>$calls, 'no_store'=>($missing['headers']['Cache-Control']??null)==='no-store'
-&&($duplicate['headers']['Cache-Control']??null)==='no-store', ]; } else throw new RuntimeException('Unknown fixture scenario'); echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL; } finally { @unlink($temp); }
+&&($duplicate['headers']['Cache-Control']??null)==='no-store', ]; $generated=json_decode($router::forbidden([])['body'],true,16,JSON_THROW_ON_ERROR); $out['generated_ids']=preg_match('/^[a-f0-9]{32}$/D',$generated['request_id'])===1 && preg_match('/^[a-f0-9]{32}$/D',$generated['correlation_id'])===1; } else throw new RuntimeException('Unknown fixture scenario'); echo json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),PHP_EOL; } finally { @unlink($temp); }
 """
 
 
@@ -52,7 +52,6 @@ def scenario(name: str) -> dict:
         return json.loads(result.stdout)
     except ValueError as exc:
         raise AssertionError("Owner routes fixture returned no JSON: " + result.stdout[-800:]) from exc
-
 
 class RoutesTests(unittest.TestCase):
     def test_criterio_principal(self):
@@ -81,6 +80,7 @@ class RoutesTests(unittest.TestCase):
         self.assertEqual(200, found["additional_file"])
         self.assertTrue(found["no_store"])
         self.assertTrue(found["not_leaked"])
+        self.assertTrue(found["generated_ids"])
         self.assertEqual(0, found["backend_calls"])
         for name, status in expected.items():
             error = found["errors"][name]

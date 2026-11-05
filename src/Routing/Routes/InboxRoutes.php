@@ -35,6 +35,8 @@ if (!class_exists(InboxRoutes::class, false)) {
             if ($backend === null) return self::unavailable();
             try {
                 if ($method === 'POST') {
+                    if (!is_string($form['_csrf'] ?? null) || $form['_csrf'] === '')
+                        return self::response(403, 'Sin permiso', '<p>CSRF requerido.</p>');
                     $keys = array_keys($form);
                     sort($keys);
                     if ($keys !== ['_csrf', 'idempotency_key', 'outcome']

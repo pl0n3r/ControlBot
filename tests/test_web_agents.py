@@ -90,6 +90,7 @@ class AgentsTests(unittest.TestCase):
         self.assertEqual(200, result["local_status"])
         self.assertEqual("no-store", result["api_headers"]["Cache-Control"])
         self.assertEqual("no-store", result["page_headers"]["Cache-Control"])
+        self.assertLess(len(result["page"].encode("utf-8")), 65536)  # HTML budget offline
         self.assertEqual("READY", result["api"]["state"])
         self.assertEqual("SOLO", result["api"]["presence"])
         self.assertEqual("IDLE_CAPACITY", result["api"]["capacity"])

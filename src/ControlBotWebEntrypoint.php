@@ -82,6 +82,7 @@ final class ControlBotWebEntrypoint
         ?string $githubProjectionPath = null,
         ?string $orchestratorSnapshotPath = null,
         ?string $orchestratorCachePath = null,
+        ?callable $ownerApiBackend = null,
     ): array {
         require_once __DIR__ . '/Routing/OwnerAuthenticatedRouter.php';
         $owner = \ControlBot\Routing\OwnerAuthenticatedRouter::verifiedOwner(
@@ -90,7 +91,13 @@ final class ControlBotWebEntrypoint
             $now,
         );
         $expected = $environment['CONTROLBOT_OWNER_LOGIN'] ?? null;
+        $uri = $server['REQUEST_URI'] ?? null;
+        $apiPath = is_string($uri) && strlen($uri) <= 2048 && !str_contains($uri, "\0")
+            ? parse_url($uri, PHP_URL_PATH) : null;
         if ($owner === null || !is_string($expected) || !hash_equals($expected, $owner)) {
+            if (is_string($apiPath) && str_starts_with($apiPath, '/api/v1/')) {
+                return \ControlBot\Routing\OwnerAuthenticatedRouter::forbidden($server);
+            }
             return [
                 'status' => 403,
                 'headers' => [
@@ -102,6 +109,14 @@ final class ControlBotWebEntrypoint
                 ],
                 'body' => "Forbidden.\n",
             ];
+        }
+        // API owner-v1: el servidor NO confiere autoridad por cabeceras.
+        // OAuth+TOTP ya se validaron arriba, pero el registro vuelve a
+        // verificarlos antes de seleccionar handlers/mutaciones.
+        if (is_string($apiPath) && str_starts_with($apiPath, '/api/v1/')) {
+            return \ControlBot\Routing\OwnerAuthenticatedRouter::dispatch(
+                $ownerAuth, $ownerSession, $server, $now, $ownerApiBackend,
+            ) ?? self::error();
         }
         // Delegar solo DESPUES de verificar OAuth y TOTP; se descarta
         // cualquier REMOTE_USER recibido en la peticion original.
@@ -135,6 +150,15 @@ final class ControlBotWebEntrypoint
         $owner = self::text($environment['CONTROLBOT_OWNER_LOGIN'] ?? null);
         if ($owner === null) {
             return self::error();
+        }
+        // La sesión local de contraseña NO sustituye un acceso OAuth+TOTP.
+        // El API mobile de owner se reserva a handleAuthenticated.
+        $uri = $server['REQUEST_URI'] ?? null;
+        $path = is_string($uri) && strlen($uri) <= 2048
+            ? parse_url($uri, PHP_URL_PATH) : null;
+        if (is_string($path) && str_starts_with($path, '/api/v1/')) {
+            require_once __DIR__ . '/Routing/OwnerAuthenticatedRouter.php';
+            return \ControlBot\Routing\OwnerAuthenticatedRouter::forbidden($server);
         }
         $server['REMOTE_USER'] = $owner;
         return self::handle($server, $environment, $now);

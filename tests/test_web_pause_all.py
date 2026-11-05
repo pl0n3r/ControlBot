@@ -216,7 +216,7 @@ class PauseTests(unittest.TestCase):
         }
         self.assertEqual(expected, data["statuses"])
         self.assertEqual(0, data["commits"])
-        self.assertEqual([], data["audit_count"] * [None])
+        self.assertEqual(0, data["audit_count"])
         self.assertEqual(["work-running"], data["work"])
         self.assertIsNone(data["pause"])
         self.assertTrue(data["local_never_shows_page"])

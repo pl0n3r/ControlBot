@@ -20,7 +20,9 @@ final class SupportNotificationRecipients
     private const ROUTE = '/support-notifications';
     private const MAX_BYTES = 1048576;
 
-    private function __construct(private readonly string $directory)
+    private readonly string $directory;
+
+    private function __construct(string $directory)
     {
         $root = realpath(dirname(__DIR__));
         $dir = realpath($directory);
@@ -29,6 +31,7 @@ final class SupportNotificationRecipients
             || ($root !== false && ($dir === $root || str_starts_with($dir, $root . DIRECTORY_SEPARATOR)))) {
             throw new RuntimeException('Private directory unavailable.');
         }
+        $this->directory = $dir;
     }
 
     /** Request adapter for a future owner route; no public router changes are authorized by #1428. */

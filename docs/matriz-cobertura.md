@@ -19,6 +19,10 @@
 
 Cada partición conserva una fila por obligación con ID, fuente, estado, evidencia y issue, además de una prueba de integridad independiente. El índice conserva las 215 filas de las fuentes originales. La prueba integradora falla si falta una parte, una fila, un test, si se duplica un ID o si aparece un ID extraño; no infiere completitud desde un enlace.
 
+## Lote dirigido #1454 — cierre verificable de 47 filas
+
+**Reconciliación 5-nov-2026:** [contraste del lote](contraste-cb_0001_0300.md) y [prueba exacta](../tests/test_no_verificable_lote_1.py). Las **47** filas del índice CB-0001…CB-0300 se conservan (46 NO_VERIFICABLE, 1 CUBIERTO offline ya sustentado por #971/PR #899). Cada fila tiene fuente normativa, testigo/candidato y razón causal cuando todavía no existe aserción íntegra correlacionada con PR fusionado. Esta hoja no actualiza estados sin prueba ni altera las otras 1.147 obligaciones: **1.194 IDs = 569 CUBIERTO + 625 NO_VERIFICABLE**, live/operando UNKNOWN, sin go-live, autorización, secreto ni proveedor.
+
 ## Contraste CB-0001..0300 #971
 
 Las **47** obligaciones del índice CB-0001..0300 cuentan con dictamen individual y candidatos de código/prueba en [reporte #971](contraste-cb_0001_0300.md). Se conservaron las 47 como `NO_VERIFICABLE` por no acreditarse una cadena exacta de aserción y PR fusionado por cláusula; `live` y operación productiva siguen UNKNOWN. No hay nuevos permisos ni cambios de runtime.

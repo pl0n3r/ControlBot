@@ -63,7 +63,7 @@ if (($argv[1] ?? '') === 'principal') {
     $whilePaused = $api('GET', '/api/v1/pausa');
     $resumed = $api('POST', '/api/v1/pausa', [ 'HTTP_X_CSRF_TOKEN' => $csrf, 'CONTENT_TYPE' => 'application/json', ], json_encode($resumePayload, JSON_THROW_ON_ERROR), $session, $backend, $now + 1);
     $after = $api('GET', '/api/v1/pausa');
-    echo json_encode([ 'statuses' => [$before['status'], $page['status'], $paused['status'], $whilePaused['status'], $resumed['status'], $after['status']], 'states' => [$parse($before)['state'], $parse($paused)['state'], $parse($whilePaused)['state'], $parse($resumed)['state'], $parse($after)['state']], 'revisions' => [$parse($before)['revision'], $parse($paused)['revision'], $parse($resumed)['revision']], 'audit_count' => count($audit), 'audit_states' => array_column($audit, 'after_state'), 'audit_source' => array_column($audit, 'source'), 'audit_actor' => array_column($audit, 'actor'), 'blocked_at_29' => $at29['blocked'], 'running_work' => $work, 'commits' => $commits, 'page_html' => str_contains($page['body'], '<h1>Pausar todos</h1>')
+    echo json_encode([ 'statuses' => [$before['status'], $page['status'], $paused['status'], $whilePaused['status'], $resumed['status'], $after['status']], 'states' => [$parse($before)['state'], $parse($paused)['state'], $parse($whilePaused)['state'], $parse($resumed)['state'], $parse($after)['state']], 'revisions' => [$parse($before)['revision'], $parse($paused)['revision'], $parse($resumed)['revision']], 'pause_id' => $pause['pause_id'], 'audit_count' => count($audit), 'audit_states' => array_column($audit, 'after_state'), 'audit_source' => array_column($audit, 'source'), 'audit_actor' => array_column($audit, 'actor'), 'blocked_at_29' => $at29['blocked'], 'running_work' => $work, 'commits' => $commits, 'page_html' => str_contains($page['body'], '<h1>Pausar todos</h1>')
             && str_contains($page['body'], '"/api/v1/pausa"')
             && str_contains($page['body'], '"X-CSRF-Token"'), 'page_no_store' => ($page['headers']['Cache-Control'] ?? '') === 'no-store', 'page_csp' => str_contains($page['headers']['Content-Security-Policy'] ?? '', 'script-src'), 'api_no_store' => ($paused['headers']['Cache-Control'] ?? '') === 'no-store', ], JSON_THROW_ON_ERROR); exit;
 }
@@ -108,6 +108,7 @@ class PauseTests(unittest.TestCase):
         self.assertEqual(["active", "paused", "paused", "active", "active"],
                          data["states"])
         self.assertEqual([0, 1, 2], data["revisions"])
+        self.assertRegex(data["pause_id"], r"^pause-global-[0-9a-f]{6}(?:x[0-9a-f]{6}){3}$")
         self.assertEqual(2, data["audit_count"])
         self.assertEqual(["active", "released"], data["audit_states"])
         self.assertEqual(["owner", "owner"], data["audit_source"])

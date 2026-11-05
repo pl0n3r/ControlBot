@@ -98,7 +98,7 @@ return [
                     throw new InvalidArgumentException('Already paused.');
                 }
                 $after = PauseControl::state([
-                    'version' => 1, 'pause_id' => 'pause-global-' . bin2hex(random_bytes(12)),
+                    'version' => 1, 'pause_id' => 'pause-global-' . implode('x', str_split(bin2hex(random_bytes(12)), 6)),
                     'scope_type' => 'global', 'scope_id' => 'global',
                     'state' => 'active', 'reason' => $body['reason'], 'source' => 'owner',
                     'created_at' => $now, 'activated_at' => $now, 'released_at' => null,

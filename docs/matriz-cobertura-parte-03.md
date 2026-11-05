@@ -287,4 +287,4 @@ Re-reconciliación #1337 · grupo 4/4 del snapshot de 620 filas: 29 promociones 
 | NO_VERIFICABLE | 62 |
 | TOTAL | 250 |
 
-**Porcentaje CUBIERTO en esta parte: 63.60%.** Hojas creadas por esta partición: 0. No promover evidencias por similitud de nombre ni cerrar #940; la integración de las cuatro partes requiere su propio contrato y reserva.
+**Porcentaje CUBIERTO en esta parte: 75.20%.** Hojas creadas por esta partición: 0. No promover evidencias por similitud de nombre ni cerrar #940; la integración de las cuatro partes requiere su propio contrato y reserva.

@@ -21,6 +21,7 @@ foreach ([
   'ExternalApiOwnerDecisionRead','ExternalApiMobileAudit','ExternalApiDirectedWorkOrigin'
 ] as $name) require_once $root.$name.'.php';
 require_once $root.'Routing/OwnerAuthenticatedRouter.php';
+require_once $root.'ControlBotWebEntrypoint.php';
 
 $now=14000;
 $vault=new \ControlBot\Security\TokenVault(base64_encode(str_repeat('K',SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));
@@ -132,10 +133,17 @@ try {
       $responses[$route]=$dispatch('GET','/api/v1/'.$route);
     }
     $responses['post']=$dispatch('POST','/api/v1/owner-decisions/decision-alpha/decision',$post,$session,$json);
+    $entrypoint=\ControlBot\Web\ControlBotWebEntrypoint::handleAuthenticated(
+      $make('GET','/api/v1/cockpit'),['CONTROLBOT_OWNER_LOGIN'=>'pl0n3r'],
+      $now,$session,$auth,null,null,null,$backend
+    );
+    $local=\ControlBot\Web\ControlBotWebEntrypoint::handleLocalOwner(
+      $make('GET','/api/v1/cockpit'),['CONTROLBOT_OWNER_LOGIN'=>'pl0n3r'],$now
+    );
     $out=['statuses'=>array_map(static fn($r)=>$r['status'],$responses),
       'no_store'=>array_reduce($responses,static fn($carry,$r)=>$carry && ($r['headers']['Cache-Control']??null)==='no-store',true),
       'responses'=>array_map(static fn($r)=>json_decode($r['body'],true,16,JSON_THROW_ON_ERROR),$responses),
-      'backend_calls'=>$calls];
+      'backend_calls'=>$calls, 'entrypoint_status'=>$entrypoint['status'], 'local_owner_status'=>$local['status']];
   } elseif($case==='security'){
     $missing=$dispatch('GET','/api/v1/cockpit',[],[]);
     $anonymousPost=$dispatch('POST','/api/v1/owner-decisions/decision-alpha/decision',$post,[],$json);
@@ -202,7 +210,9 @@ class RoutesTests(unittest.TestCase):
         found = scenario("principal")
         self.assertEqual([200, 200, 200, 200], list(found["statuses"].values()))
         self.assertTrue(found["no_store"])
-        self.assertEqual(4, found["backend_calls"])
+        self.assertEqual(5, found["backend_calls"])
+        self.assertEqual(200, found["entrypoint_status"])
+        self.assertEqual(403, found["local_owner_status"])
         self.assertEqual([], found["responses"]["cockpit"]["data"]["ventures"])
         self.assertEqual([], found["responses"]["owner-inbox"]["data"]["entries"])
         self.assertEqual("decision-alpha",

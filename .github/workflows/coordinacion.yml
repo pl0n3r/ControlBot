@@ -33,7 +33,12 @@ jobs:
         startsWith(github.event.comment.body, '/liberar ') ||
         startsWith(github.event.comment.body, '/transferir ') ||
         startsWith(github.event.comment.body, '/migrar-contrato ') ||
-        startsWith(github.event.comment.body, '/renovar-contrato ')
+        startsWith(github.event.comment.body, '/renovar-contrato ') ||
+        (
+          github.event.comment.author_association == 'OWNER' &&
+          github.repository == 'pl0n3r/ControlBot' &&
+          startsWith(github.event.comment.body, '/recuperar-lock-v3-activa ')
+        )
       )
     permissions:
       contents: write

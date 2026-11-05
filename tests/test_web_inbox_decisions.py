@@ -90,7 +90,7 @@ class InboxDecisionsTests(unittest.TestCase):
 
     def run_case(self, case: str):
         proc = subprocess.run(
-            ["php", "-d", "display_errors=stderr", "-r", PHP_FIXTURE + CASE, case],
+            ["php", "-r", PHP_FIXTURE + CASE, case],
             cwd=ROOT, text=True, capture_output=True, timeout=25, check=False,
         )
         self.assertEqual(proc.returncode, 0, proc.stderr[-3000:])

@@ -35,6 +35,12 @@ final class OwnerAuthenticatedRouter
         }
     }
 
+    /** Return the public API's typed denial without granting owner authority. */
+    public static function forbidden(array $server): array
+    {
+        return self::response(403, ['error' => 'forbidden'], $server);
+    }
+
     /**
      * Return null for routes owned by other controllers; never read anonymous
      * session material and never trust REMOTE_USER or HTTP authorization.
@@ -51,7 +57,7 @@ final class OwnerAuthenticatedRouter
     ): ?array {
         $uri = $server['REQUEST_URI'] ?? null;
         if (!is_string($uri) || strlen($uri) > 2048 || str_contains($uri, "\0")) {
-            return self::response(400, ['error' => 'invalid_request']);
+            return self::response(400, ['error' => 'invalid_request'], $server);
         }
         $path = parse_url($uri, PHP_URL_PATH);
         if (!is_string($path) || !str_starts_with($path, '/api/v1/')) {
@@ -59,20 +65,20 @@ final class OwnerAuthenticatedRouter
         }
         if (str_contains($path, '%') || str_contains($path, '//')
             || str_contains($path, '..') || preg_match('/[\x00-\x1f\x7f]/', $path)) {
-            return self::response(400, ['error' => 'invalid_request']);
+            return self::response(400, ['error' => 'invalid_request'], $server);
         }
         if (self::verifiedOwner($service, $session, $now) === null) {
-            return self::response(403, ['error' => 'forbidden']);
+            return self::forbidden($server);
         }
         $method = $server['REQUEST_METHOD'] ?? null;
         if (!is_string($method) || !in_array($method, ['GET', 'POST'], true)) {
-            return self::response(405, ['error' => 'method_not_allowed']);
+            return self::response(405, ['error' => 'method_not_allowed'], $server);
         }
 
         try {
             $matched = self::match($method, $path, self::routes($routesDirectory));
             if ($matched === null) {
-                return self::response(404, ['error' => 'not_found']);
+                return self::response(404, ['error' => 'not_found'], $server);
             }
             [$handler, $params] = $matched;
             $payload = [];
@@ -82,36 +88,36 @@ final class OwnerAuthenticatedRouter
                 // backend that might perform a mutation.
                 $csrf = $server['HTTP_X_CSRF_TOKEN'] ?? null;
                 if (!is_string($csrf) || strlen($csrf) > 256) {
-                    return self::response(403, ['error' => 'forbidden']);
+                    return self::forbidden($server);
                 }
                 try {
                     $service->assertCsrf($session, $csrf);
                 } catch (Throwable) {
-                    return self::response(403, ['error' => 'forbidden']);
+                    return self::forbidden($server);
                 }
                 $type = $server['CONTENT_TYPE'] ?? '';
                 if (!is_string($type)
                     || preg_match('#^application/json(?:\s*;\s*charset=utf-8)?$#iD', $type) !== 1) {
-                    return self::response(400, ['error' => 'invalid_request']);
+                    return self::response(400, ['error' => 'invalid_request'], $server);
                 }
                 $size = $server['CONTENT_LENGTH'] ?? null;
                 if ($size !== null && (!is_scalar($size) || !ctype_digit((string) $size)
                     || (int) $size > 16384)) {
-                    return self::response(400, ['error' => 'invalid_request']);
+                    return self::response(400, ['error' => 'invalid_request'], $server);
                 }
                 $raw = $rawBody ?? file_get_contents('php://input', false, null, 0, 16385);
                 if (!is_string($raw) || $raw === '' || strlen($raw) > 16384) {
-                    return self::response(400, ['error' => 'invalid_request']);
+                    return self::response(400, ['error' => 'invalid_request'], $server);
                 }
                 $payload = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
                 if (!is_array($payload) || array_is_list($payload)) {
-                    return self::response(400, ['error' => 'invalid_request']);
+                    return self::response(400, ['error' => 'invalid_request'], $server);
                 }
             }
             if ($backend === null) {
                 // No fabricated owner data or executed decisions in the absence
                 // of a trusted server adapter (D-059).
-                return self::response(503, ['error' => 'source_unavailable']);
+                return self::response(503, ['error' => 'source_unavailable'], $server);
             }
             $output = $handler($backend, $params, $payload, $now);
             if (!is_array($output) || array_is_list($output)) {
@@ -119,9 +125,9 @@ final class OwnerAuthenticatedRouter
             }
             return self::response(200, $output);
         } catch (InvalidArgumentException|\JsonException) {
-            return self::response(400, ['error' => 'invalid_request']);
+            return self::response(400, ['error' => 'invalid_request'], $server);
         } catch (Throwable) {
-            return self::response(503, ['error' => 'source_unavailable']);
+            return self::response(503, ['error' => 'source_unavailable'], $server);
         }
     }
 
@@ -138,6 +144,7 @@ final class OwnerAuthenticatedRouter
         }
         sort($files, SORT_STRING);
         $routes = [];
+        $shapes = [];
         foreach ($files as $file) {
             if (is_link($file) || realpath($file) !== $file) {
                 throw new RuntimeException('Untrusted owner routes file.');
@@ -155,9 +162,12 @@ final class OwnerAuthenticatedRouter
                     throw new RuntimeException('Invalid owner route definition.');
                 }
                 $key = $definition['method'] . ' ' . $definition['path'];
-                if (isset($routes[$key])) {
+                $shape = $definition['method'] . ' '
+                    . preg_replace('/\{[a-z][a-z_]*\}/', '{}', rtrim($definition['path'], '/'));
+                if (isset($shapes[$shape])) {
                     throw new RuntimeException('Duplicate owner route.');
                 }
+                $shapes[$shape] = true;
                 $routes[$key] = $definition['handler'];
             }
         }
@@ -192,8 +202,28 @@ final class OwnerAuthenticatedRouter
         return null;
     }
 
-    private static function response(int $status, array $body): array
+    private static function response(int $status, array $body, array $server = []): array
     {
+        if ($status >= 400) {
+            $code = match ($status) {
+                403 => 'forbidden',
+                404 => 'not_found',
+                503 => 'internal_error',
+                default => 'invalid_request',
+            };
+            $body = [
+                'version' => 1,
+                'code' => $code,
+                'message' => match ($code) {
+                    'forbidden' => 'Owner access forbidden.',
+                    'not_found' => 'Route not found.',
+                    'internal_error' => 'Service unavailable.',
+                    default => 'Invalid request.',
+                },
+                'request_id' => self::requestId($server['HTTP_X_REQUEST_ID'] ?? null),
+                'correlation_id' => self::requestId($server['HTTP_X_CORRELATION_ID'] ?? null),
+            ];
+        }
         return [
             'status' => $status,
             'headers' => [
@@ -205,5 +235,11 @@ final class OwnerAuthenticatedRouter
             ],
             'body' => json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
         ];
+    }
+
+    private static function requestId(mixed $value): string
+    {
+        return is_string($value) && preg_match('/^[a-f0-9]{32}$/D', $value) === 1
+            ? $value : bin2hex(random_bytes(16));
     }
 }

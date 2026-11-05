@@ -23,44 +23,61 @@ return [
     [
         'method' => 'GET', 'path' => '/api/v1/cockpit',
         'handler' => static function (callable $backend, array $vars, array $request, int $now) use ($source): array {
-            $data = $source($backend, 'cockpit.read', $vars, $request, $now);
-            return ExternalApiReadProjection::cockpit($data['meta'], $data['ventures']);
+            try {
+                $data = $source($backend, 'cockpit.read', $vars, $request, $now);
+                return ExternalApiReadProjection::cockpit($data['meta'], $data['ventures']);
+            } catch (InvalidArgumentException|JsonException $error) {
+                throw new RuntimeException('Invalid trusted cockpit source.', 0, $error);
+            }
         },
     ],
     [
         'method' => 'GET', 'path' => '/api/v1/owner-inbox',
         'handler' => static function (callable $backend, array $vars, array $request, int $now) use ($source): array {
-            $data = $source($backend, 'owner_inbox.read', $vars, $request, $now);
-            // Domain validation precedes the public mobile projection. Do not
-            // expose internal authority/provenance fields directly to clients.
-            $inbox = OwnerInbox::collection($data['entries']);
-            $entries = [];
-            foreach ($inbox['entries'] as $entry) {
-                $slug = substr($entry['entry_ref'], (int) strrpos($entry['entry_ref'], '/') + 1);
-                $decisionRef = $entry['decision_ref'];
-                $decisionId = $decisionRef === null ? null
-                    : substr($decisionRef, (int) strrpos($decisionRef, '/') + 1);
-                $entries[] = [
-                    'entry_id' => $slug,
-                    'kind' => strtoupper($entry['class']),
-                    'venture_ref' => $entry['scope']['kind'] === 'venture' ? $entry['scope']['ref'] : null,
-                    'title' => $entry['title'],
-                    'summary' => $entry['summary'],
-                    'decision_id' => $decisionId,
-                    'deadline_at' => $entry['deadline_at'],
-                ];
+            try {
+                $data = $source($backend, 'owner_inbox.read', $vars, $request, $now);
+                // Domain validation precedes the public mobile projection. Do
+                // not expose internal authority/provenance fields to clients.
+                $inbox = OwnerInbox::collection($data['entries']);
+                $entries = [];
+                $seenIds = [];
+                foreach ($inbox['entries'] as $entry) {
+                    $slug = substr($entry['entry_ref'], (int) strrpos($entry['entry_ref'], '/') + 1);
+                    if (isset($seenIds[$slug])) {
+                        throw new RuntimeException('Duplicate owner inbox entry ID.');
+                    }
+                    $seenIds[$slug] = true;
+                    $decisionRef = $entry['decision_ref'];
+                    $decisionId = $decisionRef === null ? null
+                        : substr($decisionRef, (int) strrpos($decisionRef, '/') + 1);
+                    $entries[] = [
+                        'entry_id' => $slug,
+                        'kind' => strtoupper($entry['class']),
+                        'venture_ref' => $entry['scope']['kind'] === 'venture' ? $entry['scope']['ref'] : null,
+                        'title' => $entry['title'],
+                        'summary' => $entry['summary'],
+                        'decision_id' => $decisionId,
+                        'deadline_at' => $entry['deadline_at'],
+                    ];
+                }
+                return ExternalApiReadProjection::ownerInbox($data['meta'], $entries);
+            } catch (InvalidArgumentException|JsonException $error) {
+                throw new RuntimeException('Invalid trusted inbox source.', 0, $error);
             }
-            return ExternalApiReadProjection::ownerInbox($data['meta'], $entries);
         },
     ],
     [
         'method' => 'GET', 'path' => '/api/v1/owner-decisions/{decision_id}',
         'handler' => static function (callable $backend, array $vars, array $request, int $now) use ($source): array {
-            $data = $source($backend, 'owner_decision.read', $vars, $request, $now);
-            return ExternalApiOwnerDecisionRead::detail(
-                $data['access'], $data['authentication'], $data['scope'],
-                $vars['decision_id'], $data['meta'], $data['detail'], $now,
-            );
+            try {
+                $data = $source($backend, 'owner_decision.read', $vars, $request, $now);
+                return ExternalApiOwnerDecisionRead::detail(
+                    $data['access'], $data['authentication'], $data['scope'],
+                    $vars['decision_id'], $data['meta'], $data['detail'], $now,
+                );
+            } catch (InvalidArgumentException|JsonException $error) {
+                throw new RuntimeException('Invalid trusted decision source.', 0, $error);
+            }
         },
     ],
     [
@@ -77,8 +94,12 @@ return [
                 || !isset($data['response']['meta'], $data['response']['data'])) {
                 throw new RuntimeException('Decision was not committed.');
             }
-            $meta = ExternalApiContract::responseMeta($data['response']['meta']);
-            $body = $data['response']['data'];
+            try {
+                $meta = ExternalApiContract::responseMeta($data['response']['meta']);
+                $body = $data['response']['data'];
+            } catch (InvalidArgumentException|JsonException $error) {
+                throw new RuntimeException('Invalid committed decision source.', 0, $error);
+            }
             if (!is_array($body) || array_is_list($body)
                 || ($body['decision_id'] ?? null) !== $vars['decision_id']
                 || ($body['outcome'] ?? null) !== $mutation['outcome']) {

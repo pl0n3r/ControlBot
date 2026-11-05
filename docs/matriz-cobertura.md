@@ -441,3 +441,4 @@ Este registro **separa** las hojas documentales posteriores al snapshot normativ
 | `docs/dr-drill-report.md` | [#1371](https://github.com/pl0n3r/ControlBot/issues/1371) | [#1414](https://github.com/pl0n3r/ControlBot/pull/1414) | `tests/test_dr_drill_rpo_rto.py` | NO_VERIFICABLE / NO ENSAYADO |
 | `docs/persistencia-dominio.md` | [#1453](https://github.com/pl0n3r/ControlBot/issues/1453) | [#1463](https://github.com/pl0n3r/ControlBot/pull/1463) | `tests/test_domain_persistence.py` | NO_VERIFICABLE / NO ENSAYADO |
 | `docs/soporte-destinatarios.md` | [#1428](https://github.com/pl0n3r/ControlBot/issues/1428) | [#1468](https://github.com/pl0n3r/ControlBot/pull/1468) | `tests/test_support_notification_recipients.py` | NO_VERIFICABLE / NO ENSAYADO |
+| `docs/modulo-legal.md` | [#1429](https://github.com/pl0n3r/ControlBot/issues/1429) | [#1466](https://github.com/pl0n3r/ControlBot/pull/1466) | `tests/test_legal_status_panel.py` | NO_VERIFICABLE / NO ENSAYADO |

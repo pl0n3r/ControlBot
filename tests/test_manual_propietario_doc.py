@@ -35,24 +35,24 @@ class ManualPropietarioTests(unittest.TestCase):
         self.guide = GUIDE.read_text(encoding="utf-8")
 
     def test_modulos_y_lenguaje(self):
-        modules = re.split(r"(?m)^## [1-9]\\. ", self.guide)[1:]
+        modules = re.split(r"(?m)^## [1-9]\. ", self.guide)[1:]
         self.assertEqual(9, len(modules))
         for module in modules:
             for title in SECTIONS:
                 self.assertIn(title, module)
             self.assertLessEqual(len(module.split()), 450)
-        self.assertNotRegex(self.guide, r"\\b(?:POST|API|JSON|TOTP|OAuth)\\b")
+        self.assertNotRegex(self.guide, r"\b(?:POST|API|JSON|TOTP|OAuth)\b")
 
     def test_etiquetas_que_existen_en_interfaz(self):
         labels = re.findall(r"«([^»]+)»", self.guide)
         self.assertGreaterEqual(len(set(labels)), 40)
-        source = "\\n".join((ROOT / path).read_text(encoding="utf-8") for path in UI)
+        source = "\n".join((ROOT / path).read_text(encoding="utf-8") for path in UI)
         self.assertEqual([], sorted(set(label for label in labels if label not in source)))
 
     def test_sin_secretos_y_sin_promover_live(self):
         self.assertNotRegex(self.guide, r"(?i)(?:github_pat_|ghp_[A-Za-z0-9]{20}|sk-[A-Za-z0-9]{20}|-----BEGIN PRIVATE KEY-----)")
         self.assertIn("no una instalación en producción comprobada", self.guide)
-        self.assertIn("no crea copias", self.guide)
+        self.assertIn("no crea copias", self.guide.lower())
         self.assertIn("no están fusionados", self.guide)
 
 

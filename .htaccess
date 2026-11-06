@@ -42,11 +42,15 @@ RewriteRule ^public/health\.php$ - [R=404,L,NC]
 # La página de login se sirve solo como /login; el archivo no es accesible directamente.
 RewriteCond %{THE_REQUEST} \s/+public/login\.php(?:\s|\?|$) [NC]
 RewriteRule ^public/login\.php$ - [R=404,L,NC]
-RewriteRule ^(?!(?:index\.php|public/index\.php|health\.php|public/health\.php|public/login\.php)$).+\.php$ - [F,L,NC]
+# El bootstrap privado del Inbox solo se alcanza por sus URLs virtuales.
+RewriteCond %{THE_REQUEST} \s/+public/inbox\.php(?:\s|\?|$) [NC]
+RewriteRule ^public/inbox\.php$ - [R=404,L,NC]
+RewriteRule ^(?!(?:index\.php|public/index\.php|health\.php|public/health\.php|public/login\.php|public/inbox\.php)$).+\.php$ - [F,L,NC]
 
 # Owner-gated health route stays closed without real server auth and private artifact.
 RewriteRule ^health\.php$ public/health.php [L,NC]
 RewriteRule ^login$ public/login.php [L,NC]
+RewriteRule ^(?:inbox|decisiones/[a-z][a-z0-9-]{1,63})$ public/inbox.php [L]
 # Only the intended public surface bypasses the front controller.
 RewriteRule ^(?:index\.php$|public(?:/|$)) - [L,NC]
 RewriteRule ^ index.php [L]

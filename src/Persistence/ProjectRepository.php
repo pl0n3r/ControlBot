@@ -24,11 +24,7 @@ final class DomainSchemaMigrator
         if (!is_string($sql) || trim($sql) === '') {
             throw new RuntimeException('Domain migration missing.');
         }
-        $withoutComments = preg_replace('/^\s*--[^\n]*(?:\n|$)/m', '', $sql);
-        if (!is_string($withoutComments)) {
-            throw new RuntimeException('Domain migration unreadable.');
-        }
-        $statements = array_values(array_filter(array_map('trim', explode(';', $withoutComments))));
+        $statements = self::parseStatements($sql);
         if (count($statements) !== count(self::TABLES)) {
             throw new RuntimeException('Domain migration statement count invalid.');
         }
@@ -70,11 +66,7 @@ final class DomainSchemaMigrator
             if (!is_string($sql) || !hash_equals($plan['sha256'], hash('sha256', $sql))) {
                 throw new RuntimeException('Domain migration changed after preflight.');
             }
-            $withoutComments = preg_replace('/^\s*--[^\n]*(?:\n|$)/m', '', $sql);
-            if (!is_string($withoutComments)) {
-                throw new RuntimeException('Domain migration unreadable.');
-            }
-            foreach (array_filter(array_map('trim', explode(';', $withoutComments))) as $statement) {
+            foreach (self::parseStatements($sql) as $statement) {
                 $db->exec($statement);
             }
             if ($sqlite) {
@@ -86,6 +78,15 @@ final class DomainSchemaMigrator
             }
             throw $error;
         }
+    }
+    /** @return list<string> */
+    private static function parseStatements(string $sql): array
+    {
+        $clean = preg_replace('/^\s*--[^\n]*(?:\n|$)/m', '', $sql);
+        if (!is_string($clean)) {
+            throw new RuntimeException('Domain migration unreadable.');
+        }
+        return array_values(array_filter(array_map('trim', explode(';', $clean))));
     }
     private static function requireExceptions(PDO $db): void
     {
@@ -117,11 +118,11 @@ abstract class PdoDomainRepository
         }
         try {
             $json = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES, 32);
+            if (strlen($json) > 65535) {
+                throw new InvalidArgumentException('Domain payload too large.');
+            }
         } catch (JsonException) {
             throw new InvalidArgumentException('Invalid domain JSON.');
-        }
-        if (strlen($json) > 65535) {
-            throw new InvalidArgumentException('Domain payload too large.');
         }
         if ($this->db->inTransaction()) {
             throw new RuntimeException('Nested domain write prohibited.');
@@ -153,26 +154,27 @@ abstract class PdoDomainRepository
     {
         self::identity($scopeId, 64);
         self::identity($recordId, 96);
-        $query = $this->db->prepare(
+        $statement = $this->db->prepare(
             'SELECT payload_json FROM ' . static::TABLE . ' WHERE scope_id = :scope AND record_id = :id'
         );
-        $query->execute([':scope' => $scopeId, ':id' => $recordId]);
-        $json = $query->fetchColumn();
-        if ($json === false) {
+        $statement->execute([':scope' => $scopeId, ':id' => $recordId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
             return null;
         }
-        if (!is_string($json) || strlen($json) > 65535) {
+        $raw = $row['payload_json'] ?? null;
+        if (!is_string($raw) || strlen($raw) > 65535) {
             throw new RuntimeException('Stored domain record invalid.');
         }
         try {
-            $value = json_decode($json, true, 32, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
+            if (is_array($decoded) && $decoded !== [] && !array_is_list($decoded)) {
+                return $decoded;
+            }
         } catch (JsonException) {
-            throw new RuntimeException('Stored domain record invalid.');
+            // One failure path for malformed or non-object payloads.
         }
-        if (!is_array($value) || $value === [] || array_is_list($value)) {
-            throw new RuntimeException('Stored domain record invalid.');
-        }
-        return $value;
+        throw new RuntimeException('Stored domain record invalid.');
     }
     private static function identity(string $value, int $max): void
     {

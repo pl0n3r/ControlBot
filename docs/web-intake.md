@@ -12,11 +12,16 @@ con Cache-Control: no-store, sin autoridad de cabeceras HTTP ni REMOTE_USER.
 **Límite comprobado:** el acceso literal a una página HTML /intake **no**
 está cableado en el front controller. El archivo imprescindible
 src/ControlBotWebEntrypoint.php está reclamado por otra reserva V3
-(ControlBot #1429), y NO se invadió. Este módulo aporta el contrato
-seguro del formulario y la decisión, pero **no equivale a la pantalla
-web de aceptación integral**. La integración HTML requiere liberar
-ese claim y ampliar la reserva antes de modificar el front controller.
-No afirmar AC-01 completo hasta que la URL y su vista real estén probadas.
+(ControlBot #1449, PR #1465, reserva activa `607a6e7e-a967-4b3e-bf90-6c7d4f4d4cd7`).
+#1429 ya está fusionado y no es el bloqueador vigente. Este módulo aporta
+el contrato seguro del formulario y la decisión, pero **no equivale a la
+pantalla web de aceptación integral**. No se invaden archivos de #1449.
+La integración HTML exige primero su merge/liberación, luego renovar el
+contrato V3 de #1448 para reclamar el front controller y probar la URL real.
+No afirmar AC-01 completo hasta que la vista esté conectada y verificada.
+La revisión CodeRabbit de PR #1467 se solicitó una vez sobre un HEAD anterior;
+no se repite ni se reutiliza como D-070 para un HEAD nuevo sin las condiciones
+exactas del protocolo y la autorización específica correspondiente.
 
 ## Endpoints del módulo
 

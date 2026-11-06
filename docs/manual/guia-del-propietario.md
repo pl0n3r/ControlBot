@@ -114,7 +114,7 @@ La pantalla /pausa exige la sesión reforzada del propietario. La operación nec
 1. Abre /pausa y comprueba el estado mostrado.
 2. Para detener nuevas asignaciones, explica la causa en «Motivo» y pulsa «Pausar todos».
 3. Lee «¿Pausar toda asignación nueva?» y confirma solamente si eso es lo que deseas.
-4. Para permitir asignaciones de nuevo, pulsa «Reanudar» y revisa «¿Reanudar asignaciones?».
+4. Para permitir asignaciones de nuevo, pulsa «Reanudar», revisa «¿Reanudar asignaciones?» y **confirma**. Si cancelas, no se envía ninguna orden y las nuevas asignaciones continúan pausadas.
 5. Comprueba el resultado: «Todos pausados» o «Asignación habilitada».
 
 ### Avisos y mensajes

@@ -18,6 +18,7 @@ final class ControlCenterShell
         'factory-live' => 'Fábrica viva',
         'github' => 'GitHub',
         'decisions' => 'Decisiones',
+        'legal' => 'Legal',
     ];
 
     public static function render(

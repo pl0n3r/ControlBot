@@ -6,12 +6,44 @@ require_once __DIR__ . '/../src/OwnerSession.php';
 require_once __DIR__ . '/../src/SecretSource.php';
 require_once __DIR__ . '/../src/ControlBotWebEntrypoint.php';
 require_once __DIR__ . '/../src/OwnerLoginGate.php';
+require_once __DIR__ . '/../src/LegalStatusPanel.php';
+require_once __DIR__ . '/../src/ControlCenterShell.php';
+require_once __DIR__ . '/../src/Routing/OwnerAuthenticatedRouter.php';
 
 use ControlBot\Security\OwnerLoginGate;
 use ControlBot\Security\OwnerSessionService;
 use ControlBot\Security\SecretSource;
 use ControlBot\Security\TokenVault;
+use ControlBot\Legal\LegalStatusPanel;
+use ControlBot\Ui\ControlCenterShell;
+use ControlBot\Routing\OwnerAuthenticatedRouter;
 use ControlBot\Web\ControlBotWebEntrypoint;
+
+
+// /legal existe SOLO en este bootstrap, que valida sesiones server-side.
+// Nunca se autoriza con REMOTE_USER, parámetros de URL ni cabeceras de cliente.
+$legalUri = $_SERVER['REQUEST_URI'] ?? null;
+$legalPath = is_string($legalUri) && strlen($legalUri) <= 2048
+    && !str_contains($legalUri, "\0") ? parse_url($legalUri, PHP_URL_PATH) : null;
+$legalHeaders = ['Content-Type' => 'text/html; charset=utf-8',
+    'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff',
+    'X-Frame-Options' => 'DENY', 'Referrer-Policy' => 'no-referrer'];
+$legalResponse = static function (array $request) use ($legalHeaders): array {
+    if (($request['REQUEST_METHOD'] ?? null) !== 'GET') {
+        return ['status' => 405, 'headers' => $legalHeaders + ['Allow' => 'GET'],
+            'body' => "Method not allowed.\n"];
+    }
+    try {
+        return ['status' => 200, 'headers' => $legalHeaders, 'body' => ControlCenterShell::render(
+            'Legal y privacidad', 'legal',
+            ['overview' => '/overview', 'github' => '/github', 'legal' => '/legal'],
+            LegalStatusPanel::render(LegalStatusPanel::readConfigured())
+        )];
+    } catch (Throwable) {
+        return ['status' => 503, 'headers' => $legalHeaders,
+            'body' => "Service unavailable.\n"];
+    }
+};
 
 // Acceso con página de login (#1346): solo se activa cuando el servidor tiene el hash de la
 // contraseña del dueño. Sin él, todo sigue cerrado por la ruta OAuth/TOTP de más abajo.
@@ -62,7 +94,7 @@ if (is_string($passwordHash) && $passwordHash !== '') {
         unset($gate['headers']['Location']);
     }
     if ($gate === null) {
-        $gate = ControlBotWebEntrypoint::handleLocalOwner(
+        $gate = $legalPath === '/legal' ? $legalResponse($_SERVER) : ControlBotWebEntrypoint::handleLocalOwner(
             $_SERVER,
             ['CONTROLBOT_OWNER_LOGIN' => $loginConfig['owner_login'],
              'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH' => getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH') ?: null],
@@ -113,13 +145,19 @@ try {
         }
     }
 
-    $response = ControlBotWebEntrypoint::handleAuthenticated(
-        $_SERVER,
-        $environment,
-        time(),
-        is_array($session) ? $session : [],
-        $service,
-    );
+    if ($legalPath === '/legal') {
+        $verified = OwnerAuthenticatedRouter::verifiedOwner(
+            $service, is_array($session) ? $session : [], time()
+        );
+        $response = is_string($verified) && hash_equals($owner, $verified)
+            ? $legalResponse($_SERVER)
+            : ['status' => 403, 'headers' => $legalHeaders,
+               'body' => "Forbidden.\n"];
+    } else {
+        $response = ControlBotWebEntrypoint::handleAuthenticated(
+            $_SERVER, $environment, time(), is_array($session) ? $session : [], $service,
+        );
+    }
 } catch (Throwable) {
     // Missing server-side configuration is an unavailable service (503);
     // an invalid/absent owner session with valid configuration is forbidden (403).

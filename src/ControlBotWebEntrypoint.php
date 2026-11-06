@@ -110,6 +110,77 @@ final class ControlBotWebEntrypoint
                 'body' => "Forbidden.\n",
             ];
         }
+        // Pausa owner: jamás se sirve desde handleLocalOwner ni sin OAuth+TOTP.
+        // Las escrituras viajan al router owner-v1 con CSRF y backend server-bound.
+        if ($apiPath === '/pausa') {
+            if (($server['REQUEST_METHOD'] ?? null) !== 'GET') {
+                return ['status' => 405, 'headers' => [
+                    'Content-Type' => 'text/plain; charset=utf-8',
+                    'Cache-Control' => 'no-store',
+                    'X-Content-Type-Options' => 'nosniff',
+                ], 'body' => "Method not allowed.\n"];
+            }
+            $nonce = base64_encode(random_bytes(18));
+            $csrfJson = json_encode(
+                $ownerAuth->csrfToken($ownerSession),
+                JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS,
+            );
+            $html = <<<'PAUSE_HTML'
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pausar todos · ControlBot</title>
+<style>body{font:1rem system-ui;max-width:48rem;margin:2rem auto;padding:0 1rem}
+button,input{padding:.7rem;margin:.4rem}button:focus-visible,input:focus-visible{outline:3px solid}
+#status{padding:1rem;border:1px solid}button{cursor:pointer}</style></head>
+<body><main><h1>Pausar todos</h1><p>Solo dueño autenticado. No interrumpe trabajo en curso.</p>
+<p role="status" id="status" aria-live="polite">Consultando estado…</p>
+<label for="reason">Motivo</label><input id="reason" maxlength="240" value="Pausa operativa del dueño">
+<div><button id="pause" type="button">Pausar todos</button>
+<button id="resume" type="button">Reanudar</button></div>
+<p id="notice" role="alert" aria-live="assertive"></p></main>
+<script nonce="__NONCE__">
+"use strict";
+const csrf = __CSRF__;
+const status = document.getElementById("status");
+const notice = document.getElementById("notice");
+async function refresh() {
+  const r = await fetch("/api/v1/pausa", {credentials:"same-origin",cache:"no-store"});
+  if (!r.ok) throw new Error("No se pudo verificar el estado");
+  const body = await r.json();
+  status.textContent = body.state === "paused" ? "Todos pausados" : "Asignación habilitada";
+}
+async function act(action) {
+  const isPause = action === "pause";
+  if (!window.confirm(isPause ? "¿Pausar toda asignación nueva?" : "¿Reanudar asignaciones?")) return;
+  notice.textContent = "";
+  try {
+    const payload = {action, confirmation: isPause ? "PAUSAR TODOS" : "REANUDAR TODOS"};
+    if (isPause) payload.reason = document.getElementById("reason").value;
+    const r = await fetch("/api/v1/pausa", {method:"POST",credentials:"same-origin",
+      headers:{"Content-Type":"application/json","X-CSRF-Token":csrf},
+      body:JSON.stringify(payload),cache:"no-store"});
+    if (!r.ok) throw new Error("No se acreditó el cambio; estado sin confirmar");
+    await refresh();
+  } catch (e) {notice.textContent = e.message;}
+}
+document.getElementById("pause").addEventListener("click", () => act("pause"));
+document.getElementById("resume").addEventListener("click", () => act("resume"));
+refresh().catch(e => {status.textContent = "Estado no disponible"; notice.textContent=e.message;});
+</script></body></html>
+PAUSE_HTML;
+            $html = str_replace(['__NONCE__', '__CSRF__'], [
+                htmlspecialchars($nonce, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+                $csrfJson,
+            ], $html);
+            return ['status' => 200, 'headers' => [
+                'Content-Type' => 'text/html; charset=utf-8',
+                'Cache-Control' => 'no-store',
+                'X-Content-Type-Options' => 'nosniff',
+                'X-Frame-Options' => 'DENY',
+                'Referrer-Policy' => 'no-referrer',
+                'Content-Security-Policy' => "default-src 'none'; connect-src 'self'; script-src 'nonce-{$nonce}'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+            ], 'body' => $html];
+        }
         // API owner-v1: el servidor NO confiere autoridad por cabeceras.
         // OAuth+TOTP ya se validaron arriba, pero el registro vuelve a
         // verificarlos antes de seleccionar handlers/mutaciones.

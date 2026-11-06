@@ -39,7 +39,10 @@ $backend = static function ($op, $vars, $request, $when) use (
             foreach (['health','ci','deploy','agent'] as $source)
                 $events[] = $event('project-controlbot',$source);
         } elseif ($mode === 'stale') {
+            // Tres fuentes frescas: UNKNOWN debe depender de health stale.
             $events[] = $event('project-controlbot','health',1);
+            foreach (['ci','deploy','agent'] as $source)
+                $events[] = $event('project-controlbot',$source);
         }
         $data = ['project_ids'=>['project-controlbot','project-condor'],
             'events'=>$events, 'ttl_by_source'=>['health'=>120,
@@ -126,6 +129,12 @@ class ObservabilityTests(unittest.TestCase):
         data = fixture("security")
         self.assertTrue(all(p["status"]=="UNKNOWN" for p in data["missing"]["projects"]))
         self.assertTrue(all(p["status"]=="UNKNOWN" for p in data["stale"]["projects"]))
+        controlbot = next(p for p in data["stale"]["projects"]
+                          if p["project_id"] == "project-controlbot")
+        self.assertEqual("stale", controlbot["sources"]["health"]["freshness"])
+        for source in ("ci", "deploy", "agent"):
+            self.assertEqual("fresh", controlbot["sources"][source]["freshness"])
+        self.assertEqual("UNKNOWN", controlbot["status"])
         self.assertEqual("UNKNOWN", data["missing_incident"]["status"])
         self.assertEqual([], data["missing_incident"]["timeline"])
         self.assertTrue(data["bad_input"])

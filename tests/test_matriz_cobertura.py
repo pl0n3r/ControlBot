@@ -52,6 +52,10 @@ POST_SNAPSHOT = {
     "docs/panel-kill-switch.md": (1363, 1409, "tests/test_panel_kill_switch.py"),
     "docs/support-channels.md": (1358, 1404, "tests/test_support_channels.py"),
     "docs/dr-drill-report.md": (1371, 1414, "tests/test_dr_drill_rpo_rto.py"),
+    "docs/persistencia-dominio.md": (1453, 1463, "tests/test_domain_persistence.py"),
+    "docs/soporte-destinatarios.md": (1428, 1468, "tests/test_support_notification_recipients.py"),
+    "docs/modulo-legal.md": (1429, 1466, "tests/test_legal_status_panel.py"),
+    "docs/manual/guia-del-propietario.md": (1479, 1480, "tests/test_manual_propietario_doc.py"),
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
 POST_CELL = re.compile(
@@ -257,6 +261,72 @@ class MatrizCoberturaTests(unittest.TestCase):
     def setUpClass(cls):
         cls.text = DOC.read_text(encoding="utf-8")
         cls.rows = parse_rows(cls.text)
+
+    def test_registro_persistencia_dominio_exacto(self):
+        registro = parse_post_snapshot(self.text)
+        self.assertEqual(registro["docs/persistencia-dominio.md"],
+                         (1453, 1463, "tests/test_domain_persistence.py"))
+        self.assertEqual(registro["docs/soporte-destinatarios.md"],
+                         (1428, 1468, "tests/test_support_notification_recipients.py"))
+        self.assertFalse(set(registro) & {source[1] for source in self.rows})
+
+    def test_registro_manual_propietario_exacto(self):
+        """#1479 / PR #1480: catálogo de manual sin certificar producción."""
+        path = "docs/manual/guia-del-propietario.md"
+        expected = (1479, 1480, "tests/test_manual_propietario_doc.py")
+        self.assertEqual(expected, POST_SNAPSHOT[path])
+        self.assertEqual(expected, parse_post_snapshot(self.text)[path])
+        self.assertEqual(set(), missing_normative_sources(self.text, {path}))
+        rows = [line for line in self.text.splitlines()
+                if line.startswith("| `" + path + "` |")]
+        self.assertEqual(1, len(rows))
+        row = rows[0]
+        self.assertTrue(row.endswith("| NO_VERIFICABLE / NO ENSAYADO |"))
+        self.assertTrue((ROOT / expected[2]).is_file())
+        for original, replacement in (
+            ("#1479", "#9999"),
+            ("#1480", "#9999"),
+            ("tests/test_manual_propietario_doc.py", "tests/test_fake_manual.py"),
+            ("NO_VERIFICABLE / NO ENSAYADO", "CUBIERTO"),
+        ):
+            with self.subTest(replacement=replacement):
+                changed = row.replace(original, replacement)
+                self.assertNotEqual(row, changed)
+                with self.assertRaises(ValueError):
+                    parse_post_snapshot(self.text.replace(row, changed, 1))
+
+    def test_registro_modulo_legal_exacto(self):
+        """#1429 / PR #1466: procedencia legal exacta sin aprobación inventada."""
+        path = "docs/modulo-legal.md"
+        expected = (1429, 1466, "tests/test_legal_status_panel.py")
+        self.assertEqual(expected, POST_SNAPSHOT[path])
+        self.assertEqual(expected, parse_post_snapshot(self.text)[path])
+        self.assertEqual(set(), missing_normative_sources(self.text, {path}))
+        source_paths = {SOURCE.fullmatch(row[1])["path"] for row in self.rows}
+        self.assertNotIn(path, source_paths)
+        rows = [row for row in self.text.splitlines()
+                if row.startswith("| `" + path + "` |")]
+        self.assertEqual(1, len(rows), "El documento legal se indexa una sola vez")
+        row = rows[0]
+        self.assertTrue(row.endswith("| NO_VERIFICABLE / NO ENSAYADO |"))
+        for original, replacement in (
+            (path, "docs/modulo-legal-aprobado.md"),
+            ("[#1429](https://github.com/pl0n3r/ControlBot/issues/1429)",
+             "[#9999](https://github.com/pl0n3r/ControlBot/issues/9999)"),
+            ("[#1466](https://github.com/pl0n3r/ControlBot/pull/1466)",
+             "[#9999](https://github.com/pl0n3r/ControlBot/pull/9999)"),
+            ("tests/test_legal_status_panel.py", "tests/test_legal_falso.py"),
+            ("NO_VERIFICABLE / NO ENSAYADO", "CUBIERTO"),
+        ):
+            with self.subTest(replacement=replacement):
+                altered = self.text.replace(row, row.replace(original, replacement, 1), 1)
+                self.assertNotEqual(self.text, altered)
+                with self.assertRaises(ValueError):
+                    parse_post_snapshot(altered)
+        with self.assertRaisesRegex(ValueError, "duplicado"):
+            parse_post_snapshot(self.text.replace(row, row + "\n" + row, 1))
+        with self.assertRaisesRegex(ValueError, "no coinciden"):
+            parse_post_snapshot(self.text.replace(row, "", 1))
 
     def test_cubre_todas_las_fuentes(self):
         files = {f"docs/{p.relative_to(ROOT / 'docs').as_posix()}"

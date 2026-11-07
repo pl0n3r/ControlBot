@@ -34,6 +34,7 @@ POST_SNAPSHOT = {
     "docs/github-projection-owner-e2e.md": (993, 994, "tests/test_github_projection_owner_e2e.py"),
     "docs/github-readonly-installation-admission.md": (998, 999, "tests/test_github_readonly_installation_admission.py"),
     "docs/github-readonly-admission-projection-gate.md": (1003, 1004, "tests/test_github_readonly_admission_projection_gate.py"),
+    "docs/github-readonly-runtime-activation.md": (1484, 1485, "tests/test_github_readonly_runtime_activation.py"),
     "docs/DISENO-CONTROLBOT.md": (1169, 1171, "tests/test_control_theme_redesign.py"),
     "docs/operator-runbook.md": (959, 965, "tests/test_runbook_operador_doc.py"),
     "docs/dr-drill-plan.md": (960, 968, "tests/test_simulacro_dr_doc.py"),

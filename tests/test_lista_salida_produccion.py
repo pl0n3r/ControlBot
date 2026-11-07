@@ -100,6 +100,13 @@ class ListaSalidaTests(unittest.TestCase):
         for keyword in must:
             with self.subTest(keyword=keyword):
                 self.assertIn(keyword.lower(), content.lower())
+        audits = {r[4]: r for r in self.rows if r[0] == "Auditoría de salida"}
+        self.assertEqual(len(audits), 2)
+        for num in (940, 941):
+            row = audits[f"[#{num}](https://github.com/pl0n3r/ControlBot/issues/{num})"]
+            self.assertEqual(row[2], "NO_APLICA")
+            self.assertIn("MERGED", row[3])
+            self.assertIn("no acredita producto LISTO", row[3])
         self.assertIn("NO-GO", self.text)
         self.assertIn("40454554886", self.text)
 
@@ -109,7 +116,7 @@ class ListaSalidaTests(unittest.TestCase):
                 self.assertIsNotNone(ISSUE.fullmatch(row[4]))
                 self.assertIn("Hoja ejecutable", row[3])
         bad = self.text.replace(
-            "| Auditoría de salida | Checklist de go-live con test y enlace de evidencias | EN_CURSO | Hoja ejecutable #941",
+            "| Auditoría de salida | Checklist de go-live con test y enlace de evidencias | NO_APLICA |",
             "| Auditoría de salida | Checklist de go-live con test y enlace de evidencias | SIN_COBERTURA | Sin hoja #941",
             1,
         )

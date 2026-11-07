@@ -14,10 +14,11 @@ $handlers = [];
 foreach ($routes as $route) $handlers[$route['path']] = $route['handler'];
 $now = 14000;
 $hex = str_repeat('a', 32);
-$event = static function (string $project, string $source, int $time = 13980): array {
+$event = static function (string $project, string $source, int $time = 13980,
+    string $severity = 'info'): array {
     $types = ['health'=>'health_probe','ci'=>'ci_run','deploy'=>'deploy','agent'=>'heartbeat'];
     return ['version'=>1,'source'=>$source,'project_id'=>$project,'environment_id'=>null,
-        'repository_id'=>null,'severity'=>'info','type'=>$types[$source],
+        'repository_id'=>null,'severity'=>$severity,'type'=>$types[$source],
         'payload'=>['status'=>'ok'],'occurred_at'=>$time,'received_at'=>$time+1,
         'correlation_keys'=>['project:'.$project]];
 };
@@ -43,8 +44,22 @@ $backend = static function ($op, $vars, $request, $when) use (
             $events[] = $event('project-controlbot','health',1);
             foreach (['ci','deploy','agent'] as $source)
                 $events[] = $event('project-controlbot',$source);
+        } elseif ($mode === 'severities') {
+            // Cuatro fuentes por proyecto: cada estado depende de severidad, no de ausencia.
+            $levels = [
+                'project-warning'=>['health'=>'warning'],
+                'project-error'=>['ci'=>'error'],
+                'project-critical'=>['deploy'=>'critical'],
+                'project-mixed'=>['health'=>'warning','ci'=>'error'],
+            ];
+            foreach ($levels as $project => $severities)
+                foreach (['health','ci','deploy','agent'] as $source)
+                    $events[] = $event($project,$source,13980,$severities[$source] ?? 'info');
         }
-        $data = ['project_ids'=>['project-controlbot','project-condor'],
+        $projects = $mode === 'severities'
+            ? ['project-warning','project-error','project-critical','project-mixed']
+            : ['project-controlbot','project-condor'];
+        $data = ['project_ids'=>$projects,
             'events'=>$events, 'ttl_by_source'=>['health'=>120,
                 'ci'=>120,'deploy'=>120,'agent'=>120]];
         if ($mode === 'invalid') $data['extra'] = 'forbidden';
@@ -63,7 +78,10 @@ $call = static function (string $path, array $vars=[]) use (
 ): array {
     return $handlers[$path]($backend,$vars,[],$now);
 };
-if (($argv[1] ?? '') === 'principal') {
+if (($argv[1] ?? '') === 'severities') {
+    $mode = 'severities';
+    $out = $call('/api/v1/observabilidad');
+} elseif (($argv[1] ?? '') === 'principal') {
     $overview = $call('/api/v1/observabilidad');
     $incident = $call('/api/v1/incidentes/{incident_id}',
         ['incident_id'=>'incident-'.$hex]);
@@ -124,6 +142,24 @@ class ObservabilityTests(unittest.TestCase):
         self.assertEqual("incident:" + "a"*32, incident["incident_ref"])
         self.assertEqual(["incident.opened"], [e["kind"] for e in incident["timeline"]])
         self.assertEqual(0, incident["notifications_sent"])
+
+    def test_proyectos_frescos_con_severidades_mixtas(self):
+        """Warning/error degradan; critical cae, incluso con cuatro fuentes frescas."""
+        data = fixture("severities")
+        self.assertEqual(0, data["notifications_sent"])
+        actual = {p["project_id"]: p for p in data["projects"]}
+        self.assertEqual({
+            "project-warning": "DEGRADED",
+            "project-error": "DEGRADED",
+            "project-critical": "DOWN",
+            "project-mixed": "DEGRADED",
+        }, {name: project["status"] for name, project in actual.items()})
+        for project in actual.values():
+            self.assertEqual({"health", "ci", "deploy", "agent"},
+                             set(project["sources"]))
+            self.assertTrue(all(slot["freshness"] == "fresh"
+                                for slot in project["sources"].values()))
+            self.assertFalse(project["alert"]["sent"])
 
     def test_criterio_seguridad_y_bordes(self):
         data = fixture("security")

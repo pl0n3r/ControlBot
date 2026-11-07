@@ -1,60 +1,17 @@
-# Proyectos web: conexión owner y evidencia privada (#1478)
+# Proyectos web owner-only — ControlBot #1478
 
-## Alcance y autoridad
+## Rutas y autorización
+`GET /proyectos` y `GET /proyectos/{project_id}` sirven HTML solo tras `OwnerSessionService` con **OAuth+TOTP** verificado. `REMOTE_USER`, `Authorization`, sesión local de contraseña y entradas de cliente no otorgan permisos. Anónimo, TOTP ausente/expirado: **403**. Método distinto de GET: **405**; identificador inexistente: **404**. Renderer `ProjectUi` y handlers `ProjectRoutes.php` de #1447 se reutilizan sin modificaciones. `projects.read` es exclusivamente de lectura; no existe mutación ni backfill en las vistas.
 
-Las vistas HTML `GET /proyectos` y `GET /proyectos/{project_id}` requieren una sesión **OAuth+TOTP** verificada por `OwnerSessionService`. El `REMOTE_USER`, la cabecera `Authorization`, parámetros URL y el login local solo con contraseña **no** autorizan estas vistas. Las peticiones anónimas y sesiones con 2FA ausente/expirada reciben **403**. Solo se permite `GET` (otros métodos **405**).
+## Origen privado y validación
+El servidor debe configurar `CONTROLBOT_PROJECTS_SNAPSHOT_PATH` a un JSON **absoluto fuera de DOCUMENT_ROOT**, sin symlinks, con permisos **0600**. No se incluye snapshot productivo en el repositorio ni se aceptan rutas, contenidos o autenticación desde el navegador. El lector comprueba ruta real, identidad de archivo, tamaño máximo 256 KiB, JSON con claves exactas y `observed_at` dentro de **300 segundos**. También exige observaciones frescas en repositorios, entornos y referencias agregadas.
 
-El contrato hereda el modelo y renderer `ProjectUi` de #1447 sin modificar `ProjectRoutes.php`, `ProjectBackfill` ni las cuatro definiciones canónicas. El API owner `/api/v1/proyectos`, la vista HTML y el detalle usan `projects.read` **solo lectura**. Ningún request del navegador puede suministrar el contenido del adaptador.
+Formato: `{"version":1,"observed_at":14000,"projects":[...]}`. Los registros del array son los DTO `ProjectModel` de #1447, con `version,project_id,slug,title,phase,priority,repositories,environments,aggregate_refs,history_refs`. Se exigen exactamente cuatro identidades con su repositorio canónico: `project-controlbot` → `pl0n3r/ControlBot`, `project-condor` → `pl0n3r/Condor`, `project-brvtal` → `pl0n3r/brvtal` y `project-grindflow` → `pl0n3r/GrindFlow`. Son **IDs de contrato**, no un origen ficticio de datos. Una fuente incompleta, caducada o incoherente devuelve **503**; nunca se inventan proyectos, entornos, informes, estados de salud ni readiness.
 
-## Fuente real, no inferida
+## Respuestas, seguridad y QA
+HTML semántico, responsive y con escape de entidades de `ProjectUi`; `Cache-Control:no-store`, CSP sin scripts, `nosniff`, `X-Frame-Options:DENY` y `Referrer-Policy:no-referrer`. Sin entornos acreditados se muestra «Sin entornos» y sin referencia de salud aparece **UNKNOWN**, nunca GREEN. La lectura privada no se filtra en páginas de error.
 
-El operador del servidor configura `CONTROLBOT_PROJECTS_SNAPSHOT_PATH` con una ruta absoluta a un **JSON de solo lectura y no público**, creada fuera del `DOCUMENT_ROOT` con permisos **0600**. No se entrega un snapshot de ejemplo en producción ni se añade uno al repositorio. El archivo no debe ser symlink; el lector comprueba ruta real, permisos, tamaño, identidad de archivo y estructura antes de aceptarlo. No lee `.env`, no conecta a base de datos ni llama redes externas.
+`tests/test_web_projects_http.py`: AC-01 lista/detalle de cuatro proyectos con sesión OAuth+TOTP, backend sintético y snapshot de archivo temporal privado 0600. AC-02 casos negativos de sesión/TOTP, expiración, login local, REMOTE_USER forjado, métodos, ID, fuente ausente, symlink, archivo expuesto al DOCUMENT_ROOT, permisos 0644, vencimiento, repositorio falso, XSS y UNKNOWN. `tests/test_web_projects.py` conserva los controles JSON/backfill anteriores. El documento nuevo se registra en `docs/matriz-cobertura.md` y `tests/test_matriz_cobertura.py` como `NO_VERIFICABLE / NO ENSAYADO`, sin alterar los 1.194 requisitos históricos.
 
-Formato del adaptador privado:
-
-```json
-{
-  "version": 1,
-  "observed_at": 14000,
-  "projects": [
-    {
-      "version": 1,
-      "project_id": "project-controlbot",
-      "slug": "controlbot",
-      "title": "ControlBot",
-      "phase": "building",
-      "priority": "medium",
-      "repositories": [
-        {
-          "repository_id": "repo-controlbot",
-          "repository": "pl0n3r/ControlBot",
-          "source_ref": "https://github.com/pl0n3r/ControlBot",
-          "observed_at": 13999
-        }
-      ],
-      "environments": [],
-      "aggregate_refs": {
-        "roadmap": null,
-        "agents": null,
-        "decisions": null,
-        "health": null,
-        "incidents": null,
-        "costs": null
-      },
-      "history_refs": []
-    }
-  ]
-}
-```
-
-**Los valores de arriba son únicamente una muestra estructural sintética e incompleta**, nunca datos desplegados. Un snapshot válido contiene las cuatro identidades `project-controlbot`, `project-condor`, `project-brvtal` y `project-grindflow` con repositorios congruentes `pl0n3r/ControlBot`, `pl0n3r/Condor`, `pl0n3r/brvtal` y `pl0n3r/GrindFlow`. No se añaden registros ficticios si falta alguno.
-
-El archivo y cada referencia de repositorio, entorno o agregado **deben tener `observed_at` en la ventana de 300 segundos** respecto del servidor; fuentes ausentes, inválidas, incompletas o caducadas producen **503** sin exponer errores privados. Si no hay entornos observados, el detalle dice «Sin entornos»; si no hay fuente de salud, la vista marca **UNKNOWN**, nunca GREEN. Un ID desconocido devuelve **404**. No se fabrican observaciones, eventos ni estados productivos.
-
-## Seguridad, QA y límites operativos
-
-- HTML generado por `ProjectUi` con escape de entidades, `Cache-Control: no-store`, CSP, `nosniff`, `DENY` y política no-referrer. Nunca mostrar secretos ni el contenido íntegro del snapshot en una página de error.
-- `tests/test_web_projects_http.py` prueba AC-01: cuatro proyectos con OAuth+TOTP, backend inyectado y archivo real privado, lista/detalle y solo lectura. AC-02: no-owner, no-MFA, expiración, login local, 405/404, fuente faltante/permiso público/symlink/STALE, repositorio alterado, escape XSS y salud UNKNOWN.
-- `tests/test_web_projects.py` de #1447 sigue cubriendo el API JSON y el backfill idempotente; no es prueba de autorización HTML.
-- La referencia documental se registra como fuente posterior al corte de 1.194 IDs, con estado `NO_VERIFICABLE / NO ENSAYADO`, no como certificación de producción.
-- Merge de preparación **no** despliega, enciende live, usa datos reales, crea respaldos ni acredita D-043/D-059. Hostinger, identidad de producción, backup/restore y revisión jurídica conservan sus propias puertas. Reversión técnica: revert del squash.
+## Fronteras
+Cambio de **construcción offline**: sin datos reales, secretos, proveedores, tráfico de producción, migraciones, backups, restauraciones, deploy, publicación ni go-live. No acredita D-043/D-059, revisión jurídica, `VALIDATED_IN_PRODUCTION` ni restore verificado. Reversión: revert del squash.

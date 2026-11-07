@@ -1,13 +1,9 @@
 <?php
 declare(strict_types=1);
-
 namespace ControlBot\Project;
-
 use RuntimeException;
 use Throwable;
-
 require_once __DIR__ . '/ProjectModel.php';
-
 /**
  * Private, read-only server snapshot. A public repository list is not authority
  * for environments or health; absence/staleness fails closed.
@@ -17,12 +13,9 @@ final class ProjectReadSource
     private const MAX_BYTES = 262144;
     private const MAX_AGE = 300;
     private const REPOSITORIES = [
-        'project-controlbot' => 'pl0n3r/ControlBot',
-        'project-condor' => 'pl0n3r/Condor',
-        'project-brvtal' => 'pl0n3r/brvtal',
-        'project-grindflow' => 'pl0n3r/GrindFlow',
+        'project-controlbot'=>'pl0n3r/ControlBot', 'project-condor'=>'pl0n3r/Condor',
+        'project-brvtal'=>'pl0n3r/brvtal', 'project-grindflow'=>'pl0n3r/GrindFlow',
     ];
-
     public static function readConfigured(array $environment, int $now): array
     {
         $path = $environment['CONTROLBOT_PROJECTS_SNAPSHOT_PATH'] ?? null;
@@ -60,27 +53,19 @@ final class ProjectReadSource
                 throw new RuntimeException('Project snapshot changed during read.');
             }
             $raw = stream_get_contents($stream, self::MAX_BYTES + 1);
-        } finally {
-            fclose($stream);
-        }
+        } finally { fclose($stream); }
         if (!is_string($raw) || strlen($raw) < 2 || strlen($raw) > self::MAX_BYTES) {
             throw new RuntimeException('Project snapshot size invalid.');
         }
-        try {
-            $decoded = json_decode($raw, true, 20, JSON_THROW_ON_ERROR);
-        } catch (Throwable $error) {
-            throw new RuntimeException('Project snapshot JSON invalid.', 0, $error);
-        }
+        try { $decoded = json_decode($raw, true, 20, JSON_THROW_ON_ERROR); }
+        catch (Throwable $error) { throw new RuntimeException('Project snapshot JSON invalid.', 0, $error); }
         if (!is_array($decoded) || array_is_list($decoded)
             || !self::sameKeys($decoded, ['version', 'observed_at', 'projects'])
             || !self::fresh($decoded['observed_at'], $now)) {
             throw new RuntimeException('Project snapshot timestamp/schema invalid.');
         }
-        return self::verifyProjection([
-            'version' => $decoded['version'], 'projects' => $decoded['projects'],
-        ], $now);
+        return self::verifyProjection(['version'=>$decoded['version'], 'projects'=>$decoded['projects']], $now);
     }
-
     /** Validate the injected backend as well: no project may be synthesized. */
     public static function verifyProjection(mixed $snapshot, int $now): array
     {
@@ -131,13 +116,11 @@ final class ProjectReadSource
         }
         return ['version' => 1, 'projects' => $out];
     }
-
     private static function fresh(mixed $timestamp, int $now): bool
     {
         return is_int($timestamp) && $now > 0 && $timestamp > 0
             && $timestamp <= $now && $now - $timestamp <= self::MAX_AGE;
     }
-
     private static function sameKeys(array $value, array $expected): bool
     {
         $keys = array_keys($value);

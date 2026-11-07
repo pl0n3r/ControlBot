@@ -19,22 +19,30 @@ La función NO confiere autorización por sí misma; el front controller debe
 invocarla solo después de verificar OAuth+TOTP. La API sigue exigiendo
 autenticación y CSRF independientemente, y no hay creación de repo/Issue.
 
-**Límite comprobado:** el acceso literal a una página HTML /intake **no**
-está cableado en el front controller. El archivo imprescindible
-src/ControlBotWebEntrypoint.php está reclamado por otra reserva V3
-(ControlBot #1449, PR #1465, reserva activa `90fa469e-f24e-4493-b063-a77efe0ad431`).
-#1429 ya está fusionado y no es el bloqueador vigente. Este módulo aporta
-el contrato seguro del formulario y la decisión, pero **no equivale a la
-pantalla web de aceptación integral**. No se invaden archivos de #1449.
-La integración HTML exige primero su merge/liberación, luego renovar el
-contrato V3 de #1448 para reclamar el front controller y probar la URL real.
-En la integración, invocar require_once sobre el módulo de IntakeRoutes
-tras verifiedOwner() y pasar el CSRF generado en servidor; probar GET /intake
-owner con vista HTML y no-owner 403. No usar esta función desde handleLocalOwner.
-No afirmar AC-01 completo hasta que la vista esté conectada y verificada.
-La revisión CodeRabbit de PR #1467 se solicitó una vez sobre un HEAD anterior;
-no se repite ni se reutiliza como D-070 para un HEAD nuevo sin las condiciones
-exactas del protocolo y la autorización específica correspondiente.
+**Estado de integración (7-nov-2026):** el acceso HTML literal
+`GET /intake` aún no está enlazado a `ControlBotWebEntrypoint`.
+#1449 / PR #1495 están **fusionados** y su V3 quedó liberada.
+Ahora `src/ControlBotWebEntrypoint.php` está reclamado por la V3 activa
+de #1478 / PR #1499 (UUID `a071d3d4-7920-5770-8b3e-791fdcdfd881`);
+**no pertenece a los tres claims propios de #1448**. Este módulo presenta
+API y renderer aislado; eso **no acredita la ruta HTML real ni AC-01 completo**.
+
+El PR anterior #1467 fue **cerrado sin fusión** con autorización exclusiva
+del OWNER en #1496/A (journal BOT v2/A). El PR sucesor #1500 restaura
+exclusivamente los tres archivos bajo reserva V3 propia
+`47de566e-172b-4133-8772-c45be64758fc`; seguirá DRAFT
+mientras exista la colisión. Tras fusionar #1478 y liberarse esa reserva,
+renovar el contrato y V3 de #1448 para reclamar el controlador, enlazar
+`controlbot_intake_html_page($ownerAuth->csrfToken($ownerSession), $server)`
+**solo** en `handleAuthenticated` después de verificar OAuth+TOTP;
+probar owner GET 200, no-owner 403, POST no permitido y que
+`handleLocalOwner` no confiera acceso. Conservar CSP, `no-store`
+y preview sin crear repos ni issues.
+
+La petición manual CodeRabbit de #1467 fue consumida una vez en SHA anterior
+y **no se repite** en ese PR. #1496/A autoriza una única revisión FINAL
+**del sucesor #1500** cuando HEAD definitivo, `Validar`,
+SonarCloud y CodeQL estén completos en verde; antes no solicitarla.
 
 ## Endpoints del módulo
 

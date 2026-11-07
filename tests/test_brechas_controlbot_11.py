@@ -24,7 +24,7 @@ GROUP = frozenset({
     "autofactory", "brvtal", "condor", "controlbot",
     "factory", "factoryrunner", "grindflow",
 })
-DECLARED = GROUP - {"factoryrunner"}
+DECLARED = GROUP
 UNKNOWN = "UNKNOWN"
 
 # The PHP class under test is the actual repository implementation. Its only
@@ -105,7 +105,8 @@ class BrechasControlbot11Tests(unittest.TestCase):
 
     def test_contrato_principal(self) -> None:
         declared = profiles()
-        result = validate({**declared, "factoryrunner": None})
+        result = validate(declared)
+        missing_runner = validate({"factoryrunner": None})["factoryrunner"]
         doc = CONTRACT.read_text(encoding="utf-8")
         condor = result["condor"]["profile"]
         factory = result["factory"]["profile"]
@@ -131,10 +132,11 @@ class BrechasControlbot11Tests(unittest.TestCase):
                         for name in DECLARED)
             ),
             "CB-0153": (
-                "factoryrunner" not in declared
-                and result["factoryrunner"] == {
-                    "accepted": False, "status": "unknown"
-                }
+                "factoryrunner" in declared
+                and result["factoryrunner"]["status"] == "configured"
+                and result["factoryrunner"]["profile"]["source_ref"]
+                    == "https://github.com/pl0n3r/ControlBot/issues/1490"
+                and missing_runner == {"accepted": False, "status": "unknown"}
             ),
             "CB-0154": (
                 condor["targets"] == {"rpo_minutes": 15, "rto_minutes": 60}
@@ -200,7 +202,8 @@ class BrechasControlbot11Tests(unittest.TestCase):
             ),
             "CB-0164": (
                 "Hasta tener receipts reales, se conserva `UNKNOWN`" in doc
-                and result["factoryrunner"]["status"] == "unknown"
+                and result["factoryrunner"]["status"] == "configured"
+                and missing_runner["status"] == "unknown"
                 and operational_state("CB-0164", {"receipt": None}) == UNKNOWN
             ),
             "CB-0165": (

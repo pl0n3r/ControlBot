@@ -33,7 +33,7 @@ CLAUSE = {
     "CB-0984": ("r", "no autoriza provisión", "no autoriza provisión"),
     "CB-0985": ("r", "reserva **V3**", "reserva **V3**"),
     "CB-0986": ("r", "deploy, secretos", "deploy, secretos"),
-    "CB-0987": ("r", "seis perfiles locales JSON", "seis perfiles locales JSON"),
+    "CB-0987": ("r", "siete perfiles locales JSON", "siete perfiles locales JSON"),
     "CB-0988": ("r", "`FactoryRunner`", "`FactoryRunner`"),
     "CB-0989": ("r", "`RecoveryPortfolio`", "`RecoveryPortfolio`"),
     "CB-0990": ("r", "RPO/RTO como **objetivos**", "RPO/RTO como **objetivos**"),
@@ -132,14 +132,14 @@ def exercises(ident: str, source: dict[str, str]) -> bool:
     if ident == "CB-0987":
         return (tuple(x["project"] for x in projects()) == PROJECTS
                 and len(projects()) == 7
-                and sum(p["profile_status"] == "configured" for p in projects()) == 6
+                and sum(p["profile_status"] == "configured" for p in projects()) == 7
                 and "config/recovery" in source[SRC["w"]])
     if ident == "CB-0988":
         p = next(x for x in projects() if x["project"] == "factoryrunner")
-        return (p["profile_status"] == "unknown" and p["dr_status"] == UNKNOWN
-                and p["reason"] == "PROFILE_MISSING"
-                and p["rpo_target_minutes"] is None
-                and p["rto_target_minutes"] is None
+        return (p["profile_status"] == "configured" and p["dr_status"] == UNKNOWN
+                and p["reason"] == "RECOVERY_HEALTH_MISSING"
+                and p["rpo_target_minutes"] == 15
+                and p["rto_target_minutes"] == 60
                 and scenario("p", "unexpected-runner")["rejected"] is True)
     if ident == "CB-0989":
         base = scenario("p", "baseline")

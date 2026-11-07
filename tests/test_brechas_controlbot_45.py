@@ -95,6 +95,66 @@ def checklist_rows() -> list[list[str]]:
     return rows
 
 
+AUDIT_MERGED_PRS = {"940": "958", "941": "942"}
+
+
+def audited_exit_rows_valid(rows: list[list[str]]) -> bool:
+    """Solo admite dos auditorías históricas V3 o dos cierres acreditados.
+
+    La evidencia documental NO_APLICA nunca declara operaciones live LISTO.
+    El predicado es puro para probar mutaciones sin cambiar el checklist real.
+    """
+    if len(rows) != 39 or any(len(row) != 5 for row in rows):
+        return False
+    if sum(row[2] == "DEL_DUEÑO" for row in rows) != 37:
+        return False
+    if any(row[2] in {"LISTO", "SIN_COBERTURA"} for row in rows):
+        return False
+
+    audits = [row for row in rows if row[0] == "Auditoría de salida"]
+    if len(audits) != len(AUDIT_MERGED_PRS):
+        return False
+    by_issue: dict[str, list[str]] = {}
+    for row in audits:
+        match = re.fullmatch(
+            r"\[#(?P<id>\d+)\]\(https://github\.com/pl0n3r/ControlBot/issues/(?P=id)\)",
+            row[4],
+        )
+        if match is None or match.group("id") in by_issue:
+            return False
+        by_issue[match.group("id")] = row
+    if set(by_issue) != set(AUDIT_MERGED_PRS):
+        return False
+
+    states = {row[2] for row in audits}
+    if states == {"EN_CURSO"}:
+        return (
+            sum(row[2] == "EN_CURSO" for row in rows) == 2
+            and not any(row[2] == "NO_APLICA" for row in rows)
+            and all(
+                "Hoja ejecutable" in row[3] and "V3" in row[3]
+                for row in audits
+            )
+        )
+    if states != {"NO_APLICA"}:
+        return False
+    if any(row[2] == "EN_CURSO" for row in rows):
+        return False
+    if sum(row[2] == "NO_APLICA" for row in rows) != 2:
+        return False
+    for issue_id, pr_id in AUDIT_MERGED_PRS.items():
+        evidence = by_issue[issue_id][3]
+        if not all(fragment in evidence for fragment in (
+            f"#{issue_id} CLOSED/completado",
+            f"PR #{pr_id} MERGED",
+            "no es gate adicional de funcionamiento live",
+            "ni acredita producto LISTO",
+            "Las verificaciones operativas siguen DEL_DUEÑO",
+        )):
+            return False
+    return True
+
+
 class BrechasControlbot45Tests(unittest.TestCase):
     """Cada una de las quince cláusulas tiene un predicado individual."""
 
@@ -107,34 +167,8 @@ class BrechasControlbot45Tests(unittest.TestCase):
         rows = checklist_rows()
         doc = CHECKLIST.read_text(encoding="utf-8")
         lex = (ROOT / "docs/lex-watch.md").read_text(encoding="utf-8")
-        ongoing = [r for r in rows if r[2] == "EN_CURSO"]
         owner = [r for r in rows if r[2] == "DEL_DUEÑO"]
-        audits = [r for r in rows if r[0] == "Auditoría de salida"]
-        audit_ids = {
-            re.search(r"/issues/(\d+)\)", row[4]).group(1): row
-            for row in audits
-        }
-        # El corte inicial admitía dos hojas en curso. Tras sus PR MERGED
-        # ambas son N/A como gates de live, jamás LISTO productivo.
-        old_audit_snapshot = (
-            len(audits) == 2 and set(audit_ids) == {"940", "941"}
-            and len(ongoing) == 2
-            and all(r[2] == "EN_CURSO" and "Hoja ejecutable" in r[3]
-                    and "V3" in r[3] for r in audits)
-        )
-        reconciled_audit_snapshot = (
-            len(audits) == 2 and set(audit_ids) == {"940", "941"}
-            and not ongoing and len(owner) == 37
-            and sum(r[2] == "NO_APLICA" for r in rows) == 2
-            and all(
-                audit_ids[issue_id][2] == "NO_APLICA"
-                and f"PR #{pr_id} MERGED" in audit_ids[issue_id][3]
-                and "no es gate adicional de funcionamiento live"
-                    in audit_ids[issue_id][3]
-                and "ni acredita producto LISTO" in audit_ids[issue_id][3]
-                for issue_id, pr_id in (("940", "958"), ("941", "942"))
-            )
-        )
+        audit_snapshot_valid = audited_exit_rows_valid(rows)
         sources = (
             "decisiones.yml", "datos.yml", "docs/hostinger-go-live-plan.md",
             "docs/hostinger-d059-backup.md", "docs/hostinger-public-api-runtime.md",
@@ -175,7 +209,7 @@ class BrechasControlbot45Tests(unittest.TestCase):
             "CB-0684": "NO-GO" in doc
                 and "LISTO" in doc and "evidencia productiva autenticada" in doc
                 and not any(r[2] == "LISTO" for r in rows),
-            "CB-0685": old_audit_snapshot or reconciled_audit_snapshot,
+            "CB-0685": audit_snapshot_valid,
             "CB-0686": len(owner) > 20
                 and all(any(p in r[3].lower()
                             for p in ("owner", "operador", "cuenta", "consentimiento"))
@@ -183,7 +217,7 @@ class BrechasControlbot45Tests(unittest.TestCase):
                 and "no concede ese permiso" in doc,
             "CB-0687": "NO_APLICA" in doc and "exige motivo concreto" in doc
                 and (not any(r[2] == "NO_APLICA" for r in rows)
-                     or reconciled_audit_snapshot),
+                     or audit_snapshot_valid),
             "CB-0688": "**Hojas nuevas creadas por esta auditoría:** 0" in doc
                 and "| SIN_COBERTURA | 0 |" in doc
                 and not any(r[2] == "SIN_COBERTURA" for r in rows),
@@ -205,6 +239,50 @@ class BrechasControlbot45Tests(unittest.TestCase):
                 self.assertTrue(bool(truth), f"{clause} sin contraste verificable")
 
     def test_falla_cerrado(self) -> None:
+        # Mutaciones del documento real: no alteran archivo ni decisión NO-GO.
+        baseline = checklist_rows()
+        self.assertTrue(audited_exit_rows_valid(baseline))
+        audit_indices = {}
+        for index, row in enumerate(baseline):
+            if row[0] == "Auditoría de salida":
+                match = re.search(r"/issues/(\d+)\)", row[4])
+                self.assertIsNotNone(match)
+                audit_indices[match.group(1)] = index
+        self.assertEqual(set(audit_indices), {"940", "941"})
+        audit_940 = audit_indices["940"]
+        audit_941 = audit_indices["941"]
+
+        mutations = {
+            "CB-0685/mixto": (audit_940, 2, "EN_CURSO"),
+            "CB-0685/listo-ficticio": (audit_940, 2, "LISTO"),
+            "CB-0687/sin-motivo": (audit_940, 3, ""),
+            "CB-0687/sin-PR": (audit_940, 3,
+                baseline[audit_940][3].replace("PR #958 MERGED", "sin prueba")),
+            "CB-0687/PR-no-fusionado": (audit_940, 3,
+                baseline[audit_940][3].replace("PR #958 MERGED", "PR #958 OPEN")),
+            "CB-0687/PR-incorrecto": (audit_941, 3,
+                baseline[audit_941][3].replace("PR #942 MERGED", "PR #999 MERGED")),
+            "CB-0687/cierre-inexistente": (audit_940, 3,
+                baseline[audit_940][3].replace("#940 CLOSED/completado", "#940 OPEN")),
+            "CB-0687/sin-limite-live": (audit_940, 3,
+                baseline[audit_940][3].replace("ni acredita producto LISTO", "")),
+            "CB-0687/referencia-falsa": (audit_940, 4,
+                baseline[audit_940][4].replace("/issues/940)", "/issues/999)")),
+        }
+        for clause, (index, column, value) in mutations.items():
+            changed = [row.copy() for row in baseline]
+            changed[index][column] = value
+            with self.subTest(clause=clause):
+                self.assertFalse(audited_exit_rows_valid(changed), clause)
+
+        for clause, changed in (
+            ("CB-0685/fila-extra", [*baseline, baseline[audit_940].copy()]),
+            ("CB-0685/falta-auditoria",
+             [row.copy() for i, row in enumerate(baseline) if i != audit_940]),
+        ):
+            with self.subTest(clause=clause):
+                self.assertFalse(audited_exit_rows_valid(changed), clause)
+
         rejected_cases = {
             "CB-0676/observacion-futura": [signal(observed_at=1300)],
             "CB-0676/publicacion-futura": [

@@ -109,6 +109,32 @@ class BrechasControlbot45Tests(unittest.TestCase):
         lex = (ROOT / "docs/lex-watch.md").read_text(encoding="utf-8")
         ongoing = [r for r in rows if r[2] == "EN_CURSO"]
         owner = [r for r in rows if r[2] == "DEL_DUEÑO"]
+        audits = [r for r in rows if r[0] == "Auditoría de salida"]
+        audit_ids = {
+            re.search(r"/issues/(\d+)\)", row[4]).group(1): row
+            for row in audits
+        }
+        # El corte inicial admitía dos hojas en curso. Tras sus PR MERGED
+        # ambas son N/A como gates de live, jamás LISTO productivo.
+        old_audit_snapshot = (
+            len(audits) == 2 and set(audit_ids) == {"940", "941"}
+            and len(ongoing) == 2
+            and all(r[2] == "EN_CURSO" and "Hoja ejecutable" in r[3]
+                    and "V3" in r[3] for r in audits)
+        )
+        reconciled_audit_snapshot = (
+            len(audits) == 2 and set(audit_ids) == {"940", "941"}
+            and not ongoing and len(owner) == 37
+            and sum(r[2] == "NO_APLICA" for r in rows) == 2
+            and all(
+                audit_ids[issue_id][2] == "NO_APLICA"
+                and f"PR #{pr_id} MERGED" in audit_ids[issue_id][3]
+                and "no es gate adicional de funcionamiento live"
+                    in audit_ids[issue_id][3]
+                and "ni acredita producto LISTO" in audit_ids[issue_id][3]
+                for issue_id, pr_id in (("940", "958"), ("941", "942"))
+            )
+        )
         sources = (
             "decisiones.yml", "datos.yml", "docs/hostinger-go-live-plan.md",
             "docs/hostinger-d059-backup.md", "docs/hostinger-public-api-runtime.md",
@@ -149,17 +175,15 @@ class BrechasControlbot45Tests(unittest.TestCase):
             "CB-0684": "NO-GO" in doc
                 and "LISTO" in doc and "evidencia productiva autenticada" in doc
                 and not any(r[2] == "LISTO" for r in rows),
-            "CB-0685": len(ongoing) == 2
-                and all("Hoja ejecutable" in r[3] and "V3" in r[3] for r in ongoing)
-                and {re.search(r"/issues/(\d+)\)", r[4]).group(1)
-                     for r in ongoing} == {"940", "941"},
+            "CB-0685": old_audit_snapshot or reconciled_audit_snapshot,
             "CB-0686": len(owner) > 20
                 and all(any(p in r[3].lower()
                             for p in ("owner", "operador", "cuenta", "consentimiento"))
                         for r in owner)
                 and "no concede ese permiso" in doc,
             "CB-0687": "NO_APLICA" in doc and "exige motivo concreto" in doc
-                and not any(r[2] == "NO_APLICA" for r in rows),
+                and (not any(r[2] == "NO_APLICA" for r in rows)
+                     or reconciled_audit_snapshot),
             "CB-0688": "**Hojas nuevas creadas por esta auditoría:** 0" in doc
                 and "| SIN_COBERTURA | 0 |" in doc
                 and not any(r[2] == "SIN_COBERTURA" for r in rows),

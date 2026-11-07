@@ -2,6 +2,8 @@
 
 **Corte documental:** ControlBot `main@fb90e4cddf7e55cd79747c2b613cc872f36a4d10` · 27-oct-2026 · [#941](https://github.com/pl0n3r/ControlBot/issues/941).
 
+**Reconciliación documental (7-nov-2026, #1486):** las hojas de auditoría #940 y #941 ya finalizaron, con PR #958 y #942 fusionados. Se retiran dos EN_CURSO históricos, ahora NO_APLICA como controles operativos adicionales, sin declarar ninguna operación productiva LISTO. Las 37 puertas DEL_DUEÑO y el veredicto NO-GO continúan intactos.
+
 **Decisión vigente: NO-GO.** Esta es una auditoría **offline de preparación**, no una autorización de despliegue, una revisión legal final ni una observación de servicio. `datos.yml.phase=construccion`. El [PR #766](https://github.com/pl0n3r/ControlBot/pull/766) ya corrigió #760 en código, pero AC-04 exige señales reales; [Observar producción #40454554886](https://github.com/pl0n3r/ControlBot/actions/runs/40454554886) acabó `skipped`.
 
 ## Política de clasificación
@@ -53,18 +55,18 @@
 | Persistencia y sesión | Cookies, CSRF, expiración y sesiones reales en HTTPS | DEL_DUEÑO | OWNER y operador: controles de código no prueban transporte/sesión en dominio real | [#625](https://github.com/pl0n3r/ControlBot/issues/625) |
 | Monitoreo del propio ControlBot | Health real y alertas de caída del panel | DEL_DUEÑO | Operador: health.php y HealthIdentityPayload son código, pero readiness real del observador permanece omitido | [#625](https://github.com/pl0n3r/ControlBot/issues/625) |
 | Recuperación de desastres | RPO/RTO medidos y simulacro de recuperación independiente | DEL_DUEÑO | OWNER y operador: #182 es épico bloqueado; falta drill autenticado de infraestructura | [#182](https://github.com/pl0n3r/ControlBot/issues/182) |
-| Auditoría de salida | Matriz requisito por requisito en hoja ejecutable separada | EN_CURSO | Hoja ejecutable #940 con V3, claims docs/matriz-cobertura.md y tests/test_matriz_cobertura.py | [#940](https://github.com/pl0n3r/ControlBot/issues/940) |
-| Auditoría de salida | Checklist de go-live con test y enlace de evidencias | EN_CURSO | Hoja ejecutable #941 con V3, claims docs/lista-salida-produccion.md y tests/test_lista_salida_produccion.py | [#941](https://github.com/pl0n3r/ControlBot/issues/941) |
+| Auditoría de salida | Matriz requisito por requisito en hoja ejecutable separada | NO_APLICA | Entrega documental completada: #940 CLOSED/completado, PR #958 MERGED; no es gate adicional de funcionamiento live ni acredita producto LISTO. Las verificaciones operativas siguen DEL_DUEÑO. | [#940](https://github.com/pl0n3r/ControlBot/issues/940) |
+| Auditoría de salida | Checklist de go-live con test y enlace de evidencias | NO_APLICA | Entrega documental completada: #941 CLOSED/completado, PR #942 MERGED; no es gate adicional de funcionamiento live ni acredita producto LISTO. Las verificaciones operativas siguen DEL_DUEÑO. | [#941](https://github.com/pl0n3r/ControlBot/issues/941) |
 
 ## Resumen final
 
 | Estado | Filas |
 | --- | ---: |
 | LISTO | 0 |
-| EN_CURSO | 2 |
+| EN_CURSO | 0 |
 | SIN_COBERTURA | 0 |
 | DEL_DUEÑO | 37 |
-| NO_APLICA | 0 |
+| NO_APLICA | 2 |
 | TOTAL | 39 |
 
 **Hojas nuevas creadas por esta auditoría:** 0. No hay filas `SIN_COBERTURA` en este corte: las faltas productivas enumeradas están bloqueadas por operación/autoridad del OWNER y el operador, no se convierten en hojas sin scope autorizado. Cualquier brecha puramente técnica nueva debe identificarse con `SIN_COBERTURA` y materializar su hoja ejecutable antes de aceptar el checklist.

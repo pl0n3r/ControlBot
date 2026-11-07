@@ -30,9 +30,10 @@ squash revierte el route y la pantalla sin migraciones.
 La misma ruta **owner-only** y GET incorpora una tabla escapada y sin acciones
 para `autofactory`, `brvtal`, `condor`, `controlbot`, `factory`,
 `factoryrunner` y `grindflow`. La allowlist es fija, no viene de URI/query.
-Lee solo seis perfiles locales JSON versionados bajo `config/recovery/`;
-`FactoryRunner` no tiene perfil/targets fuente verificable y queda `UNKNOWN`
-con objetivos **No declarado**, sin inventarlos. Si un JSON es inválido,
+Lee siete perfiles locales JSON versionados bajo `config/recovery/`.
+`FactoryRunner` utiliza únicamente objetivos declarativos del OWNER #1490/A
+(RPO 15 min y RTO 60 min) y sigue con salud DR `UNKNOWN` sin receipts reales.
+Ninguna política declarada demuestra backups o restores. Si un JSON es inválido,
 sensible o pertenece a otro proyecto, se responde 503 genérico, sin eco.
 La proyección pura `RecoveryPortfolio` impide entradas externas y solo muestra
 RPO/RTO como **objetivos**, nunca medidas. El estado operativo de los siete

@@ -9,7 +9,7 @@ use ControlBot\Security\RecoveryPortfolio;
 
 $root = dirname(__DIR__) . '/config/recovery';
 $profiles = [];
-foreach (['autofactory', 'brvtal', 'condor', 'controlbot', 'factory', 'grindflow'] as $key) {
+foreach (['autofactory', 'brvtal', 'condor', 'controlbot', 'factory', 'factoryrunner', 'grindflow'] as $key) {
     $profiles[$key] = json_decode(file_get_contents($root . '/' . $key . '.json'), true, 32, JSON_THROW_ON_ERROR);
 }
 $scenario = $argv[1] ?? '';
@@ -24,8 +24,7 @@ if ($scenario === 'baseline') {
     if ($scenario === 'extra-project') $profiles['unknown-project'] = null;
     if ($scenario === 'bad-shape') $profiles['controlbot'] = 'unexpected';
     if ($scenario === 'unexpected-runner') {
-        $profiles['factoryrunner'] = $profiles['factory'];
-        $profiles['factoryrunner']['project_ref'] = 'controlbot:project/project-factoryrunner';
+        $profiles['factoryrunner']['source_ref'] = 'https://github.com/pl0n3r/ControlBot/issues/577';
     }
     try {
         RecoveryPortfolio::project($profiles);

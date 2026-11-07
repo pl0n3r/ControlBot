@@ -12,8 +12,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config" / "recovery"
-DECLARED = frozenset(("autofactory", "brvtal", "condor", "controlbot", "factory", "grindflow"))
-GROUP = DECLARED | {"factoryrunner"}
+DECLARED = frozenset(("autofactory", "brvtal", "condor", "controlbot", "factory", "factoryrunner", "grindflow"))
+GROUP = DECLARED
 STRATEGY = {
     "copies_required": 3, "media_types_required": 2,
     "offsite_required": True, "immutable_required": True,
@@ -78,10 +78,13 @@ class CoberturaControlbot11Tests(unittest.TestCase):
     def test_contrato_principal(self) -> None:
         configs = local_profiles()
         self.assertEqual(set(configs), DECLARED)
-        observations = exercise_php({**configs, "factoryrunner": None})
+        observations = exercise_php(configs)
         self.assertEqual(set(GROUP), set(observations))
-        self.assertEqual(observations["factoryrunner"],
-                         {"accepted": False, "status": "unknown"})
+        self.assertEqual(observations["factoryrunner"]["status"], "configured")
+        self.assertEqual(
+            exercise_php({"factoryrunner": None})["factoryrunner"],
+            {"accepted": False, "status": "unknown"},
+        )
         seen_projects, seen_manifests = set(), set()
         for name in sorted(DECLARED):
             with self.subTest(project=name):

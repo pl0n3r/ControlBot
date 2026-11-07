@@ -73,7 +73,7 @@ class CoberturaControlbot59Tests(unittest.TestCase):
 
         # CB-0987..0993: RecoveryPortfolio real acepta solo los
         # proyectos declarativos, mantiene UNKNOWN sin evidencia live
-        # y no inventa targets para FactoryRunner.
+        # y muestra targets OWNER #1490/A de FactoryRunner sin salud real.
         portfolio = object_result(PORTFOLIO, "baseline")
         self.assertIs(portfolio["execution"], False)
         self.assertEqual(portfolio["actions"], [])
@@ -86,11 +86,12 @@ class CoberturaControlbot59Tests(unittest.TestCase):
                 self.assertNotIn("backup_receipt", item)
                 self.assertIn(item["profile_status"], ("configured", "unknown"))
         runner = rows[5]
-        self.assertEqual(runner["reason"], "PROFILE_MISSING")
-        self.assertEqual(runner["profile_status"], "unknown")
-        self.assertIsNone(runner["rpo_target_minutes"])
-        self.assertIsNone(runner["rto_target_minutes"])
-        self.assertIn("PROFILE_MISSING", page)
+        self.assertEqual(runner["reason"], "RECOVERY_HEALTH_MISSING")
+        self.assertEqual(runner["profile_status"], "configured")
+        self.assertEqual(runner["rpo_target_minutes"], 15)
+        self.assertEqual(runner["rto_target_minutes"], 60)
+        self.assertEqual(runner["dr_status"], "UNKNOWN")
+        self.assertIn("RECOVERY_HEALTH_MISSING", page)
         for name in PROJECTS:
             self.assertIn(f">{name}</td>", page)
 

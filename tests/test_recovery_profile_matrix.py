@@ -17,7 +17,7 @@ GROUP = frozenset({
     "autofactory", "brvtal", "condor", "controlbot",
     "factory", "factoryrunner", "grindflow",
 })
-DECLARED = frozenset({"autofactory", "brvtal", "condor", "controlbot", "factory", "grindflow"})
+DECLARED = GROUP
 
 PHP_VALIDATE = r"""
 require 'src/InfrastructureProvider.php';
@@ -80,17 +80,22 @@ class RecoveryProfileMatrixTests(unittest.TestCase):
                 self.assertTrue(profile["encryption_required"])
                 self.assertTrue(profile["strategy"]["offsite_required"])
                 self.assertTrue(profile["strategy"]["immutable_required"])
+        runner = declared["factoryrunner"]
+        self.assertEqual(runner["source_ref"], "https://github.com/pl0n3r/ControlBot/issues/1490")
+        self.assertEqual(runner["targets"], {"rpo_minutes": 15, "rto_minutes": 60})
+        self.assertEqual(runner["retention"], {
+            "hourly": 0, "daily": 7, "weekly": 8, "monthly": 12,
+        })
 
     def test_missing_projects_remain_unknown_not_healthy(self):
         declared = profiles()
-        absent = GROUP - set(declared)
-        self.assertEqual(absent, {"factoryrunner"})
+        self.assertEqual(GROUP - set(declared), set())
         stale = copy.deepcopy(declared["controlbot"])
         stale["freshness"] = "stale"
-        checked = validate({**{k: None for k in sorted(absent)}, "stale": stale})
-        for name in absent:
-            self.assertFalse(checked[name]["accepted"])
-            self.assertEqual(checked[name]["status"], "unknown")
+        # Absence still fails closed, even after FactoryRunner's policy is approved.
+        checked = validate({"factoryrunner": None, "stale": stale})
+        self.assertFalse(checked["factoryrunner"]["accepted"])
+        self.assertEqual(checked["factoryrunner"]["status"], "unknown")
         self.assertTrue(checked["stale"]["accepted"])
         self.assertEqual(checked["stale"]["status"], "unknown")
         # Even a configured policy is never a usable backup or HEALTHY evidence.

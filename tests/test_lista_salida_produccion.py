@@ -106,7 +106,7 @@ class ListaSalidaTests(unittest.TestCase):
             row = audits[f"[#{num}](https://github.com/pl0n3r/ControlBot/issues/{num})"]
             self.assertEqual(row[2], "NO_APLICA")
             self.assertIn("MERGED", row[3])
-            self.assertIn("no acredita producto LISTO", row[3])
+            self.assertIn("ni acredita producto LISTO", row[3])
         self.assertIn("NO-GO", self.text)
         self.assertIn("40454554886", self.text)
 

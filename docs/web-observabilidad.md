@@ -13,11 +13,15 @@ termina en 503. La definición de rutas no acredita disponibilidad.
 
 **NO ACREDITADO:** la especificación exige las páginas HTML literales
 /observabilidad e /incidentes/{id}; el front controller
-src/ControlBotWebEntrypoint.php aún no las cablea y está reclamado por
-la reserva V3 de #1449 sobre ese archivo. El contrato no se amplió
-ni se invadió. El JSON API no sustituye la pantalla HTML ni permite
-certificar AC-01 en su integridad. Tras liberar el claim se necesitará
-renovar el contrato V3, integrar la vista y probar ambas rutas.
+src/ControlBotWebEntrypoint.php aún no las cablea. La reserva V3 de
+#1449 se liberó por fusión del PR #1495, pero el archivo sigue fuera de
+los tres paths exclusivos de la reserva V3 vigente de #1451 y también
+está planificado en #1478. El contrato no se amplió ni se invadió.
+El JSON API no sustituye las pantallas HTML y AC-01 sigue incumplido.
+La puerta OWNER #1498 exige decisión expresa para sustituir el PR #1472
+y pedir una nueva revisión FINAL; no hay autorización por defecto.
+La integración pendiente requiere contrato y reserva V3 nuevos, backend
+server-bound autorizado, pruebas HTTP completas y checks en HEAD final.
 
 ## Proyección por proyecto
 

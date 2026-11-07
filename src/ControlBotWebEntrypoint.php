@@ -12,6 +12,7 @@ require_once __DIR__ . '/FactoryOrchestratorWebEntrypoint.php';
 require_once __DIR__ . '/GitHubPublicEntrypoint.php';
 require_once __DIR__ . '/GitHubProjectEntrypoint.php';
 require_once __DIR__ . '/ControlCenterShell.php';
+require_once __DIR__ . '/ProjectReadSource.php';
 
 final class ControlBotWebEntrypoint
 {
@@ -39,6 +40,10 @@ final class ControlBotWebEntrypoint
         }
 
         if ($path === '/agentes') return self::forbiddenAgents();
+        // REMOTE_USER is never authority for private project pages.
+        if ($path === '/proyectos' || str_starts_with($path, '/proyectos/')) {
+            return self::forbiddenAgents();
+        }
 
         if ($path !== '/github'
             && preg_match('#^/projects/[a-z][a-z0-9-]{1,63}/github$#D', $path) !== 1) {
@@ -116,6 +121,10 @@ final class ControlBotWebEntrypoint
             return ($server['REQUEST_METHOD'] ?? null) === 'GET'
                 ? self::agentsPage($now, $ownerApiBackend) : self::forbiddenAgents();
         }
+        if (is_string($apiPath)
+            && ($apiPath === '/proyectos' || str_starts_with($apiPath, '/proyectos/'))) {
+            return self::projectsPage($apiPath, $server, $environment, $now, $ownerApiBackend);
+        }
         // Pausa owner: jamás se sirve desde handleLocalOwner ni sin OAuth+TOTP.
         // Las escrituras viajan al router owner-v1 con CSRF y backend server-bound.
         if ($apiPath === '/pausa') {
@@ -191,8 +200,15 @@ PAUSE_HTML;
         // OAuth+TOTP ya se validaron arriba, pero el registro vuelve a
         // verificarlos antes de seleccionar handlers/mutaciones.
         if (is_string($apiPath) && str_starts_with($apiPath, '/api/v1/')) {
+            // Only the project API gains a private disk-backed read source. All
+            // other owner APIs retain their existing explicit-backend contract.
+            $backend = $ownerApiBackend;
+            if ($backend === null && ($apiPath === '/api/v1/proyectos'
+                || str_starts_with($apiPath, '/api/v1/proyectos/'))) {
+                $backend = self::projectsBackend($environment);
+            }
             return \ControlBot\Routing\OwnerAuthenticatedRouter::dispatch(
-                $ownerAuth, $ownerSession, $server, $now, $ownerApiBackend,
+                $ownerAuth, $ownerSession, $server, $now, $backend,
             ) ?? self::error();
         }
         // Delegar solo DESPUES de verificar OAuth y TOTP; se descarta
@@ -241,8 +257,87 @@ PAUSE_HTML;
             return ($server['REQUEST_METHOD'] ?? null) === 'GET'
                 ? self::agentsPage($now, null) : self::forbiddenAgents();
         }
+        // A password-only local session does not attest OAuth + TOTP for projects.
+        if ($path === '/proyectos' || (is_string($path)
+            && str_starts_with($path, '/proyectos/'))) {
+            return self::forbiddenAgents();
+        }
         $server['REMOTE_USER'] = $owner;
         return self::handle($server, $environment, $now);
+    }
+
+    /**
+     * HTML routes require the verified OAuth+TOTP session above and a complete,
+     * fresh private projection; no backfill may invent records for the web view.
+     */
+    private static function projectsPage(
+        string $path, array $server, array $environment, int $now, ?callable $backend,
+    ): array {
+        if (($server['REQUEST_METHOD'] ?? null) !== 'GET') {
+            return ['status' => 405, 'headers' => self::projectHeaders() + ['Allow' => 'GET'],
+                'body' => "Method not allowed.\n"];
+        }
+        $detail = $path !== '/proyectos';
+        $projectId = null;
+        if ($detail) {
+            if (preg_match('#^/proyectos/(project-[a-z0-9-]{2,64})$#D', $path, $match) !== 1) {
+                return ['status' => 404, 'headers' => self::projectHeaders(),
+                    'body' => "Not found.\n"];
+            }
+            $projectId = $match[1];
+        }
+        try {
+            $backend ??= self::projectsBackend($environment);
+            $trusted = \ControlBot\Project\ProjectReadSource::verifyProjection(
+                $backend('projects.read', [], [], $now), $now,
+            );
+            // The API route handler consumes a frozen, already-validated snapshot.
+            $read = static function (string $operation, array $vars, array $payload, int $at)
+                use ($trusted): array {
+                if ($operation !== 'projects.read' || $vars !== [] || $payload !== []) {
+                    throw new \RuntimeException('Read-only project operation required.');
+                }
+                return $trusted;
+            };
+            $routes = require __DIR__ . '/Routing/Routes/ProjectRoutes.php';
+            $handler = $routes[$detail ? 2 : 1]['handler'] ?? null;
+            if (!is_callable($handler)) throw new \RuntimeException('Project HTML handler missing.');
+            $view = $handler($read, $detail ? ['project_id' => $projectId] : [], [], $now);
+            if ($detail && ($view['found'] ?? false) !== true) {
+                return ['status' => 404, 'headers' => self::projectHeaders(),
+                    'body' => "Not found.\n"];
+            }
+            $html = $view['html'] ?? null;
+            if (!is_string($html) || !str_starts_with($html, '<!doctype html>')) {
+                throw new \RuntimeException('Project HTML invalid.');
+            }
+            return ['status' => 200, 'headers' => self::projectHeaders(true), 'body' => $html];
+        } catch (\Throwable) {
+            return self::error();
+        }
+    }
+
+    private static function projectsBackend(array $environment): callable
+    {
+        return static function (string $operation, array $vars, array $payload, int $now)
+            use ($environment): array {
+            if ($operation !== 'projects.read' || $vars !== [] || $payload !== []) {
+                throw new \RuntimeException('Read-only project operation required.');
+            }
+            return \ControlBot\Project\ProjectReadSource::readConfigured($environment, $now);
+        };
+    }
+
+    private static function projectHeaders(bool $html = false): array
+    {
+        $headers = [
+            'Content-Type' => $html ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8',
+            'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff',
+            'X-Frame-Options' => 'DENY', 'Referrer-Policy' => 'no-referrer',
+        ];
+        if ($html) $headers['Content-Security-Policy'] =
+            "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'";
+        return $headers;
     }
 
     /** Rendering from a trusted backend only; missing live adapter is UNKNOWN. */

@@ -95,6 +95,49 @@ def checklist_rows() -> list[list[str]]:
     return rows
 
 
+AUDIT_MERGED_PRS = {"940": "958", "941": "942"}
+
+
+def audited_exit_rows_valid(rows: list[list[str]]) -> bool:
+    """Accept the original V3 census or the two completed documentary gates.
+
+    Those audits never indicate product readiness. Mixed statuses, extra
+    rows and a missing merged PR are explicitly rejected.
+    """
+    if len(rows) != 39 or sum(r[2] == "DEL_DUEÑO" for r in rows) != 37:
+        return False
+    if any(r[2] in {"LISTO", "SIN_COBERTURA"} for r in rows):
+        return False
+    audits = [r for r in rows if r[0] == "Auditoría de salida"]
+    if len(audits) != len(AUDIT_MERGED_PRS):
+        return False
+    by_issue = {}
+    for row in audits:
+        match = re.fullmatch(
+            r"\[#(?P<id>\d+)\]\(https://github\.com/pl0n3r/ControlBot/issues/(?P=id)\)",
+            row[4],
+        )
+        if match is None or match.group(1) in by_issue:
+            return False
+        by_issue[match.group(1)] = row
+    if set(by_issue) != set(AUDIT_MERGED_PRS):
+        return False
+    states = {r[2] for r in audits}
+    if states == {"EN_CURSO"}:
+        return all("Hoja ejecutable" in r[3] and "V3" in r[3]
+                   for r in audits)
+    if states != {"NO_APLICA"}:
+        return False
+    for issue, pr in AUDIT_MERGED_PRS.items():
+        evidence = by_issue[issue][3]
+        if not all(value in evidence for value in (
+            f"#{issue} CLOSED/completado", f"PR #{pr} MERGED",
+            "no es gate adicional", "ni acredita producto LISTO", "DEL_DUEÑO",
+        )):
+            return False
+    return not any(r[2] == "EN_CURSO" for r in rows)
+
+
 class BrechasControlbot45Tests(unittest.TestCase):
     """Cada una de las quince cláusulas tiene un predicado individual."""
 
@@ -149,17 +192,14 @@ class BrechasControlbot45Tests(unittest.TestCase):
             "CB-0684": "NO-GO" in doc
                 and "LISTO" in doc and "evidencia productiva autenticada" in doc
                 and not any(r[2] == "LISTO" for r in rows),
-            "CB-0685": len(ongoing) == 2
-                and all("Hoja ejecutable" in r[3] and "V3" in r[3] for r in ongoing)
-                and {re.search(r"/issues/(\d+)\)", r[4]).group(1)
-                     for r in ongoing} == {"940", "941"},
+            "CB-0685": audited_exit_rows_valid(rows),
             "CB-0686": len(owner) > 20
                 and all(any(p in r[3].lower()
                             for p in ("owner", "operador", "cuenta", "consentimiento"))
                         for r in owner)
                 and "no concede ese permiso" in doc,
             "CB-0687": "NO_APLICA" in doc and "exige motivo concreto" in doc
-                and not any(r[2] == "NO_APLICA" for r in rows),
+                and audited_exit_rows_valid(rows),
             "CB-0688": "**Hojas nuevas creadas por esta auditoría:** 0" in doc
                 and "| SIN_COBERTURA | 0 |" in doc
                 and not any(r[2] == "SIN_COBERTURA" for r in rows),
@@ -179,6 +219,34 @@ class BrechasControlbot45Tests(unittest.TestCase):
         for clause, truth in verdicts.items():
             with self.subTest(clause=clause):
                 self.assertTrue(bool(truth), f"{clause} sin contraste verificable")
+
+    def test_auditorias_historial_y_no_aplica_fail_closed(self) -> None:
+        legacy = checklist_rows()
+        self.assertTrue(audited_exit_rows_valid(legacy))
+        completed = [r.copy() for r in legacy]
+        for row in completed:
+            if row[0] != "Auditoría de salida":
+                continue
+            number = re.search(r"/issues/(\d+)\)", row[4]).group(1)
+            row[2] = "NO_APLICA"
+            row[3] = (f"Entrega documental completada: #{number} CLOSED/completado, "
+                      f"PR #{AUDIT_MERGED_PRS[number]} MERGED; no es gate adicional "
+                      "de funcionamiento live ni acredita producto LISTO. "
+                      "Las verificaciones operativas siguen DEL_DUEÑO.")
+        self.assertTrue(audited_exit_rows_valid(completed))
+        for label, mutate in (
+            ("fase-mixta", lambda rows: rows[-1].__setitem__(2, "EN_CURSO")),
+            ("sin-evidencia", lambda rows: rows[-1].__setitem__(3, "Prueba sin merge")),
+            ("listo-inventado", lambda rows: rows[-1].__setitem__(2, "LISTO")),
+            ("fila-extra", lambda rows: rows.append(rows[-1].copy())),
+            ("pr-falso", lambda rows: rows[-1].__setitem__(
+                3, rows[-1][3].replace("PR #942 MERGED", "PR #999 MERGED"))),
+        ):
+            edited = [row.copy() for row in completed]
+            # Both audit rows appear at the end of the checklist.
+            mutate(edited)
+            with self.subTest(label=label):
+                self.assertFalse(audited_exit_rows_valid(edited))
 
     def test_falla_cerrado(self) -> None:
         rejected_cases = {

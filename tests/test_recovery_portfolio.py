@@ -31,11 +31,12 @@ class RecoveryPortfolioTests(unittest.TestCase):
             self.assertNotIn("observed_rpo", item)
             self.assertNotIn("backup_receipt", item)
         runner = view["projects"][5]
-        self.assertEqual(runner["profile_status"], "unknown")
-        self.assertEqual(runner["reason"], "PROFILE_MISSING")
-        self.assertIsNone(runner["rpo_target_minutes"])
-        self.assertIsNone(runner["rto_target_minutes"])
-        self.assertEqual(sum(p["profile_status"] == "configured" for p in view["projects"]), 6)
+        self.assertEqual(runner["profile_status"], "configured")
+        self.assertEqual(runner["reason"], "RECOVERY_HEALTH_MISSING")
+        self.assertEqual(runner["rpo_target_minutes"], 15)
+        self.assertEqual(runner["rto_target_minutes"], 60)
+        self.assertEqual(runner["dr_status"], "UNKNOWN")
+        self.assertEqual(sum(p["profile_status"] == "configured" for p in view["projects"]), 7)
 
     def test_invalid_cross_project_and_sensitive_fail_closed(self):
         for label in ("cross-project", "sensitive", "extra-project", "bad-shape", "unexpected-runner"):
@@ -56,7 +57,8 @@ class RecoveryPortfolioTests(unittest.TestCase):
         self.assertIn('id="recovery-portfolio-title"', html)
         for name in ("autofactory", "brvtal", "condor", "controlbot", "factory", "factoryrunner", "grindflow"):
             self.assertIn(f">{name}</td>", html)
-        self.assertIn("PROFILE_MISSING", html)
+        self.assertIn("RECOVERY_HEALTH_MISSING", html)
+        self.assertNotIn("PROFILE_MISSING", html)
         self.assertNotIn("HEALTHY", html)
         for unsafe in ("<script", "<form", "<button", "api_key", "gho_offline_recovery_fixture"):
             self.assertNotIn(unsafe, html.lower())

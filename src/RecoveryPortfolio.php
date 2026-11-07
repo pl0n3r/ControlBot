@@ -26,8 +26,20 @@ final class RecoveryPortfolio
         $projects = [];
         foreach (self::PROJECTS as $key) {
             $raw = $profiles[$key] ?? null;
+            // OWNER #1490/A approved declarative targets only, not Recovery Health.
+            // Reject a caller-supplied FactoryRunner profile with different authority
+            // or targets, even if it is otherwise syntactically valid.
             if ($key === 'factoryrunner' && $raw !== null) {
-                throw new InvalidArgumentException('FactoryRunner has no approved recovery profile.');
+                if (!is_array($raw) || array_is_list($raw)
+                    || ($raw['source_ref'] ?? null) !== 'https://github.com/pl0n3r/ControlBot/issues/1490'
+                    || ($raw['targets']['rpo_minutes'] ?? null) !== 15
+                    || ($raw['targets']['rto_minutes'] ?? null) !== 60
+                    || ($raw['retention']['hourly'] ?? null) !== 0
+                    || ($raw['retention']['daily'] ?? null) !== 7
+                    || ($raw['retention']['weekly'] ?? null) !== 8
+                    || ($raw['retention']['monthly'] ?? null) !== 12) {
+                    throw new InvalidArgumentException('FactoryRunner recovery policy not authorized.');
+                }
             }
             if ($raw !== null && (!is_array($raw) || array_is_list($raw))) {
                 throw new InvalidArgumentException('Recovery portfolio profile invalid.');

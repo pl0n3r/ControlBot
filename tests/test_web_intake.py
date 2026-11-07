@@ -229,8 +229,43 @@ def run_fixture(name: str) -> dict:
     return json.loads(result.stdout)
 
 
+
+def run_html_fixture(method: str, csrf: str) -> dict:
+    """Exercise the owner-only HTML renderer without exposing an HTTP route."""
+    php = shutil.which("php")
+    if not php:
+        raise AssertionError("PHP runtime unavailable")
+    script = r"""
+require 'src/Routing/Routes/IntakeRoutes.php';
+$result = controlbot_intake_html_page($argv[2], ['REQUEST_METHOD' => $argv[1]]);
+echo json_encode($result, JSON_THROW_ON_ERROR), "\n";
+"""
+    result = subprocess.run(
+        [php, "-r", script, method, csrf], cwd=ROOT, capture_output=True,
+        text=True, timeout=45, check=False,
+    )
+    if result.returncode:
+        raise AssertionError("PHP intake HTML fixture failed: " + result.stderr[-1200:])
+    return json.loads(result.stdout)
+
+
 class IntakeTests(unittest.TestCase):
     def test_criterio_principal(self):
+        html = run_html_fixture("GET", "synthetic-csrf-token")
+        self.assertEqual(200, html["status"])
+        self.assertEqual("text/html; charset=utf-8", html["headers"]["Content-Type"])
+        self.assertEqual("no-store", html["headers"]["Cache-Control"])
+        self.assertEqual("DENY", html["headers"]["X-Frame-Options"])
+        self.assertIn("script-src 'nonce-", html["headers"]["Content-Security-Policy"])
+        self.assertIn("connect-src 'self'", html["headers"]["Content-Security-Policy"])
+        self.assertIn('id="idea-form"', html["body"])
+        self.assertIn('id="decide"', html["body"])
+        self.assertIn('"/api/v1/intake"', html["body"])
+        self.assertIn('project_mode:projectMode', html["body"])
+        self.assertIn("data.committed !== false", html["body"])
+        self.assertIn("data.repositories_created !== 0", html["body"])
+        self.assertNotIn("window.location =", html["body"])
+        self.assertNotIn("innerHTML", html["body"])
         r = run_fixture("principal")
         self.assertEqual([200] * 6, r["statuses"])
         self.assertTrue(r["no_store"])
@@ -255,6 +290,19 @@ class IntakeTests(unittest.TestCase):
                              for operation in r["operations"]))
 
     def test_criterio_seguridad_y_bordes(self):
+        invalid_method = run_html_fixture("POST", "synthetic-csrf-token")
+        self.assertEqual(405, invalid_method["status"])
+        self.assertNotIn("<html", invalid_method["body"])
+        missing_csrf = run_html_fixture("GET", "")
+        self.assertEqual(503, missing_csrf["status"])
+        self.assertNotIn("<html", missing_csrf["body"])
+        injection = '<script>alert("owner")</script>'
+        escaped = run_html_fixture("GET", injection)
+        self.assertEqual(200, escaped["status"])
+        self.assertNotIn(injection, escaped["body"])
+        self.assertIn("\\u003Cscript\\u003E", escaped["body"])
+        self.assertIn("frame-ancestors 'none'", escaped["headers"]["Content-Security-Policy"])
+        self.assertIn("form-action 'none'", escaped["headers"]["Content-Security-Policy"])
         r = run_fixture("security")
         self.assertEqual({
             "anonymous": 403, "csrf": 403, "invalid_json": 400,

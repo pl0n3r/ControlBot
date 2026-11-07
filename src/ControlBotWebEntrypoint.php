@@ -38,6 +38,8 @@ final class ControlBotWebEntrypoint
             );
         }
 
+        if ($path === '/agentes') return self::forbiddenAgents();
+
         if ($path !== '/github'
             && preg_match('#^/projects/[a-z][a-z0-9-]{1,63}/github$#D', $path) !== 1) {
             return FactoryOrchestratorWebEntrypoint::handle(
@@ -109,6 +111,10 @@ final class ControlBotWebEntrypoint
                 ],
                 'body' => "Forbidden.\n",
             ];
+        }
+        if ($apiPath === '/agentes') {
+            return ($server['REQUEST_METHOD'] ?? null) === 'GET'
+                ? self::agentsPage($now, $ownerApiBackend) : self::forbiddenAgents();
         }
         // Pausa owner: jamás se sirve desde handleLocalOwner ni sin OAuth+TOTP.
         // Las escrituras viajan al router owner-v1 con CSRF y backend server-bound.
@@ -231,8 +237,81 @@ PAUSE_HTML;
             require_once __DIR__ . '/Routing/OwnerAuthenticatedRouter.php';
             return \ControlBot\Routing\OwnerAuthenticatedRouter::forbidden($server);
         }
+        if ($path === '/agentes') {
+            return ($server['REQUEST_METHOD'] ?? null) === 'GET'
+                ? self::agentsPage($now, null) : self::forbiddenAgents();
+        }
         $server['REMOTE_USER'] = $owner;
         return self::handle($server, $environment, $now);
+    }
+
+    /** Rendering from a trusted backend only; missing live adapter is UNKNOWN. */
+    private static function agentsPage(int $now, ?callable $backend): array
+    {
+        if ($now < 1) return self::error();
+        try {
+            $routes = require __DIR__ . '/Routing/Routes/AgentRoutes.php';
+            $handler = $routes[0]['handler'] ?? null;
+            if (!is_callable($handler)) return self::error();
+            $backend ??= static fn (): array => [
+                'accounts' => [], 'agents' => [], 'rows' => [], 'capacity_observations' => [],
+            ];
+            $view = $handler($backend, [], [], $now);
+            $e = static fn (mixed $value): string => htmlspecialchars(
+                (string) ($value ?? 'UNKNOWN'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8',
+            );
+            $content = '<main style="padding:clamp(1rem,2vw,2rem);max-width:80rem">'
+                . '<h1>Agentes y sesiones</h1><p role="status">Presencia: '
+                . $e($view['presence']) . ' · Capacidad: ' . $e($view['capacity'])
+                . ' · Datos: ' . $e($view['state']) . '</p>';
+            foreach ([
+                'agents' => ['Agentes', ['id' => 'Agente', 'role' => 'Rol',
+                    'presence' => 'Presencia', 'session_count' => 'Sesiones']],
+                'accounts' => ['Cuentas', ['id' => 'Cuenta', 'alias' => 'Alias',
+                    'status' => 'Estado', 'capacity' => 'Capacidad', 'free_slots' => 'Libres']],
+                'sessions' => ['Sesiones', ['id' => 'Sesión', 'agent_id' => 'Agente',
+                    'account_id' => 'Cuenta', 'status' => 'Estado', 'presence' => 'Presencia']],
+            ] as $field => [$label, $columns]) {
+                $content .= '<section aria-label="' . $e($label)
+                    . '" style="margin-block:1.5rem"><h2>' . $e($label) . '</h2>';
+                if ($view[$field] === []) {
+                    $content .= '<p>UNKNOWN · Sin observaciones.</p></section>';
+                    continue;
+                }
+                $content .= '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
+                    . '<thead><tr>';
+                foreach ($columns as $heading) $content .= '<th scope="col" style="padding:.5rem;text-align:left">' . $e($heading) . '</th>';
+                $content .= '</tr></thead><tbody>';
+                foreach ($view[$field] as $record) {
+                    $content .= '<tr>';
+                    foreach ($columns as $name => $heading) {
+                        $content .= '<td style="padding:.5rem;border-top:1px solid var(--line)">'
+                            . $e($record[$name] ?? null) . '</td>';
+                    }
+                    $content .= '</tr>';
+                }
+                $content .= '</tbody></table></div></section>';
+            }
+            $html = ControlCenterShell::render('Agentes', 'agents', [
+                'overview' => '/overview', 'agents' => '/agentes', 'github' => '/github',
+            ], $content . '</main>');
+            return ['status' => 200, 'headers' => [
+                'Content-Type' => 'text/html; charset=utf-8',
+                'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff',
+                'X-Frame-Options' => 'DENY', 'Referrer-Policy' => 'no-referrer',
+            ], 'body' => $html];
+        } catch (\Throwable) {
+            return self::error();
+        }
+    }
+
+    private static function forbiddenAgents(): array
+    {
+        return ['status' => 403, 'headers' => [
+            'Content-Type' => 'text/plain; charset=utf-8',
+            'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff',
+            'X-Frame-Options' => 'DENY', 'Referrer-Policy' => 'no-referrer',
+        ], 'body' => "Forbidden.\n"];
     }
 
     private static function withShell(array $response, string $title): array

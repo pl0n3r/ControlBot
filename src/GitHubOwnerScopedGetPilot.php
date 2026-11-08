@@ -1,28 +1,16 @@
 <?php
-
 declare(strict_types=1);
-
 namespace ControlBot\GitHub;
-
 use Closure;
 use Throwable;
-
-/**
- * Owner-approved GET pilot; deliberately not wired to web routes or cron.
- * Neither constructor defaults nor browser requests can activate it.
- *
- * Trusted source and token provider MUST be injected by private server code.
- * Tests inject a fake sender; no GitHub installation is connected by this file.
- */
+/** Dormant GET-only owner pilot; never activate or wire without a separate OWNER grant. */
 final class GitHubOwnerScopedGetPilot
 {
     private const HOST = 'api.github.com';
     private const MAX_PAGES = 3;
     private const MAX_PAGE_BYTES = 32768;
     private const MAX_TOTAL_BYTES = 65536;
-
     private array $events = [];
-
     public function __construct(
         private readonly Closure $trustedSource,
         private readonly Closure $tokenProvider,
@@ -30,8 +18,6 @@ final class GitHubOwnerScopedGetPilot
         private readonly bool $enabled = false,
     ) {
     }
-
-    /** @return array<string, mixed> Minimal evidence, never raw GitHub JSON. */
     public function read(array $request, int $now): array
     {
         if (!$this->enabled) {
@@ -40,7 +26,6 @@ final class GitHubOwnerScopedGetPilot
         if (!$this->validRequest($request, $now)) {
             return $this->result('invalid_request');
         }
-
         try {
             $witness = ($this->trustedSource)(
                 $request['repository'], $request['resource'], $now
@@ -51,7 +36,6 @@ final class GitHubOwnerScopedGetPilot
         if (!$this->validWitness($witness, $request, $now)) {
             return $this->result('authority_unverified');
         }
-
         try {
             $token = ($this->tokenProvider)($witness['installation_id']);
             if (!is_string($token) || strlen($token) < 12 || strlen($token) > 4096
@@ -61,7 +45,6 @@ final class GitHubOwnerScopedGetPilot
         } catch (Throwable) {
             return $this->result('token_unavailable');
         }
-
         $sender = $this->sender ?? Closure::fromCallable([self::class, 'nativeGet']);
         $items = [];
         $seen = [];
@@ -69,7 +52,6 @@ final class GitHubOwnerScopedGetPilot
         $completed = false;
         try {
             for ($page = 1; $page <= self::MAX_PAGES; ++$page) {
-                // No caller-provided host, path, query string or token.
                 $url = 'https://' . self::HOST . '/repos/'
                     . $request['repository'] . '/' . $request['resource']
                     . '?per_page=' . $request['page_size'] . '&page=' . $page;
@@ -84,40 +66,30 @@ final class GitHubOwnerScopedGetPilot
                 ];
                 $reply = $sender($url, $token, $guards);
                 if (!is_array($reply) || !$this->exactKeys($reply,
-                    ['status', 'content_type', 'redirected', 'tls_verified', 'body'])
-                    || ($reply['status'] ?? null) !== 200
-                    || ($reply['tls_verified'] ?? null) !== true
-                    || ($reply['redirected'] ?? null) !== false
+                    ['status', 'content_type', 'redirected', 'tls_verified', 'body']) || ($reply['status'] ?? null) !== 200
+                    || ($reply['tls_verified'] ?? null) !== true || ($reply['redirected'] ?? null) !== false
                     || !is_string($reply['content_type'])
                     || !in_array(strtolower(trim(explode(';', $reply['content_type'])[0])),
-                        ['application/json', 'application/vnd.github+json'], true)
-                    || !is_string($reply['body'])) {
+                        ['application/json', 'application/vnd.github+json'], true) || !is_string($reply['body'])) {
                     return $this->result('response_invalid');
                 }
-
                 $bytes = strlen($reply['body']);
                 $totalBytes += $bytes;
-                if ($bytes < 2 || $bytes > self::MAX_PAGE_BYTES
-                    || $totalBytes > self::MAX_TOTAL_BYTES) {
+                if ($bytes < 2 || $bytes > self::MAX_PAGE_BYTES || $totalBytes > self::MAX_TOTAL_BYTES) {
                     return $this->result('size_limit');
                 }
-
                 $decoded = json_decode($reply['body'], true, 16, JSON_THROW_ON_ERROR);
-                if (!is_array($decoded) || !array_is_list($decoded)
-                    || count($decoded) > $request['page_size']) {
+                if (!is_array($decoded) || !array_is_list($decoded) || count($decoded) > $request['page_size']) {
                     return $this->result('response_invalid');
                 }
                 foreach ($decoded as $entry) {
-                    if (!is_array($entry) || !is_int($entry['number'] ?? null)
-                        || $entry['number'] < 1
-                        || !in_array($entry['state'] ?? null, ['open', 'closed'], true)
-                        || isset($seen[$entry['number']])) {
+                    if (!is_array($entry) || !is_int($entry['number'] ?? null) || $entry['number'] < 1
+                        || !in_array($entry['state'] ?? null, ['open', 'closed'], true) || isset($seen[$entry['number']])) {
                         return $this->result('response_invalid');
                     }
                     $seen[$entry['number']] = true;
                     $items[] = ['number' => $entry['number'], 'state' => $entry['state']];
                 }
-                // A full third page cannot prove the collection is complete.
                 if (count($decoded) < $request['page_size']) {
                     $completed = true;
                     break;
@@ -128,7 +100,6 @@ final class GitHubOwnerScopedGetPilot
         } finally {
             unset($token);
         }
-
         if (!$completed) {
             return $this->result('page_limit');
         }
@@ -143,26 +114,20 @@ final class GitHubOwnerScopedGetPilot
                 'observed_at' => $now,
                 'expires_at' => min($witness['expires_at'], $witness['grant']['expires_at']),
             ],
-            // Even a successful GET is never a production-health or write authorization.
             'runtime_authorized' => false,
             'production_verified' => false,
             'execute_actions' => false,
             'authority' => 'unchanged',
         ];
     }
-
     private function validRequest(array $r, int $now): bool
     {
-        return $now > 0
-            && $this->exactKeys($r, ['repository', 'resource', 'page_size'])
-            && is_string($r['repository'])
+        return $now > 0 && $this->exactKeys($r, ['repository', 'resource', 'page_size']) && is_string($r['repository'])
             && preg_match('~^[A-Za-z0-9][A-Za-z0-9._-]{0,38}/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$~D',
-                $r['repository']) === 1
-            && !str_contains($r['repository'], '..')
+                $r['repository']) === 1 && !str_contains($r['repository'], '..')
             && in_array($r['resource'], ['issues', 'pulls'], true)
             && is_int($r['page_size']) && $r['page_size'] >= 1 && $r['page_size'] <= 20;
     }
-
     private function validWitness(mixed $w, array $r, int $now): bool
     {
         if (!is_array($w) || !$this->exactKeys($w, [
@@ -170,40 +135,27 @@ final class GitHubOwnerScopedGetPilot
                 'grant', 'observed_at', 'expires_at', 'verified', 'revoked',
             ]) || $w['origin'] !== 'trusted_installation_source'
             || !is_int($w['installation_id']) || $w['installation_id'] < 1
-            || $w['verified'] !== true || $w['revoked'] !== false
-            || $w['owner'] !== explode('/', $r['repository'], 2)[0]
-            || $w['repository'] !== $r['repository']
-            || !is_array($w['permissions'])
+            || $w['verified'] !== true || $w['revoked'] !== false || $w['owner'] !== explode('/', $r['repository'], 2)[0]
+            || $w['repository'] !== $r['repository'] || !is_array($w['permissions'])
             || !$this->exactKeys($w['permissions'], [
                 'metadata', $r['resource'] === 'issues' ? 'issues' : 'pull_requests',
             ]) || ($w['permissions']['metadata'] ?? null) !== 'read'
             || ($w['permissions'][$r['resource'] === 'issues' ? 'issues' : 'pull_requests'] ?? null) !== 'read'
             || !is_int($w['observed_at']) || !is_int($w['expires_at'])
-            || $w['observed_at'] > $now || $now >= $w['expires_at']
-            || $now - $w['observed_at'] > 300
-            || $w['expires_at'] <= $w['observed_at']
-            || $w['expires_at'] - $w['observed_at'] > 300) {
+            || $w['observed_at'] > $now || $now >= $w['expires_at'] || $now - $w['observed_at'] > 300
+            || $w['expires_at'] <= $w['observed_at'] || $w['expires_at'] - $w['observed_at'] > 300) {
             return false;
         }
-
         $g = $w['grant'];
         return is_array($g) && $this->exactKeys($g, [
                 'origin', 'installation_id', 'owner', 'repository', 'resource',
                 'approved', 'revoked', 'issued_at', 'expires_at',
-            ])
-            && $g['origin'] === 'owner_approved_grant'
-            && $g['installation_id'] === $w['installation_id']
-            && $g['owner'] === $w['owner']
-            && $g['repository'] === $w['repository']
-            && $g['resource'] === $r['resource']
-            && $g['approved'] === true && $g['revoked'] === false
-            && is_int($g['issued_at']) && is_int($g['expires_at'])
-            && $g['issued_at'] <= $now && $now < $g['expires_at']
-            && $g['issued_at'] >= $w['observed_at']
-            && $g['expires_at'] <= $w['expires_at']
-            && $g['expires_at'] - $g['issued_at'] <= 300;
+            ]) && $g['origin'] === 'owner_approved_grant' && $g['installation_id'] === $w['installation_id']
+            && $g['owner'] === $w['owner'] && $g['repository'] === $w['repository'] && $g['resource'] === $r['resource']
+            && $g['approved'] === true && $g['revoked'] === false && is_int($g['issued_at']) && is_int($g['expires_at'])
+            && $g['issued_at'] <= $now && $now < $g['expires_at'] && $g['issued_at'] >= $w['observed_at']
+            && $g['expires_at'] <= $w['expires_at'] && $g['expires_at'] - $g['issued_at'] <= 300;
     }
-
     private function exactKeys(array $a, array $keys): bool
     {
         $actual = array_keys($a);
@@ -211,7 +163,6 @@ final class GitHubOwnerScopedGetPilot
         sort($keys);
         return $actual === $keys;
     }
-
     private function result(string $reason): array
     {
         $this->record($reason);
@@ -225,23 +176,16 @@ final class GitHubOwnerScopedGetPilot
             'authority' => 'unchanged',
         ];
     }
-
     private function record(string $reason): void
     {
         if (count($this->events) < 16) {
             $this->events[] = ['status' => 'UNKNOWN', 'reason' => $reason];
         }
     }
-
     public function audit(): array
     {
         return $this->events;
     }
-
-    /**
-     * Dormant network adapter. No route instantiates this class with enabled=true.
-     * Credentials must come from a separately owner-authorized server provider.
-     */
     private static function nativeGet(string $url, string $token, array $guards): array
     {
         if (!function_exists('curl_init')) {

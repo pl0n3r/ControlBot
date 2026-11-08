@@ -17,6 +17,33 @@ try {
  echo json_encode(['out'=>$p->read($d['request'],$d['now']??1050),'calls'=>$calls,'source_calls'=>$sc,'token_calls'=>$tc,'audit'=>$p->audit()],JSON_THROW_ON_ERROR);
 } catch(Throwable) {echo '{"error":"fixture_invalid"}';}
 '''
+PHP_NATIVE = r'''
+namespace {if(!function_exists('curl_init')){function curl_init($u){return false;}}
+ foreach(explode(' ','CURLOPT_PROTOCOLS CURLPROTO_HTTPS CURLOPT_HTTPGET CURLOPT_FOLLOWLOCATION CURLOPT_MAXREDIRS CURLOPT_SSL_VERIFYPEER CURLOPT_SSL_VERIFYHOST CURLOPT_CONNECTTIMEOUT CURLOPT_TIMEOUT CURLOPT_USERAGENT CURLOPT_HTTPHEADER CURLOPT_WRITEFUNCTION CURLINFO_HTTP_CODE CURLINFO_CONTENT_TYPE CURLINFO_REDIRECT_COUNT CURLINFO_SSL_VERIFYRESULT') as $i=>$n){if(!defined($n))define($n,1000+$i);}}
+namespace ControlBot\GitHub {
+ function curl_init($url){$GLOBALS['fake_url']=$url;return ($GLOBALS['fake_mode']??'')==='init_fail'?false:new \stdClass();}
+ function curl_setopt_array($h,$opts){$GLOBALS['fake_opts']=$opts;return true;}
+ function curl_exec($h){if($GLOBALS['fake_mode']==='exec_fail')return false;$writer=$GLOBALS['fake_opts'][CURLOPT_WRITEFUNCTION];$writer($h,'[{"number":7,"state":"open"}]');return true;}
+ function curl_getinfo($h,$opt){return match($opt){CURLINFO_HTTP_CODE => ($GLOBALS['fake_mode']==='forbidden'?403:200),CURLINFO_CONTENT_TYPE=>'application/json',CURLINFO_REDIRECT_COUNT=>0,CURLINFO_SSL_VERIFYRESULT=>0,default=>null};}
+ function curl_close($h){}
+ require_once 'src/GitHubOwnerScopedGetPilot.php';
+ $d=json_decode(base64_decode($argv[1],true),true,16,JSON_THROW_ON_ERROR);$GLOBALS['fake_mode']=$d['mode'];
+ $source=static fn($r,$k,$now)=>$d['witness'];$token=static fn($id)=>'only-a-fake-token';
+ $pilot=new GitHubOwnerScopedGetPilot($source,$token,null,true);
+ echo json_encode(['out'=>$pilot->read($d['request'],1050),'url'=>$GLOBALS['fake_url']??null],JSON_THROW_ON_ERROR);
+}
+'''
+
+
+def native_run(mode="ok"):
+    d = dict(witness=witness(), request=REQ, mode=mode)
+    p = subprocess.run(["php", "-r", PHP_NATIVE, base64.b64encode(json.dumps(d).encode()).decode()],
+                       cwd=ROOT, capture_output=True, text=True, timeout=25, check=False)
+    if p.returncode:
+        raise AssertionError(p.stderr)
+    return json.loads(p.stdout)
+
+
 REQ = {"repository": "pl0n3r/ControlBot", "resource": "issues", "page_size": 2}
 
 
@@ -110,6 +137,15 @@ class GitHubOwnerScopedGetPilotTests(unittest.TestCase):
             self.safe(bad)
             self.assertEqual((bad["out"]["status"], bad["out"]["projection"]), ("UNKNOWN", None))
         self.assertEqual(run(mode="sender_error")["out"]["status"], "UNKNOWN")
+
+    def test_native_adapter_uses_curl_only_under_fully_fake_namespace(self):
+        native = native_run()
+        self.assertIs(native["out"]["runtime_authorized"], False)
+        self.assertEqual(native["out"]["status"], "SOURCE_READ")
+        self.assertEqual(native["out"]["projection"]["items"], [{"number": 7, "state": "open"}])
+        self.assertEqual(native["url"], "https://api.github.com/repos/pl0n3r/ControlBot/issues?per_page=2&page=1")
+        for mode in ("forbidden", "exec_fail", "init_fail"):
+            self.assertEqual(native_run(mode)["out"]["status"], "UNKNOWN")
 
     def test_disabled_default_no_web_wiring_or_writes(self):
         off = run(enabled=False)

@@ -13,6 +13,7 @@ require_once __DIR__ . '/GitHubPublicEntrypoint.php';
 require_once __DIR__ . '/GitHubProjectEntrypoint.php';
 require_once __DIR__ . '/ControlCenterShell.php';
 require_once __DIR__ . '/ProjectReadSource.php';
+require_once __DIR__ . '/ObservabilityReadSource.php';
 
 final class ControlBotWebEntrypoint
 {
@@ -39,6 +40,7 @@ final class ControlBotWebEntrypoint
             );
         }
 
+        if (self::isObservabilityPath($path)) return self::forbiddenAgents();
         if ($path === '/agentes') return self::forbiddenAgents();
         // REMOTE_USER is never authority for private project pages.
         if ($path === '/proyectos' || str_starts_with($path, '/proyectos/')) {
@@ -116,6 +118,9 @@ final class ControlBotWebEntrypoint
                 ],
                 'body' => "Forbidden.\n",
             ];
+        }
+        if (is_string($apiPath) && self::isObservabilityPath($apiPath)) {
+            return self::observabilityPage($apiPath, $server, $environment, $now, $ownerApiBackend);
         }
         if ($apiPath === '/agentes') {
             return ($server['REQUEST_METHOD'] ?? null) === 'GET'
@@ -207,6 +212,10 @@ PAUSE_HTML;
                 || str_starts_with($apiPath, '/api/v1/proyectos/'))) {
                 $backend = self::projectsBackend($environment);
             }
+            if ($backend === null && ($apiPath === '/api/v1/observabilidad'
+                || str_starts_with($apiPath, '/api/v1/incidentes/'))) {
+                $backend = self::observabilityBackend($environment);
+            }
             return \ControlBot\Routing\OwnerAuthenticatedRouter::dispatch(
                 $ownerAuth, $ownerSession, $server, $now, $backend,
             ) ?? self::error();
@@ -252,6 +261,9 @@ PAUSE_HTML;
         if (is_string($path) && str_starts_with($path, '/api/v1/')) {
             require_once __DIR__ . '/Routing/OwnerAuthenticatedRouter.php';
             return \ControlBot\Routing\OwnerAuthenticatedRouter::forbidden($server);
+        }
+        if (is_string($path) && self::isObservabilityPath($path)) {
+            return self::forbiddenAgents();
         }
         if ($path === '/agentes') {
             return ($server['REQUEST_METHOD'] ?? null) === 'GET'
@@ -315,6 +327,87 @@ PAUSE_HTML;
         } catch (\Throwable) {
             return self::error();
         }
+    }
+
+    /** Owner-only literal HTML views; never render a missing source as healthy. */
+    private static function observabilityPage(
+        string $path, array $server, array $environment, int $now, ?callable $backend,
+    ): array {
+        if (($server['REQUEST_METHOD'] ?? null) !== 'GET') {
+            return ['status' => 405, 'headers' => self::projectHeaders() + ['Allow' => 'GET'],
+                'body' => "Method not allowed.\n"];
+        }
+        $detail = $path !== '/observabilidad';
+        $incidentId = null;
+        if ($detail) {
+            if (preg_match('#^/incidentes/(incident-[a-f0-9]{32})$#D', $path, $match) !== 1) {
+                return ['status' => 404, 'headers' => self::projectHeaders(),
+                    'body' => "Not found.\n"];
+            }
+            $incidentId = $match[1];
+        }
+        try {
+            $backend ??= self::observabilityBackend($environment);
+            $routes = require __DIR__ . '/Routing/Routes/ObservabilityRoutes.php';
+            $handler = $routes[$detail ? 1 : 0]['handler'] ?? null;
+            if (!is_callable($handler)) throw new \RuntimeException('Observability handler unavailable.');
+            $result = $handler($backend, $detail ? ['incident_id' => $incidentId] : [], [], $now);
+            $e = static fn (mixed $value): string => htmlspecialchars(
+                (string) ($value ?? 'UNKNOWN'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8',
+            );
+            $content = '<main style="max-width:75rem;margin:auto;padding:clamp(1rem,3vw,2rem)">'
+                . '<p><a href="/observabilidad">Observabilidad</a></p>';
+            if (!$detail) {
+                $content .= '<h1>Estado por proyecto</h1><p>Señales comprobadas, sin alertas salientes.</p>';
+                foreach ($result['projects'] as $project) {
+                    $content .= '<section aria-label="' . $e($project['project_id'])
+                        . '" style="padding:1rem;border:1px solid var(--line);margin-block:1rem">'
+                        . '<h2>' . $e($project['project_id']) . '</h2><p role="status">Estado: <strong>'
+                        . $e($project['status']) . '</strong></p><ul>';
+                    foreach ($project['sources'] as $name => $slot) {
+                        $content .= '<li>' . $e($name) . ': ' . $e($slot['freshness'])
+                            . ' · ' . $e($slot['severity']) . '</li>';
+                    }
+                    $content .= '</ul><p>Alertas: indicador pasivo; ningún envío.</p></section>';
+                }
+            } else {
+                $content .= '<h1>Incidente ' . $e($incidentId) . '</h1><p role="status">Estado: '
+                    . $e($result['status']) . '</p><ol>';
+                foreach ($result['timeline'] as $event) {
+                    $content .= '<li><time>' . $e(gmdate('Y-m-d H:i', $event['timestamp']))
+                        . ' UTC</time> · ' . $e($event['kind']) . ' · ' . $e($event['source'])
+                        . '</li>';
+                }
+                $content .= '</ol>';
+                if ($result['timeline'] === []) $content .= '<p>UNKNOWN · Sin evidencia de línea de tiempo.</p>';
+            }
+            $content .= '</main>';
+            $html = ControlCenterShell::render(
+                $detail ? 'Incidente' : 'Observabilidad', 'overview',
+                ['overview' => '/overview', 'projects' => '/proyectos'], $content,
+            );
+            return ['status' => 200, 'headers' => self::projectHeaders(true), 'body' => $html];
+        } catch (\Throwable) {
+            return self::error();
+        }
+    }
+
+    private static function isObservabilityPath(string $path): bool
+    {
+        return $path === '/observabilidad' || $path === '/incidentes'
+            || str_starts_with($path, '/incidentes/');
+    }
+
+    /** Only a private server-configured file can supply observability evidence. */
+    private static function observabilityBackend(array $environment): callable
+    {
+        return static function (string $operation, array $params, array $payload, int $at)
+            use ($environment): array {
+            if ($payload !== []) throw new \RuntimeException('Read-only operation required.');
+            return \ControlBot\Observability\ObservabilityReadSource::readConfigured(
+                $environment, $operation, $params, $at,
+            );
+        };
     }
 
     private static function projectsBackend(array $environment): callable

@@ -99,6 +99,7 @@ if (is_string($passwordHash) && $passwordHash !== '') {
             ['CONTROLBOT_OWNER_LOGIN' => $loginConfig['owner_login'],
              'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH' => getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH') ?: null,
              'CONTROLBOT_PROJECTS_SNAPSHOT_PATH' => getenv('CONTROLBOT_PROJECTS_SNAPSHOT_PATH') ?: null,
+             'CONTROLBOT_OBSERVABILITY_SNAPSHOT_PATH' => getenv('CONTROLBOT_OBSERVABILITY_SNAPSHOT_PATH') ?: null,
              'CONTROLBOT_DOCUMENT_ROOT' => $_SERVER['DOCUMENT_ROOT'] ?? null],
             time(),
         );
@@ -118,6 +119,7 @@ $environment = [
     'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH' => getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH') ?: null,
     // Server-only snapshot path, never supplied by browser headers/query/body.
     'CONTROLBOT_PROJECTS_SNAPSHOT_PATH' => getenv('CONTROLBOT_PROJECTS_SNAPSHOT_PATH') ?: null,
+             'CONTROLBOT_OBSERVABILITY_SNAPSHOT_PATH' => getenv('CONTROLBOT_OBSERVABILITY_SNAPSHOT_PATH') ?: null,
     'CONTROLBOT_DOCUMENT_ROOT' => $_SERVER['DOCUMENT_ROOT'] ?? null,
 ];
 

@@ -127,6 +127,18 @@ class OrquestadorLocalReferenceTests(unittest.TestCase):
         self.assertIn("g.addEventListener('keydown'", page)
         self.assertIn('pc.textContent="Condor "', graph)
 
+    def test_dashboard_distinguishes_open_pull_requests_from_merge_ready(self):
+        page = (TOOL / 'index.html').read_text(encoding='utf-8')
+        scheduler = (TOOL / 'orq.py').read_text(encoding='utf-8')
+        self.assertIn('"open_prs": sum(len(r["prs"]) for r in repos)', scheduler)
+        self.assertIn("t.open_prs??0,'PRs abiertos'", page)
+        self.assertIn("'PRs listos para fusionar'", page)
+
+    def test_issue_chart_uses_the_canonical_state_label_without_title_reclassification(self):
+        scheduler = (TOOL / 'orq.py').read_text(encoding='utf-8')
+        self.assertIn('counts[st] = counts.get(st, 0) + 1', scheduler)
+        self.assertNotIn('elif _k == "roadmap / planificado":', scheduler)
+
     def test_contract_declares_remote_log_and_assign(self):
         contract = (TOOL / 'CONTRATO-EXTENSION.md').read_text(encoding='utf-8')
         self.assertIn('POST /api/af/log', contract)

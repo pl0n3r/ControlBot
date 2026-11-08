@@ -144,7 +144,7 @@ function heroKpis(d,ex){
   const T=(v,l,c,i)=>`<div class="tile" style="--c:${c}"><i>${i}</i><b>${v}</b><span>${l}</span></div>`;
   const open=d.repos.reduce((a,r)=>a+r.total,0);
   return '<div class="hero">'+T(open,'issues abiertos · meta 0',open?'#e3a008':'#3fb950','🎯')+T(w,'chats trabajando','#4cc9f0','⚙')+T(f,'chats libres',f?'#3fb950':'#7d8a9a','✓')+T(e,'chats a reemplazar',e?'#f85149':'#7d8a9a','⚠')
-    +T((d.ready||[]).length,'PRs listos para fusionar',(d.ready||[]).length?'#3fb950':'#7d8a9a','⇄')+T(t.recover,'frentes sin recuperar (límite '+RECOVER_LIMIT+')',t.recover>RECOVER_LIMIT?'#ff9f43':'#7d8a9a','↺')
+    +T(t.open_prs??0,'PRs abiertos',(t.open_prs??0)?'#58a6ff':'#7d8a9a','⤢')+T((d.ready||[]).length,'PRs listos para fusionar',(d.ready||[]).length?'#3fb950':'#7d8a9a','⇄')+T(t.recover,'frentes sin recuperar (límite '+RECOVER_LIMIT+')',t.recover>RECOVER_LIMIT?'#ff9f43':'#7d8a9a','↺')
     +T(t.merged24,'fusionados en 24 h','#8957e5','★')+T(own,'decisiones tuyas',own?'#f85149':'#3fb950','☝')+'</div>';
 }
 let releaseBusy=false;

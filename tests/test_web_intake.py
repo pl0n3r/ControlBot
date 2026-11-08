@@ -266,8 +266,79 @@ echo json_encode($result, JSON_THROW_ON_ERROR), "\n";
     return json.loads(result.stdout)
 
 
+
+PHP_WEB = r"""
+declare(strict_types=1);
+foreach (['Approvals.php', 'OwnerSession.php', 'ControlBotWebEntrypoint.php'] as $module) {
+    require_once getcwd() . '/src/' . $module;
+}
+$now = 14000;
+$env = ['CONTROLBOT_OWNER_LOGIN' => 'pl0n3r'];
+$auth = new \ControlBot\Security\OwnerSessionService('pl0n3r',
+    new \ControlBot\Security\TokenVault(
+        base64_encode(str_repeat('K', SODIUM_CRYPTO_SECRETBOX_KEYBYTES))
+    ));
+$owner = [];
+$auth->establishTrustedOAuthSession($owner, 'pl0n3r', 'synthetic-token');
+$auth->reauthenticateTotp($owner,
+    \ControlBot\Security\Totp::code('JBSWY3DPEHPK3PXP', $now),
+    'JBSWY3DPEHPK3PXP', $now);
+$oauthOnly = [];
+$auth->establishTrustedOAuthSession($oauthOnly, 'pl0n3r', 'synthetic-token');
+$server = static fn (string $method): array => [
+    'REQUEST_URI' => '/intake', 'REQUEST_METHOD' => $method,
+    'REMOTE_USER' => 'pl0n3r', 'HTTP_AUTHORIZATION' => 'Bearer forged',
+];
+$call = static fn (string $method, array $session, int $time = 14000): array =>
+    \ControlBot\Web\ControlBotWebEntrypoint::handleAuthenticated(
+        $server($method), $env, $time, $session, $auth,
+    );
+$ownerGet = $call('GET', $owner);
+$rows = [
+    'owner_get' => $ownerGet,
+    'owner_post' => $call('POST', $owner),
+    'anonymous' => $call('GET', []),
+    'oauth_only' => $call('GET', $oauthOnly),
+    'expired' => $call('GET', $owner, $now + 301),
+    'public' => \ControlBot\Web\ControlBotWebEntrypoint::handle(
+        $server('GET'), $env, $now),
+    'local_password' => \ControlBot\Web\ControlBotWebEntrypoint::handleLocalOwner(
+        $server('GET'), $env, $now),
+];
+echo json_encode([
+    'statuses' => array_map(static fn (array $row): int => $row['status'], $rows),
+    'html_owner' => str_contains($ownerGet['body'], 'id="idea-form"')
+        && str_contains($ownerGet['body'], 'id="decide"'),
+    'csrf_nonce' => str_contains($ownerGet['headers']['Content-Security-Policy'] ?? '',
+        "script-src 'nonce-"),
+    'safe_headers' => array_reduce($rows,
+        static fn (bool $ok, array $row): bool => $ok
+            && ($row['headers']['Cache-Control'] ?? null) === 'no-store'
+            && !str_contains($row['body'], 'synthetic-token'), true),
+    'plain_rejection' => !str_contains($rows['anonymous']['body'], '<html')
+        && !str_contains($rows['local_password']['body'], '<html'),
+], JSON_THROW_ON_ERROR), "\n";
+"""
+
+
+def run_web_entrypoint_fixture() -> dict:
+    php = shutil.which("php")
+    if not php:
+        raise AssertionError("PHP runtime unavailable")
+    result = subprocess.run(
+        [php, "-r", PHP_WEB], cwd=ROOT,
+        capture_output=True, text=True, timeout=45, check=False,
+    )
+    if result.returncode:
+        raise AssertionError("PHP owner-route fixture failed: " + result.stderr[-1200:])
+    return json.loads(result.stdout)
+
+
 class IntakeTests(unittest.TestCase):
     def test_criterio_principal(self):
+        routed = run_web_entrypoint_fixture()
+        self.assertEqual(200, routed["statuses"]["owner_get"])
+        self.assertTrue(routed["html_owner"] and routed["csrf_nonce"])
         html = run_html_fixture("GET", "synthetic-csrf-token")
         self.assertEqual(200, html["status"])
         self.assertEqual("text/html; charset=utf-8", html["headers"]["Content-Type"])
@@ -307,6 +378,13 @@ class IntakeTests(unittest.TestCase):
                              for operation in r["operations"]))
 
     def test_criterio_seguridad_y_bordes(self):
+        routed = run_web_entrypoint_fixture()
+        self.assertEqual({
+            "owner_get": 200, "owner_post": 405, "anonymous": 403,
+            "oauth_only": 403, "expired": 403, "public": 403,
+            "local_password": 403,
+        }, routed["statuses"])
+        self.assertTrue(routed["safe_headers"] and routed["plain_rejection"])
         invalid_method = run_html_fixture("POST", "synthetic-csrf-token")
         self.assertEqual(405, invalid_method["status"])
         self.assertNotIn("<html", invalid_method["body"])

@@ -114,3 +114,22 @@ de #1448 antes de integrarlo. Un renderer aislado no satisface AC-01.
 La revisión CodeRabbit del PR sucesor #1500 ya fue solicitada una vez sobre
 un HEAD anterior. No repetir `@coderabbitai review` en este PR en commits
 intermedios; un check omitido no es evidencia exact-HEAD de seguridad.
+
+
+## Ruta HTML owner integrada (ControlBot #1448)
+
+La URL literal `GET /intake` se atiende exclusivamente desde
+`ControlBotWebEntrypoint::handleAuthenticated`, una vez verificado el owner
+con OAuth **y** TOTP y la identidad configurada en el servidor. El controlador
+delega en `controlbot_intake_html_page` y entrega el CSRF derivado de la sesión
+verificada (no de `REMOTE_USER`, cookies inventadas o parámetros HTTP).
+
+Los accesos anónimos y la sesión local de contraseña devuelven `403`;
+`POST /intake` devuelve `405` y no ejecuta mutaciones; las acciones del
+formulario siguen en `/api/v1/intake` con revalidación independiente de owner,
+CSRF y backend. El renderer preserva `Cache-Control: no-store`, CSP con nonce y
+`X-Frame-Options: DENY`. No hay creación real de repos/issues, uso de datos
+personales, cambios de hosting, gasto o autorización go-live.
+
+La regresión `tests.test_web_intake` verifica tanto HTTP propietario y sus
+negativos como el contrato existente de preview y la redacción de secretos.

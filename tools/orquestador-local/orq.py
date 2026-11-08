@@ -454,15 +454,9 @@ def collect_repo(repo):
     for i in issues:
         labels = [l["name"] for l in i["labels"]]
         st = NORMAL.get(state_of(labels), state_of(labels))
-        # Métrica honesta: un «bloqueado» que es contenedor de roadmap o puerta del dueño no es trabajo atascado.
-        dst = st
-        if st == "bloqueado":
-            _k = classify_block(i["title"])
-            if any(re.search(r"decisi.n: due|decision: owner", n) for n in labels) or _k.startswith("readiness"):
-                dst = "del dueño (live/decisión)"
-            elif _k == "roadmap / planificado":
-                dst = "planificado"
-        counts[dst] = counts.get(dst, 0) + 1
+        # El gráfico de estados refleja la etiqueta canónica del Issue. El título
+        # puede explicar un bloqueo, pero no puede convertirlo en «planificado».
+        counts[st] = counts.get(st, 0) + 1
         states[i["number"]] = st
         mt = re.search(r"<!-- factory-plan-task (\{.*?\}) -->", i.get("body") or "", re.S)
         if mt:
@@ -587,6 +581,7 @@ def collect():
         "rate": {"remaining": rate["remaining"], "limit": rate["limit"], "reset": rate["reset"]},
         "repos": repos, "errors": errors, "ready": ready, "goals": goals, "release": release, "health": health,
         "totals": {"available": avail, "active": active, "recover": recover,
+                   "open_prs": sum(len(r["prs"]) for r in repos),
                    "merged24": sum(r["merged24"] for r in repos),
                    "merged96": sum(r["merged96"] for r in repos)},
         "alerts": build_alerts(repos, avail, recover),

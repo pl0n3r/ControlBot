@@ -35,6 +35,7 @@ POST_SNAPSHOT = {
     "docs/github-readonly-installation-admission.md": (998, 999, "tests/test_github_readonly_installation_admission.py"),
     "docs/github-readonly-admission-projection-gate.md": (1003, 1004, "tests/test_github_readonly_admission_projection_gate.py"),
     "docs/github-readonly-runtime-activation.md": (1484, 1485, "tests/test_github_readonly_runtime_activation.py"),
+    "docs/github-owner-scoped-get-pilot.md": (1501, 1502, "tests/test_github_owner_scoped_get_pilot.py"),
     "docs/DISENO-CONTROLBOT.md": (1169, 1171, "tests/test_control_theme_redesign.py"),
     "docs/operator-runbook.md": (959, 965, "tests/test_runbook_operador_doc.py"),
     "docs/dr-drill-plan.md": (960, 968, "tests/test_simulacro_dr_doc.py"),
@@ -56,6 +57,7 @@ POST_SNAPSHOT = {
     "docs/persistencia-dominio.md": (1453, 1463, "tests/test_domain_persistence.py"),
     "docs/soporte-destinatarios.md": (1428, 1468, "tests/test_support_notification_recipients.py"),
     "docs/modulo-legal.md": (1429, 1466, "tests/test_legal_status_panel.py"),
+    "docs/web-proyectos.md": (1478, 1499, "tests/test_web_projects_http.py"),
     "docs/manual/guia-del-propietario.md": (1479, 1480, "tests/test_manual_propietario_doc.py"),
 }
 POST_TITLE = "\n## Fuentes de preparación posteriores al corte\n"
@@ -262,6 +264,24 @@ class MatrizCoberturaTests(unittest.TestCase):
     def setUpClass(cls):
         cls.text = DOC.read_text(encoding="utf-8")
         cls.rows = parse_rows(cls.text)
+
+    def test_registro_web_proyectos_http_exacto(self):
+        """#1478 / PR #1499: documento nuevo sin inventar estado live."""
+        path = "docs/web-proyectos.md"
+        expected = (1478, 1499, "tests/test_web_projects_http.py")
+        self.assertEqual(expected, POST_SNAPSHOT[path])
+        self.assertEqual(expected, parse_post_snapshot(self.text)[path])
+        self.assertTrue((ROOT / path).is_file())
+        self.assertTrue((ROOT / expected[2]).is_file())
+        row = next(line for line in self.text.splitlines()
+                   if line.startswith("| `docs/web-proyectos.md` |"))
+        self.assertEqual(1, sum(line.startswith("| `docs/web-proyectos.md` |")
+                                for line in self.text.splitlines()))
+        self.assertIn("NO_VERIFICABLE / NO ENSAYADO", row)
+        with self.assertRaisesRegex(ValueError, "no coinciden"):
+            parse_post_snapshot(self.text.replace(
+                "[#1499](https://github.com/pl0n3r/ControlBot/pull/1499)",
+                "[#1498](https://github.com/pl0n3r/ControlBot/pull/1498)", 1))
 
     def test_registro_persistencia_dominio_exacto(self):
         registro = parse_post_snapshot(self.text)

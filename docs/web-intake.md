@@ -91,3 +91,26 @@ payload corrupto, campos extra, ID forjado, proyecto incompatible, backend
 ausente y secretos saneados. Los tests emplean exclusivamente un backend
 sintético en memoria, sin efecto persistente o externo. Revertir el squash
 elimina estos tres archivos; no afecta datos de producción ni despliegues.
+
+
+## Verificación de riesgos en HEAD sucesor (8-nov-2026)
+
+El seguimiento de CodeRabbit sobre el HEAD inicial del PR #1500 identificó
+respuestas tardías de vista previa, discrepancias entre el límite UTF-8
+del formulario y el backend, y fallos del adaptador confiable reportados como
+400 de cliente. Se añadieron invalidaciones por selección y modo, validación
+de 8000 bytes UTF-8 en navegador y 503 para contratos backend incorrectos;
+las entradas cliente inválidas siguen siendo 400. Las pruebas propias incluyen
+casos negativos explícitos. Los datos se simulan en memoria, sin acciones externas.
+
+**Dependencia nueva verificada:** #1478 / PR #1499 se fusionó,
+pero #1451 / PR #1503 reclama actualmente
+`src/ControlBotWebEntrypoint.php` con reserva V3 vigente. Aún falta
+registrar la ruta literal `GET /intake` bajo `handleAuthenticated` después
+de OAuth+TOTP. No se editó el controlador ni se amplió el contrato durante
+esta preparación: debe fusionarse #1451, liberarse su claim y renovar la V3
+de #1448 antes de integrarlo. Un renderer aislado no satisface AC-01.
+
+La revisión CodeRabbit del PR sucesor #1500 ya fue solicitada una vez sobre
+un HEAD anterior. No repetir `@coderabbitai review` en este PR en commits
+intermedios; un check omitido no es evidencia exact-HEAD de seguridad.

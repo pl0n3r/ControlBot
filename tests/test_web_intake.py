@@ -198,6 +198,7 @@ if (($argv[1] ?? null) === 'principal') {
         'no_extra_records' => count($records) === $before + 1,
         'secret_redacted' => $secret['status'] === 200
             && !str_contains($secret['body'], 'hunter2')
+            && !str_contains(json_encode($lastRecord, JSON_THROW_ON_ERROR), 'hunter2')
             && str_contains($lastRecord['draft']['intent'], '[REDACTED]'),
         'no_external_operations' => count(array_diff($operations, [
             'intake.candidates', 'intake.record', 'intake.list', 'intake.read',
@@ -208,6 +209,22 @@ if (($argv[1] ?? null) === 'principal') {
                 ($r['headers']['Cache-Control'] ?? null) === 'no-store',
             true
         ),
+    ];
+} elseif (($argv[1] ?? null) === 'source_errors') {
+    $invalidIndex = static fn (): array => ['entries' => [], 'extra' => true];
+    $invalidCandidates = static fn (): array => ['projects' => [], 'extra' => true];
+    $missingReceipt = static function (
+        string $operation, array $vars, array $payload, int $time
+    ) use ($backend): array {
+        if ($operation === 'intake.record') {
+            return ['intake_id' => $payload['intake_id']];
+        }
+        return $backend($operation, $vars, $payload, $time);
+    };
+    $out = [
+        'index' => $dispatch('GET', '/api/v1/intake', null, [], null, $invalidIndex)['status'],
+        'candidates' => $dispatch('POST', '/api/v1/intake', $payload, [], null, $invalidCandidates)['status'],
+        'receipt' => $dispatch('POST', '/api/v1/intake', $payload, [], null, $missingReceipt)['status'],
     ];
 } else {
     throw new RuntimeException('Invalid fixture choice.');
@@ -315,6 +332,14 @@ class IntakeTests(unittest.TestCase):
         self.assertTrue(r["secret_redacted"])
         self.assertTrue(r["no_external_operations"])
         self.assertTrue(r["denials_no_store"])
+        self.assertEqual({"index": 503, "candidates": 503, "receipt": 503},
+                         run_fixture("source_errors"))
+        html_script = run_html_fixture("GET", "synthetic-csrf-token")["body"]
+        for guard in ("new TextEncoder().encode(content).length > 8000",
+                      "++selectionEpoch", "++previewEpoch",
+                      "epoch !== previewEpoch", "selectedId !== id",
+                      "data.intake_id !== id"):
+            self.assertIn(guard, html_script)
 
 
 if __name__ == "__main__":

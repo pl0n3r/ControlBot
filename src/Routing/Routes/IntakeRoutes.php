@@ -83,6 +83,8 @@ const decisionSection = document.getElementById("decide");
 const mode = document.getElementById("mode");
 let selectedId = null;
 let matchedRef = null;
+let selectionEpoch = 0;
+let previewEpoch = 0;
 async function request(path, payload) {
   const options = {credentials:"same-origin", cache:"no-store"};
   if (payload !== undefined) {
@@ -116,7 +118,13 @@ async function refresh() {
 }
 async function loadDecision(id) {
   if (!/^idea-[a-f0-9]{40}$/.test(id)) throw new Error("Identificador inválido");
+  const epoch = ++selectionEpoch;
+  ++previewEpoch;
+  selectedId = null;
+  matchedRef = null;
+  decisionSection.hidden = true;
   const data = await request("/api/v1/intake/" + encodeURIComponent(id) + "/decision");
+  if (epoch !== selectionEpoch) return;
   if (data.intake_id !== id) throw new Error("Identidad de idea inválida");
   const match = data.decision?.impacts?.project_match;
   matchedRef = match?.status === "matched" && typeof match.project_ref === "string"
@@ -131,11 +139,19 @@ async function loadDecision(id) {
   notice.textContent = "";
 }
 function report() {notice.textContent = "No se pudo completar la operación; no se creó ningún recurso.";}
+mode.addEventListener("change", () => {
+  ++previewEpoch;
+  document.getElementById("result").textContent = "";
+});
 document.getElementById("idea-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   notice.textContent = "";
   try {
     const content = document.getElementById("idea").value;
+    if (new TextEncoder().encode(content).length > 8000) {
+      notice.textContent = "La idea supera el límite de 8000 bytes UTF-8.";
+      return;
+    }
     const data = await request("/api/v1/intake", {content});
     if (!/^idea-[a-f0-9]{40}$/.test(data.intake_id)) throw new Error("ID inválido");
     await refresh();
@@ -144,20 +160,26 @@ document.getElementById("idea-form").addEventListener("submit", async (event) =>
 });
 document.getElementById("preview").addEventListener("click", async () => {
   if (!selectedId) return;
+  const id = selectedId;
+  const epoch = ++previewEpoch;
+  const projectMode = mode.value;
+  const projectRef = projectMode === "existing" ? matchedRef : null;
   notice.textContent = "";
   try {
-    const projectMode = mode.value;
-    if (projectMode !== "new" && (projectMode !== "existing" || !matchedRef))
+    if (projectMode !== "new" && (projectMode !== "existing" || !projectRef))
       throw new Error("Selección inválida");
-    const data = await request("/api/v1/intake/" + encodeURIComponent(selectedId) + "/decision",
-      {project_mode:projectMode, project_ref:projectMode === "existing" ? matchedRef : null});
-    if (data.status !== "preview_only" || data.committed !== false
+    const data = await request("/api/v1/intake/" + encodeURIComponent(id) + "/decision",
+      {project_mode:projectMode, project_ref:projectRef});
+    // A previous request must never repaint the current idea or destination.
+    if (epoch !== previewEpoch || selectedId !== id || mode.value !== projectMode
+        || (projectMode === "existing" && matchedRef !== projectRef)) return;
+    if (data.intake_id !== id || data.status !== "preview_only" || data.committed !== false
         || data.repositories_created !== 0 || data.issues_created !== 0)
       throw new Error("Ejecución no permitida");
     document.getElementById("result").textContent =
       "Vista previa sin cambios: " + (projectMode === "new"
         ? "se propondría un proyecto nuevo." : "se propondría vincular al proyecto identificado.");
-  } catch (_) {report();}
+  } catch (_) {if (epoch === previewEpoch && selectedId === id) report();}
 });
 refresh().catch(report);
 </script></body></html>
@@ -184,6 +206,13 @@ $exact = static function (mixed $value, array $keys): array {
     }
     return $value;
 };
+$trustedExact = static function (mixed $value, array $keys) use ($exact): array {
+    try {
+        return $exact($value, $keys);
+    } catch (InvalidArgumentException $error) {
+        throw new RuntimeException('Invalid trusted intake source.', 0, $error);
+    }
+};
 $source = static function (
     callable $backend,
     string $operation,
@@ -204,12 +233,12 @@ $identifier = static function (mixed $value): string {
     return $value;
 };
 $read = static function (callable $backend, array $vars, int $now) use (
-    $exact,
+    $trustedExact,
     $source,
     $identifier,
 ): array {
     $id = $identifier($vars['intake_id'] ?? null);
-    $record = $exact($source($backend, 'intake.read', ['intake_id' => $id], [], $now), [
+    $record = $trustedExact($source($backend, 'intake.read', ['intake_id' => $id], [], $now), [
         'draft', 'candidates',
     ]);
     if (!is_array($record['draft'])
@@ -242,8 +271,8 @@ return [
         'path' => '/api/v1/intake',
         'handler' => static function (
             callable $backend, array $vars, array $request, int $now,
-        ) use ($source, $exact, $identifier): array {
-            $data = $exact($source($backend, 'intake.list', [], [], $now), ['entries']);
+        ) use ($source, $trustedExact, $identifier): array {
+            $data = $trustedExact($source($backend, 'intake.list', [], [], $now), ['entries']);
             if (!is_array($data['entries']) || !array_is_list($data['entries'])
                 || count($data['entries']) > 50) {
                 throw new RuntimeException('Invalid intake index.');
@@ -254,7 +283,11 @@ return [
                 if (!is_array($entry) || array_keys($entry) !== ['intake_id']) {
                     throw new RuntimeException('Invalid intake index entry.');
                 }
-                $id = $identifier($entry['intake_id']);
+                try {
+                    $id = $identifier($entry['intake_id']);
+                } catch (InvalidArgumentException $error) {
+                    throw new RuntimeException('Invalid trusted intake identifier.', 0, $error);
+                }
                 if (isset($seen[$id])) {
                     throw new RuntimeException('Duplicate intake.');
                 }
@@ -279,7 +312,7 @@ return [
         'path' => '/api/v1/intake',
         'handler' => static function (
             callable $backend, array $vars, array $request, int $now,
-        ) use ($source, $exact, $identifier): array {
+        ) use ($source, $exact, $trustedExact, $identifier): array {
             $data = $exact($request, ['content']);
             $draft = RequirementIntake::normalize([
                 'version' => 1,
@@ -288,13 +321,13 @@ return [
                 'captured_at' => $now,
                 'content' => $data['content'],
             ]);
-            $candidates = $exact(
+            $candidates = $trustedExact(
                 $source($backend, 'intake.candidates', [], [], $now), ['projects'],
             )['projects'];
             $proposal = RequirementIntake::analyze($draft, $candidates);
             $decision = RequirementIntakeDecisionUi::project($proposal);
             $id = $identifier('idea-' . substr($draft['fingerprint'], 0, 40));
-            $receipt = $exact($source($backend, 'intake.record', [], [
+            $receipt = $trustedExact($source($backend, 'intake.record', [], [
                 'intake_id' => $id,
                 'draft' => $draft,
                 'candidates' => $candidates,

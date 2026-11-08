@@ -97,7 +97,9 @@ if (is_string($passwordHash) && $passwordHash !== '') {
         $gate = $legalPath === '/legal' ? $legalResponse($_SERVER) : ControlBotWebEntrypoint::handleLocalOwner(
             $_SERVER,
             ['CONTROLBOT_OWNER_LOGIN' => $loginConfig['owner_login'],
-             'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH' => getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH') ?: null],
+             'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH' => getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH') ?: null,
+             'CONTROLBOT_PROJECTS_SNAPSHOT_PATH' => getenv('CONTROLBOT_PROJECTS_SNAPSHOT_PATH') ?: null,
+             'CONTROLBOT_DOCUMENT_ROOT' => $_SERVER['DOCUMENT_ROOT'] ?? null],
             time(),
         );
     }
@@ -114,6 +116,9 @@ if (is_string($passwordHash) && $passwordHash !== '') {
 $environment = [
     'CONTROLBOT_OWNER_LOGIN' => SecretSource::ownerLogin(dirname(__DIR__)),
     'CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH' => getenv('CONTROLBOT_ORCHESTRATOR_SNAPSHOT_PATH') ?: null,
+    // Server-only snapshot path, never supplied by browser headers/query/body.
+    'CONTROLBOT_PROJECTS_SNAPSHOT_PATH' => getenv('CONTROLBOT_PROJECTS_SNAPSHOT_PATH') ?: null,
+    'CONTROLBOT_DOCUMENT_ROOT' => $_SERVER['DOCUMENT_ROOT'] ?? null,
 ];
 
 try {

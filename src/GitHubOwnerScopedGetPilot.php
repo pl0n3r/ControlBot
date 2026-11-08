@@ -38,8 +38,7 @@ final class GitHubOwnerScopedGetPilot
         }
         try {
             $token = ($this->tokenProvider)($witness['installation_id']);
-            if (!is_string($token) || strlen($token) < 12 || strlen($token) > 4096
-                || preg_match('/[\x00-\x20\x7f]/', $token) === 1) {
+            if (!is_string($token) || strlen($token) < 12 || strlen($token) > 4096 || preg_match('/[\x00-\x20\x7f]/', $token) === 1) {
                 return $this->result('token_unavailable');
             }
         } catch (Throwable) {
@@ -66,9 +65,7 @@ final class GitHubOwnerScopedGetPilot
                 ];
                 $reply = $sender($url, $token, $guards);
                 if (!is_array($reply) || !$this->exactKeys($reply,
-                    ['status', 'content_type', 'redirected', 'tls_verified', 'body']) || ($reply['status'] ?? null) !== 200
-                    || ($reply['tls_verified'] ?? null) !== true || ($reply['redirected'] ?? null) !== false
-                    || !is_string($reply['content_type'])
+                    ['status', 'content_type', 'redirected', 'tls_verified', 'body']) || ($reply['status'] ?? null) !== 200 || ($reply['tls_verified'] ?? null) !== true || ($reply['redirected'] ?? null) !== false || !is_string($reply['content_type'])
                     || !in_array(strtolower(trim(explode(';', $reply['content_type'])[0])),
                         ['application/json', 'application/vnd.github+json'], true) || !is_string($reply['body'])) {
                     return $this->result('response_invalid');
@@ -83,8 +80,7 @@ final class GitHubOwnerScopedGetPilot
                     return $this->result('response_invalid');
                 }
                 foreach ($decoded as $entry) {
-                    if (!is_array($entry) || !is_int($entry['number'] ?? null) || $entry['number'] < 1
-                        || !in_array($entry['state'] ?? null, ['open', 'closed'], true) || isset($seen[$entry['number']])) {
+                    if (!is_array($entry) || !is_int($entry['number'] ?? null) || $entry['number'] < 1 || !in_array($entry['state'] ?? null, ['open', 'closed'], true) || isset($seen[$entry['number']])) {
                         return $this->result('response_invalid');
                     }
                     $seen[$entry['number']] = true;
@@ -122,38 +118,27 @@ final class GitHubOwnerScopedGetPilot
     }
     private function validRequest(array $r, int $now): bool
     {
-        return $now > 0 && $this->exactKeys($r, ['repository', 'resource', 'page_size']) && is_string($r['repository'])
-            && preg_match('~^[A-Za-z0-9][A-Za-z0-9._-]{0,38}/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$~D',
-                $r['repository']) === 1 && !str_contains($r['repository'], '..')
-            && in_array($r['resource'], ['issues', 'pulls'], true)
-            && is_int($r['page_size']) && $r['page_size'] >= 1 && $r['page_size'] <= 20;
+        return $now > 0 && $this->exactKeys($r, ['repository', 'resource', 'page_size']) && is_string($r['repository']) && preg_match('~^[A-Za-z0-9][A-Za-z0-9._-]{0,38}/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$~D',
+                $r['repository']) === 1 && !str_contains($r['repository'], '..') && in_array($r['resource'], ['issues', 'pulls'], true) && is_int($r['page_size']) && $r['page_size'] >= 1 && $r['page_size'] <= 20;
     }
     private function validWitness(mixed $w, array $r, int $now): bool
     {
         if (!is_array($w) || !$this->exactKeys($w, [
                 'origin', 'installation_id', 'owner', 'repository', 'permissions',
                 'grant', 'observed_at', 'expires_at', 'verified', 'revoked',
-            ]) || $w['origin'] !== 'trusted_installation_source'
-            || !is_int($w['installation_id']) || $w['installation_id'] < 1
-            || $w['verified'] !== true || $w['revoked'] !== false || $w['owner'] !== explode('/', $r['repository'], 2)[0]
-            || $w['repository'] !== $r['repository'] || !is_array($w['permissions'])
-            || !$this->exactKeys($w['permissions'], [
+            ]) || $w['origin'] !== 'trusted_installation_source' || !is_int($w['installation_id']) || $w['installation_id'] < 1 || $w['verified'] !== true || $w['revoked'] !== false || $w['owner'] !== explode('/', $r['repository'], 2)[0]
+            || $w['repository'] !== $r['repository'] || !is_array($w['permissions']) || !$this->exactKeys($w['permissions'], [
                 'metadata', $r['resource'] === 'issues' ? 'issues' : 'pull_requests',
-            ]) || ($w['permissions']['metadata'] ?? null) !== 'read'
-            || ($w['permissions'][$r['resource'] === 'issues' ? 'issues' : 'pull_requests'] ?? null) !== 'read'
-            || !is_int($w['observed_at']) || !is_int($w['expires_at'])
-            || $w['observed_at'] > $now || $now >= $w['expires_at'] || $now - $w['observed_at'] > 300
-            || $w['expires_at'] <= $w['observed_at'] || $w['expires_at'] - $w['observed_at'] > 300) {
+            ]) || ($w['permissions']['metadata'] ?? null) !== 'read' || ($w['permissions'][$r['resource'] === 'issues' ? 'issues' : 'pull_requests'] ?? null) !== 'read' || !is_int($w['observed_at']) || !is_int($w['expires_at'])
+            || $w['observed_at'] > $now || $now >= $w['expires_at'] || $now - $w['observed_at'] > 300 || $w['expires_at'] <= $w['observed_at'] || $w['expires_at'] - $w['observed_at'] > 300) {
             return false;
         }
         $g = $w['grant'];
         return is_array($g) && $this->exactKeys($g, [
                 'origin', 'installation_id', 'owner', 'repository', 'resource',
                 'approved', 'revoked', 'issued_at', 'expires_at',
-            ]) && $g['origin'] === 'owner_approved_grant' && $g['installation_id'] === $w['installation_id']
-            && $g['owner'] === $w['owner'] && $g['repository'] === $w['repository'] && $g['resource'] === $r['resource']
-            && $g['approved'] === true && $g['revoked'] === false && is_int($g['issued_at']) && is_int($g['expires_at'])
-            && $g['issued_at'] <= $now && $now < $g['expires_at'] && $g['issued_at'] >= $w['observed_at']
+            ]) && $g['origin'] === 'owner_approved_grant' && $g['installation_id'] === $w['installation_id'] && $g['owner'] === $w['owner'] && $g['repository'] === $w['repository'] && $g['resource'] === $r['resource']
+            && $g['approved'] === true && $g['revoked'] === false && is_int($g['issued_at']) && is_int($g['expires_at']) && $g['issued_at'] <= $now && $now < $g['expires_at'] && $g['issued_at'] >= $w['observed_at']
             && $g['expires_at'] <= $w['expires_at'] && $g['expires_at'] - $g['issued_at'] <= 300;
     }
     private function exactKeys(array $a, array $keys): bool

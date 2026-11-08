@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 import subprocess
 import unittest
-
 ROOT = Path(__file__).resolve().parents[1]
 PHP = r'''
 use ControlBot\GitHub\GitHubOwnerScopedGetPilot; require_once 'src/GitHubOwnerScopedGetPilot.php';
@@ -33,8 +32,6 @@ namespace ControlBot\GitHub {
  echo json_encode(['out'=>$pilot->read($d['request'],1050),'url'=>$GLOBALS['fake_url']??null],JSON_THROW_ON_ERROR);
 }
 '''
-
-
 def native_run(mode="ok"):
     d = dict(witness=witness(), request=REQ, mode=mode)
     p = subprocess.run(["php", "-r", PHP_NATIVE, base64.b64encode(json.dumps(d).encode()).decode()],
@@ -42,11 +39,7 @@ def native_run(mode="ok"):
     if p.returncode:
         raise AssertionError(p.stderr)
     return json.loads(p.stdout)
-
-
 REQ = {"repository": "pl0n3r/ControlBot", "resource": "issues", "page_size": 2}
-
-
 def witness():
     return dict(origin="trusted_installation_source", installation_id=42, owner="pl0n3r",
                 repository=REQ["repository"], permissions={"metadata": "read", "issues": "read"},
@@ -54,14 +47,10 @@ def witness():
                            repository=REQ["repository"], resource="issues", approved=True,
                            revoked=False, issued_at=1000, expires_at=1150),
                 observed_at=1000, expires_at=1200, verified=True, revoked=False)
-
-
 def reply(items=None, **changes):
     r = dict(status=200, content_type="application/json", redirected=False, tls_verified=True,
              body=json.dumps([{"number": 1, "state": "open"}] if items is None else items))
     return {**r, **changes}
-
-
 def run(req=None, w=None, replies=None, enabled=True, mode="", token=None):
     d = dict(request=REQ if req is None else req, witness=witness() if w is None else w,
              replies=[reply()] if replies is None else replies, enabled=enabled, mode=mode)
@@ -72,8 +61,6 @@ def run(req=None, w=None, replies=None, enabled=True, mode="", token=None):
     if p.returncode:
         raise AssertionError(p.stderr)
     return json.loads(p.stdout)
-
-
 class GitHubOwnerScopedGetPilotTests(unittest.TestCase):
     def safe(self, result):
         self.assertIs(result["out"]["runtime_authorized"], False)
@@ -82,7 +69,6 @@ class GitHubOwnerScopedGetPilotTests(unittest.TestCase):
         self.assertEqual(result["out"]["authority"], "unchanged")
         self.assertNotIn("private-", json.dumps(result))
         self.assertNotIn("fixture-token", json.dumps(result))
-
     def test_requires_server_verified_owner_installation_and_exact_repo_scope(self):
         ok = run()
         self.safe(ok)
@@ -102,7 +88,6 @@ class GitHubOwnerScopedGetPilotTests(unittest.TestCase):
                     {"url": "https://evil.example"}):
             bad = run(req={**REQ, **key})
             self.assertEqual((bad["source_calls"], bad["calls"]), (0, []))
-
     def test_revocation_expiry_and_token_failure_fail_closed(self):
         for change in ({"revoked": True}, {"expires_at": 1050}, {"observed_at": 1051},
                        {"observed_at": 500}, {"expires_at": 1400},
@@ -117,7 +102,6 @@ class GitHubOwnerScopedGetPilotTests(unittest.TestCase):
                     run(token="short"), run(token="bad\nheader"), run(w={})):
             self.safe(bad)
             self.assertEqual((bad["out"]["status"], bad["calls"]), ("UNKNOWN", []))
-
     def test_https_get_bounded_pages_and_ambiguous_responses(self):
         ok = run(replies=[reply([{"number": 1, "state": "open"}, {"number": 2, "state": "closed"}]),
                           reply([{"number": 3, "state": "open"}])])
@@ -137,7 +121,6 @@ class GitHubOwnerScopedGetPilotTests(unittest.TestCase):
             self.safe(bad)
             self.assertEqual((bad["out"]["status"], bad["out"]["projection"]), ("UNKNOWN", None))
         self.assertEqual(run(mode="sender_error")["out"]["status"], "UNKNOWN")
-
     def test_native_adapter_uses_curl_only_under_fully_fake_namespace(self):
         native = native_run()
         self.assertIs(native["out"]["runtime_authorized"], False)
@@ -146,7 +129,6 @@ class GitHubOwnerScopedGetPilotTests(unittest.TestCase):
         self.assertEqual(native["url"], "https://api.github.com/repos/pl0n3r/ControlBot/issues?per_page=2&page=1")
         for mode in ("forbidden", "exec_fail", "init_fail"):
             self.assertEqual(native_run(mode)["out"]["status"], "UNKNOWN")
-
     def test_disabled_default_no_web_wiring_or_writes(self):
         off = run(enabled=False)
         self.safe(off)

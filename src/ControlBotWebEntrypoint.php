@@ -42,6 +42,8 @@ final class ControlBotWebEntrypoint
 
         if (self::isObservabilityPath($path)) return self::forbiddenAgents();
         if ($path === '/agentes') return self::forbiddenAgents();
+        // Public routing and REMOTE_USER never grant Intake access.
+        if ($path === '/intake') return self::forbiddenAgents();
         // REMOTE_USER is never authority for private project pages.
         if ($path === '/proyectos' || str_starts_with($path, '/proyectos/')) {
             return self::forbiddenAgents();
@@ -129,6 +131,17 @@ final class ControlBotWebEntrypoint
         if (is_string($apiPath)
             && ($apiPath === '/proyectos' || str_starts_with($apiPath, '/proyectos/'))) {
             return self::projectsPage($apiPath, $server, $environment, $now, $ownerApiBackend);
+        }
+        // Renderer is isolated from API route discovery and only runs post OAuth+TOTP.
+        if ($apiPath === '/intake') {
+            require_once __DIR__ . '/Routing/IntakePage.php';
+            try {
+                return \controlbot_intake_html_page(
+                    $ownerAuth->csrfToken($ownerSession), $server,
+                );
+            } catch (\Throwable) {
+                return self::error();
+            }
         }
         // Pausa owner: jamás se sirve desde handleLocalOwner ni sin OAuth+TOTP.
         // Las escrituras viajan al router owner-v1 con CSRF y backend server-bound.
@@ -269,6 +282,8 @@ PAUSE_HTML;
             return ($server['REQUEST_METHOD'] ?? null) === 'GET'
                 ? self::agentsPage($now, null) : self::forbiddenAgents();
         }
+        // Password-only local authentication is never sufficient for Intake.
+        if ($path === '/intake') return self::forbiddenAgents();
         // A password-only local session does not attest OAuth + TOTP for projects.
         if ($path === '/proyectos' || (is_string($path)
             && str_starts_with($path, '/proyectos/'))) {

@@ -57,6 +57,7 @@ POST_SNAPSHOT = {
     "docs/persistencia-dominio.md": (1453, 1463, "tests/test_domain_persistence.py"),
     "docs/soporte-destinatarios.md": (1428, 1468, "tests/test_support_notification_recipients.py"),
     "docs/modulo-legal.md": (1429, 1466, "tests/test_legal_status_panel.py"),
+    "docs/web-intake.md": (1511, 1515, "tests/test_web_intake.py"),
     "docs/web-proyectos.md": (1478, 1499, "tests/test_web_projects_http.py"),
     "docs/web-observabilidad.md": (1451, 1503, "tests/test_web_observability.py"),
     "docs/manual/guia-del-propietario.md": (1479, 1480, "tests/test_manual_propietario_doc.py"),

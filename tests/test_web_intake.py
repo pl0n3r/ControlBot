@@ -82,6 +82,30 @@ if(($argv[1]??'')==='principal'){
  'index'=>$decode($index),'decision'=>$decode($decision),
  'existing'=>$decode($existing),'new'=>$decode($new),
  'stored'=>count($records),'operations'=>$ops];
+}elseif(($argv[1]??'')==='web'){
+ require_once $root . 'ControlBotWebEntrypoint.php';
+ $env=['CONTROLBOT_OWNER_LOGIN'=>'pl0n3r'];
+ $server=['REQUEST_URI'=>'/intake','REQUEST_METHOD'=>'GET',
+   'REMOTE_USER'=>'pl0n3r'];
+ $view=static function(array $request,array $sess) use($auth,$env,$now,$backend):array{
+   return \ControlBot\Web\ControlBotWebEntrypoint::handleAuthenticated(
+     $request,$env,$now,$sess,$auth,null,null,null,$backend);
+ };
+ $authorized=$view($server,$session);
+ $posted=$view(array_merge($server,['REQUEST_METHOD'=>'POST']),$session);
+ $anonymous=$view($server,[]);
+ $partial=[];
+ $auth->establishTrustedOAuthSession($partial,'pl0n3r','offline-fixture-token');
+ $notTotp=$view($server,$partial);
+ $public=\ControlBot\Web\ControlBotWebEntrypoint::handle($server,$env,$now);
+ $local=\ControlBot\Web\ControlBotWebEntrypoint::handleLocalOwner($server,$env,$now);
+ $out=[
+   'status'=>array_map(static fn(array $r):int=>$r['status'],
+      [$authorized,$posted,$anonymous,$notTotp,$public,$local]),
+   'html'=>$authorized['body'],'headers'=>$authorized['headers'],
+   'denied_bodies'=>array_map(static fn(array $r):string=>$r['body'],
+      [$anonymous,$notTotp,$public,$local]),
+   'stored'=>count($records),'operations'=>$ops];
 }else{
  $bad=[
  'anonymous'=>$dispatch('POST','/api/v1/intake',$payload,[],[]),
@@ -228,6 +252,44 @@ class IntakeTests(unittest.TestCase):
         self.assertNotIn("RequirementMaterializer", body)
         self.assertNotIn("createRepository", body)
         self.assertNotIn("createIssue", body)
+
+    def test_criterio_principal(self):
+        """Owner OAuth+TOTP routes to HTML; API preview stays side-effect free."""
+        web = execute("web")
+        self.assertEqual([200, 405, 403, 403, 403, 403], web["status"])
+        self.assertEqual(1, web["stored"])
+        self.assertIn('id="idea-form"', web["html"])
+        self.assertIn('"/api/v1/intake"', web["html"])
+        self.assertEqual("no-store", web["headers"]["Cache-Control"])
+        self.assertEqual("DENY", web["headers"]["X-Frame-Options"])
+        self.assertIn("script-src 'nonce-", web["headers"]["Content-Security-Policy"])
+        data = execute("principal")
+        self.assertEqual([200] * 6, data["status"])
+        for mode in ("new", "existing"):
+            self.assertFalse(data[mode]["execution"])
+            self.assertFalse(data[mode]["committed"])
+            self.assertEqual(0, data[mode]["repositories_created"])
+            self.assertEqual(0, data[mode]["issues_created"])
+
+    def test_criterio_seguridad_y_bordes(self):
+        """Public/local/partial sessions and unsafe API calls are denied."""
+        web = execute("web")
+        self.assertEqual([200, 405, 403, 403, 403, 403], web["status"])
+        for denied in web["denied_bodies"]:
+            self.assertNotIn("<!doctype html>", denied)
+            self.assertIn("Forbidden", denied)
+        for header in ("Cache-Control", "X-Content-Type-Options",
+                       "X-Frame-Options", "Referrer-Policy"):
+            self.assertIn(header, web["headers"])
+        api = execute("security")
+        self.assertEqual(403, api["status"]["anonymous"])
+        self.assertEqual(403, api["status"]["csrf"])
+        self.assertEqual(400, api["status"]["extra"])
+        self.assertEqual(405, api["status"]["wrong_method"])
+        self.assertEqual(503, api["status"]["no_backend"])
+        self.assertFalse(any("github" in op or "materialize" in op
+                             for op in web["operations"] + api["operations"]))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -128,6 +128,26 @@ def execute(case: str) -> dict:
     if r.returncode:
         raise AssertionError("PHP fixture: " + r.stderr[-1200:])
     return json.loads(r.stdout)
+def render_html_fixture(method: str = "GET", csrf: str = "synthetic-csrf") -> dict:
+    """Call the isolated renderer: no public route or authentication bypass."""
+    php = shutil.which("php")
+    if not php:
+        raise AssertionError("PHP runtime unavailable")
+    program = r"""
+require_once getcwd() . '/src/Routing/IntakePage.php';
+$csrf = $argv[1] === '__nul__' ? "bad\0token" : $argv[1];
+$response = controlbot_intake_html_page($csrf, ['REQUEST_METHOD' => $argv[2]]);
+echo json_encode($response, JSON_THROW_ON_ERROR), "\n";
+"""
+    result = subprocess.run(
+        [php, "-r", program, csrf, method], cwd=ROOT,
+        capture_output=True, text=True, timeout=45, check=False,
+    )
+    if result.returncode:
+        raise AssertionError("Isolated renderer failed: " + result.stderr[-1200:])
+    return json.loads(result.stdout)
+
+
 class IntakeTests(unittest.TestCase):
     def test_api_preview_only(self):
         data=execute("principal")
@@ -157,5 +177,57 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(1,data["stored"])
         self.assertFalse(any("github" in op or "materialize" in op
           for op in data["operations"]))
+    def test_html_security(self):
+        response = render_html_fixture()
+        self.assertEqual(200, response["status"])
+        # A pure HTML renderer must never be scanned as a Routes/*.php API module.
+        self.assertFalse((ROOT / "src/Routing/Routes/IntakePage.php").exists())
+        self.assertEqual("text/html; charset=utf-8", response["headers"]["Content-Type"])
+        self.assertEqual("no-store", response["headers"]["Cache-Control"])
+        self.assertEqual("DENY", response["headers"]["X-Frame-Options"])
+        policy = response["headers"]["Content-Security-Policy"]
+        self.assertIn("script-src 'nonce-", policy)
+        self.assertIn("connect-src 'self'", policy)
+        self.assertIn("frame-ancestors 'none'", policy)
+        self.assertIn("form-action 'none'", policy)
+        self.assertIn('id="idea-form"', response["body"])
+        self.assertIn('id="decide"', response["body"])
+        self.assertIn('"/api/v1/intake"', response["body"])
+        self.assertIn('nonce="', response["body"])
+        self.assertEqual(405, render_html_fixture(method="POST")["status"])
+        self.assertEqual(503, render_html_fixture(csrf="")["status"])
+        self.assertEqual(503, render_html_fixture(csrf="x" * 4097)["status"])
+        self.assertEqual(503, render_html_fixture(csrf="__nul__")["status"])
+        injection = '<script>alert("owned")</script>'
+        escaped = render_html_fixture(csrf=injection)
+        self.assertEqual(200, escaped["status"])
+        self.assertNotIn(injection, escaped["body"])
+        self.assertIn("\\u003Cscript\\u003E", escaped["body"])
+        for method, token in (("POST", "csrf"), ("GET", "")):
+            denied = render_html_fixture(method=method, csrf=token)
+            self.assertNotIn("<html", denied["body"])
+            self.assertEqual("no-store", denied["headers"]["Cache-Control"])
+
+    def test_html_preview_guards(self):
+        body = render_html_fixture()["body"]
+        # The UI must reject side-effectful API replies and stale async results.
+        for guard in (
+            "credentials:\"same-origin\"", 'cache:"no-store"',
+            "data.execution !== false", "new TextEncoder().encode(content).length > 8000",
+            "++selectionEpoch", "++previewEpoch", "epoch !== selectionEpoch",
+            "epoch !== previewEpoch", "selectedId !== id",
+            "matchedRef !== projectRef", "data.intake_id !== id",
+            'data.status !== "preview_only"', "data.committed !== false",
+            "data.repositories_created !== 0", "data.issues_created !== 0",
+            "button.textContent =", "indexState.textContent =",
+            "document.getElementById(\"result\").textContent =",
+        ):
+            self.assertIn(guard, body)
+        self.assertNotIn("innerHTML", body)
+        self.assertNotIn("window.location =", body)
+        self.assertNotIn("RequirementMaterializer", body)
+        self.assertNotIn("createRepository", body)
+        self.assertNotIn("createIssue", body)
+
 if __name__ == "__main__":
     unittest.main()

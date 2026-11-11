@@ -94,7 +94,25 @@ if(($argv[1]??'')==='principal'){
  'bad_id'=>$dispatch('GET','/api/v1/intake/invalid-id/decision'),
  'no_backend'=>\ControlBot\Routing\OwnerAuthenticatedRouter::dispatch(
    $auth,$session,['REQUEST_URI'=>'/api/v1/intake',
-   'REQUEST_METHOD'=>'GET'],$now)];
+   'REQUEST_METHOD'=>'GET'],$now),
+ 'empty'=>$dispatch('POST','/api/v1/intake','{"content":""}'),
+ 'missing_id'=>$dispatch('GET','/api/v1/intake/idea-'.str_repeat('f',40).'/decision'),
+ 'wrong_existing'=>$dispatch('POST',"/api/v1/intake/$id/decision",
+   '{"project_mode":"existing","project_ref":"controlbot:project/forged"}'),
+ 'wrong_new'=>$dispatch('POST',"/api/v1/intake/$id/decision",
+   '{"project_mode":"new","project_ref":"controlbot:project/controlbot"}'),
+ 'bad_choice'=>$dispatch('POST',"/api/v1/intake/$id/decision",
+   '{"project_mode":"execute","project_ref":null}'),
+ 'bad_index'=>$dispatch('GET','/api/v1/intake',null,[],null,
+   static fn():array=>['entries'=>[],'extra'=>true]),
+ 'bad_candidates'=>$dispatch('POST','/api/v1/intake',$payload,[],null,
+   static fn():array=>['projects'=>[],'extra'=>true]),
+ 'bad_receipt'=>$dispatch('POST','/api/v1/intake',$payload,[],null,
+   static function(string $op,array $vars,array $data,int $now)
+       use($backend):array {
+     return $op==='intake.record' ? ['stored'=>false,
+       'intake_id'=>$data['intake_id']] : $backend($op,$vars,$data,$now);
+   })];
  $out=['status'=>array_map(static fn($r):int=>$r['status'],$bad),
    'stored'=>count($records),'operations'=>$ops];
 }
@@ -132,8 +150,10 @@ class IntakeTests(unittest.TestCase):
     def test_api_denials(self):
         data=execute("security")
         self.assertEqual({"anonymous":403,"csrf":403,"invalid_json":400,
-          "extra":400,"wrong_method":405,"bad_id":400,"no_backend":503},
-          data["status"])
+          "extra":400,"wrong_method":405,"bad_id":400,"no_backend":503,
+          "empty":400,"missing_id":503,"wrong_existing":400,"wrong_new":400,
+          "bad_choice":400,"bad_index":503,"bad_candidates":503,
+          "bad_receipt":503}, data["status"])
         self.assertEqual(1,data["stored"])
         self.assertFalse(any("github" in op or "materialize" in op
           for op in data["operations"]))

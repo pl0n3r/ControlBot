@@ -135,8 +135,9 @@ def render_html_fixture(method: str = "GET", csrf: str = "synthetic-csrf") -> di
         raise AssertionError("PHP runtime unavailable")
     program = r"""
 require_once getcwd() . '/src/Routing/Routes/IntakePage.php';
-$response = controlbot_intake_html_page($argv[1], ['REQUEST_METHOD' => $argv[2]]);
-echo json_encode($response, JSON_THROW_ON_ERROR), "\\n";
+$csrf = $argv[1] === '__nul__' ? "bad\0token" : $argv[1];
+$response = controlbot_intake_html_page($csrf, ['REQUEST_METHOD' => $argv[2]]);
+echo json_encode($response, JSON_THROW_ON_ERROR), "\n";
 """
     result = subprocess.run(
         [php, "-r", program, csrf, method], cwd=ROOT,
@@ -194,7 +195,7 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(405, render_html_fixture(method="POST")["status"])
         self.assertEqual(503, render_html_fixture(csrf="")["status"])
         self.assertEqual(503, render_html_fixture(csrf="x" * 4097)["status"])
-        self.assertEqual(503, render_html_fixture(csrf="bad\\x00token")["status"])
+        self.assertEqual(503, render_html_fixture(csrf="__nul__")["status"])
         injection = '<script>alert("owned")</script>'
         escaped = render_html_fixture(csrf=injection)
         self.assertEqual(200, escaped["status"])

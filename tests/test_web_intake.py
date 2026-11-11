@@ -134,7 +134,7 @@ def render_html_fixture(method: str = "GET", csrf: str = "synthetic-csrf") -> di
     if not php:
         raise AssertionError("PHP runtime unavailable")
     program = r"""
-require_once getcwd() . '/src/Routing/Routes/IntakePage.php';
+require_once getcwd() . '/src/Routing/IntakePage.php';
 $csrf = $argv[1] === '__nul__' ? "bad\0token" : $argv[1];
 $response = controlbot_intake_html_page($csrf, ['REQUEST_METHOD' => $argv[2]]);
 echo json_encode($response, JSON_THROW_ON_ERROR), "\n";
@@ -180,6 +180,8 @@ class IntakeTests(unittest.TestCase):
     def test_html_security(self):
         response = render_html_fixture()
         self.assertEqual(200, response["status"])
+        # A pure HTML renderer must never be scanned as a Routes/*.php API module.
+        self.assertFalse((ROOT / "src/Routing/Routes/IntakePage.php").exists())
         self.assertEqual("text/html; charset=utf-8", response["headers"]["Content-Type"])
         self.assertEqual("no-store", response["headers"]["Cache-Control"])
         self.assertEqual("DENY", response["headers"]["X-Frame-Options"])

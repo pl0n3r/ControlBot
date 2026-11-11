@@ -106,6 +106,17 @@ if(($argv[1]??'')==='principal'){
    'denied_bodies'=>array_map(static fn(array $r):string=>$r['body'],
       [$anonymous,$notTotp,$public,$local]),
    'stored'=>count($records),'operations'=>$ops];
+}elseif(($argv[1]??'')==='web_error'){
+ require_once $root . 'ControlBotWebEntrypoint.php';
+ // Inject a deterministic renderer failure after genuine OAuth+TOTP verification.
+ function controlbot_intake_html_page(string $csrf,array $server):array {
+   throw new \RuntimeException('Synthetic renderer unavailable');
+ }
+ $response=\ControlBot\Web\ControlBotWebEntrypoint::handleAuthenticated(
+   ['REQUEST_URI'=>'/intake','REQUEST_METHOD'=>'GET'],
+   ['CONTROLBOT_OWNER_LOGIN'=>'pl0n3r'],$now,$session,$auth);
+ $out=['status'=>$response['status'],'headers'=>$response['headers'],
+   'body'=>$response['body'],'operations'=>$ops];
 }else{
  $bad=[
  'anonymous'=>$dispatch('POST','/api/v1/intake',$payload,[],[]),
@@ -270,6 +281,16 @@ class IntakeTests(unittest.TestCase):
             self.assertFalse(data[mode]["committed"])
             self.assertEqual(0, data[mode]["repositories_created"])
             self.assertEqual(0, data[mode]["issues_created"])
+
+    def test_renderer_failure_is_fail_closed(self):
+        """A renderer exception cannot expose owner HTML or trigger external work."""
+        failed = execute("web_error")
+        self.assertEqual(503, failed["status"])
+        self.assertEqual("Service unavailable.\n", failed["body"])
+        self.assertEqual("no-store", failed["headers"]["Cache-Control"])
+        self.assertEqual("DENY", failed["headers"]["X-Frame-Options"])
+        self.assertFalse(any("github" in op or "materialize" in op
+                             for op in failed["operations"]))
 
     def test_criterio_seguridad_y_bordes(self):
         """Public/local/partial sessions and unsafe API calls are denied."""

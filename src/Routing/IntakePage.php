@@ -4,8 +4,8 @@ declare(strict_types=1);
 use ControlBot\Requirements\RequirementIntake;
 use ControlBot\Requirements\RequirementIntakeDecisionUi;
 
-require_once __DIR__ . '/../../RequirementIntake.php';
-require_once __DIR__ . '/../../RequirementIntakeDecisionUi.php';
+require_once __DIR__ . '/../RequirementIntake.php';
+require_once __DIR__ . '/../RequirementIntakeDecisionUi.php';
 
 
 /**

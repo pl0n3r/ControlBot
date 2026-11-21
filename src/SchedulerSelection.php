@@ -140,4 +140,19 @@ final class SchedulerSelection
             throw new InvalidArgumentException($label.' unsafe.');
         return $value;
     }
+
+    /** Match a synthetic execution order to a fresh owner-authorized selection. */
+    public static function assertOfflineOrderSelected(
+        array $request, array $decision, array $currentRows, array $orderRaw
+    ): void {
+        $selection = self::validateDecision($request, $decision, $currentRows);
+        $order = \ControlBot\Runner\RunnerGateway::order($orderRaw);
+        $selected = $selection['selected'];
+        if ($selected['source_ref'] !== $order['work_item_id']
+            || $selected['generation'] !== $order['generation']
+            || !in_array($order['capability'], $selected['required_capabilities'], true)) {
+            throw new InvalidArgumentException('Offline order does not match selection.');
+        }
+    }
+
 }

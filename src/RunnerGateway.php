@@ -399,4 +399,144 @@ final class RunnerGateway
         }
     }
 
+
+    /**
+     * Pure OFFLINE-FIXTURE delivery journal. It does not authenticate any real
+     * runner, execute a command or attest production. A trusted caller must
+     * verify credentials, lease ownership and durable storage independently.
+     *
+     * Snapshot JSON is deliberately small so a synthetic test can persist it
+     * after ACK, recreate the PHP process and resume without a second order.
+     */
+    public static function offlineDelivery(
+        array $orderRaw,
+        array $identityRaw,
+        ?array $heartbeatRaw,
+        string $leaseId,
+        string $sessionId,
+        bool $credentialActive,
+        int $now,
+        array $envelope,
+        ?array $stored = null,
+    ): array {
+        $order = self::order($orderRaw);
+        $identity = self::identity($identityRaw);
+        $leaseId = self::uuid($leaseId, 'lease_id');
+        $sessionId = self::ref($sessionId, 'session_id');
+        if (!$credentialActive || $order['runner_id'] !== $identity['runner_id']
+            || !in_array($order['capability'], $identity['capabilities'], true)
+            || $now < $order['issued_at'] || $now >= $order['expires_at']
+            || !self::health($identity, $heartbeatRaw, $now, 60)['eligible']) {
+            throw new InvalidArgumentException('Offline delivery authority or capacity invalid.');
+        }
+        if (!class_exists(RunnerHttpProtocol::class)) {
+            require_once __DIR__ . '/RunnerHttpProtocol.php';
+        }
+
+        $receipt = [
+            'version' => 1,
+            'provenance' => 'synthetic-offline',
+            'execution' => false,
+            'order' => $order,
+            'order_fingerprint' => self::orderFingerprint($order),
+            'lease_id' => $leaseId,
+            'session_id' => $sessionId,
+            'poll' => null,
+            'ack' => null,
+            'event' => null,
+        ];
+        if ($stored !== null) {
+            self::fields($stored, array_keys($receipt), 'OfflineDeliveryReceipt');
+            foreach (['version', 'provenance', 'execution', 'order',
+                      'order_fingerprint', 'lease_id', 'session_id'] as $key) {
+                if ($stored[$key] !== $receipt[$key]) {
+                    throw new InvalidArgumentException('Offline receipt identity drift.');
+                }
+            }
+            foreach (['poll' => '/v1/runner/poll', 'ack' => '/v1/runner/ack',
+                      'event' => '/v1/runner/event'] as $key => $path) {
+                if ($stored[$key] === null) {
+                    continue;
+                }
+                if (!is_array($stored[$key])) {
+                    throw new InvalidArgumentException('Offline receipt payload invalid.');
+                }
+                $parsed = RunnerHttpProtocol::request([
+                    'version' => 1, 'method' => 'POST',
+                    'path' => $path, 'payload' => $stored[$key],
+                ]);
+                if ($parsed['payload'] !== $stored[$key]) {
+                    throw new InvalidArgumentException('Offline receipt payload noncanonical.');
+                }
+            }
+            if (($stored['ack'] !== null && $stored['poll'] === null)
+                || ($stored['event'] !== null && $stored['ack'] === null)) {
+                throw new InvalidArgumentException('Offline receipt stages invalid.');
+            }
+            if ($stored['event'] !== null) {
+                self::assertEventOwnedByOrder($stored['event'], $order);
+            }
+            $receipt = $stored;
+        }
+
+        $request = RunnerHttpProtocol::request($envelope);
+        $path = $request['path'];
+        $payload = $request['payload'];
+        if ($path === '/v1/runner/poll') {
+            if ($payload['runner_id'] !== $order['runner_id']
+                || $payload['generation'] !== $order['generation']
+                || $payload['session_id'] !== $sessionId
+                || $payload['requested_at'] < $order['issued_at']
+                || $payload['requested_at'] > $now
+                || $receipt['ack'] !== null) {
+                throw new InvalidArgumentException('Offline poll lease or time invalid.');
+            }
+            if ($receipt['poll'] !== null && $receipt['poll'] !== $payload) {
+                throw new InvalidArgumentException('Offline poll replay conflict.');
+            }
+            $receipt['poll'] = $payload;
+            return $receipt;
+        }
+        if ($path === '/v1/runner/ack') {
+            if ($receipt['poll'] === null
+                || $payload['order_id'] !== $order['order_id']
+                || $payload['attempt_id'] !== $order['attempt_id']
+                || $payload['runner_id'] !== $order['runner_id']
+                || $payload['generation'] !== $order['generation']
+                || $payload['acknowledged_at'] < $receipt['poll']['requested_at']
+                || $payload['acknowledged_at'] > $now) {
+                throw new InvalidArgumentException('Offline ACK ownership or time invalid.');
+            }
+            if ($receipt['ack'] !== null && $receipt['ack'] !== $payload) {
+                throw new InvalidArgumentException('Offline ACK replay conflict.');
+            }
+            $receipt['ack'] = $payload;
+            return $receipt;
+        }
+        if ($path !== '/v1/runner/event' || $receipt['ack'] === null) {
+            throw new InvalidArgumentException('Offline event requires ACK.');
+        }
+        self::assertEventOwnedByOrder($payload, $order);
+        if ($payload['occurred_at'] < $receipt['ack']['acknowledged_at']
+            || $payload['occurred_at'] > $now) {
+            throw new InvalidArgumentException('Offline event time invalid.');
+        }
+        $prior = $receipt['event'];
+        if ($prior !== null && $prior['event_id'] === $payload['event_id']) {
+            if ($prior !== $payload) {
+                throw new InvalidArgumentException('Conflicting duplicate offline event.');
+            }
+            return $receipt;
+        }
+        if ($prior === null) {
+            if ($payload['state'] !== 'accepted' || $payload['sequence'] !== 1) {
+                throw new InvalidArgumentException('Offline first event must be accepted.');
+            }
+        } else {
+            self::assertEventTransition($prior, $payload, $order);
+        }
+        $receipt['event'] = $payload;
+        return $receipt;
+    }
+
 }

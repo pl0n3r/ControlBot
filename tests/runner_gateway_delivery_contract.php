@@ -157,8 +157,8 @@ $negative = [
     'conflicting_order' => cb1516Reject(static fn(): array => $apply($terminal, $stored, 1020, orderOverride: $anotherOrder)),
     'zero_capacity' => cb1516Reject(static fn(): array => $apply($terminal, $stored, 1020, beatOverride: array_replace($heartbeat, ['capacity' => ['max' => 2, 'active' => 2]]))),
     'foreign_identity' => cb1516Reject(static fn(): array => $apply($terminal, $stored, 1020, identityOverride: array_replace($identity, ['runner_id' => '99999999-9999-4999-8999-999999999999']))),
-    'selection_drift' => cb1516Reject(static fn(): void => SchedulerSelection::assertOfflineOrderSelected($selection, $decision, [array_replace($rows[0], ['generation' => 4])], $order)),
-    'selection_wrong_order' => cb1516Reject(static fn(): void => SchedulerSelection::assertOfflineOrderSelected($selection, $decision, $rows, array_replace($order, ['work_item_id' => 'pl0n3r/ControlBot#1517']))),
+    'selection_drift' => cb1516Reject(static fn() => SchedulerSelection::assertOfflineOrderSelected($selection, $decision, [array_replace($rows[0], ['generation' => 4])], $order)),
+    'selection_wrong_order' => cb1516Reject(static fn() => SchedulerSelection::assertOfflineOrderSelected($selection, $decision, $rows, array_replace($order, ['work_item_id' => 'pl0n3r/ControlBot#1517']))),
 ];
 cb1516Assert(!in_array(false, $negative, true), 'Fail-closed offline contract negatives');
 cb1516Assert(!str_contains(json_encode($stored, JSON_THROW_ON_ERROR), 'VALIDATED_IN_PRODUCTION'), 'No mock production attestation');

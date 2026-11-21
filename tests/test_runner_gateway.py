@@ -110,5 +110,47 @@ class RunnerGatewayTests(unittest.TestCase):
         self.assertTrue(data["identity_only_differs_in_placement"])
 
 
+
+    def test_offline_durable_order_poll_ack_recovery_and_replay(self):
+        """Three PHP processes share only a synthetic receipt JSON, not a live runner."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory(prefix="controlbot-1516-") as folder:
+            receipt = Path(folder) / "synthetic-receipt.json"
+            for phase in ("start", "resume", "replay"):
+                completed = subprocess.run(
+                    [
+                        "php",
+                        str(ROOT / "tests" / "runner_gateway_delivery_contract.php"),
+                        phase,
+                        str(receipt),
+                    ],
+                    cwd=ROOT,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                result = json.loads(completed.stdout)
+                self.assertTrue(result["ok"], result)
+                if phase == "start":
+                    self.assertEqual(result["stage"], "acked")
+                elif phase == "resume":
+                    self.assertEqual(result["stage"], "terminal")
+                    self.assertTrue(result["recovered"])
+                else:
+                    self.assertTrue(all(result["checks"].values()), result)
+                    self.assertEqual(result["provenance"], "synthetic-offline")
+
+            stored = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertFalse(stored["execution"])
+            self.assertEqual(stored["provenance"], "synthetic-offline")
+            self.assertEqual(stored["order"]["order_id"], stored["ack"]["order_id"])
+            self.assertEqual(stored["order"]["runner_id"], stored["event"]["runner_id"])
+            self.assertEqual(stored["lease_id"], "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+            self.assertEqual(stored["event"]["state"], "completed")
+            self.assertNotIn("VALIDATED_IN_PRODUCTION", receipt.read_text())
+
+
 if __name__ == "__main__":
     unittest.main()
